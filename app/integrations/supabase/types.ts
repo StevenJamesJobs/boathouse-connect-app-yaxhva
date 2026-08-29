@@ -649,6 +649,7 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           cycle_key: string
+          default_bucks_value: number | null
           exam_type: string
           id: string
           notify_on_activate: boolean | null
@@ -664,6 +665,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           cycle_key: string
+          default_bucks_value?: number | null
           exam_type: string
           id?: string
           notify_on_activate?: boolean | null
@@ -679,6 +681,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           cycle_key?: string
+          default_bucks_value?: number | null
           exam_type?: string
           id?: string
           notify_on_activate?: boolean | null
@@ -3227,9 +3230,17 @@ export type Database = {
           source_type: string
         }[]
       }
+      get_exam_default_bucks_value: {
+        Args: { p_actor_id: string; p_exam_id: string }
+        Returns: number | null
+      }
       get_exam_question_count: {
         Args: { p_actor_id: string; p_exam_id: string }
         Returns: number
+      }
+      set_exam_default_bucks_value: {
+        Args: { p_actor_id: string; p_exam_id: string; p_value?: number | null }
+        Returns: undefined
       }
       get_my_exam_result: {
         Args: { p_actor_id: string; p_exam_id: string }

@@ -48,7 +48,7 @@ export default function EmployeeToolsScreen() {
 
   // ─── Build flat tile list ────────────────────────────────────────────────────
 
-  // Fixed top row: Guides & Training → Game Hub → Weekly Quizzes (when eligible)
+  // Fixed top row: Guides & Training → Game Hub → Quizzes & Exams (when eligible)
   const allItems: GridItem[] = [
     { id: 'guides-training', label: t('employee_tools.guides_training'), iosIcon: 'book.fill', androidIcon: 'menu-book', route: '/guides-and-training' },
     { id: 'game-hub', label: t('employee_tools.game_hub'), iosIcon: 'gamecontroller.fill', androidIcon: 'sports-esports', route: '/game-hub', badge: unreadLeaderboardCount > 0 },

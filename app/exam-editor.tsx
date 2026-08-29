@@ -1,3 +1,20 @@
+/**
+ * Exam editor — s77 lockdown rebuild (the three-state morph):
+ *
+ *   · NO QUIZ  → the composer (count console + source/photo/difficulty dials,
+ *                default $ value, time limit, blank-quiz path, ⓘ legend).
+ *   · DRAFT    → glass settings console (collapsible) + Questions as a fold +
+ *                side-by-side add buttons + Preview/Start-over + Activate.
+ *   · ACTIVE   → the role-gradient live console PINNED outside the scroll
+ *                (countdown · vitals · Pause/Preview/Close/New in the 2×2),
+ *                Questions folded read-only, Tracker fold with its ring.
+ *   · PAUSED   → morphs back editable: PAUSED pill + RESUME chip in the glass
+ *                console, questions unlocked, sticky Resume dock.
+ *
+ * All lifecycle RPCs, the s61 hybrid bilingual modals, the storage-broker
+ * photo path and the anti-cheat surfaces are inherited unchanged.
+ */
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
@@ -11,7 +28,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Modal,
-  Switch,
 } from 'react-native';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
@@ -22,22 +38,39 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { StorageImage } from '@/components/StorageImage';
 import AmbientGlow from '@/components/AmbientGlow';
 import ScreenHeader from '@/components/ScreenHeader';
+import GlassSheet from '@/components/GlassSheet';
+import GlassActionSheet from '@/components/GlassActionSheet';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import BottomNavBar from '@/components/BottomNavBar';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
-import { generateQuizQuestions, generatePhotoQuestion, getCurrentWeekKey, getExamTypeName } from '@/utils/exam/questionGenerator';
-import type { ExamType, GeneratedQuestion } from '@/utils/exam/questionGenerator';
+import {
+  generateQuizQuestions,
+  generatePhotoQuestion,
+  getCurrentWeekKey,
+  getExamTypeName,
+} from '@/utils/exam/questionGenerator';
+import type { ExamType, GeneratedQuestion, QuizSource } from '@/utils/exam/questionGenerator';
 import { useTranslationSection } from '@/components/TranslationSection';
-import { formatTime, formatCountdown, getCountdownUrgency } from '@/utils/exam/examEngine';
-import { sendCustomNotification, bothLanguages } from '@/utils/notificationHelpers';
-import i18n from '@/i18n';
+import { formatTime } from '@/utils/exam/examEngine';
+import { activateExamWithDefaults } from '@/utils/exam/examActions';
+import { bothLanguages } from '@/utils/notificationHelpers';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import { brokerUploadImage } from '@/utils/storageBroker';
 import { translateServerError } from '@/utils/serverErrors';
+import QuizComposer, { ComposerResult } from '@/components/quiz/QuizComposer';
+import { CATEGORY_OPTIONS, sourceForQuestion, questionCategoryLabel } from '@/utils/exam/questionCategory';
+import QuizSettingsConsole from '@/components/quiz/QuizSettingsConsole';
+import QuizLiveConsole from '@/components/quiz/QuizLiveConsole';
+import QuestionCard, { EditorQuestion } from '@/components/quiz/QuestionCard';
+import QuizFold from '@/components/quiz/QuizFold';
+import ShineButton from '@/components/quiz/ShineButton';
+import ProgressRing from '@/components/ProgressRing';
+import { QUIZ_VISUALS } from '@/components/quiz/quizVisuals';
+import { fonts } from '@/constants/fonts';
 
 interface Exam {
   id: string;
@@ -54,46 +87,7 @@ interface Exam {
   rewards_enabled: boolean | null;
 }
 
-interface ExamQuestion {
-  id: string;
-  exam_id: string;
-  question_order: number;
-  question_text: string;
-  option_a: string;
-  option_b: string;
-  option_c: string;
-  option_d: string;
-  correct_option: 'A' | 'B' | 'C' | 'D';
-  is_bonus: boolean;
-  bonus_bucks_value: number | null;
-  bucks_value: number | null;
-  category_label: string | null;
-  source_type: 'auto' | 'custom' | 'bonus';
-  source_table: string | null;
-  question_image_url?: string | null;
-  question_text_es?: string | null;
-  option_a_es?: string | null;
-  option_b_es?: string | null;
-  option_c_es?: string | null;
-  option_d_es?: string | null;
-}
-
-// label = the EN-canonical value persisted into exam_questions.category_label
-// (stored data stays English); labelKey translates the DISPLAY only.
-const CATEGORY_OPTIONS: { label: string; labelKey: string; sourceTable: string | null }[] = [
-  { label: 'Menu Items', labelKey: 'exam_editor.cat_menu_items', sourceTable: 'menu_items' },
-  { label: 'Wine Pairings', labelKey: 'exam_editor.cat_wine_pairings', sourceTable: 'wine_pairings' },
-  { label: 'Libation Recipes', labelKey: 'exam_editor.cat_libation_recipes', sourceTable: 'recipes' },
-  { label: 'Check List Items', labelKey: 'exam_editor.cat_checklist_items', sourceTable: 'checklist_items' },
-  { label: 'Menu Category', labelKey: 'exam_editor.cat_menu_category', sourceTable: 'menu_category' },
-];
-
-const STATUS_LABEL_KEYS: Record<Exam['status'], string> = {
-  draft: 'exam_editor.status_draft',
-  active: 'exam_editor.status_active',
-  paused: 'exam_editor.status_paused',
-  closed: 'exam_editor.status_closed',
-};
+type ExamQuestion = EditorQuestion;
 
 interface CompletionEntry {
   user_id: string;
@@ -106,35 +100,48 @@ interface CompletionEntry {
   bucks_awarded: number;
 }
 
-type ActiveSection = 'questions' | 'tracker';
+const TIME_PRESETS = [60, 105, 120, 180, 240, 300, 360, 420, 480, 0];
 
 export default function ExamEditorScreen() {
   useRequireManagerRoute();
   const router = useRouter();
-  const { t, i18n } = useTranslation();
-  const isSpanish = i18n.language === 'es';
+  const { t, i18n: i18nHook } = useTranslation();
+  const isSpanish = i18nHook.language === 'es';
   const colors = useThemeColors();
   const { mode } = useAppTheme();
   const { user } = useAuth();
   const { organizationId, organization } = useOrganization();
   const { hasPremium } = useSubscription();
   const currencyName = organization.reward_currency_name;
-  const params = useLocalSearchParams<{ type: string }>();
+  const params = useLocalSearchParams<{ type: string; tab: string }>();
   const examType = (params.type || 'server') as ExamType;
+  const visual = QUIZ_VISUALS[examType];
 
-  const [activeSection, setActiveSection] = useState<ActiveSection>('questions');
   const [currentExam, setCurrentExam] = useState<Exam | null>(null);
   const [questions, setQuestions] = useState<ExamQuestion[]>([]);
   const [completionData, setCompletionData] = useState<CompletionEntry[]>([]);
+  const [defaultBucksValue, setDefaultBucksValue] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [actionBusy, setActionBusy] = useState(false);
+
+  // The morph's fold states.
+  const [consoleOpen, setConsoleOpen] = useState(true);
+  const [questionsOpen, setQuestionsOpen] = useState(true);
+  const [trackerOpen, setTrackerOpen] = useState(params.tab === 'tracker');
+
+  // Modals / sheets
   const [editingQuestion, setEditingQuestion] = useState<ExamQuestion | null>(null);
   const [showAddCustom, setShowAddCustom] = useState(false);
   const [showAddBonus, setShowAddBonus] = useState(false);
+  const [showTimeSheet, setShowTimeSheet] = useState(false);
+  const [showValueSheet, setShowValueSheet] = useState(false);
+  const [valueSheetText, setValueSheetText] = useState('');
+  const [showInfoSheet, setShowInfoSheet] = useState(false);
+  const [regenQuestion, setRegenQuestion] = useState<ExamQuestion | null>(null);
   const [timeLimit, setTimeLimit] = useState(300);
-  const [questionCount, setQuestionCount] = useState(5);
 
-  // Custom question form state
+  // Custom question form state (s61 hybrid bilingual authoring)
   const [customText, setCustomText] = useState('');
   const [customA, setCustomA] = useState('');
   const [customB, setCustomB] = useState('');
@@ -147,26 +154,26 @@ export default function ExamEditorScreen() {
   const [customCEs, setCustomCEs] = useState('');
   const [customDEs, setCustomDEs] = useState('');
   const [bonusBucksValue, setBonusBucksValue] = useState('5');
+  const [customBucksValue, setCustomBucksValue] = useState('');
   const [customImageUrl, setCustomImageUrl] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
 
-  // Close-at scheduling + Notify Staff toggle + No Rewards toggle
-  const [closeAt, setCloseAt] = useState<Date | null>(null);
-  const [notifyOnActivate, setNotifyOnActivate] = useState(false);
-  const [rewardsEnabled, setRewardsEnabled] = useState(true);
-  const [customBucksValue, setCustomBucksValue] = useState('');
-
-  // Category-tag picker state for editing a question's category_label
+  // Category-tag picker — 'assign' relabels a question; 'regen' regenerates
+  // from the picked category's pool (MOD·REGEN lockdown).
   const [categoryPickerForQuestion, setCategoryPickerForQuestion] = useState<ExamQuestion | null>(null);
+  const [catPickerMode, setCatPickerMode] = useState<'assign' | 'regen'>('assign');
   const [showCustomCategoryInput, setShowCustomCategoryInput] = useState(false);
   const [customCategoryText, setCustomCategoryText] = useState('');
   const [showCloseDatePicker, setShowCloseDatePicker] = useState(false);
   const [showCloseTimePicker, setShowCloseTimePicker] = useState(false);
-  // Countdown tick state — forces re-render every second while a close_at is set
-  const [countdownTick, setCountdownTick] = useState(0);
+  const [closeAt, setCloseAt] = useState<Date | null>(null);
+  const [notifyOnActivate, setNotifyOnActivate] = useState(false);
+  const [rewardsEnabled, setRewardsEnabled] = useState(true);
+  // Countdown tick — re-render each second while a live close_at counts down.
+  const [, setCountdownTick] = useState(0);
+  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [refreshingQuestionId, setRefreshingQuestionId] = useState<string | null>(null);
 
-  // Hybrid bilingual authoring (s61): custom/bonus + edit modals bind the
-  // device language; the shared section previews and resolves the other side.
   const addTranslation = useTranslationSection({
     fields: [
       { key: 'question', labelKey: 'translation_section:field_question', enValue: customText, esValue: customTextEs, setEnValue: setCustomText, setEsValue: setCustomTextEs, multiline: true },
@@ -189,7 +196,20 @@ export default function ExamEditorScreen() {
     sessionKey: editingQuestion ? `edit:${editingQuestion.id}` : 'none',
     active: !!editingQuestion,
   });
-  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // ─── Data ───────────────────────────────────────────────────────────────
+
+  const fetchDefaultValue = async (examId: string) => {
+    if (!user?.id) return;
+    try {
+      const { data } = await supabase.rpc('get_exam_default_bucks_value', {
+        p_actor_id: user.id, p_exam_id: examId,
+      });
+      setDefaultBucksValue(typeof data === 'number' ? data : null);
+    } catch {
+      setDefaultBucksValue(null);
+    }
+  };
 
   const fetchCurrentExam = useCallback(async () => {
     if (!user?.id) { setLoading(false); return; }
@@ -203,7 +223,6 @@ export default function ExamEditorScreen() {
         console.warn('close_expired_exams cleanup failed:', cleanupErr);
       }
 
-      // Get the most recent draft/active/paused exam for this type (org-scoped server-side)
       const { data, error } = await supabase.rpc('get_exam', {
         p_actor_id: user?.id,
         p_exam_type: examType,
@@ -217,7 +236,15 @@ export default function ExamEditorScreen() {
         setCloseAt(exam.close_at ? new Date(exam.close_at) : null);
         setNotifyOnActivate(Boolean(exam.notify_on_activate));
         setRewardsEnabled(exam.rewards_enabled !== false);
+        // The morph's default fold posture per state.
+        if (exam.status === 'active') {
+          setQuestionsOpen(false);
+          setTrackerOpen(params.tab === 'tracker');
+        } else {
+          setQuestionsOpen(true);
+        }
         await fetchQuestions(exam.id);
+        await fetchDefaultValue(exam.id);
         if (exam.status === 'active' || exam.status === 'paused') {
           await fetchCompletionData(exam.id);
         }
@@ -227,15 +254,16 @@ export default function ExamEditorScreen() {
         setCloseAt(null);
         setNotifyOnActivate(false);
         setRewardsEnabled(true);
+        setDefaultBucksValue(null);
       }
     } catch (err) {
       console.error('Error fetching exam:', err);
     }
     setLoading(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [examType, user?.id]);
 
-  // Tick a countdown re-render once per second while a close_at is active,
-  // so the "Closes in …" label updates live.
+  // Tick a countdown re-render once per second while a close_at is active.
   useEffect(() => {
     if (!closeAt || !currentExam || currentExam.status === 'closed' || currentExam.status === 'paused') {
       if (countdownIntervalRef.current) {
@@ -245,7 +273,7 @@ export default function ExamEditorScreen() {
       return;
     }
     countdownIntervalRef.current = setInterval(() => {
-      setCountdownTick(t => (t + 1) % 1_000_000);
+      setCountdownTick(n => (n + 1) % 1_000_000);
     }, 1000);
     return () => {
       if (countdownIntervalRef.current) {
@@ -261,7 +289,6 @@ export default function ExamEditorScreen() {
       p_actor_id: user?.id,
       p_exam_id: examId,
     });
-
     if (!error && data) {
       setQuestions(data as ExamQuestion[]);
     }
@@ -275,7 +302,6 @@ export default function ExamEditorScreen() {
         p_exam_type: examType,
         p_actor_id: user.id,
       });
-
       if (!error && data) {
         setCompletionData(data as CompletionEntry[]);
       }
@@ -288,28 +314,73 @@ export default function ExamEditorScreen() {
     fetchCurrentExam();
   }, [fetchCurrentExam]);
 
-  // Generate new quiz
-  const handleGenerate = async () => {
+  // ─── Composer → create + generate ───────────────────────────────────────
+
+  const applyComposerSettings = async (examId: string, opts: ComposerResult) => {
+    if (!user?.id) return;
+    await supabase.rpc('update_exam_settings', {
+      p_actor_id: user.id, p_exam_id: examId, p_time_limit_seconds: opts.timeLimitSeconds,
+    });
+    if (opts.defaultBucksValue != null) {
+      await supabase.rpc('set_exam_default_bucks_value', {
+        p_actor_id: user.id, p_exam_id: examId, p_value: opts.defaultBucksValue,
+      });
+    }
+  };
+
+  const createExamShell = async (actorId: string): Promise<Exam> => {
+    const { data: examRows, error: examError } = await supabase.rpc('create_exam', {
+      p_actor_id: actorId,
+      p_exam_type: examType,
+      p_cycle_key: getCurrentWeekKey(),
+    });
+    if (examError) throw examError;
+    const exam = (examRows as Exam[])?.[0];
+    if (!exam) throw new Error(t('exam_editor.no_data_returned'));
+    return exam;
+  };
+
+  const handleGenerate = async (opts: ComposerResult) => {
     if (!user?.id) return;
     setGenerating(true);
     try {
-      const cycleKey = getCurrentWeekKey();
+      const exam = await createExamShell(user.id);
+      await applyComposerSettings(exam.id, opts);
 
-      // Create the exam record (server derives org, gates manager/owner, and does the
-      // unique-cycle_key suffix retry internally — returns the row with its final cycle_key)
-      const { data: examRows, error: examError } = await supabase.rpc('create_exam', {
-        p_actor_id: user?.id,
-        p_exam_type: examType,
-        p_cycle_key: cycleKey,
+      const generated = await generateQuizQuestions(
+        examType, exam.cycle_key, opts.count, organizationId ?? '', user.id,
+        { sources: opts.sources, photoCount: opts.photoCount, difficulty: opts.difficulty },
+      );
+      const questionsToInsert = generated.map((q) => ({
+        question_text: q.question_text,
+        option_a: q.option_a,
+        option_b: q.option_b,
+        option_c: q.option_c,
+        option_d: q.option_d,
+        correct_option: q.correct_option,
+        is_bonus: false,
+        bonus_bucks_value: null,
+        source_type: q.source_type,
+        source_table: q.source_table,
+        question_text_es: q.question_text_es || null,
+        option_a_es: q.option_a_es || null,
+        option_b_es: q.option_b_es || null,
+        option_c_es: q.option_c_es || null,
+        option_d_es: q.option_d_es || null,
+        question_image_url: q.question_image_url || null,
+      }));
+      // Server assigns question_order (1-based) + org; extra keys are ignored.
+      const { error } = await supabase.rpc('create_exam_questions', {
+        p_actor_id: user.id,
+        p_exam_id: exam.id,
+        p_questions: questionsToInsert,
       });
+      if (error) throw error;
 
-      if (examError) throw examError;
-      const exam = (examRows as Exam[])?.[0];
-      if (!exam) throw new Error(t('exam_editor.no_data_returned'));
-
-      await generateAndSaveQuestions(exam.id, exam.cycle_key);
-      setCurrentExam(exam);
-      setTimeLimit(exam.time_limit_seconds);
+      setCurrentExam({ ...exam, time_limit_seconds: opts.timeLimitSeconds });
+      setTimeLimit(opts.timeLimitSeconds);
+      setDefaultBucksValue(opts.defaultBucksValue);
+      setQuestionsOpen(true);
       await fetchQuestions(exam.id);
     } catch (err: any) {
       Alert.alert(t('common.error'), translateServerError(err, t('exam_editor.failed_generate')));
@@ -318,42 +389,25 @@ export default function ExamEditorScreen() {
     setGenerating(false);
   };
 
-  const generateAndSaveQuestions = async (examId: string, cycleKey: string) => {
+  const handleStartBlank = async (opts: ComposerResult) => {
     if (!user?.id) return;
-    const generatedQuestions = await generateQuizQuestions(examType, cycleKey, questionCount, organizationId ?? '', user.id);
-
-    const questionsToInsert = generatedQuestions.map((q, index) => ({
-      exam_id: examId,
-      organization_id: organizationId,
-      question_order: index + 1,
-      question_text: q.question_text,
-      option_a: q.option_a,
-      option_b: q.option_b,
-      option_c: q.option_c,
-      option_d: q.option_d,
-      correct_option: q.correct_option,
-      is_bonus: false,
-      bonus_bucks_value: null,
-      source_type: q.source_type,
-      source_table: q.source_table,
-      question_text_es: q.question_text_es || null,
-      option_a_es: q.option_a_es || null,
-      option_b_es: q.option_b_es || null,
-      option_c_es: q.option_c_es || null,
-      option_d_es: q.option_d_es || null,
-      question_image_url: q.question_image_url || null,
-    }));
-
-    // Server assigns question_order (1-based) + org; extra keys in the objects are ignored.
-    const { error } = await supabase.rpc('create_exam_questions', {
-      p_actor_id: user.id,
-      p_exam_id: examId,
-      p_questions: questionsToInsert,
-    });
-    if (error) throw error;
+    setGenerating(true);
+    try {
+      const exam = await createExamShell(user.id);
+      await applyComposerSettings(exam.id, opts);
+      setCurrentExam({ ...exam, time_limit_seconds: opts.timeLimitSeconds });
+      setTimeLimit(opts.timeLimitSeconds);
+      setDefaultBucksValue(opts.defaultBucksValue);
+      setQuestions([]);
+      setQuestionsOpen(true);
+    } catch (err: any) {
+      Alert.alert(t('common.error'), translateServerError(err, t('exam_editor.failed_generate')));
+    }
+    setGenerating(false);
   };
 
-  // Update time limit
+  // ─── Settings ───────────────────────────────────────────────────────────
+
   const handleUpdateTimeLimit = async (newSeconds: number) => {
     if (!currentExam || !user?.id) return;
     setTimeLimit(newSeconds);
@@ -362,126 +416,28 @@ export default function ExamEditorScreen() {
     });
   };
 
-  // Activate quiz
-  const handleActivate = () => {
-    if (!user?.id) return;
-    if (!currentExam || questions.length === 0) {
-      Alert.alert(t('common.error'), t('exam_editor.no_questions_activate'));
-      return;
+  const handleSaveDefaultValue = async () => {
+    if (!currentExam || !user?.id) return;
+    const trimmed = valueSheetText.trim();
+    const next = trimmed === '' ? null : Math.max(0, parseInt(trimmed, 10) || 0);
+    setShowValueSheet(false);
+    try {
+      const { error } = await supabase.rpc('set_exam_default_bucks_value', {
+        p_actor_id: user.id, p_exam_id: currentExam.id, p_value: next,
+      });
+      if (error) throw error;
+      setDefaultBucksValue(next);
+      // The Rewards toggle follows the value (Steve's smoke round): $0 means
+      // this quiz pays nothing → flip rewards off; any paying value → on.
+      const shouldReward = next !== 0;
+      if (shouldReward !== rewardsEnabled) {
+        handleToggleRewardsEnabled(shouldReward);
+      }
+    } catch (err: any) {
+      Alert.alert(t('common.error'), translateServerError(err));
     }
-
-    Alert.alert(
-      t('exam_editor.activate_quiz'),
-      t('exam_editor.activate_msg', { type: getExamTypeName(examType, isSpanish) }),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('exam_editor.activate_btn'),
-          onPress: async () => {
-            try {
-              // Default close_at = 7 days from now at 23:59 local if unset
-              let effectiveCloseAt = closeAt;
-              if (!effectiveCloseAt) {
-                const d = new Date();
-                d.setDate(d.getDate() + 7);
-                d.setHours(23, 59, 0, 0);
-                effectiveCloseAt = d;
-                setCloseAt(d);
-              }
-
-              // Atomic: server closes any other active exam of this type, then activates
-              // this one (activated_at + close_at + notify reset) — one call.
-              await supabase.rpc('activate_exam', {
-                p_actor_id: user?.id,
-                p_exam_id: currentExam.id,
-                p_close_at: effectiveCloseAt.toISOString(),
-              });
-
-              // Fire push if the manager armed the toggle
-              if (notifyOnActivate) {
-                try {
-                  const jobTitlesByType: Record<string, string[]> = {
-                    server: ['Server', 'Lead Server', 'Busser', 'Runner'],
-                    bartender: ['Bartender'],
-                    host: ['Host'],
-                  };
-                  const targetJobTitles = jobTitlesByType[examType] || [];
-                  const quizTitle = bothLanguages('notifications.quiz_live_title');
-                  // Body interpolates the language-specific quiz-type name, so
-                  // the two copies are built individually.
-                  const quizBodyEn = i18n.t('notifications.quiz_live_body', { lng: 'en', type: getExamTypeName(examType) });
-                  const quizBodyEs = i18n.t('notifications.quiz_live_body', { lng: 'es', type: getExamTypeName(examType, true) });
-                  await sendCustomNotification(
-                    quizTitle.en,
-                    quizBodyEn,
-                    {
-                      destination: 'weekly-quizzes',
-                      exam_id: currentExam.id,
-                      job_titles: targetJobTitles,
-                    },
-                    organizationId ?? undefined,
-                    quizTitle.es,
-                    quizBodyEs
-                  );
-                } catch (pushErr) {
-                  // Non-fatal: activation still succeeded.
-                  console.error('Notify Staff push failed:', pushErr);
-                }
-              }
-
-              setNotifyOnActivate(false);
-              await fetchCurrentExam();
-              Alert.alert(t('exam_editor.activated_title'), t('exam_editor.activated_msg'));
-            } catch (err) {
-              console.error('Activate error:', err);
-            }
-          },
-        },
-      ]
-    );
   };
 
-  const handlePause = () => {
-    if (!currentExam || !user?.id) return;
-    Alert.alert(
-      t('exam_editor.pause_quiz'),
-      t('exam_editor.pause_msg'),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('exam_editor.pause_btn'),
-          onPress: async () => {
-            await supabase.rpc('set_exam_status', {
-              p_actor_id: user?.id, p_exam_id: currentExam.id, p_status: 'paused',
-            });
-            await fetchCurrentExam();
-          },
-        },
-      ]
-    );
-  };
-
-  const handleResume = () => {
-    if (!currentExam || !user?.id) return;
-    Alert.alert(
-      t('exam_editor.resume_quiz'),
-      t('exam_editor.resume_msg'),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('exam_editor.resume_btn'),
-          onPress: async () => {
-            await supabase.rpc('set_exam_status', {
-              p_actor_id: user?.id, p_exam_id: currentExam.id, p_status: 'active',
-            });
-            await fetchCurrentExam();
-          },
-        },
-      ]
-    );
-  };
-
-  // Persist a new close_at value (draft or active)
   const handleUpdateCloseAt = async (next: Date | null) => {
     if (!currentExam || !user?.id) return;
     setCloseAt(next);
@@ -497,8 +453,6 @@ export default function ExamEditorScreen() {
     }
   };
 
-  // Persist the No Rewards toggle (draft only). When false, no Bucks awarded
-  // for this quiz regardless of per-question values.
   const handleToggleRewardsEnabled = async (next: boolean) => {
     if (!currentExam || currentExam.status !== 'draft' || !user?.id) return;
     setRewardsEnabled(next);
@@ -512,26 +466,6 @@ export default function ExamEditorScreen() {
     }
   };
 
-  // Persist a question's category_label override
-  const handleUpdateCategoryLabel = async (q: ExamQuestion, newLabel: string | null) => {
-    setCategoryPickerForQuestion(null);
-    setShowCustomCategoryInput(false);
-    setCustomCategoryText('');
-    if (!user?.id) return;
-    try {
-      await supabase.rpc('update_exam_question', {
-        p_actor_id: user.id, p_question_id: q.id, p_fields: { category_label: newLabel },
-      });
-      setQuestions(prev =>
-        prev.map(qq => (qq.id === q.id ? { ...qq, category_label: newLabel } : qq))
-      );
-    } catch (err) {
-      console.error('Update category_label error:', err);
-      Alert.alert(t('common.error'), t('exam_editor.failed_update_category'));
-    }
-  };
-
-  // Persist the Notify Staff toggle (draft only)
   const handleToggleNotifyOnActivate = async (next: boolean) => {
     if (!currentExam || currentExam.status !== 'draft' || !user?.id) return;
     setNotifyOnActivate(next);
@@ -544,59 +478,113 @@ export default function ExamEditorScreen() {
     }
   };
 
-  // Close quiz
-  const handleClose = () => {
-    if (!currentExam || !user?.id) return;
+  // ─── Lifecycle ──────────────────────────────────────────────────────────
 
+  const handleActivate = () => {
+    if (!user?.id) return;
+    if (!currentExam || questions.length === 0) {
+      Alert.alert(t('common.error'), t('exam_editor.no_questions_activate'));
+      return;
+    }
     Alert.alert(
-      t('exam_editor.close_quiz'),
-      t('exam_editor.close_msg'),
+      t('exam_editor.activate_quiz'),
+      t('exam_editor.activate_msg', { type: getExamTypeName(examType, isSpanish) }),
       [
         { text: t('common.cancel'), style: 'cancel' },
         {
-          text: t('common.close'),
-          style: 'destructive',
+          text: t('exam_editor.activate_btn'),
           onPress: async () => {
-            await supabase.rpc('set_exam_status', {
-              p_actor_id: user?.id, p_exam_id: currentExam.id, p_status: 'closed',
-            });
-
-            setCurrentExam(null);
-            setQuestions([]);
-            setCompletionData([]);
+            setActionBusy(true);
+            try {
+              const effective = await activateExamWithDefaults({
+                actorId: user.id,
+                organizationId: organizationId ?? null,
+                examId: currentExam.id,
+                examType,
+                notifyOnActivate,
+                closeAt,
+              });
+              setCloseAt(effective);
+              setNotifyOnActivate(false);
+              await fetchCurrentExam();
+              Alert.alert(t('exam_editor.activated_title'), t('exam_editor.activated_msg'));
+            } catch (err: any) {
+              console.error('Activate error:', err);
+              Alert.alert(t('common.error'), translateServerError(err));
+            }
+            setActionBusy(false);
           },
         },
       ]
     );
   };
 
-  // Reset and start new
+  const setStatus = async (status: 'active' | 'paused' | 'closed', clearAfter = false) => {
+    if (!currentExam || !user?.id) return;
+    setActionBusy(true);
+    try {
+      const { error } = await supabase.rpc('set_exam_status', {
+        p_actor_id: user?.id, p_exam_id: currentExam.id, p_status: status,
+      });
+      if (error) throw error;
+      if (clearAfter) {
+        setCurrentExam(null);
+        setQuestions([]);
+        setCompletionData([]);
+        setDefaultBucksValue(null);
+      } else {
+        await fetchCurrentExam();
+      }
+    } catch (err: any) {
+      Alert.alert(t('common.error'), translateServerError(err));
+    }
+    setActionBusy(false);
+  };
+
+  const handlePause = () => {
+    Alert.alert(t('exam_editor.pause_quiz'), t('exam_editor.pause_msg'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('exam_editor.pause_btn'), onPress: () => setStatus('paused') },
+    ]);
+  };
+
+  const handleResume = () => {
+    Alert.alert(t('exam_editor.resume_quiz'), t('exam_editor.resume_msg'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('exam_editor.resume_btn'), onPress: () => setStatus('active') },
+    ]);
+  };
+
+  const handleClose = () => {
+    Alert.alert(t('exam_editor.close_quiz'), t('exam_editor.close_msg'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('common.close'), style: 'destructive', onPress: () => setStatus('closed', true) },
+    ]);
+  };
+
   const handleResetAndNew = () => {
     if (!user?.id) return;
-    Alert.alert(
-      t('exam_editor.reset_new_quiz'),
-      t('exam_editor.reset_new_msg'),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('exam_editor.reset_btn'),
-          style: 'destructive',
-          onPress: async () => {
-            if (currentExam) {
-              await supabase.rpc('set_exam_status', {
-                p_actor_id: user?.id, p_exam_id: currentExam.id, p_status: 'closed',
-              });
-            }
-            setCurrentExam(null);
-            setQuestions([]);
-            setCompletionData([]);
-          },
+    Alert.alert(t('exam_editor.reset_new_quiz'), t('exam_editor.reset_new_msg'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('exam_editor.reset_btn'),
+        style: 'destructive',
+        onPress: async () => {
+          if (currentExam) {
+            await setStatus('closed', true);
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
-  // Add custom question
+  const handlePreview = () => {
+    if (!currentExam || questions.length === 0) return;
+    router.push(`/exam-play?examId=${currentExam.id}&preview=true`);
+  };
+
+  // ─── Questions ──────────────────────────────────────────────────────────
+
   const handleAddCustom = async (isBonus: boolean = false) => {
     if (!currentExam || !user?.id) return;
     const authorText = isSpanish ? customTextEs : customText;
@@ -613,7 +601,6 @@ export default function ExamEditorScreen() {
     const resolved = await addTranslation.resolveOnSave();
     if (!resolved) return;
 
-    const nextOrder = questions.length > 0 ? Math.max(...questions.map(q => q.question_order)) + 1 : 1;
     const bonusValue = isBonus ? parseInt(bonusBucksValue) || 5 : null;
     const trimmedCustomBucks = customBucksValue.trim();
     const customBucks = !isBonus && trimmedCustomBucks !== ''
@@ -655,40 +642,35 @@ export default function ExamEditorScreen() {
     }
   };
 
-  // Delete question
   const handleDeleteQuestion = (question: ExamQuestion) => {
     if (!user?.id) return;
-    Alert.alert(
-      t('exam_editor.delete_q_title'),
-      t('exam_editor.delete_q_msg'),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('common.delete'),
-          style: 'destructive',
-          onPress: async () => {
-            await supabase.rpc('delete_exam_question', {
-              p_actor_id: user?.id, p_question_id: question.id,
-            });
-            if (currentExam) await fetchQuestions(currentExam.id);
-          },
+    Alert.alert(t('exam_editor.delete_q_title'), t('exam_editor.delete_q_msg'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('common.delete'),
+        style: 'destructive',
+        onPress: async () => {
+          await supabase.rpc('delete_exam_question', {
+            p_actor_id: user?.id, p_question_id: question.id,
+          });
+          if (currentExam) await fetchQuestions(currentExam.id);
         },
-      ]
-    );
+      },
+    ]);
   };
 
-  // Refresh single question — regenerate just one question
-  const [refreshingQuestionId, setRefreshingQuestionId] = useState<string | null>(null);
-
-  const handleRefreshQuestion = async (question: ExamQuestion) => {
+  // Regenerate one question — optionally pinned to a source pool. A photo
+  // question with no pin regenerates as a fresh photo question (the classic
+  // behavior); a pinned regen always draws text templates from that pool.
+  const handleRefreshQuestion = async (
+    question: ExamQuestion,
+    pin?: { source: QuizSource; clearLabel?: boolean },
+  ) => {
     if (!currentExam || !user?.id) return;
     setRefreshingQuestionId(question.id);
     try {
-      // If the current question has an image, regenerate another photo
-      // question against the same pool (this yields a fresh item + prompt).
-      // Otherwise fall back to the text-template batch path below.
       let newQuestion: GeneratedQuestion | null = null;
-      if (question.question_image_url) {
+      if (!pin && question.question_image_url) {
         const photo = await generatePhotoQuestion(
           organizationId ?? '',
           [],
@@ -701,11 +683,11 @@ export default function ExamEditorScreen() {
       }
 
       if (!newQuestion) {
-        // Generate a batch of questions and pick one that's different from the current
         const cycleKey = currentExam.cycle_key + '-refresh-' + Date.now().toString(36);
-        const generated = await generateQuizQuestions(examType, cycleKey, 5, organizationId ?? '', user.id);
-
-        // Find one that doesn't duplicate existing questions
+        const generated = await generateQuizQuestions(
+          examType, cycleKey, 5, organizationId ?? '', user.id,
+          pin ? { sources: [pin.source], photoCount: 0 } : {},
+        );
         const existingTexts = new Set(questions.map(q => q.question_text));
         newQuestion = generated.find(q => !existingTexts.has(q.question_text)) || generated[0];
       }
@@ -729,14 +711,17 @@ export default function ExamEditorScreen() {
             option_c_es: newQuestion.option_c_es || null,
             option_d_es: newQuestion.option_d_es || null,
             question_image_url: newQuestion.question_image_url ?? null,
+            // A pinned regen shows its new source honestly — drop any override.
+            ...(pin?.clearLabel ? { category_label: null } : {}),
           },
         });
-
         if (error) {
           Alert.alert(t('common.error'), translateServerError(error));
         } else {
           await fetchQuestions(currentExam.id);
         }
+      } else {
+        Alert.alert(t('common.error'), t('exam_editor.failed_refresh'));
       }
     } catch (err) {
       console.error('Refresh question error:', err);
@@ -745,13 +730,10 @@ export default function ExamEditorScreen() {
     setRefreshingQuestionId(null);
   };
 
-  // Save edited question
   const handleSaveEdit = async () => {
     if (!editingQuestion || !user?.id) return;
-
-    // Fill/refresh the other language per the s61 staleness rules (may ask
-    // once). Sending the _es keys explicitly (value or null) also fixes the
-    // stale-Spanish defect: an EN edit no longer leaves old ES text live.
+    // Fill/refresh the other language per the s61 staleness rules; sending the
+    // _es keys explicitly (value or null) keeps stale Spanish from surviving.
     const resolved = await editTranslation.resolveOnSave();
     if (!resolved) return;
 
@@ -784,10 +766,22 @@ export default function ExamEditorScreen() {
     }
   };
 
-  // Preview quiz
-  const handlePreview = () => {
-    if (!currentExam || questions.length === 0) return;
-    router.push(`/exam-play?examId=${currentExam.id}&preview=true`);
+  const handleUpdateCategoryLabel = async (q: ExamQuestion, newLabel: string | null) => {
+    setCategoryPickerForQuestion(null);
+    setShowCustomCategoryInput(false);
+    setCustomCategoryText('');
+    if (!user?.id) return;
+    try {
+      await supabase.rpc('update_exam_question', {
+        p_actor_id: user.id, p_question_id: q.id, p_fields: { category_label: newLabel },
+      });
+      setQuestions(prev =>
+        prev.map(qq => (qq.id === q.id ? { ...qq, category_label: newLabel } : qq))
+      );
+    } catch (err) {
+      console.error('Update category_label error:', err);
+      Alert.alert(t('common.error'), t('exam_editor.failed_update_category'));
+    }
   };
 
   const resetCustomForm = () => {
@@ -807,9 +801,7 @@ export default function ExamEditorScreen() {
     setCustomImageUrl(null);
   };
 
-  // ─── Image picker / upload for picture questions ───────────────────
-  // Pick via ImagePicker → upload through the storage broker → return
-  // the public URL.
+  // ─── Image picker / upload for picture questions ────────────────────────
   const pickAndUploadQuizImage = async (): Promise<string | null> => {
     if (!user?.id) return null;
     try {
@@ -856,32 +848,7 @@ export default function ExamEditorScreen() {
     setEditingQuestion({ ...editingQuestion, question_image_url: null });
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'draft': return '#F59E0B';
-      case 'active': return '#10B981';
-      case 'paused': return '#F59E0B';
-      case 'closed': return '#EF4444';
-      default: return colors.textSecondary;
-    }
-  };
-
-  const getSourceLabel = (q: ExamQuestion) => {
-    if (q.category_label) {
-      // Stored labels are EN-canonical; translate display when it matches a
-      // known option, custom manager-typed labels render as typed.
-      const known = CATEGORY_OPTIONS.find(o => o.label === q.category_label);
-      return (known ? t(known.labelKey) : q.category_label).toUpperCase();
-    }
-    if (q.source_type === 'bonus') return t('exam_editor.source_bonus').toUpperCase();
-    if (q.source_type === 'custom') return t('exam_editor.source_custom').toUpperCase();
-    // Auto-chips read like the category picker: any known source_table shows its
-    // picker label (recipes → LIBATION RECIPES, checklist_items → CHECK LIST ITEMS);
-    // unknown tables and null fall back to the raw slug.
-    const bySource = CATEGORY_OPTIONS.find(o => o.sourceTable === q.source_table);
-    if (bySource) return t(bySource.labelKey).toUpperCase();
-    return (q.source_table || 'auto').replace(/_/g, ' ').toUpperCase();
-  };
+  const getSourceLabel = (q: ExamQuestion) => questionCategoryLabel(q, t);
 
   // Reset a specific user's quiz result so they can retake
   const handleResetUserQuiz = (entry: CompletionEntry) => {
@@ -898,7 +865,7 @@ export default function ExamEditorScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              // Reset via gated RPC: deletes the result + dismissals and claws back awarded bucks
+              // Gated RPC: deletes the result + dismissals and claws back bucks.
               const { error: resetError } = await supabase.rpc('reset_user_exam_attempt', {
                 p_exam_id: currentExam.id,
                 p_user_id: entry.user_id,
@@ -906,12 +873,8 @@ export default function ExamEditorScreen() {
                 p_actor_id: user?.id,
               });
               if (resetError) throw resetError;
-
-              // Refresh tracker data
               await fetchCompletionData(currentExam.id);
 
-              // Push the user a "you've been cleared" notification — uses the
-              // existing send-push-notification edge function with userIds filter.
               try {
                 const take2Title = bothLanguages('notifications.take2_title');
                 const take2Body = bothLanguages('notifications.take2_body');
@@ -932,9 +895,8 @@ export default function ExamEditorScreen() {
                     organization_id: organizationId,
                   },
                 });
-                // Log to the shade — visible only to managers/owners and the cleared
-                // user (retake_granted), never the whole org. Spanish copy rides
-                // data.title_es/body_es for the dropdown's viewer-language pick.
+                // Log to the shade — visible only to managers/owners and the
+                // cleared user (retake_granted), never the whole org.
                 await supabase.rpc('create_notification', {
                   p_actor_id: actorId,
                   p_title: take2Title.en,
@@ -963,14 +925,205 @@ export default function ExamEditorScreen() {
     );
   };
 
+  // ─── Derived ────────────────────────────────────────────────────────────
+
   const completedCount = completionData.filter(e => e.has_completed).length;
   const totalEmployees = completionData.length;
+  const paidTotal = completionData.reduce((sum, e) => sum + (e.has_completed ? e.bucks_awarded : 0), 0);
+  const scored = completionData.filter(e => e.has_completed && e.total_questions > 0);
+  const avgPct = scored.length > 0
+    ? Math.round((scored.reduce((s, e) => s + e.correct_count / e.total_questions, 0) / scored.length) * 100)
+    : null;
+  const bonusQ = questions.find(q => q.is_bonus);
+
+  const consoleSummary = (() => {
+    const parts: string[] = [];
+    parts.push(t('weekly_quizzes.question_count_short', { count: questions.length }));
+    parts.push(timeLimit === 0 ? '∞' : formatTime(timeLimit));
+    if (closeAt) {
+      parts.push(t('exam_editor.sum_closes', {
+        date: closeAt.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }),
+      }));
+    }
+    return parts.join(' · ');
+  })();
+
+  const payoutLine = (() => {
+    if (!rewardsEnabled) return null;
+    const base = defaultBucksValue ?? 1;
+    const max = questions.filter(q => !q.is_bonus).length * base + (bonusQ?.bonus_bucks_value ?? 0);
+    return t('exam_editor.payout_line_max', { max });
+  })();
+
+  // The split explainer under the Rewards chip (Steve's smoke-2 note): the
+  // plain-English rule, plus the concrete 2-/3-quiz per-answer math so a
+  // first-time O/M sees exactly what the split does.
+  const fmtSplit = (n: number) => (n % 1 === 0 ? `$${n}` : `$${n.toFixed(2)}`);
+  const splitNote = (() => {
+    if (!rewardsEnabled) return null;
+    const base = defaultBucksValue ?? 1;
+    if (base <= 0) return null;
+    return `${t('exam_editor.split_note')} ${t('exam_editor.split_note_math', {
+      base: fmtSplit(base),
+      two: fmtSplit(base / 2),
+      three: fmtSplit(base / 3),
+    })}`;
+  })();
+
+  // Plain dollar number everywhere — the split story lives on the Rewards
+  // line only (Steve's smoke ruling). Unset = the $1 base.
+  const valueLabel = `$${defaultBucksValue ?? 1}`;
+
+  const closeAtLabel = closeAt
+    ? closeAt.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+    : t('exam_editor.set_datetime');
+
+  // ─── Render pieces ──────────────────────────────────────────────────────
+
+  const renderTrackerRows = () => (
+    <>
+      {completionData.map(entry => (
+        <View key={entry.user_id} style={[styles.trow, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
+          {entry.profile_picture_url ? (
+            <StorageImage source={{ uri: entry.profile_picture_url }} style={styles.tavImage} />
+          ) : (
+            <View style={[styles.tav, { backgroundColor: visual.accent + '33' }]}>
+              <Text style={[styles.tavText, { color: visual.accent }]}>
+                {entry.name.charAt(0).toUpperCase()}
+              </Text>
+            </View>
+          )}
+          <View style={styles.tbd}>
+            <Text style={[styles.tnm, { color: colors.text }]} numberOfLines={1}>{entry.name}</Text>
+            <Text style={[styles.tjb, { color: colors.textSecondary }]} numberOfLines={1}>{entry.job_title}</Text>
+          </View>
+          {entry.has_completed ? (
+            <>
+              <View style={styles.tsc}>
+                <Text style={styles.tscScore}>{entry.correct_count}/{entry.total_questions}</Text>
+                <Text style={styles.tscBucks}>+${entry.bucks_awarded}</Text>
+              </View>
+              <View style={styles.tchips}>
+                <TouchableOpacity
+                  style={[styles.tchip, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
+                  onPress={() => router.push(`/exam-answer-review?examId=${currentExam?.id}&userId=${entry.user_id}` as any)}
+                >
+                  <IconSymbol ios_icon_name="eye" android_material_icon_name="visibility" size={10} color={visual.accent} />
+                  <Text style={[styles.tchipText, { color: visual.accent }]}>{t('common.view')}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.tchip, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
+                  onPress={() => handleResetUserQuiz(entry)}
+                >
+                  <IconSymbol ios_icon_name="arrow.counterclockwise" android_material_icon_name="refresh" size={10} color={visual.accent} />
+                  <Text style={[styles.tchipText, { color: visual.accent }]}>{t('exam_editor.retake_btn')}</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          ) : (
+            <View style={styles.notTaken}>
+              <Text style={styles.notTakenText}>{t('exam_editor.not_taken').toUpperCase()}</Text>
+            </View>
+          )}
+        </View>
+      ))}
+      {completionData.length === 0 && (
+        <Text style={[styles.emptyTracker, { color: colors.textSecondary }]}>
+          {t('exam_editor.no_employees')}
+        </Text>
+      )}
+    </>
+  );
+
+  const renderQuestionsFold = (editable: boolean, locked: boolean) => (
+    <QuizFold
+      title={t('exam_editor.questions')}
+      iosIcon="list.bullet"
+      androidIcon="format-list-bulleted"
+      iconColor={locked ? colors.textSecondary : visual.accent}
+      meta={
+        locked
+          ? t('exam_editor.locked_while_live', { count: questions.length })
+          : String(questions.length + (bonusQ ? 0 : 0))
+      }
+      open={questionsOpen}
+      onToggle={() => setQuestionsOpen(o => !o)}
+    >
+      {questions.map(q => (
+        <QuestionCard
+          key={q.id}
+          question={q}
+          categoryLabel={getSourceLabel(q)}
+          accent={visual.accent}
+          defaultBucksValue={defaultBucksValue}
+          editable={editable}
+          locked={locked}
+          refreshing={refreshingQuestionId === q.id}
+          isSpanish={isSpanish}
+          onPressCategory={() => { setCatPickerMode('assign'); setCategoryPickerForQuestion(q); }}
+          onRefresh={() => setRegenQuestion(q)}
+          onEdit={() => setEditingQuestion(q)}
+          onDelete={() => handleDeleteQuestion(q)}
+        />
+      ))}
+      {questions.length === 0 && (
+        <Text style={[styles.emptyTracker, { color: colors.textSecondary }]}>
+          {t('exam_editor.no_questions_yet')}
+        </Text>
+      )}
+      {locked && questions.length > 0 && (
+        <Text style={[styles.lockedNote, { color: colors.textSecondary }]}>
+          {t('exam_editor.locked_note')}
+        </Text>
+      )}
+      {editable && (
+        // The add buttons live INSIDE the Questions fold, at its foot — right
+        // where new questions land (Steve's smoke round).
+        <View style={[styles.btnRow, styles.addRowInFold]}>
+          <TouchableOpacity
+            style={[styles.dashBtn, { borderColor: visual.accent + '73', backgroundColor: visual.accent + '12' }]}
+            onPress={() => { resetCustomForm(); setShowAddCustom(true); }}
+          >
+            <IconSymbol ios_icon_name="plus.circle" android_material_icon_name="add-circle-outline" size={15} color={visual.accent} />
+            <Text style={[styles.dashText, { color: visual.accent }]}>{t('exam_editor.add_custom_short')}</Text>
+          </TouchableOpacity>
+          {!bonusQ && (
+            <TouchableOpacity
+              style={[styles.dashBtn, { borderColor: '#F59E0B80', backgroundColor: '#F59E0B14' }]}
+              onPress={() => { resetCustomForm(); setShowAddBonus(true); }}
+            >
+              <IconSymbol ios_icon_name="star.circle" android_material_icon_name="stars" size={15} color="#F59E0B" />
+              <Text style={[styles.dashText, { color: '#F59E0B' }]}>{t('exam_editor.add_bonus_short')}</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+    </QuizFold>
+  );
+
+  const trackerRing = (
+    <ProgressRing
+      pct={totalEmployees > 0 ? (completedCount / totalEmployees) * 100 : 0}
+      size={38}
+      stroke={4}
+      color={visual.accent}
+      trackColor={colors.glassBorder}
+    >
+      <Text style={[styles.ringLabel, { color: colors.text }]}>
+        {completedCount}/{totalEmployees}
+      </Text>
+    </ProgressRing>
+  );
+
+  // ─── Early exits ────────────────────────────────────────────────────────
+
+  const headerTitle = t('weekly_quizzes.type_quiz_title', { type: getExamTypeName(examType, isSpanish) });
 
   if (!hasPremium) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <AmbientGlow />
-        <ScreenHeader title={t('exam_editor.title', { type: getExamTypeName(examType, isSpanish) })} />
+        <ScreenHeader title={headerTitle} eyebrow={t('weekly_quizzes.title')} />
         <PremiumGate
           desc={t('weekly_quizzes.premium_desc')}
           bullets={[t('weekly_quizzes.premium_b1'), t('weekly_quizzes.premium_b2'), t('weekly_quizzes.premium_b3')]}
@@ -984,13 +1137,17 @@ export default function ExamEditorScreen() {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <AmbientGlow />
-        <ScreenHeader title={t('exam_editor.title', { type: getExamTypeName(examType, isSpanish) })} />
+        <ScreenHeader title={headerTitle} eyebrow={t('weekly_quizzes.title')} />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator size="large" color={visual.accent} />
         </View>
       </View>
     );
   }
+
+  const status = currentExam?.status;
+  const isLive = status === 'active';
+  const isDraftish = status === 'draft' || status === 'paused';
 
   return (
     <KeyboardAvoidingView
@@ -998,544 +1155,194 @@ export default function ExamEditorScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <AmbientGlow />
-      <ScreenHeader title={t('exam_editor.title', { type: getExamTypeName(examType, isSpanish) })} />
+      <ScreenHeader
+        title={headerTitle}
+        eyebrow={t('weekly_quizzes.title')}
+        right={
+          !currentExam ? (
+            <TouchableOpacity
+              style={[styles.infoChip, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
+              onPress={() => setShowInfoSheet(true)}
+            >
+              <IconSymbol ios_icon_name="info.circle" android_material_icon_name="info-outline" size={17} color={visual.accent} />
+            </TouchableOpacity>
+          ) : undefined
+        }
+      />
 
-      {/* Tab Selector (only show when there's an active exam) */}
-      {(currentExam?.status === 'active' || currentExam?.status === 'paused') && (
-        <View style={styles.tabWrapper}>
-          <View style={[styles.tabContainer, { backgroundColor: colors.card }]}>
-            <TouchableOpacity
-              style={[styles.tab, activeSection === 'questions' && { backgroundColor: colors.highlight }]}
-              onPress={() => setActiveSection('questions')}
-            >
-              <Text style={[styles.tabText, { color: colors.textSecondary }, activeSection === 'questions' && { color: colors.text }]}>
-                {t('exam_editor.questions')}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tab, activeSection === 'tracker' && { backgroundColor: colors.highlight }]}
-              onPress={() => { setActiveSection('tracker'); if (currentExam) fetchCompletionData(currentExam.id); }}
-            >
-              <Text style={[styles.tabText, { color: colors.textSecondary }, activeSection === 'tracker' && { color: colors.text }]}>
-                {t('exam_editor.tab_tracker', { done: completedCount, total: totalEmployees })}
-              </Text>
-            </TouchableOpacity>
-          </View>
+      {/* The pinned live console — native chrome outside the scroll (ED·LIVE). */}
+      {currentExam && isLive && (
+        <View style={styles.pinnedConsole}>
+          <QuizLiveConsole
+            examType={examType}
+            closeAt={closeAt}
+            questionCount={questions.length}
+            completedCount={completedCount}
+            totalEmployees={totalEmployees}
+            avgPct={avgPct}
+            paidTotal={paidTotal}
+            busy={actionBusy}
+            onPause={handlePause}
+            onPreview={handlePreview}
+            onCloseQuiz={handleClose}
+            onNewQuiz={handleResetAndNew}
+          />
         </View>
       )}
 
-      <ScrollView contentContainerStyle={styles.contentContainer}>
-        {/* No Exam State */}
+      <ScrollView
+        // The paused state's sticky Resume dock floats over the tail — give
+        // the scroll enough runway that Close/New clear it (Steve's smoke
+        // round: they were hiding behind the dock).
+        contentContainerStyle={[styles.contentContainer, status === 'paused' && styles.pausedRunway]}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* ── No quiz: the composer ── */}
         {!currentExam && (
-          <>
-            <View style={[styles.emptyCard, { backgroundColor: colors.card }]}>
-              <IconSymbol ios_icon_name="doc.questionmark.fill" android_material_icon_name="quiz" size={48} color={colors.primary} />
-              <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('exam_editor.no_active_title')}</Text>
-              <Text style={[styles.emptyDesc, { color: colors.textSecondary }]}>
-                {t('exam_editor.no_active_desc')}
-              </Text>
-            </View>
-
-            {/* Question Count Selector */}
-            <View style={[styles.questionCountCard, { backgroundColor: colors.card }]}>
-              <View style={styles.timeLimitHeader}>
-                <IconSymbol ios_icon_name="number.circle.fill" android_material_icon_name="format-list-numbered" size={22} color={colors.primary} />
-                <Text style={[styles.timeLimitTitle, { color: colors.text }]}>{t('exam_editor.number_of_questions')}</Text>
-              </View>
-              <Text style={[styles.timeLimitDisplay, { color: colors.primary }]}>{questionCount}</Text>
-              <View style={styles.timeLimitButtons}>
-                {[5, 10, 15, 20, 25, 30].map(count => (
-                  <TouchableOpacity
-                    key={count}
-                    style={[
-                      styles.timeLimitOption,
-                      { backgroundColor: questionCount === count ? colors.primary : colors.background, borderColor: colors.border },
-                    ]}
-                    onPress={() => setQuestionCount(count)}
-                  >
-                    <Text style={[
-                      styles.timeLimitOptionText,
-                      { color: questionCount === count ? colors.fireText : colors.text },
-                    ]}>
-                      {count}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              <View style={styles.customCountRow}>
-                <Text style={[styles.customCountLabel, { color: colors.textSecondary }]}>{t('exam_editor.custom_label')}</Text>
-                <TextInput
-                  style={[styles.customCountInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
-                  keyboardType="number-pad"
-                  value={String(questionCount)}
-                  onChangeText={(val) => {
-                    const num = parseInt(val);
-                    if (!isNaN(num) && num >= 1 && num <= 100) setQuestionCount(num);
-                    else if (val === '') setQuestionCount(5);
-                  }}
-                  maxLength={3}
-                  placeholder="5"
-                  placeholderTextColor={colors.textSecondary}
-                />
-              </View>
-            </View>
-
-            <TouchableOpacity
-              style={[styles.generateButton, { backgroundColor: colors.primary }]}
-              onPress={handleGenerate}
-              disabled={generating}
-            >
-              {generating ? (
-                <ActivityIndicator color={colors.fireText} />
-              ) : (
-                <>
-                  <IconSymbol ios_icon_name="wand.and.stars" android_material_icon_name="auto-awesome" size={22} color={colors.fireText} />
-                  <Text style={[styles.generateButtonText, { color: colors.fireText }]}>{t('exam_editor.generate_btn', { count: questionCount })}</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </>
+          <QuizComposer
+            examType={examType}
+            currencyName={currencyName}
+            generating={generating}
+            onGenerate={handleGenerate}
+            onStartBlank={handleStartBlank}
+          />
         )}
 
-        {/* Exam Exists */}
-        {currentExam && activeSection === 'questions' && (
+        {/* ── Draft / paused: settings console + editable questions ── */}
+        {currentExam && isDraftish && (
           <>
-            {/* Status Card */}
-            <View style={[styles.statusCard, { backgroundColor: colors.card }]}>
-              <View style={styles.statusRow}>
-                <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>{t('exam_editor.status_label')}</Text>
-                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(currentExam.status) + '20' }]}>
-                  <Text style={[styles.statusBadgeText, { color: getStatusColor(currentExam.status) }]}>
-                    {t(STATUS_LABEL_KEYS[currentExam.status]).toUpperCase()}
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.statusRow}>
-                <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>{t('exam_editor.questions')}</Text>
-                <Text style={[styles.statusValue, { color: colors.text }]}>{questions.length}</Text>
-              </View>
+            <QuizSettingsConsole
+              examType={examType}
+              status={status as 'draft' | 'paused'}
+              open={consoleOpen}
+              onToggleOpen={() => setConsoleOpen(o => !o)}
+              summary={consoleSummary}
+              timeLimitLabel={timeLimit === 0 ? t('exam_editor.no_limit') : formatTime(timeLimit)}
+              onPressTimeLimit={() => setShowTimeSheet(true)}
+              closeAtLabel={closeAtLabel}
+              onPressCloseAt={() => setShowCloseDatePicker(true)}
+              valueLabel={valueLabel}
+              onPressValue={() => {
+                setValueSheetText(String(defaultBucksValue ?? 1));
+                setShowValueSheet(true);
+              }}
+              notifyOnActivate={notifyOnActivate}
+              onToggleNotify={handleToggleNotifyOnActivate}
+              rewardsEnabled={rewardsEnabled}
+              onToggleRewards={handleToggleRewardsEnabled}
+              payoutLine={payoutLine}
+              splitNote={splitNote}
+              editable={status === 'draft'}
+              onResume={status === 'paused' ? handleResume : undefined}
+            />
 
-              {/* Closes At row — editable while draft or active */}
-              {currentExam.status !== 'closed' && (
-                <TouchableOpacity
-                  style={styles.statusRow}
-                  onPress={() => setShowCloseDatePicker(true)}
-                  activeOpacity={0.6}
-                >
-                  <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>{t('exam_editor.closes_at')}</Text>
-                  <View style={styles.closeAtRight}>
-                    {closeAt ? (
-                      (() => {
-                        const msRemaining = closeAt.getTime() - Date.now();
-                        const urgency = getCountdownUrgency(msRemaining);
-                        const color =
-                          urgency === 'red' ? '#EF4444'
-                          : urgency === 'amber' ? '#F59E0B'
-                          : urgency === 'expired' ? '#9CA3AF'
-                          : colors.text;
-                        return (
-                          <>
-                            <Text style={[styles.statusValue, { color }]}>
-                              {formatCountdown(msRemaining, isSpanish)}
-                            </Text>
-                            <Text style={[styles.closeAtDate, { color: colors.textSecondary }]}>
-                              {closeAt.toLocaleString(undefined, {
-                                month: 'short',
-                                day: 'numeric',
-                                hour: 'numeric',
-                                minute: '2-digit',
-                              })}
-                            </Text>
-                          </>
-                        );
-                      })()
-                    ) : (
-                      <Text style={[styles.statusValue, { color: colors.primary }]}>{t('exam_editor.set_datetime')}</Text>
-                    )}
-                  </View>
-                </TouchableOpacity>
-              )}
-              {closeAt && currentExam.status !== 'closed' && (
-                <View style={styles.closeAtActions}>
-                  <TouchableOpacity
-                    style={[styles.closeAtClearBtn, { borderColor: colors.border }]}
-                    onPress={() => handleUpdateCloseAt(null)}
-                  >
-                    <Text style={[styles.closeAtClearText, { color: colors.textSecondary }]}>{t('common.clear')}</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
+            {renderQuestionsFold(true, false)}
 
-              {/* Notify Staff toggle — draft only */}
-              {currentExam.status === 'draft' && (
-                <View style={styles.statusRow}>
-                  <View style={styles.notifyLabelCol}>
-                    <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>{t('exam_editor.notify_staff')}</Text>
-                    <Text style={[styles.notifyDesc, { color: colors.textSecondary }]}>
-                      {t('exam_editor.notify_staff_desc')}
-                    </Text>
-                  </View>
-                  <Switch
-                    value={notifyOnActivate}
-                    onValueChange={handleToggleNotifyOnActivate}
-                    trackColor={{ false: colors.border, true: colors.primary + '80' }}
-                    thumbColor={notifyOnActivate ? colors.primary : '#F4F3F4'}
-                  />
-                </View>
-              )}
-
-              {/* No Rewards toggle — draft only. Off = no reward currency awarded for this quiz. */}
-              {currentExam.status === 'draft' && (
-                <View style={styles.statusRow}>
-                  <View style={styles.notifyLabelCol}>
-                    <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>{t('exam_editor.award_currency', { currency: currencyName })}</Text>
-                    <Text style={[styles.notifyDesc, { color: colors.textSecondary }]}>
-                      {t('exam_editor.award_currency_desc')}
-                    </Text>
-                  </View>
-                  <Switch
-                    value={rewardsEnabled}
-                    onValueChange={handleToggleRewardsEnabled}
-                    trackColor={{ false: colors.border, true: colors.primary + '80' }}
-                    thumbColor={rewardsEnabled ? colors.primary : '#F4F3F4'}
-                  />
-                </View>
-              )}
-            </View>
-
-            {/* Time Limit */}
-            <View style={[styles.timeLimitCard, { backgroundColor: colors.card }]}>
-              <View style={styles.timeLimitHeader}>
-                <IconSymbol ios_icon_name="timer" android_material_icon_name="timer" size={22} color={colors.primary} />
-                <Text style={[styles.timeLimitTitle, { color: colors.text }]}>{t('exam_editor.time_limit')}</Text>
-              </View>
-              <Text style={[styles.timeLimitDisplay, { color: colors.primary }]}>
-                {timeLimit === 0 ? t('exam_editor.no_limit') : formatTime(timeLimit)}
-              </Text>
-              <View style={styles.timeLimitButtons}>
-                {[60, 105, 120, 180, 240, 300, 360, 420, 480, 0].map(secs => (
-                  <TouchableOpacity
-                    key={secs}
-                    style={[
-                      styles.timeLimitOption,
-                      { backgroundColor: timeLimit === secs ? colors.primary : colors.background, borderColor: colors.border },
-                    ]}
-                    onPress={() => handleUpdateTimeLimit(secs)}
-                    disabled={currentExam.status === 'active' || currentExam.status === 'paused'}
-                  >
-                    <Text style={[
-                      styles.timeLimitOptionText,
-                      { color: timeLimit === secs ? colors.fireText : colors.text },
-                    ]}>
-                      {secs === 0 ? '∞' : formatTime(secs)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-
-            {/* Questions List */}
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('exam_editor.questions')}</Text>
-            {questions.map((q, index) => (
-              <View
-                key={q.id}
-                style={[
-                  styles.questionCard,
-                  { backgroundColor: colors.card },
-                  q.is_bonus && { borderWidth: 2, borderColor: '#F59E0B' },
-                ]}
+            {status === 'paused' && (
+              <QuizFold
+                title={t('exam_editor.tracker_fold')}
+                iosIcon="person.2"
+                androidIcon="people-outline"
+                iconColor={visual.accent}
+                open={trackerOpen}
+                onToggle={() => setTrackerOpen(o => !o)}
+                headerExtra={trackerRing}
               >
-                <View style={styles.questionHeader}>
-                  <View style={styles.questionNumberContainer}>
-                    <Text style={[styles.questionNumber, { color: colors.primary }]}>{t('exam_editor.q_number', { n: q.question_order })}</Text>
-                    <TouchableOpacity
-                      style={[styles.sourceChip, { backgroundColor: q.is_bonus ? '#F59E0B20' : colors.primary + '15' }]}
-                      onPress={() => {
-                        if ((currentExam.status === 'draft' || currentExam.status === 'paused') && !q.is_bonus) {
-                          setCategoryPickerForQuestion(q);
-                        }
-                      }}
-                      disabled={(currentExam.status !== 'draft' && currentExam.status !== 'paused') || q.is_bonus}
-                    >
-                      <Text style={[styles.sourceChipText, { color: q.is_bonus ? '#F59E0B' : colors.primary }]}>
-                        {getSourceLabel(q)}
-                      </Text>
-                      {(currentExam.status === 'draft' || currentExam.status === 'paused') && !q.is_bonus && (
-                        <IconSymbol
-                          ios_icon_name="chevron.down"
-                          android_material_icon_name="expand-more"
-                          size={10}
-                          color={colors.primary}
-                        />
-                      )}
-                    </TouchableOpacity>
-                    {q.is_bonus && (
-                      <View style={[styles.sourceChip, { backgroundColor: '#F59E0B20' }]}>
-                        <Text style={[styles.sourceChipText, { color: '#F59E0B' }]}>
-                          ${q.bonus_bucks_value}
-                        </Text>
-                      </View>
-                    )}
-                    {!q.is_bonus && typeof q.bucks_value === 'number' && (
-                      <View style={[styles.sourceChip, { backgroundColor: colors.primary + '15' }]}>
-                        <Text style={[styles.sourceChipText, { color: colors.primary }]}>
-                          ${q.bucks_value}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                  <View style={styles.questionActions}>
-                    {(currentExam.status === 'draft' || currentExam.status === 'paused') && (
-                      <>
-                        {q.source_type === 'auto' && (
-                          <TouchableOpacity
-                            onPress={() => handleRefreshQuestion(q)}
-                            style={styles.actionButton}
-                            disabled={refreshingQuestionId === q.id}
-                          >
-                            {refreshingQuestionId === q.id ? (
-                              <ActivityIndicator size={16} color={colors.primary} />
-                            ) : (
-                              <IconSymbol ios_icon_name="arrow.clockwise" android_material_icon_name="refresh" size={18} color={colors.primary} />
-                            )}
-                          </TouchableOpacity>
-                        )}
-                        <TouchableOpacity onPress={() => setEditingQuestion(q)} style={styles.actionButton}>
-                          <IconSymbol ios_icon_name="pencil" android_material_icon_name="edit" size={18} color={colors.primary} />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => handleDeleteQuestion(q)} style={styles.actionButton}>
-                          <IconSymbol ios_icon_name="trash" android_material_icon_name="delete" size={18} color="#EF4444" />
-                        </TouchableOpacity>
-                      </>
-                    )}
-                  </View>
-                </View>
-                {q.question_image_url && (
-                  <StorageImage
-                    source={{ uri: q.question_image_url }}
-                    style={styles.questionCardImage}
-                    resizeMode="cover"
-                  />
-                )}
-                <Text style={[styles.questionText, { color: colors.text }]}>{isSpanish && q.question_text_es ? q.question_text_es : q.question_text}</Text>
-                <View style={styles.optionsList}>
-                  {(['A', 'B', 'C', 'D'] as const).map(letter => {
-                    const optionEs = q[`option_${letter.toLowerCase()}_es` as keyof ExamQuestion] as string | null | undefined;
-                    const optionText = isSpanish && optionEs ? optionEs : (q[`option_${letter.toLowerCase()}` as keyof ExamQuestion] as string);
-                    const isCorrect = q.correct_option === letter;
-                    return (
-                      <View
-                        key={letter}
-                        style={[
-                          styles.optionRow,
-                          isCorrect && { backgroundColor: '#10B98115' },
-                        ]}
-                      >
-                        <Text style={[
-                          styles.optionLetter,
-                          { color: isCorrect ? '#10B981' : colors.textSecondary },
-                          isCorrect && { fontWeight: 'bold' },
-                        ]}>
-                          {letter}.
-                        </Text>
-                        <Text style={[
-                          styles.optionText,
-                          { color: isCorrect ? '#10B981' : colors.text },
-                          isCorrect && { fontWeight: '600' },
-                        ]}>
-                          {optionText}
-                        </Text>
-                        {isCorrect && (
-                          <IconSymbol ios_icon_name="checkmark.circle.fill" android_material_icon_name="check-circle" size={16} color="#10B981" />
-                        )}
-                      </View>
-                    );
-                  })}
-                </View>
-              </View>
-            ))}
+                {renderTrackerRows()}
+              </QuizFold>
+            )}
 
-            {/* Add Buttons (draft or paused) */}
-            {(currentExam.status === 'draft' || currentExam.status === 'paused') && (
+            {status === 'draft' && (
               <>
-                <TouchableOpacity
-                  style={[styles.addQuestionButton, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}
-                  onPress={() => { resetCustomForm(); setShowAddCustom(true); }}
-                >
-                  <IconSymbol ios_icon_name="plus.circle.fill" android_material_icon_name="add-circle" size={20} color={colors.primary} />
-                  <Text style={[styles.addQuestionText, { color: colors.primary }]}>{t('exam_editor.add_custom_question')}</Text>
-                </TouchableOpacity>
-
-                {!questions.some(q => q.is_bonus) && (
+                <View style={styles.btnRow}>
                   <TouchableOpacity
-                    style={[styles.addQuestionButton, { backgroundColor: '#F59E0B15', borderColor: '#F59E0B' }]}
-                    onPress={() => { resetCustomForm(); setShowAddBonus(true); }}
+                    style={[styles.quietBtn, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
+                    onPress={handlePreview}
                   >
-                    <IconSymbol ios_icon_name="star.circle.fill" android_material_icon_name="stars" size={20} color="#F59E0B" />
-                    <Text style={[styles.addQuestionText, { color: '#F59E0B' }]}>{t('exam_editor.add_bonus_question')}</Text>
+                    <IconSymbol ios_icon_name="eye" android_material_icon_name="visibility" size={13} color={colors.text} />
+                    <Text style={[styles.quietText, { color: colors.text }]}>{t('exam_editor.preview_btn')}</Text>
                   </TouchableOpacity>
-                )}
+                  <TouchableOpacity
+                    style={[styles.quietBtn, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
+                    onPress={handleResetAndNew}
+                  >
+                    <IconSymbol ios_icon_name="arrow.counterclockwise" android_material_icon_name="refresh" size={13} color={colors.textSecondary} />
+                    <Text style={[styles.quietText, { color: colors.textSecondary }]}>{t('exam_editor.start_over')}</Text>
+                  </TouchableOpacity>
+                </View>
+                <ShineButton
+                  label={t('exam_editor.activate_quiz')}
+                  gradient={['#0B7A5C', '#12A97F']}
+                  iosIcon="checkmark.circle"
+                  androidIcon="check-circle-outline"
+                  loading={actionBusy}
+                  onPress={handleActivate}
+                />
               </>
             )}
 
-            {/* Action Buttons */}
-            <View style={styles.actionSection}>
-              {currentExam.status === 'draft' && (
-                <>
-                  <TouchableOpacity
-                    style={[styles.previewButton, { borderColor: colors.primary }]}
-                    onPress={handlePreview}
-                  >
-                    <IconSymbol ios_icon_name="eye.fill" android_material_icon_name="preview" size={20} color={colors.primary} />
-                    <Text style={[styles.previewButtonText, { color: colors.primary }]}>{t('exam_editor.preview_quiz')}</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.activateButton, { backgroundColor: '#10B981' }]}
-                    onPress={handleActivate}
-                  >
-                    <IconSymbol ios_icon_name="checkmark.circle.fill" android_material_icon_name="check-circle" size={22} color="#FFF" />
-                    <Text style={styles.activateButtonText}>{t('exam_editor.activate_quiz')}</Text>
-                  </TouchableOpacity>
-                </>
-              )}
-
-              {currentExam.status === 'active' && (
-                <>
-                  <TouchableOpacity
-                    style={[styles.pauseButton, { backgroundColor: '#F59E0B' }]}
-                    onPress={handlePause}
-                  >
-                    <IconSymbol ios_icon_name="pause.circle.fill" android_material_icon_name="pause-circle-filled" size={22} color="#FFF" />
-                    <Text style={styles.pauseButtonText}>{t('exam_editor.pause_quiz')}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.closeButton, { borderColor: '#EF4444' }]}
-                    onPress={handleClose}
-                  >
-                    <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={20} color="#EF4444" />
-                    <Text style={[styles.closeButtonText, { color: '#EF4444' }]}>{t('exam_editor.close_quiz')}</Text>
-                  </TouchableOpacity>
-                </>
-              )}
-
-              {currentExam.status === 'paused' && (
-                <>
-                  <TouchableOpacity
-                    style={[styles.activateButton, { backgroundColor: '#10B981' }]}
-                    onPress={handleResume}
-                  >
-                    <IconSymbol ios_icon_name="play.circle.fill" android_material_icon_name="play-circle-filled" size={22} color="#FFF" />
-                    <Text style={styles.activateButtonText}>{t('exam_editor.resume_quiz')}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.closeButton, { borderColor: '#EF4444' }]}
-                    onPress={handleClose}
-                  >
-                    <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={20} color="#EF4444" />
-                    <Text style={[styles.closeButtonText, { color: '#EF4444' }]}>{t('exam_editor.close_quiz')}</Text>
-                  </TouchableOpacity>
-                </>
-              )}
-
-              <TouchableOpacity
-                style={[styles.resetButton, { borderColor: colors.textSecondary }]}
-                onPress={handleResetAndNew}
-              >
-                <IconSymbol ios_icon_name="arrow.counterclockwise" android_material_icon_name="refresh" size={18} color={colors.textSecondary} />
-                <Text style={[styles.resetButtonText, { color: colors.textSecondary }]}>{t('exam_editor.reset_new_quiz')}</Text>
-              </TouchableOpacity>
-            </View>
+            {status === 'paused' && (
+              <View style={styles.btnRow}>
+                <TouchableOpacity
+                  style={[styles.quietBtn, { backgroundColor: colors.glass, borderColor: '#EF444466' }]}
+                  onPress={handleClose}
+                >
+                  <IconSymbol ios_icon_name="xmark.circle" android_material_icon_name="cancel" size={13} color="#EF4444" />
+                  <Text style={[styles.quietText, { color: '#EF4444' }]}>{t('exam_editor.close_btn')}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.quietBtn, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
+                  onPress={handleResetAndNew}
+                >
+                  <IconSymbol ios_icon_name="arrow.counterclockwise" android_material_icon_name="refresh" size={13} color={colors.textSecondary} />
+                  <Text style={[styles.quietText, { color: colors.textSecondary }]}>{t('exam_editor.new_quiz_btn')}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </>
         )}
 
-        {/* Completion Tracker */}
-        {currentExam && activeSection === 'tracker' && (
+        {/* ── Live: locked questions + tracker under the pinned console ── */}
+        {currentExam && isLive && (
           <>
-            <View style={[styles.trackerSummary, { backgroundColor: colors.card }]}>
-              <Text style={[styles.trackerSummaryText, { color: colors.text }]}>
-                {t('exam_editor.completed_ratio', { done: completedCount, total: totalEmployees })}
-              </Text>
-              <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
-                <View
-                  style={[
-                    styles.progressFill,
-                    { backgroundColor: '#10B981', width: totalEmployees > 0 ? `${(completedCount / totalEmployees) * 100}%` : '0%' },
-                  ]}
-                />
-              </View>
-            </View>
-
-            {completionData.map(entry => (
-              <View key={entry.user_id} style={[styles.trackerRow, { backgroundColor: colors.card }]}>
-                <View style={styles.trackerAvatar}>
-                  {entry.profile_picture_url ? (
-                    <StorageImage source={{ uri: entry.profile_picture_url }} style={styles.trackerAvatarImage} />
-                  ) : (
-                    <View style={[styles.trackerAvatarPlaceholder, { backgroundColor: colors.primary + '20' }]}>
-                      <Text style={[styles.trackerAvatarInitial, { color: colors.primary }]}>
-                        {entry.name.charAt(0).toUpperCase()}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-                <View style={styles.trackerInfo}>
-                  <Text style={[styles.trackerName, { color: colors.text }]}>{entry.name}</Text>
-                  <Text style={[styles.trackerJob, { color: colors.textSecondary }]}>{entry.job_title}</Text>
-                </View>
-                {entry.has_completed ? (
-                  <View style={styles.trackerResultContainer}>
-                    <View style={styles.trackerResult}>
-                      <Text style={[styles.trackerScore, { color: '#10B981' }]}>
-                        {entry.correct_count}/{entry.total_questions}
-                      </Text>
-                      <Text style={[styles.trackerBucks, { color: '#10B981' }]}>
-                        +${entry.bucks_awarded}
-                      </Text>
-                    </View>
-                    <TouchableOpacity
-                      style={[styles.retakeButton, { borderColor: colors.primary }]}
-                      onPress={() =>
-                        router.push(
-                          `/exam-answer-review?examId=${currentExam.id}&userId=${entry.user_id}` as any
-                        )
-                      }
-                    >
-                      <IconSymbol ios_icon_name="doc.text.magnifyingglass" android_material_icon_name="pageview" size={12} color={colors.primary} />
-                      <Text style={[styles.retakeButtonText, { color: colors.primary }]}>{t('common.view')}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.retakeButton, { borderColor: colors.primary }]}
-                      onPress={() => handleResetUserQuiz(entry)}
-                    >
-                      <IconSymbol ios_icon_name="arrow.counterclockwise" android_material_icon_name="refresh" size={12} color={colors.primary} />
-                      <Text style={[styles.retakeButtonText, { color: colors.primary }]}>{t('exam_editor.retake_btn')}</Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <View style={[styles.notTakenBadge, { backgroundColor: '#EF444420' }]}>
-                    <Text style={styles.notTakenText}>{t('exam_editor.not_taken')}</Text>
-                  </View>
-                )}
-              </View>
-            ))}
-
-            {completionData.length === 0 && (
-              <Text style={[styles.emptyTrackerText, { color: colors.textSecondary }]}>
-                {t('exam_editor.no_employees')}
-              </Text>
-            )}
+            {renderQuestionsFold(false, true)}
+            <QuizFold
+              title={t('exam_editor.tracker_fold')}
+              iosIcon="person.2"
+              androidIcon="people-outline"
+              iconColor={visual.accent}
+              open={trackerOpen}
+              onToggle={() => setTrackerOpen(o => !o)}
+              headerExtra={trackerRing}
+            >
+              {renderTrackerRows()}
+            </QuizFold>
           </>
         )}
       </ScrollView>
 
-      {/* Add Custom Question Modal */}
+      {/* The paused state's sticky Resume dock (ED·PAUSED lockdown). */}
+      {currentExam && status === 'paused' && (
+        <View style={[styles.dock, { backgroundColor: colors.background }]}>
+          <ShineButton
+            label={t('exam_editor.resume_quiz')}
+            gradient={['#0B7A5C', '#12A97F']}
+            iosIcon="play.fill"
+            androidIcon="play-arrow"
+            loading={actionBusy}
+            onPress={handleResume}
+          />
+        </View>
+      )}
+
+      {/* ── Add Custom / Bonus Question Modal ── */}
       <Modal visible={showAddCustom || showAddBonus} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 40 : 0} style={styles.modalContainer}>
             <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+              <View style={[styles.grabber, { backgroundColor: colors.glassBorder }]} />
               <View style={styles.modalHeader}>
-                <Text style={[styles.modalTitle, { color: colors.text }]}>
+                <Text style={[styles.modalTitle, { color: showAddBonus ? '#F59E0B' : colors.text }]}>
                   {showAddBonus ? t('exam_editor.add_bonus_question') : t('exam_editor.add_custom_question')}
                 </Text>
                 <TouchableOpacity onPress={() => { setShowAddCustom(false); setShowAddBonus(false); }}>
@@ -1544,71 +1351,59 @@ export default function ExamEditorScreen() {
               </View>
 
               <ScrollView style={styles.modalScroll} contentContainerStyle={{ paddingBottom: 320 }} keyboardShouldPersistTaps="handled">
-                {showAddBonus ? (
-                  <View style={styles.bonusValueRow}>
-                    <View style={{ flex: 1 }}><Text style={[styles.formLabel, { color: colors.textSecondary }]}>{t('exam_editor.bonus_bucks_value', { currency: currencyName })}</Text></View>
+                {/* Value + photo share one row (MOD lockdown). */}
+                <View style={styles.valuePhotoRow}>
+                  <View style={styles.valueHalf}>
+                    <Text style={[styles.formLabel, { color: colors.textSecondary }]}>
+                      {showAddBonus
+                        ? t('exam_editor.bonus_bucks_value', { currency: currencyName })
+                        : t('exam_editor.currency_value', { currency: currencyName })}
+                    </Text>
                     <TextInput
-                      style={[styles.bonusInput, { backgroundColor: colors.background, color: '#F59E0B', borderColor: '#F59E0B' }]}
-                      value={bonusBucksValue}
-                      onChangeText={setBonusBucksValue}
+                      style={[
+                        styles.valueInput,
+                        { backgroundColor: colors.background, color: showAddBonus ? '#F59E0B' : visual.accent, borderColor: showAddBonus ? '#F59E0B' : colors.border },
+                      ]}
+                      value={showAddBonus ? bonusBucksValue : customBucksValue}
+                      onChangeText={showAddBonus ? setBonusBucksValue : setCustomBucksValue}
                       keyboardType="numeric"
-                      placeholder="5"
+                      placeholder={
+                        showAddBonus
+                          ? '5'
+                          : defaultBucksValue != null
+                            ? `$${defaultBucksValue} · ${t('exam_editor.quiz_default')}`
+                            : t('exam_editor.default_ph')
+                      }
                       placeholderTextColor={colors.textSecondary}
                     />
                   </View>
-                ) : (
-                  <View style={styles.bonusValueRow}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.formLabel, { color: colors.textSecondary }]}>{t('exam_editor.currency_value', { currency: currencyName })}</Text>
-                      <Text style={[styles.notifyDesc, { color: colors.textSecondary, marginTop: 2 }]}>
-                        {t('exam_editor.leave_blank_default')}
-                      </Text>
-                    </View>
-                    <TextInput
-                      style={[styles.bonusInput, { backgroundColor: colors.background, color: colors.primary, borderColor: colors.primary }]}
-                      value={customBucksValue}
-                      onChangeText={setCustomBucksValue}
-                      keyboardType="numeric"
-                      placeholder={t('exam_editor.default_ph')}
-                      placeholderTextColor={colors.textSecondary}
-                    />
-                  </View>
-                )}
-
-                <Text style={[styles.formLabel, { color: colors.textSecondary }]}>{t('exam_editor.photo_optional')}</Text>
-                {customImageUrl ? (
-                  <View style={styles.photoPreviewRow}>
-                    <StorageImage source={{ uri: customImageUrl }} style={styles.photoPreview} resizeMode="cover" />
-                    <View style={styles.photoPreviewButtons}>
+                  <View style={styles.valueHalf}>
+                    <Text style={[styles.formLabel, { color: colors.textSecondary }]}>{t('exam_editor.photo_optional')}</Text>
+                    {customImageUrl ? (
+                      <View style={styles.photoMiniRow}>
+                        <StorageImage source={{ uri: customImageUrl }} style={styles.photoMini} resizeMode="cover" />
+                        <TouchableOpacity onPress={() => setCustomImageUrl(null)} style={styles.photoMiniRemove}>
+                          <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={18} color="#EF4444" />
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
                       <TouchableOpacity
-                        style={[styles.photoButton, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}
+                        style={[styles.photoBtn, { backgroundColor: visual.accent + '14', borderColor: visual.accent + '66' }]}
                         onPress={handleAttachPhotoToCustomForm}
                         disabled={uploadingImage}
                       >
-                        <Text style={[styles.photoButtonText, { color: colors.primary }]}>
-                          {uploadingImage ? t('exam_editor.uploading') : t('exam_editor.change_photo')}
+                        <IconSymbol ios_icon_name="photo" android_material_icon_name="photo" size={14} color={visual.accent} />
+                        <Text style={[styles.photoBtnText, { color: visual.accent }]}>
+                          {uploadingImage ? t('exam_editor.uploading') : t('exam_editor.add_photo')}
                         </Text>
                       </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.photoButton, { backgroundColor: '#EF444415', borderColor: '#EF4444' }]}
-                        onPress={() => setCustomImageUrl(null)}
-                        disabled={uploadingImage}
-                      >
-                        <Text style={[styles.photoButtonText, { color: '#EF4444' }]}>{t('exam_editor.remove')}</Text>
-                      </TouchableOpacity>
-                    </View>
+                    )}
                   </View>
-                ) : (
-                  <TouchableOpacity
-                    style={[styles.photoButton, { backgroundColor: colors.primary + '15', borderColor: colors.primary, alignSelf: 'flex-start' }]}
-                    onPress={handleAttachPhotoToCustomForm}
-                    disabled={uploadingImage}
-                  >
-                    <IconSymbol ios_icon_name="photo.fill" android_material_icon_name="photo" size={16} color={colors.primary} />
-                    <Text style={[styles.photoButtonText, { color: colors.primary, marginLeft: 6 }]}>
-                      {uploadingImage ? t('exam_editor.uploading') : t('exam_editor.add_photo')}
-                    </Text>
-                  </TouchableOpacity>
+                </View>
+                {showAddBonus && (
+                  <Text style={[styles.oneShotNote, { color: colors.textSecondary }]}>
+                    {t('exam_editor.bonus_one_shot')}
+                  </Text>
                 )}
 
                 <Text style={[styles.formLabel, { color: colors.textSecondary }]}>{t('exam_editor.question_label')}</Text>
@@ -1635,8 +1430,9 @@ export default function ExamEditorScreen() {
                         <TouchableOpacity
                           style={[
                             styles.correctToggle,
-                            customCorrect === letter && { backgroundColor: '#10B981' },
-                            customCorrect !== letter && { backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border },
+                            customCorrect === letter
+                              ? { backgroundColor: '#10B981' }
+                              : { backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border },
                           ]}
                           onPress={() => setCustomCorrect(letter)}
                         >
@@ -1658,25 +1454,24 @@ export default function ExamEditorScreen() {
 
                 {addTranslation.element}
 
-                <TouchableOpacity
-                  style={[styles.modalSaveButton, { backgroundColor: showAddBonus ? '#F59E0B' : colors.primary }]}
+                <ShineButton
+                  label={showAddBonus ? t('exam_editor.add_bonus_question') : t('exam_editor.add_question_btn')}
+                  gradient={showAddBonus ? ['#B45309', '#F59E0B'] : visual.gradient}
                   onPress={() => handleAddCustom(showAddBonus)}
-                >
-                  <Text style={[styles.modalSaveText, !showAddBonus && { color: colors.fireText }]}>
-                    {showAddBonus ? t('exam_editor.add_bonus_question') : t('exam_editor.add_question_btn')}
-                  </Text>
-                </TouchableOpacity>
+                  style={styles.modalSave}
+                />
               </ScrollView>
             </View>
           </KeyboardAvoidingView>
         </View>
       </Modal>
 
-      {/* Edit Question Modal */}
+      {/* ── Edit Question Modal ── */}
       <Modal visible={!!editingQuestion} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 40 : 0} style={styles.modalContainer}>
             <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+              <View style={[styles.grabber, { backgroundColor: colors.glassBorder }]} />
               <View style={styles.modalHeader}>
                 <Text style={[styles.modalTitle, { color: colors.text }]}>{t('exam_editor.edit_question')}</Text>
                 <TouchableOpacity onPress={() => setEditingQuestion(null)}>
@@ -1686,82 +1481,74 @@ export default function ExamEditorScreen() {
 
               {editingQuestion && (
                 <ScrollView style={styles.modalScroll} contentContainerStyle={{ paddingBottom: 320 }} keyboardShouldPersistTaps="handled">
-                  {editingQuestion.is_bonus ? (
-                    <View style={styles.bonusValueRow}>
-                      <View style={{ flex: 1 }}><Text style={[styles.formLabel, { color: colors.textSecondary }]}>{t('exam_editor.bonus_bucks_value', { currency: currencyName })}</Text></View>
+                  <View style={styles.valuePhotoRow}>
+                    <View style={styles.valueHalf}>
+                      <Text style={[styles.formLabel, { color: colors.textSecondary }]}>
+                        {editingQuestion.is_bonus
+                          ? t('exam_editor.bonus_bucks_value', { currency: currencyName })
+                          : t('exam_editor.currency_value', { currency: currencyName })}
+                      </Text>
                       <TextInput
-                        style={[styles.bonusInput, { backgroundColor: colors.background, color: '#F59E0B', borderColor: '#F59E0B' }]}
-                        value={String(editingQuestion.bonus_bucks_value || 5)}
-                        onChangeText={(v) => setEditingQuestion({ ...editingQuestion, bonus_bucks_value: parseInt(v) || 0 })}
-                        keyboardType="numeric"
-                      />
-                    </View>
-                  ) : (
-                    <View style={styles.bonusValueRow}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.formLabel, { color: colors.textSecondary }]}>{t('exam_editor.currency_value', { currency: currencyName })}</Text>
-                        <Text style={[styles.notifyDesc, { color: colors.textSecondary, marginTop: 2 }]}>
-                          {t('exam_editor.leave_blank_default')}
-                        </Text>
-                      </View>
-                      <TextInput
-                        style={[styles.bonusInput, { backgroundColor: colors.background, color: colors.primary, borderColor: colors.primary }]}
+                        style={[
+                          styles.valueInput,
+                          {
+                            backgroundColor: colors.background,
+                            color: editingQuestion.is_bonus ? '#F59E0B' : visual.accent,
+                            borderColor: editingQuestion.is_bonus ? '#F59E0B' : colors.border,
+                          },
+                        ]}
                         value={
-                          editingQuestion.bucks_value === null || editingQuestion.bucks_value === undefined
-                            ? ''
-                            : String(editingQuestion.bucks_value)
+                          editingQuestion.is_bonus
+                            ? String(editingQuestion.bonus_bucks_value || 5)
+                            : editingQuestion.bucks_value == null ? '' : String(editingQuestion.bucks_value)
                         }
                         onChangeText={(v) => {
-                          const trimmed = v.trim();
-                          if (trimmed === '') {
-                            setEditingQuestion({ ...editingQuestion, bucks_value: null });
+                          if (editingQuestion.is_bonus) {
+                            setEditingQuestion({ ...editingQuestion, bonus_bucks_value: parseInt(v) || 0 });
                           } else {
-                            const n = parseInt(trimmed);
-                            setEditingQuestion({ ...editingQuestion, bucks_value: Number.isNaN(n) ? null : n });
+                            const trimmed = v.trim();
+                            if (trimmed === '') {
+                              setEditingQuestion({ ...editingQuestion, bucks_value: null });
+                            } else {
+                              const n = parseInt(trimmed);
+                              setEditingQuestion({ ...editingQuestion, bucks_value: Number.isNaN(n) ? null : n });
+                            }
                           }
                         }}
                         keyboardType="numeric"
-                        placeholder={t('exam_editor.default_ph')}
+                        placeholder={
+                          editingQuestion.is_bonus
+                            ? '5'
+                            : defaultBucksValue != null
+                              ? `$${defaultBucksValue} · ${t('exam_editor.quiz_default')}`
+                              : t('exam_editor.default_ph')
+                        }
                         placeholderTextColor={colors.textSecondary}
                       />
                     </View>
-                  )}
-
-                  <Text style={[styles.formLabel, { color: colors.textSecondary }]}>{t('exam_editor.photo_optional')}</Text>
-                  {editingQuestion.question_image_url ? (
-                    <View style={styles.photoPreviewRow}>
-                      <StorageImage source={{ uri: editingQuestion.question_image_url }} style={styles.photoPreview} resizeMode="cover" />
-                      <View style={styles.photoPreviewButtons}>
+                    <View style={styles.valueHalf}>
+                      <Text style={[styles.formLabel, { color: colors.textSecondary }]}>{t('exam_editor.photo_optional')}</Text>
+                      {editingQuestion.question_image_url ? (
+                        <View style={styles.photoMiniRow}>
+                          <StorageImage source={{ uri: editingQuestion.question_image_url }} style={styles.photoMini} resizeMode="cover" />
+                          <TouchableOpacity onPress={handleRemovePhotoFromEditingQuestion} style={styles.photoMiniRemove}>
+                            <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={18} color="#EF4444" />
+                          </TouchableOpacity>
+                        </View>
+                      ) : (
                         <TouchableOpacity
-                          style={[styles.photoButton, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}
+                          style={[styles.photoBtn, { backgroundColor: visual.accent + '14', borderColor: visual.accent + '66' }]}
                           onPress={handleAttachPhotoToEditingQuestion}
                           disabled={uploadingImage}
                         >
-                          <Text style={[styles.photoButtonText, { color: colors.primary }]}>
-                            {uploadingImage ? t('exam_editor.uploading') : t('exam_editor.change_photo')}
+                          <IconSymbol ios_icon_name="photo" android_material_icon_name="photo" size={14} color={visual.accent} />
+                          <Text style={[styles.photoBtnText, { color: visual.accent }]}>
+                            {uploadingImage ? t('exam_editor.uploading') : t('exam_editor.add_photo')}
                           </Text>
                         </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.photoButton, { backgroundColor: '#EF444415', borderColor: '#EF4444' }]}
-                          onPress={handleRemovePhotoFromEditingQuestion}
-                          disabled={uploadingImage}
-                        >
-                          <Text style={[styles.photoButtonText, { color: '#EF4444' }]}>{t('exam_editor.remove')}</Text>
-                        </TouchableOpacity>
-                      </View>
+                      )}
                     </View>
-                  ) : (
-                    <TouchableOpacity
-                      style={[styles.photoButton, { backgroundColor: colors.primary + '15', borderColor: colors.primary, alignSelf: 'flex-start' }]}
-                      onPress={handleAttachPhotoToEditingQuestion}
-                      disabled={uploadingImage}
-                    >
-                      <IconSymbol ios_icon_name="photo.fill" android_material_icon_name="photo" size={16} color={colors.primary} />
-                      <Text style={[styles.photoButtonText, { color: colors.primary, marginLeft: 6 }]}>
-                        {uploadingImage ? t('exam_editor.uploading') : t('exam_editor.add_photo')}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
+                  </View>
 
                   <Text style={[styles.formLabel, { color: colors.textSecondary }]}>{t('exam_editor.question_label')}</Text>
                   <TextInput
@@ -1780,8 +1567,9 @@ export default function ExamEditorScreen() {
                           <TouchableOpacity
                             style={[
                               styles.correctToggle,
-                              editingQuestion.correct_option === letter && { backgroundColor: '#10B981' },
-                              editingQuestion.correct_option !== letter && { backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border },
+                              editingQuestion.correct_option === letter
+                                ? { backgroundColor: '#10B981' }
+                                : { backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border },
                             ]}
                             onPress={() => setEditingQuestion({ ...editingQuestion, correct_option: letter })}
                           >
@@ -1801,12 +1589,12 @@ export default function ExamEditorScreen() {
 
                   {editTranslation.element}
 
-                  <TouchableOpacity
-                    style={[styles.modalSaveButton, { backgroundColor: colors.primary }]}
+                  <ShineButton
+                    label={t('exam_editor.save_changes')}
+                    gradient={visual.gradient}
                     onPress={handleSaveEdit}
-                  >
-                    <Text style={[styles.modalSaveText, { color: colors.fireText }]}>{t('exam_editor.save_changes')}</Text>
-                  </TouchableOpacity>
+                    style={styles.modalSave}
+                  />
                 </ScrollView>
               )}
             </View>
@@ -1814,7 +1602,57 @@ export default function ExamEditorScreen() {
         </View>
       </Modal>
 
-      {/* Category Picker Modal — for editing a question's category_label */}
+      {/* ── Regenerate sheet (MOD·REGEN) ── */}
+      <GlassActionSheet
+        visible={!!regenQuestion}
+        onClose={() => setRegenQuestion(null)}
+        title={t('exam_editor.regen_title', { n: regenQuestion?.question_order ?? '' })}
+        subtitle={regenQuestion ? getSourceLabel(regenQuestion) : undefined}
+        actions={
+          regenQuestion
+            ? [
+                ...(sourceForQuestion(regenQuestion)
+                  ? [{
+                      key: 'same',
+                      label: t('exam_editor.regen_same'),
+                      iosIcon: 'arrow.clockwise',
+                      androidIcon: 'refresh',
+                      onPress: () => {
+                        const q = regenQuestion;
+                        const src = q ? sourceForQuestion(q) : null;
+                        if (q && src) handleRefreshQuestion(q, { source: src });
+                      },
+                    }]
+                  : []),
+                {
+                  key: 'pick',
+                  label: t('exam_editor.regen_pick'),
+                  iosIcon: 'square.grid.2x2',
+                  androidIcon: 'grid-view',
+                  onPress: () => {
+                    const q = regenQuestion;
+                    if (q) {
+                      setCatPickerMode('regen');
+                      setCategoryPickerForQuestion(q);
+                    }
+                  },
+                },
+                {
+                  key: 'surprise',
+                  label: t('exam_editor.regen_surprise'),
+                  iosIcon: 'wand.and.stars',
+                  androidIcon: 'auto-awesome',
+                  onPress: () => {
+                    const q = regenQuestion;
+                    if (q) handleRefreshQuestion(q);
+                  },
+                },
+              ]
+            : []
+        }
+      />
+
+      {/* ── Category Picker (assign or regen) ── */}
       <Modal
         visible={!!categoryPickerForQuestion}
         transparent
@@ -1844,7 +1682,9 @@ export default function ExamEditorScreen() {
             onStartShouldSetResponder={() => true}
           >
             <Text style={[styles.modalTitle, { color: colors.text, marginBottom: 12 }]}>
-              {t('exam_editor.question_category')}
+              {catPickerMode === 'regen'
+                ? t('exam_editor.regen_pick')
+                : t('exam_editor.question_category')}
             </Text>
             {!showCustomCategoryInput ? (
               <>
@@ -1860,47 +1700,44 @@ export default function ExamEditorScreen() {
                       style={[
                         styles.categoryRow,
                         { borderBottomColor: colors.border },
-                        isCurrent && { backgroundColor: colors.primary + '15' },
+                        isCurrent && { backgroundColor: visual.accent + '15' },
                       ]}
                       onPress={() => {
                         if (!q) return;
-                        // If selection matches the derived label, clear the override.
-                        const newLabel = q.source_table === opt.sourceTable ? null : opt.label;
-                        handleUpdateCategoryLabel(q, newLabel);
+                        if (catPickerMode === 'regen') {
+                          setCategoryPickerForQuestion(null);
+                          handleRefreshQuestion(q, { source: opt.source, clearLabel: true });
+                        } else {
+                          // If selection matches the derived label, clear the override.
+                          const newLabel = q.source_table === opt.sourceTable ? null : opt.label;
+                          handleUpdateCategoryLabel(q, newLabel);
+                        }
                       }}
                     >
                       <Text style={{ color: colors.text, fontSize: 15, fontWeight: '500' }}>
                         {t(opt.labelKey)}
                       </Text>
                       {isCurrent && (
-                        <IconSymbol
-                          ios_icon_name="checkmark"
-                          android_material_icon_name="check"
-                          size={16}
-                          color={colors.primary}
-                        />
+                        <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={16} color={visual.accent} />
                       )}
                     </TouchableOpacity>
                   );
                 })}
-                <TouchableOpacity
-                  style={[styles.categoryRow, { borderBottomColor: colors.border }]}
-                  onPress={() => {
-                    const q = categoryPickerForQuestion;
-                    setCustomCategoryText(q?.category_label || '');
-                    setShowCustomCategoryInput(true);
-                  }}
-                >
-                  <Text style={{ color: colors.primary, fontSize: 15, fontWeight: '600' }}>
-                    {t('common.custom_option')}
-                  </Text>
-                  <IconSymbol
-                    ios_icon_name="chevron.right"
-                    android_material_icon_name="chevron-right"
-                    size={16}
-                    color={colors.primary}
-                  />
-                </TouchableOpacity>
+                {catPickerMode === 'assign' && (
+                  <TouchableOpacity
+                    style={[styles.categoryRow, { borderBottomColor: colors.border }]}
+                    onPress={() => {
+                      const q = categoryPickerForQuestion;
+                      setCustomCategoryText(q?.category_label || '');
+                      setShowCustomCategoryInput(true);
+                    }}
+                  >
+                    <Text style={{ color: visual.accent, fontSize: 15, fontWeight: '600' }}>
+                      {t('common.custom_option')}
+                    </Text>
+                    <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={16} color={visual.accent} />
+                  </TouchableOpacity>
+                )}
               </>
             ) : (
               <View>
@@ -1908,10 +1745,7 @@ export default function ExamEditorScreen() {
                   {t('exam_editor.custom_category')}
                 </Text>
                 <TextInput
-                  style={[
-                    styles.input,
-                    { backgroundColor: colors.background, color: colors.text, borderColor: colors.border },
-                  ]}
+                  style={[styles.input, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
                   value={customCategoryText}
                   onChangeText={setCustomCategoryText}
                   placeholder={t('exam_editor.custom_category_ph')}
@@ -1920,16 +1754,16 @@ export default function ExamEditorScreen() {
                 />
                 <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
                   <TouchableOpacity
-                    style={[styles.modalSaveButton, { flex: 1, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border }]}
+                    style={[styles.modalPlainBtn, { backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border }]}
                     onPress={() => {
                       setShowCustomCategoryInput(false);
                       setCustomCategoryText('');
                     }}
                   >
-                    <Text style={[styles.modalSaveText, { color: colors.text }]}>{t('common.back')}</Text>
+                    <Text style={[styles.modalPlainText, { color: colors.text }]}>{t('common.back')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.modalSaveButton, { flex: 1, backgroundColor: colors.primary }]}
+                    style={[styles.modalPlainBtn, { backgroundColor: visual.accent }]}
                     onPress={() => {
                       const q = categoryPickerForQuestion;
                       if (!q) return;
@@ -1937,7 +1771,7 @@ export default function ExamEditorScreen() {
                       handleUpdateCategoryLabel(q, trimmed || null);
                     }}
                   >
-                    <Text style={[styles.modalSaveText, { color: colors.fireText }]}>{t('common.save')}</Text>
+                    <Text style={[styles.modalPlainText, { color: '#FFF' }]}>{t('common.save')}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1947,14 +1781,117 @@ export default function ExamEditorScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
+      {/* ── Time limit sheet ── */}
+      <GlassSheet
+        visible={showTimeSheet}
+        onClose={() => setShowTimeSheet(false)}
+        title={t('exam_editor.time_limit')}
+      >
+        <View style={styles.presetWrap}>
+          {TIME_PRESETS.map(secs => {
+            const on = timeLimit === secs;
+            return (
+              <TouchableOpacity
+                key={secs}
+                style={[
+                  styles.preset,
+                  { backgroundColor: colors.glass, borderColor: colors.glassBorder },
+                  on && { backgroundColor: visual.accent, borderColor: visual.accent },
+                ]}
+                onPress={() => {
+                  setShowTimeSheet(false);
+                  handleUpdateTimeLimit(secs);
+                }}
+              >
+                <Text style={[styles.presetText, { color: on ? '#FFFFFF' : colors.text }]}>
+                  {secs === 0 ? '∞' : formatTime(secs)}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </GlassSheet>
+
+      {/* ── Default value sheet ── */}
+      <GlassSheet
+        visible={showValueSheet}
+        onClose={() => setShowValueSheet(false)}
+        title={t('exam_editor.value_sheet_title', { currency: currencyName })}
+      >
+        <Text style={[styles.valueSheetHint, { color: colors.textSecondary }]}>
+          {t('exam_editor.value_sheet_hint')}
+        </Text>
+        <View style={styles.valueSheetRow}>
+          <Text style={[styles.valueSheetDollar, { color: visual.accent }]}>$</Text>
+          <TextInput
+            style={[styles.valueSheetInput, { backgroundColor: colors.glass, borderColor: colors.glassBorder, color: visual.accent }]}
+            value={valueSheetText}
+            onChangeText={(v) => setValueSheetText(v.replace(/[^0-9]/g, ''))}
+            keyboardType="number-pad"
+            maxLength={3}
+            placeholder="1"
+            placeholderTextColor={colors.textSecondary}
+            autoFocus
+          />
+          {[0, 1, 2, 5].map(v => (
+            <TouchableOpacity
+              key={v}
+              style={[styles.preset, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
+              onPress={() => setValueSheetText(String(v))}
+            >
+              <Text style={[styles.presetText, { color: colors.text }]}>${v}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <ShineButton
+          label={t('common.save')}
+          gradient={visual.gradient}
+          onPress={handleSaveDefaultValue}
+          style={{ marginTop: 14 }}
+        />
+      </GlassSheet>
+
+      {/* ── ⓘ How generation works ── */}
+      <GlassSheet
+        visible={showInfoSheet}
+        onClose={() => setShowInfoSheet(false)}
+        title={t('exam_editor.info_title')}
+      >
+        {([
+          ['list.bullet', 'format-list-bulleted', 'info_questions'],
+          ['square.grid.2x2', 'grid-view', 'info_sources'],
+          ['photo', 'photo', 'info_photos'],
+          ['star', 'star-border', 'info_difficulty'],
+          ['dollarsign.circle', 'attach-money', 'info_value'],
+          ['timer', 'timer', 'info_time'],
+        ] as const).map(([ios, android, key]) => (
+          <View key={key} style={[styles.infoRow, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
+            <IconSymbol ios_icon_name={ios as any} android_material_icon_name={android as any} size={15} color={visual.accent} />
+            <Text style={[styles.infoText, { color: colors.text }]}>{t(`exam_editor.${key}`)}</Text>
+          </View>
+        ))}
+        <ShineButton
+          label={t('exam_editor.got_it')}
+          gradient={visual.gradient}
+          onPress={() => setShowInfoSheet(false)}
+          style={{ marginTop: 10 }}
+        />
+      </GlassSheet>
+
       {/* iOS Close-At Date Picker */}
       {Platform.OS === 'ios' && showCloseDatePicker && (
         <Modal visible transparent animationType="fade">
           <View style={styles.datePickerOverlay}>
             <View style={[styles.datePickerContainer, { backgroundColor: colors.card }]}>
               <View style={styles.datePickerHeader}>
+                {closeAt && (
+                  <TouchableOpacity onPress={() => { setShowCloseDatePicker(false); handleUpdateCloseAt(null); }}>
+                    <Text style={[styles.datePickerDone, { color: colors.textSecondary }]}>{t('common.clear')}</Text>
+                  </TouchableOpacity>
+                )}
+                <View style={{ flex: 1 }} />
                 <TouchableOpacity onPress={() => { setShowCloseDatePicker(false); setShowCloseTimePicker(true); }}>
-                  <Text style={[styles.datePickerDone, { color: colors.primary }]}>{t('exam_editor.picker_next_time')}</Text>
+                  <Text style={[styles.datePickerDone, { color: visual.accent }]}>{t('exam_editor.picker_next_time')}</Text>
                 </TouchableOpacity>
               </View>
               <DateTimePicker
@@ -1991,8 +1928,9 @@ export default function ExamEditorScreen() {
           <View style={styles.datePickerOverlay}>
             <View style={[styles.datePickerContainer, { backgroundColor: colors.card }]}>
               <View style={styles.datePickerHeader}>
+                <View style={{ flex: 1 }} />
                 <TouchableOpacity onPress={() => setShowCloseTimePicker(false)}>
-                  <Text style={[styles.datePickerDone, { color: colors.primary }]}>{t('exam_editor.picker_done')}</Text>
+                  <Text style={[styles.datePickerDone, { color: visual.accent }]}>{t('exam_editor.picker_done')}</Text>
                 </TouchableOpacity>
               </View>
               <DateTimePicker
@@ -2070,253 +2008,107 @@ export default function ExamEditorScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  tabWrapper: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
-  tabContainer: {
-    flexDirection: 'row',
+  contentContainer: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 110 },
+  pausedRunway: { paddingBottom: 210 },
+  addRowInFold: { marginTop: 4, marginBottom: 2, paddingHorizontal: 2 },
+  pinnedConsole: { paddingHorizontal: 16, paddingBottom: 10 },
+  infoChip: {
+    width: 38,
+    height: 38,
     borderRadius: 12,
-    padding: 4,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
-  },
-  tab: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 8 },
-  tabText: { fontSize: 14, fontWeight: '600' },
-  contentContainer: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 100 },
-
-  // Empty state
-  emptyCard: {
-    borderRadius: 16,
-    padding: 32,
+    borderWidth: 1,
     alignItems: 'center',
-    marginBottom: 16,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 3,
+    justifyContent: 'center',
   },
-  emptyTitle: { fontSize: 22, fontWeight: 'bold', marginTop: 16, marginBottom: 8 },
-  emptyDesc: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
-  generateButton: {
+
+  // Buttons
+  btnRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
+  dashBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
-    paddingVertical: 16,
-    gap: 10,
-  },
-  generateButtonText: { color: '#FFF', fontSize: 17, fontWeight: '700' },
-
-  // Status card
-  statusCard: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 3,
-  },
-  statusRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 6,
-  },
-  statusLabel: { fontSize: 14 },
-  statusValue: { fontSize: 14, fontWeight: '600' },
-  statusBadge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
-  statusBadgeText: { fontSize: 12, fontWeight: '700' },
-
-  // Time limit
-  timeLimitCard: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 3,
-  },
-  timeLimitHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
-  timeLimitTitle: { fontSize: 16, fontWeight: 'bold' },
-  timeLimitDisplay: { fontSize: 36, fontWeight: 'bold', textAlign: 'center', marginVertical: 8 },
-  timeLimitButtons: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
-  timeLimitOption: {
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderWidth: 1,
-  },
-  timeLimitOptionText: { fontSize: 14, fontWeight: '600' },
-
-  // Question Count
-  questionCountCard: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 3,
-  },
-  customCountRow: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-    marginTop: 12,
-    gap: 8,
-  },
-  customCountLabel: { fontSize: 14, fontWeight: '500' as const },
-  customCountInput: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    fontSize: 16,
-    fontWeight: '600' as const,
-    width: 60,
-    textAlign: 'center' as const,
-  },
-
-  // Questions
-  sectionTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 12 },
-  questionCard: {
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 12,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 3,
-  },
-  questionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  questionNumberContainer: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  questionNumber: { fontSize: 16, fontWeight: 'bold' },
-  sourceChip: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2, flexDirection: 'row', alignItems: 'center', gap: 4 },
-  categoryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 14,
-    paddingHorizontal: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  sourceChipText: { fontSize: 10, fontWeight: '700' },
-  questionActions: { flexDirection: 'row', gap: 4 },
-  actionButton: { padding: 6 },
-  questionText: { fontSize: 15, fontWeight: '600', marginBottom: 10, lineHeight: 20 },
-  optionsList: { gap: 4 },
-  optionRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 8, borderRadius: 8, gap: 8 },
-  optionLetter: { fontSize: 14, width: 20 },
-  optionText: { flex: 1, fontSize: 14 },
-
-  // Add question buttons
-  addQuestionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    gap: 6,
     borderRadius: 12,
     borderWidth: 1.5,
     borderStyle: 'dashed',
-    paddingVertical: 14,
-    marginBottom: 12,
-    gap: 8,
+    paddingVertical: 11,
   },
-  addQuestionText: { fontSize: 15, fontWeight: '600' },
-
-  // Action buttons
-  actionSection: { marginTop: 16, gap: 12 },
-  previewButton: {
+  dashText: { fontFamily: fonts.body.semibold, fontSize: 12.5 },
+  quietBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
-    borderRadius: 12,
-    paddingVertical: 14,
-    gap: 8,
-  },
-  previewButtonText: { fontSize: 16, fontWeight: '600' },
-  activateButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
-    paddingVertical: 16,
-    gap: 8,
-  },
-  activateButtonText: { color: '#FFF', fontSize: 17, fontWeight: '700' },
-  pauseButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
-    paddingVertical: 16,
-    gap: 8,
-  },
-  pauseButtonText: { color: '#FFF', fontSize: 17, fontWeight: '700' },
-  closeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderRadius: 12,
-    paddingVertical: 14,
-    gap: 8,
-  },
-  closeButtonText: { fontSize: 16, fontWeight: '600' },
-  resetButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    gap: 6,
+    borderRadius: 11,
     borderWidth: 1,
-    borderRadius: 12,
-    paddingVertical: 12,
-    gap: 8,
+    paddingVertical: 10,
   },
-  resetButtonText: { fontSize: 14, fontWeight: '600' },
+  quietText: { fontFamily: fonts.body.semibold, fontSize: 12.5 },
+  dock: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 88,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 10,
+  },
 
-  // Completion tracker
-  trackerSummary: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 3,
-  },
-  trackerSummaryText: { fontSize: 16, fontWeight: 'bold', marginBottom: 10 },
-  progressBar: { height: 8, borderRadius: 4, overflow: 'hidden' },
-  progressFill: { height: '100%', borderRadius: 4 },
-  trackerRow: {
+  // Tracker
+  trow: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 8,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 3,
-  },
-  trackerAvatar: { marginRight: 12 },
-  trackerAvatarImage: { width: 40, height: 40, borderRadius: 20 },
-  trackerAvatarPlaceholder: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  trackerAvatarInitial: { fontSize: 18, fontWeight: 'bold' },
-  trackerInfo: { flex: 1 },
-  trackerName: { fontSize: 15, fontWeight: '600' },
-  trackerJob: { fontSize: 12, marginTop: 2 },
-  trackerResultContainer: { alignItems: 'flex-end', gap: 6 },
-  trackerResult: { alignItems: 'flex-end' },
-  retakeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    gap: 10,
+    borderRadius: 13,
     borderWidth: 1,
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    padding: 11,
+    marginBottom: 7,
+    marginTop: 3,
+  },
+  tav: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  tavImage: { width: 34, height: 34, borderRadius: 17 },
+  tavText: { fontFamily: fonts.body.semibold, fontSize: 14 },
+  tbd: { flex: 1, minWidth: 0 },
+  tnm: { fontFamily: fonts.body.semibold, fontSize: 12.5 },
+  tjb: { fontFamily: fonts.body.regular, fontSize: 10, marginTop: 1 },
+  tsc: { alignItems: 'flex-end' },
+  tscScore: { fontFamily: fonts.mono.semibold, fontSize: 12.5, color: '#10B981' },
+  tscBucks: { fontFamily: fonts.mono.semibold, fontSize: 9.5, color: '#10B981', opacity: 0.85 },
+  tchips: { gap: 4, marginLeft: 2 },
+  tchip: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 4,
+    borderRadius: 7,
+    borderWidth: 1,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
   },
-  retakeButtonText: { fontSize: 11, fontWeight: '600' },
-  trackerScore: { fontSize: 16, fontWeight: 'bold' },
-  trackerBucks: { fontSize: 13, fontWeight: '600' },
-  notTakenBadge: { borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
-  notTakenText: { color: '#EF4444', fontSize: 12, fontWeight: '700' },
-  emptyTrackerText: { textAlign: 'center', fontSize: 14, marginTop: 40 },
+  tchipText: { fontFamily: fonts.body.semibold, fontSize: 9.5 },
+  notTaken: {
+    borderRadius: 8,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    backgroundColor: 'rgba(239,68,68,0.11)',
+    borderWidth: 1,
+    borderColor: 'rgba(239,68,68,0.32)',
+  },
+  notTakenText: { fontFamily: fonts.mono.semibold, fontSize: 8.5, letterSpacing: 0.6, color: '#EF4444' },
+  emptyTracker: { textAlign: 'center', fontFamily: fonts.body.regular, fontSize: 12.5, paddingVertical: 16 },
+  lockedNote: { fontFamily: fonts.body.regular, fontSize: 10.5, fontStyle: 'italic', paddingHorizontal: 2 },
+  ringLabel: { fontFamily: fonts.mono.semibold, fontSize: 8.5 },
 
   // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalContainer: { maxHeight: '85%' },
-  modalContent: { borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 20, paddingHorizontal: 20, paddingBottom: 40 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  modalTitle: { fontSize: 20, fontWeight: 'bold' },
-  modalScroll: { maxHeight: 500 },
-  formLabel: { fontSize: 13, fontWeight: '600', marginBottom: 6, marginTop: 10 },
+  modalContainer: { maxHeight: '88%' },
+  modalContent: { borderTopLeftRadius: 22, borderTopRightRadius: 22, paddingTop: 10, paddingHorizontal: 20, paddingBottom: 40 },
+  grabber: { width: 38, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 10 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
+  modalTitle: { fontFamily: fonts.display.semibold, fontSize: 18 },
+  modalScroll: { maxHeight: 520 },
+  formLabel: { fontFamily: fonts.mono.semibold, fontSize: 9, letterSpacing: 0.9, textTransform: 'uppercase', marginBottom: 6, marginTop: 10 },
   input: {
     borderWidth: 1,
     borderRadius: 10,
@@ -2325,92 +2117,79 @@ const styles = StyleSheet.create({
     fontSize: 15,
     marginBottom: 4,
   },
-  optionLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  correctToggle: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
-  correctToggleText: { fontSize: 11, fontWeight: '700' },
-  bonusValueRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  bonusInput: {
-    borderWidth: 2,
+  valuePhotoRow: { flexDirection: 'row', gap: 10 },
+  valueHalf: { flex: 1 },
+  valueInput: {
+    borderWidth: 1.5,
     borderRadius: 10,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingVertical: 10,
-    fontSize: 20,
-    fontWeight: 'bold',
-    width: 80,
-    textAlign: 'center',
+    fontSize: 15,
+    fontFamily: fonts.mono.semibold,
   },
-  modalSaveButton: {
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 16,
-    marginBottom: 20,
-  },
-  modalSaveText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
-
-  // Picture questions
-  questionCardImage: {
-    width: '100%',
-    aspectRatio: 16 / 10,
-    borderRadius: 10,
-    marginBottom: 10,
-    backgroundColor: '#00000010',
-  },
-  photoPreviewRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 8,
-  },
-  photoPreview: {
-    width: 96,
-    height: 60,
-    borderRadius: 8,
-    backgroundColor: '#00000010',
-  },
-  photoPreviewButtons: { flex: 1, gap: 6 },
-  photoButton: {
+  photoBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 6,
     borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    borderRadius: 10,
+    paddingVertical: 11,
   },
-  photoButtonText: { fontSize: 13, fontWeight: '600' },
+  photoBtnText: { fontFamily: fonts.body.semibold, fontSize: 12 },
+  photoMiniRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  photoMini: { width: 64, height: 40, borderRadius: 8, backgroundColor: '#00000010' },
+  photoMiniRemove: { padding: 4 },
+  oneShotNote: { fontFamily: fonts.body.regular, fontSize: 10.5, lineHeight: 15, marginTop: 8 },
+  optionLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  correctToggle: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
+  correctToggleText: { fontSize: 11, fontWeight: '700' },
+  modalSave: { marginTop: 16, marginBottom: 20 },
+  modalPlainBtn: { flex: 1, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+  modalPlainText: { fontFamily: fonts.body.semibold, fontSize: 15 },
+  categoryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
 
-  // Closes At / Notify Staff / Date picker
-  closeAtRight: { alignItems: 'flex-end' },
-  closeAtDate: { fontSize: 11, marginTop: 2 },
-  closeAtActions: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 4 },
-  closeAtClearBtn: {
+  // Sheets
+  presetWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingBottom: 8 },
+  preset: { borderRadius: 10, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 9 },
+  presetText: { fontFamily: fonts.mono.semibold, fontSize: 12.5 },
+  valueSheetHint: { fontFamily: fonts.body.regular, fontSize: 12, lineHeight: 17, marginBottom: 12 },
+  valueSheetRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  valueSheetDollar: { fontFamily: fonts.mono.semibold, fontSize: 20 },
+  valueSheetInput: {
     borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    fontFamily: fonts.mono.semibold,
+    fontSize: 17,
+    minWidth: 72,
   },
-  closeAtClearText: { fontSize: 12, fontWeight: '600' },
-  notifyLabelCol: { flex: 1, paddingRight: 12 },
-  notifyDesc: { fontSize: 11, marginTop: 2 },
-  datePickerOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 9,
+    borderRadius: 11,
+    borderWidth: 1,
+    paddingHorizontal: 11,
+    paddingVertical: 9,
+    marginBottom: 6,
   },
-  datePickerContainer: {
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    paddingBottom: 24,
-  },
+  infoText: { flex: 1, fontFamily: fonts.body.regular, fontSize: 12, lineHeight: 17 },
+
+  // Close-at pickers
+  datePickerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  datePickerContainer: { borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingBottom: 24 },
   datePickerHeader: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    alignItems: 'center',
     padding: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#00000020',

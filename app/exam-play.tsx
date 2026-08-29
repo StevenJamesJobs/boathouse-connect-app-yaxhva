@@ -1,4 +1,21 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+/**
+ * Quiz player — s77 lockdown rebuild on the Picture This! magazine template:
+ * a FULL-BLEED hero (the photo, or the role-gradient board with the question
+ * set big as typography) with the frosted console strip glued to its top edge
+ * carrying the quiz vitals — question count · countdown · Bucks banked — and
+ * the glass question panel riding the photo. Answers are the PT adaptive
+ * tiles (2×2 grid for short options, rows for long). Correct answers pop the
+ * gold GameToast down from the console with the Bucks banked.
+ *
+ * EVERY anti-cheat surface is inherited unchanged: server-anchored wall-clock
+ * timer (start_exam_attempt), background timeout enforcement, back-blocking,
+ * the already-completed redirect, and the offline outbox (a queued submit
+ * counts as TAKEN). New (s77): the quiz-level default value feeds scoring and
+ * the intro copy, and the BONUS ONE-SHOT rule — a multi-quiz employee who
+ * already answered a bonus in another live quiz never sees a second one.
+ */
+
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -6,11 +23,15 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   SafeAreaView,
+  ScrollView,
   BackHandler,
   AppState,
   Alert,
 } from 'react-native';
+import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { useAppTheme } from '@/contexts/ThemeContext';
 import { IconSymbol } from '@/components/IconSymbol';
 import { StorageImage } from '@/components/StorageImage';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -18,6 +39,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { supabase } from '@/app/integrations/supabase/client';
 import * as Haptics from 'expo-haptics';
+import { useTranslation } from 'react-i18next';
 import {
   ExamQuestion,
   ExamState,
@@ -28,7 +50,6 @@ import {
   handleTimeout,
   calculateResults,
   getCurrentQuestion,
-  getAnswerStatuses,
   formatTime,
   formatCountdown,
   getCountdownUrgency,
@@ -38,14 +59,32 @@ import { getEligibleQuizTypes } from '@/app/weekly-quizzes';
 import { refreshAllUnreadQuizReward } from '@/hooks/useUnreadQuizReward';
 import { refreshAllUnreadQuizzes } from '@/hooks/useUnreadQuizzes';
 import { enqueuePendingSubmit, getPendingSubmit, removePendingSubmit } from '@/utils/exam/pendingSubmits';
-import { useTranslation } from 'react-i18next';
+import GameToast from '@/components/game/GameToast';
+import GameConfetti from '@/components/game/GameConfetti';
+import MoneyRain from '@/components/quiz/MoneyRain';
+import ShineButton from '@/components/quiz/ShineButton';
+import { questionCategoryLabel } from '@/utils/exam/questionCategory';
+import { QUIZ_VISUALS, quizRole, CONSOLE_COUNTDOWN_GOLD } from '@/components/quiz/quizVisuals';
+import { fonts } from '@/constants/fonts';
 
 type Phase = 'loading' | 'intro' | 'playing' | 'feedback' | 'completed';
+
+// The adaptive-answers rule: every option this short → 2×2 tiles; anything
+// longer falls back to full-width rows. Tighter than PT's 28 — quiz answers
+// (ingredients, wine names) run long, and a truncated answer is unanswerable
+// (Steve's smoke catch).
+const GRID_MAX_CHARS = 16;
+
+/** "$2" for whole amounts, "$0.33" for split fractions. */
+function fmtBucks(n: number): string {
+  return n % 1 === 0 ? `$${n}` : `$${n.toFixed(2)}`;
+}
 
 export default function ExamPlayScreen() {
   const router = useRouter();
   const colors = useThemeColors();
-  const { i18n } = useTranslation();
+  const { resolvedMode } = useAppTheme();
+  const { t, i18n } = useTranslation();
   const isSpanish = i18n.language === 'es';
   const { user, refreshUser } = useAuth();
   const { organizationId, organization } = useOrganization();
@@ -61,14 +100,23 @@ export default function ExamPlayScreen() {
   const [examType, setExamType] = useState('');
   const [closeAt, setCloseAt] = useState<Date | null>(null);
   const [rewardsEnabled, setRewardsEnabled] = useState(true);
+  const [defaultBucksValue, setDefaultBucksValue] = useState<number | null>(null);
   const [, setCountdownTick] = useState(0);
   const [submitting, setSubmitting] = useState(false);
-  const [feedbackCorrect, setFeedbackCorrect] = useState(false);
+  const [consoleH, setConsoleH] = useState(0);
+  const [toast, setToast] = useState<string | null>(null);
 
-  // Multi-quiz reward split: a user eligible for N weekly quizzes earns
-  // $1/N per correct standard question. Bonus questions always pay full.
+  // Multi-quiz reward split: a user eligible for N quizzes earns $1/N per
+  // correct standard question UNLESS the manager set a quiz-level default
+  // (which, like per-question values, pays in full). Bonus always pays full.
   const eligibleQuizCount = Math.max(1, getEligibleQuizTypes(user?.jobTitles || []).length);
   const rewardPerCorrect = 1 / eligibleQuizCount;
+  // The quiz default (or the $1 base) splits across a member's quizzes —
+  // the split story lives on the editor's Rewards line (Steve's smoke ruling).
+  const effectivePerCorrect = (defaultBucksValue ?? 1) * rewardPerCorrect;
+
+  const role = quizRole(examType);
+  const visual = QUIZ_VISUALS[role];
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const examStateRef = useRef<ExamState | null>(null);
@@ -83,14 +131,15 @@ export default function ExamPlayScreen() {
     phaseRef.current = phase;
   }, [phase]);
 
-  // Countdown tick for close_at display on intro screen
+  // Countdown tick for close_at display on the intro screen
   useEffect(() => {
     if (!closeAt || phase !== 'intro') return;
-    const interval = setInterval(() => setCountdownTick((t) => t + 1), 1000);
+    const interval = setInterval(() => setCountdownTick((n) => n + 1), 1000);
     return () => clearInterval(interval);
   }, [closeAt, phase]);
 
-  // Block back navigation during active quiz (Android hardware back + iOS gesture blocked in _layout.tsx)
+  // Block back navigation during an active quiz (Android hardware back;
+  // the iOS gesture is blocked in _layout.tsx)
   useEffect(() => {
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
       if (phase === 'playing' || phase === 'feedback') {
@@ -101,7 +150,7 @@ export default function ExamPlayScreen() {
     return () => backHandler.remove();
   }, [phase]);
 
-  // AppState listener: recalculate timer when app returns from background
+  // AppState listener: recalculate the timer when the app returns from background
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextAppState) => {
       if (nextAppState === 'active' && examStartedAtRef.current && timeLimitSeconds > 0) {
@@ -111,7 +160,7 @@ export default function ExamPlayScreen() {
           const remaining = timeLimitSeconds - elapsed;
 
           if (remaining <= 0) {
-            // Time expired while app was in background
+            // Time expired while the app was in the background
             if (timerRef.current) clearInterval(timerRef.current);
             setTimeRemaining(0);
             const currentState = examStateRef.current;
@@ -130,15 +179,56 @@ export default function ExamPlayScreen() {
       }
     });
     return () => subscription.remove();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeLimitSeconds, isPreview]);
 
-  // Load exam data
   useEffect(() => {
     loadExam();
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // The s77 bonus one-shot: if this member is eligible for MULTIPLE quizzes
+  // and has already taken (or has queued offline) another live quiz that
+  // contained a bonus question, this quiz's bonus never appears for them —
+  // answered anywhere, right or wrong, is answered everywhere.
+  const bonusAlreadySeen = async (thisExamType: string): Promise<boolean> => {
+    if (!user?.id) return false;
+    const otherTypes = getEligibleQuizTypes(user.jobTitles || []).filter(
+      (tp) => tp !== thisExamType,
+    );
+    for (const otherType of otherTypes) {
+      try {
+        const { data: examRows } = await supabase.rpc('get_exam', {
+          p_actor_id: user.id,
+          p_exam_type: otherType,
+          p_statuses: ['active', 'paused'],
+        });
+        const other = examRows?.[0];
+        if (!other) continue;
+
+        const { data: resultRows } = await supabase.rpc('get_my_exam_result', {
+          p_actor_id: user.id,
+          p_exam_id: other.id,
+        });
+        const taken =
+          (resultRows && resultRows.length > 0 && resultRows[0].completed_at) ||
+          (await getPendingSubmit(user.id, other.id)) != null;
+        if (!taken) continue;
+
+        const { data: otherQs } = await supabase.rpc('get_exam_questions', {
+          p_actor_id: user.id,
+          p_exam_id: other.id,
+        });
+        if (otherQs && otherQs.some((q: any) => q.is_bonus)) return true;
+      } catch {
+        // Best-effort: a failed check never blocks the quiz itself.
+      }
+    }
+    return false;
+  };
 
   const loadExam = async () => {
     if (!user?.id) {
@@ -146,7 +236,6 @@ export default function ExamPlayScreen() {
       return;
     }
     try {
-      // Fetch exam info
       const { data: examRows, error: examError } = await supabase.rpc('get_exam', {
         p_actor_id: user?.id,
         p_exam_id: examId,
@@ -165,10 +254,20 @@ export default function ExamPlayScreen() {
       if (examData.close_at) {
         setCloseAt(new Date(examData.close_at));
       }
-      // rewards_enabled defaults to true if column missing (older quizzes)
+      // rewards_enabled defaults to true if the column is missing (older quizzes)
       setRewardsEnabled(examData.rewards_enabled !== false);
 
-      // Check for existing attempt (anti-cheat: detect already completed or already started)
+      // Quiz-level default value (s77) — additive reader, best-effort.
+      try {
+        const { data: dv } = await supabase.rpc('get_exam_default_bucks_value', {
+          p_actor_id: user.id, p_exam_id: examId,
+        });
+        setDefaultBucksValue(typeof dv === 'number' ? dv : null);
+      } catch {
+        setDefaultBucksValue(null);
+      }
+
+      // Anti-cheat: detect already-completed / already-queued attempts
       if (!isPreview && user?.id) {
         const { data: existingResults } = await supabase.rpc('get_my_exam_result', {
           p_actor_id: user.id,
@@ -177,11 +276,10 @@ export default function ExamPlayScreen() {
         const existingResult = existingResults?.[0];
 
         if (existingResult?.completed_at) {
-          // Already completed — redirect back
           Alert.alert(
-            isSpanish ? 'Cuestionario Completado' : 'Quiz Already Completed',
-            isSpanish ? 'Ya completaste este cuestionario.' : 'You have already completed this quiz.',
-            [{ text: isSpanish ? 'Aceptar' : 'OK', onPress: () => router.back() }]
+            t('exam_play.done_title'),
+            t('exam_play.done_body'),
+            [{ text: t('common.ok'), onPress: () => router.back() }]
           );
           return;
         }
@@ -190,17 +288,14 @@ export default function ExamPlayScreen() {
         // quiz with already-revealed answers is the retake loophole this closes.
         if (await getPendingSubmit(user.id, examId)) {
           Alert.alert(
-            isSpanish ? 'Cuestionario Completado' : 'Quiz Already Completed',
-            isSpanish
-              ? 'Tus resultados están guardados y se enviarán automáticamente cuando vuelvas a tener conexión.'
-              : 'Your results are saved and will submit automatically when you are back online.',
-            [{ text: isSpanish ? 'Aceptar' : 'OK', onPress: () => router.back() }]
+            t('exam_play.done_title'),
+            t('exam_play.offline_saved_body'),
+            [{ text: t('common.ok'), onPress: () => router.back() }]
           );
           return;
         }
       }
 
-      // Fetch questions
       const { data: questionsData, error: questionsError } = await supabase.rpc('get_exam_questions', {
         p_actor_id: user?.id,
         p_exam_id: examId,
@@ -212,7 +307,18 @@ export default function ExamPlayScreen() {
         return;
       }
 
-      const state = createExamState(questionsData as ExamQuestion[]);
+      let playQuestions = questionsData as ExamQuestion[];
+      if (!isPreview && playQuestions.some((q) => q.is_bonus)) {
+        if (await bonusAlreadySeen(examData.exam_type)) {
+          playQuestions = playQuestions.filter((q) => !q.is_bonus);
+        }
+      }
+      if (playQuestions.length === 0) {
+        router.back();
+        return;
+      }
+
+      const state = createExamState(playQuestions);
       setExamState({ ...state, phase: 'intro' });
       setPhase('intro');
     } catch (err) {
@@ -221,7 +327,7 @@ export default function ExamPlayScreen() {
     }
   };
 
-  // Start timer — uses wall-clock time to prevent backgrounding exploit
+  // Start timer — wall-clock time prevents the backgrounding exploit
   const startTimer = () => {
     timerRef.current = setInterval(() => {
       if (!examStartedAtRef.current) return;
@@ -231,7 +337,6 @@ export default function ExamPlayScreen() {
       if (remaining <= 0) {
         if (timerRef.current) clearInterval(timerRef.current);
         setTimeRemaining(0);
-        // Time's up
         const currentState = examStateRef.current;
         if (currentState && currentState.phase !== 'completed') {
           const timedOutState = handleTimeout(currentState);
@@ -247,7 +352,7 @@ export default function ExamPlayScreen() {
     }, 1000);
   };
 
-  // Handle start quiz — registers server-side started_at to prevent force-close exploit
+  // Handle start — registers server-side started_at to prevent force-close exploit
   const handleStart = async () => {
     if (!examState) return;
 
@@ -261,10 +366,7 @@ export default function ExamPlayScreen() {
 
         if (error) {
           console.error('start_exam_attempt error:', error);
-          Alert.alert(
-            isSpanish ? 'Error' : 'Error',
-            isSpanish ? 'No se pudo iniciar el cuestionario. Inténtalo de nuevo.' : 'Could not start the quiz. Please try again.'
-          );
+          Alert.alert(t('common.error'), t('exam_play.err_start_body'));
           return;
         }
 
@@ -272,18 +374,18 @@ export default function ExamPlayScreen() {
 
         if (attempt?.is_completed) {
           Alert.alert(
-            isSpanish ? 'Cuestionario Completado' : 'Quiz Already Completed',
-            isSpanish ? 'Ya completaste este cuestionario.' : 'You have already completed this quiz.',
-            [{ text: isSpanish ? 'Aceptar' : 'OK', onPress: () => router.back() }]
+            t('exam_play.done_title'),
+            t('exam_play.done_body'),
+            [{ text: t('common.ok'), onPress: () => router.back() }]
           );
           return;
         }
 
-        // Set the wall-clock start time from the server timestamp
+        // Wall-clock start from the server timestamp
         if (attempt?.started_at) {
           const serverStartMs = new Date(attempt.started_at).getTime();
 
-          // Check if this is a resumed attempt (started_at is more than 5 seconds ago)
+          // Resumed attempt (started more than 5 seconds ago)?
           const elapsed = Math.floor((Date.now() - serverStartMs) / 1000);
           if (elapsed > 5 && timeLimitSeconds > 0) {
             const remaining = timeLimitSeconds - elapsed;
@@ -295,7 +397,6 @@ export default function ExamPlayScreen() {
               submitResults(timedOutState);
               return;
             }
-            // Resume with reduced time
             setTimeRemaining(remaining);
           }
 
@@ -305,14 +406,11 @@ export default function ExamPlayScreen() {
         }
       } catch (err) {
         console.error('start_exam_attempt exception:', err);
-        Alert.alert(
-          isSpanish ? 'Error' : 'Error',
-          isSpanish ? 'No se pudo iniciar el cuestionario. Inténtalo de nuevo.' : 'Could not start the quiz. Please try again.'
-        );
+        Alert.alert(t('common.error'), t('exam_play.err_start_body'));
         return;
       }
     } else {
-      // Preview mode — just use local time
+      // Preview mode — local time only
       examStartedAtRef.current = Date.now();
     }
 
@@ -324,7 +422,6 @@ export default function ExamPlayScreen() {
     }
   };
 
-  // Handle option selection
   const handleSelectOption = (option: 'A' | 'B' | 'C' | 'D') => {
     if (!examState || phase !== 'playing') return;
     const updated = selectOption(examState, option);
@@ -332,7 +429,13 @@ export default function ExamPlayScreen() {
     try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
   };
 
-  // Handle next/submit
+  const bucksForQuestion = (q: ExamQuestion): number => {
+    if (!rewardsEnabled) return 0;
+    if (q.is_bonus) return q.bonus_bucks_value || 0;
+    // Per-question overrides pay full; the fallback carries the split.
+    return typeof q.bucks_value === 'number' ? q.bucks_value : effectivePerCorrect;
+  };
+
   const handleNext = () => {
     if (!examState || !examState.selectedOption) return;
 
@@ -340,7 +443,6 @@ export default function ExamPlayScreen() {
     if (!currentQ) return;
 
     const isCorrect = examState.selectedOption === currentQ.correct_option;
-    setFeedbackCorrect(isCorrect);
     setPhase('feedback');
 
     try {
@@ -349,7 +451,15 @@ export default function ExamPlayScreen() {
       );
     } catch {}
 
-    // After brief feedback delay, advance
+    // The gold toast pops from the console when a correct answer banks Bucks.
+    if (isCorrect && !isPreview) {
+      const earned = bucksForQuestion(currentQ);
+      if (earned > 0) {
+        setToast(t('exam_play.toast_banked', { amount: fmtBucks(earned) }));
+      }
+    }
+
+    // After the feedback beat, advance
     setTimeout(() => {
       const submitted = submitAnswer(examState);
       setExamState(submitted);
@@ -366,12 +476,11 @@ export default function ExamPlayScreen() {
     }, 800);
   };
 
-  // Submit results to DB
   const submitResults = async (state: ExamState) => {
     if (!user?.id || submitting) return;
     setSubmitting(true);
 
-    const results = calculateResults(state, rewardPerCorrect, rewardsEnabled);
+    const results = calculateResults(state, rewardPerCorrect, rewardsEnabled, defaultBucksValue);
     const submitArgs = {
       p_exam_id: examId,
       p_user_id: user.id,
@@ -391,41 +500,36 @@ export default function ExamPlayScreen() {
 
       // A retry/flush may have queued this attempt earlier — clear it.
       removePendingSubmit(user.id, examId);
-      // Refresh user to update reward currency balance
+      // Refresh user to update the reward-currency balance
       await refreshUser();
       // Light up the Rewards-tab badge — a quiz reward is now waiting.
       refreshAllUnreadQuizReward();
-      // ...and clear the unread-QUIZ badge: this quiz is now taken, so the tab
-      // bars / Tools tile / BadgeSyncer counts are stale until we broadcast
-      // (they would otherwise sit wrong until their next 30s poll).
+      // ...and clear the unread-QUIZ badge so the tab bars / Tools tile /
+      // BadgeSyncer counts don't sit stale until their next 30s poll.
       refreshAllUnreadQuizzes();
     } catch (err) {
       console.error('Submit results error:', err);
       // Park the exact payload in the offline outbox: the quiz now counts as
-      // TAKEN (weekly-quizzes card + badge) and these first-attempt answers
-      // auto-submit on reconnect — closing the offline retake loophole.
+      // TAKEN and these first-attempt answers auto-submit on reconnect —
+      // closing the offline retake loophole.
       await enqueuePendingSubmit(user.id, examId, submitArgs);
       Alert.alert(
-        isSpanish ? 'Sin conexión' : 'Connection issue',
-        isSpanish
-          ? 'No se pudieron enviar tus resultados ahora. Quedaron guardados en este dispositivo y se enviarán automáticamente cuando vuelvas a tener conexión.'
-          : "Your results couldn't be submitted right now. They're saved on this device and will submit automatically when you're back online.",
+        t('exam_play.offline_title'),
+        t('exam_play.offline_body'),
         [
-          { text: isSpanish ? 'Reintentar' : 'Retry', onPress: () => submitResults(state) },
-          { text: isSpanish ? 'Aceptar' : 'OK', style: 'cancel' },
+          { text: t('common.retry'), onPress: () => submitResults(state) },
+          { text: t('common.ok'), style: 'cancel' },
         ],
       );
     }
     setSubmitting(false);
   };
 
-  // Navigate to results
   const handleViewResults = () => {
     if (!examState) return;
-    const results = calculateResults(examState, rewardPerCorrect, rewardsEnabled);
-    // In preview mode there is no exam_results row to read, so we pass the
-    // in-memory answers through the URL so exam-results can render the
-    // per-question correct/wrong badges accurately.
+    const results = calculateResults(examState, rewardPerCorrect, rewardsEnabled, defaultBucksValue);
+    // In preview mode there is no exam_results row to read, so the in-memory
+    // answers ride the URL for exam-results' per-question badges.
     const previewAnswersParam = isPreview
       ? `&previewAnswers=${encodeURIComponent(JSON.stringify(examState.answers))}`
       : '';
@@ -434,322 +538,447 @@ export default function ExamPlayScreen() {
     );
   };
 
+  // Running banked total for the console chip.
+  const bankedSoFar = useMemo(() => {
+    if (!examState || isPreview || !rewardsEnabled) return 0;
+    let sum = 0;
+    examState.answers.forEach((answer, index) => {
+      const q = examState.questions[index];
+      if (q && answer.is_correct) sum += bucksForQuestion(q);
+    });
+    return sum;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [examState?.answers.length, rewardsEnabled, defaultBucksValue]);
+
   if (phase === 'loading' || !examState) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 100 }} />
+        <ActivityIndicator size="large" color={visual.accent} style={{ marginTop: 100 }} />
       </SafeAreaView>
     );
   }
 
   const currentQuestion = getCurrentQuestion(examState);
-  const answerStatuses = getAnswerStatuses(examState);
   const isTimeLow = timeLimitSeconds > 0 && timeRemaining <= 30;
+  const typeName = getExamTypeName((examType || 'server') as ExamType, isSpanish);
+  const quizTitle = t('weekly_quizzes.type_quiz_title', { type: typeName });
 
-  // INTRO SCREEN
+  // ── INTRO — the threshold (START·FINAL) ──────────────────────────────────
   if (phase === 'intro') {
+    const msRemaining = closeAt ? closeAt.getTime() - Date.now() : null;
+    const urgency = msRemaining != null ? getCountdownUrgency(msRemaining) : null;
+    const closesColor =
+      urgency === 'red' ? '#EF4444' : urgency === 'amber' ? '#F59E0B' : colors.text;
+
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.introContent}>
+        <ScrollView contentContainerStyle={styles.introContent} showsVerticalScrollIndicator={false}>
           {isPreview && (
-            <View style={[styles.previewBanner, { backgroundColor: '#F59E0B' }]}>
-              <IconSymbol ios_icon_name="eye.fill" android_material_icon_name="preview" size={18} color="#FFF" />
-              <Text style={styles.previewBannerText}>{isSpanish ? 'Modo Vista Previa — los resultados no se guardarán' : 'Preview Mode — results will not be saved'}</Text>
+            <View style={styles.previewPill}>
+              <IconSymbol ios_icon_name="eye" android_material_icon_name="visibility" size={11} color="#F59E0B" />
+              <Text style={styles.previewPillText}>{t('exam_play.preview_pill').toUpperCase()}</Text>
             </View>
           )}
 
-          <View style={[styles.introCard, { backgroundColor: colors.card }]}>
-            <IconSymbol ios_icon_name="doc.text.fill" android_material_icon_name="quiz" size={56} color={colors.primary} />
-            <Text style={[styles.introTitle, { color: colors.text }]}>
-              {isSpanish ? `Cuestionario Semanal del ${getExamTypeName(examType as ExamType, true)}` : `${getExamTypeName(examType as ExamType)} Weekly Quiz`}
-            </Text>
-            <Text style={[styles.introSubtitle, { color: colors.textSecondary }]}>
-              {examState.questions.length} {isSpanish ? 'Preguntas' : 'Questions'}
-            </Text>
-
-            <View style={[styles.introInfoRow, { backgroundColor: colors.background }]}>
-              <IconSymbol ios_icon_name="timer" android_material_icon_name="timer" size={20} color={colors.primary} />
-              <Text style={[styles.introInfoText, { color: colors.text }]}>
-                {timeLimitSeconds > 0
-                  ? (isSpanish ? `Límite de Tiempo: ${formatTime(timeLimitSeconds)}` : `Time Limit: ${formatTime(timeLimitSeconds)}`)
-                  : (isSpanish ? 'Sin Límite de Tiempo — toma tu tiempo' : 'No Time Limit — take your time')}
-              </Text>
+          <View style={[styles.startCard, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
+            <View style={styles.startRing}>
+              <LinearGradient
+                colors={[visual.gradient[0], visual.gradient[1]]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFill}
+              />
+              <IconSymbol ios_icon_name="graduationcap.fill" android_material_icon_name="school" size={32} color="#FFFFFF" />
             </View>
+            <Text style={[styles.startTitle, { color: colors.text }]}>{quizTitle}</Text>
+            <Text style={[styles.startSub, { color: colors.textSecondary }]}>
+              {t('exam_play.q_count', { count: examState.questions.length }).toUpperCase()}
+              {' · '}
+              {(timeLimitSeconds > 0
+                ? t('exam_play.limit_chip', { time: formatTime(timeLimitSeconds) })
+                : t('exam_play.no_limit_chip')
+              ).toUpperCase()}
+            </Text>
 
-            {closeAt && (() => {
-              const msRemaining = closeAt.getTime() - Date.now();
-              const urgency = getCountdownUrgency(msRemaining);
-              const color =
-                urgency === 'red' ? '#EF4444'
-                : urgency === 'amber' ? '#F59E0B'
-                : colors.text;
-              return (
-                <View style={[styles.introInfoRow, { backgroundColor: colors.background }]}>
-                  <IconSymbol ios_icon_name="hourglass" android_material_icon_name="hourglass-empty" size={20} color={color} />
-                  <Text style={[styles.introInfoText, { color }]}>
-                    {isSpanish
-                      ? `Cierra en ${formatCountdown(msRemaining, true)}`
-                      : `Closes in ${formatCountdown(msRemaining)}`}
-                  </Text>
-                </View>
-              );
-            })()}
+            {msRemaining != null && (
+              <View style={[styles.infoRow, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
+                <IconSymbol ios_icon_name="hourglass" android_material_icon_name="hourglass-empty" size={14} color={closesColor} />
+                <Text style={[styles.infoRowText, { color: closesColor }]}>
+                  {t('exam_play.closes_line', { time: formatCountdown(msRemaining, isSpanish) })}
+                </Text>
+              </View>
+            )}
 
-            <View style={[styles.introInfoRow, { backgroundColor: colors.background }]}>
-              <IconSymbol ios_icon_name="dollarsign.circle.fill" android_material_icon_name="attach-money" size={20} color="#10B981" />
-              <Text style={[styles.introInfoText, { color: colors.text }]}>
-                {isSpanish
-                  ? `Gana $${rewardPerCorrect.toFixed(2)} ${currencyName} por respuesta correcta`
-                  : `Earn $${rewardPerCorrect.toFixed(2)} ${currencyName} per correct answer`}
-              </Text>
-            </View>
+            {rewardsEnabled && effectivePerCorrect > 0 && (
+              <View style={[styles.infoRow, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
+                <IconSymbol ios_icon_name="dollarsign.circle.fill" android_material_icon_name="attach-money" size={14} color="#10B981" />
+                <Text style={[styles.infoRowText, { color: colors.text }]}>
+                  {t('exam_play.earn_line', { amount: fmtBucks(effectivePerCorrect), currency: currencyName })}
+                </Text>
+              </View>
+            )}
 
-            {eligibleQuizCount > 1 && (
-              <Text style={[styles.introSplitNote, { color: colors.textSecondary }]}>
-                {isSpanish
-                  ? `Tu recompensa por pregunta se divide entre tus ${eligibleQuizCount} cuestionarios — el máximo semanal sigue siendo el mismo.`
-                  : `Your reward per question is split across your ${eligibleQuizCount} quizzes — total weekly max stays the same.`}
+            {eligibleQuizCount > 1 && rewardsEnabled && effectivePerCorrect > 0 && (
+              <Text style={[styles.splitNote, { color: colors.textSecondary }]}>
+                {t('exam_play.earn_split_note', { count: eligibleQuizCount })}
               </Text>
             )}
 
-            <View style={[styles.introInfoRow, { backgroundColor: colors.background }]}>
-              <IconSymbol ios_icon_name="exclamationmark.triangle.fill" android_material_icon_name="warning" size={20} color="#F59E0B" />
-              <Text style={[styles.introInfoText, { color: colors.text }]}>
-                {timeLimitSeconds > 0
-                  ? (isSpanish
-                    ? 'No puedes volver a preguntas anteriores y el reloj seguirá corriendo una vez que comiences'
-                    : 'You cannot go back to previous questions and the clock will continue to run once you start')
-                  : (isSpanish
-                    ? 'No puedes volver a preguntas anteriores'
-                    : 'You cannot go back to previous questions')}
-              </Text>
-            </View>
-
-            <View style={[styles.introInfoRow, { backgroundColor: colors.background }]}>
-              <IconSymbol ios_icon_name="lock.shield.fill" android_material_icon_name="shield" size={20} color={colors.primary} />
-              <Text style={[styles.introInfoText, { color: colors.text }]}>
-                {isSpanish
-                  ? 'No te preocupes, tus compañeros no podrán ver tus resultados'
-                  : "Don't worry, your teammates will not be able to view your test scores"}
-              </Text>
+            <View style={[styles.rules, { borderTopColor: colors.hairline }]}>
+              <View style={styles.rule}>
+                <IconSymbol ios_icon_name="arrow.right" android_material_icon_name="arrow-forward" size={13} color={visual.accent} />
+                <Text style={[styles.ruleText, { color: colors.textSecondary }]}>
+                  {timeLimitSeconds > 0 ? t('exam_play.rule_one_way_timed') : t('exam_play.rule_one_way')}
+                </Text>
+              </View>
+              <View style={styles.rule}>
+                <IconSymbol ios_icon_name="lock.shield" android_material_icon_name="shield" size={13} color={visual.accent} />
+                <Text style={[styles.ruleText, { color: colors.textSecondary }]}>
+                  {t('exam_play.rule_privacy')}
+                </Text>
+              </View>
             </View>
           </View>
 
-          <TouchableOpacity
-            style={[styles.startButton, { backgroundColor: colors.primary }]}
+          <ShineButton
+            label={t('exam_play.start_btn')}
+            gradient={visual.gradient}
+            iosIcon="arrow.right"
+            androidIcon="arrow-forward"
             onPress={handleStart}
-          >
-            <Text style={[styles.startButtonText, { color: colors.fireText }]}>{isSpanish ? 'Comenzar Cuestionario' : 'Start Quiz'}</Text>
-          </TouchableOpacity>
-
+          />
           <TouchableOpacity onPress={() => router.back()} style={styles.cancelLink}>
-            <Text style={[styles.cancelText, { color: colors.textSecondary }]}>{isSpanish ? 'Cancelar' : 'Cancel'}</Text>
+            <Text style={[styles.cancelText, { color: colors.textSecondary }]}>{t('exam_play.cancel_link')}</Text>
           </TouchableOpacity>
-        </View>
+        </ScrollView>
       </SafeAreaView>
     );
   }
 
-  // COMPLETED SCREEN (brief before navigating to results)
+  // ── COMPLETED (brief, before results) ────────────────────────────────────
   if (phase === 'completed') {
-    const results = calculateResults(examState, rewardPerCorrect, rewardsEnabled);
+    const results = calculateResults(examState, rewardPerCorrect, rewardsEnabled, defaultBucksValue);
+    // The first thing they see after finishing earns the celebration too
+    // (Steve's smoke round) — same locked rules as the results screen:
+    // ≥$1 banked → money rain; otherwise confetti above 50%.
+    const donePct = results.totalQuestions > 0
+      ? Math.round((results.correctCount / results.totalQuestions) * 100)
+      : 0;
+    const doneRained = !isPreview && results.totalBucksAwarded >= 1;
+    const doneConfetti = !doneRained && donePct > 50;
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        {doneRained && <MoneyRain />}
+        {doneConfetti && (
+          <GameConfetti visual={{ accent: visual.accent, gradient: visual.gradient }} count={70} />
+        )}
         <View style={styles.completedContent}>
           {examState.isTimedOut && (
-            <View style={[styles.timeoutBanner, { backgroundColor: '#EF4444' }]}>
-              <IconSymbol ios_icon_name="clock.badge.exclamationmark.fill" android_material_icon_name="timer-off" size={22} color="#FFF" />
-              <Text style={styles.timeoutBannerText}>{isSpanish ? '¡Se Acabó el Tiempo!' : "Time's Up!"}</Text>
+            <View style={styles.timeoutBanner}>
+              <IconSymbol ios_icon_name="clock.badge.exclamationmark.fill" android_material_icon_name="timer-off" size={20} color="#FFF" />
+              <Text style={styles.timeoutBannerText}>{t('exam_play.times_up')}</Text>
             </View>
           )}
 
-          <View style={[styles.completedCard, { backgroundColor: colors.card }]}>
-            <Text style={[styles.completedTitle, { color: colors.text }]}>{isSpanish ? '¡Cuestionario Completo!' : 'Quiz Complete!'}</Text>
-
-            <View style={[styles.scoreCircle, { borderColor: colors.primary }]}>
-              <Text style={[styles.scoreNumber, { color: colors.primary }]}>
+          <View style={[styles.completedCard, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
+            <Text style={[styles.completedTitle, { color: colors.text }]}>{t('exam_play.completed_title')}</Text>
+            <View style={[styles.scoreCircle, { borderColor: visual.accent }]}>
+              <Text style={[styles.scoreNumber, { color: visual.accent }]}>
                 {results.correctCount}/{results.totalQuestions}
               </Text>
             </View>
-
-            <View style={[styles.bucksEarned, { backgroundColor: '#10B98115' }]}>
-              <Text style={styles.bucksEarnedText}>+${results.totalBucksAwarded} {currencyName}</Text>
-            </View>
-
+            {!isPreview && results.totalBucksAwarded > 0 && (
+              <View style={styles.bucksEarned}>
+                <Text style={styles.bucksEarnedText}>+${results.totalBucksAwarded} {currencyName}</Text>
+              </View>
+            )}
             {submitting && (
-              <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: 12 }} />
+              <ActivityIndicator size="small" color={visual.accent} style={{ marginTop: 12 }} />
             )}
           </View>
 
-          <TouchableOpacity
-            style={[styles.viewResultsButton, { backgroundColor: colors.primary }]}
-            onPress={handleViewResults}
+          <ShineButton
+            label={t('exam_play.view_results')}
+            gradient={visual.gradient}
             disabled={submitting}
-          >
-            <Text style={[styles.viewResultsText, { color: colors.fireText }]}>{isSpanish ? 'Ver Resultados Completos' : 'View Full Results'}</Text>
-          </TouchableOpacity>
+            onPress={handleViewResults}
+          />
         </View>
       </SafeAreaView>
     );
   }
 
-  // PLAYING / FEEDBACK SCREEN
-  return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      {isPreview && (
-        <View style={[styles.previewBanner, { backgroundColor: '#F59E0B' }]}>
-          <Text style={styles.previewBannerText}>{isSpanish ? 'Modo Vista Previa' : 'Preview Mode'}</Text>
-        </View>
-      )}
+  // ── PLAYING / FEEDBACK — the magazine ────────────────────────────────────
+  const hasPhoto = !!currentQuestion?.question_image_url;
+  const useGrid = !!currentQuestion &&
+    (['A', 'B', 'C', 'D'] as const).every((letter) => {
+      const key = `option_${letter.toLowerCase()}` as keyof ExamQuestion;
+      const esKey = `${key}_es` as keyof ExamQuestion;
+      const txt = (isSpanish && (currentQuestion[esKey] as string | null)) || (currentQuestion[key] as string);
+      return (txt ?? '').length <= GRID_MAX_CHARS;
+    });
+  const questionText = currentQuestion
+    ? (isSpanish && currentQuestion.question_text_es) || currentQuestion.question_text
+    : '';
+  const boardColors = visual.board[resolvedMode];
+  const boardInk = visual.boardInk[resolvedMode];
+  // The category chip on the hero (Steve's smoke round) — bonus questions
+  // already wear the gold pill, so they skip the chip.
+  const catLabel = currentQuestion && !currentQuestion.is_bonus
+    ? questionCategoryLabel(currentQuestion, t)
+    : null;
 
-      {/* Top Bar: Progress indicators + Timer */}
-      <View style={[styles.topBar, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <View style={styles.indicatorRow}>
-          {answerStatuses.map((status, index) => {
-            const isCurrent = index === examState.currentIndex && phase !== 'feedback';
-            const question = examState.questions[index];
-            return (
-              <View
-                key={index}
-                style={[
-                  styles.indicator,
-                  status === 'correct' && styles.indicatorCorrect,
-                  status === 'wrong' && styles.indicatorWrong,
-                  status === 'unanswered' && { backgroundColor: colors.border },
-                  isCurrent && { borderWidth: 2, borderColor: colors.primary },
-                  question.is_bonus && { borderWidth: 2, borderColor: '#F59E0B' },
-                ]}
-              />
-            );
-          })}
-        </View>
+  const renderAnswer = (letter: 'A' | 'B' | 'C' | 'D') => {
+    if (!currentQuestion) return null;
+    const key = `option_${letter.toLowerCase()}` as keyof ExamQuestion;
+    const esKey = `${key}_es` as keyof ExamQuestion;
+    const optionText =
+      (isSpanish && (currentQuestion[esKey] as string | null)) ||
+      (currentQuestion[key] as string);
+    const isSelected = examState.selectedOption === letter;
+    const showFeedback = phase === 'feedback';
+    const isCorrectOption = letter === currentQuestion.correct_option;
 
+    let borderColor = colors.surfaceBorder;
+    let bg: string | undefined;
+    let textColor = colors.text;
+    let letterColor = visual.accent;
+    let dim = false;
+
+    if (showFeedback) {
+      if (isCorrectOption) {
+        borderColor = '#10B981';
+        bg = 'rgba(16,185,129,0.11)';
+        textColor = '#10B981';
+        letterColor = '#10B981';
+      } else if (isSelected) {
+        borderColor = '#EF4444';
+        bg = 'rgba(239,68,68,0.10)';
+        textColor = '#EF4444';
+        letterColor = '#EF4444';
+      } else {
+        dim = true;
+      }
+    } else if (isSelected) {
+      borderColor = visual.accent;
+      bg = visual.accent + '14';
+      textColor = visual.accent;
+    }
+
+    return (
+      <TouchableOpacity
+        key={letter}
+        style={[
+          useGrid ? styles.ansTile : styles.ansRow,
+          { backgroundColor: bg ?? colors.surface, borderColor },
+          dim && { opacity: 0.5 },
+        ]}
+        onPress={() => handleSelectOption(letter)}
+        disabled={phase === 'feedback'}
+        activeOpacity={0.75}
+      >
+        <View style={[styles.letterChip, { backgroundColor: letterColor + '22' }]}>
+          <Text style={[styles.letterChipText, { color: letterColor }]}>{letter}</Text>
+        </View>
+        <Text
+          style={[
+            useGrid ? styles.ansTileText : styles.ansRowText,
+            { color: textColor },
+          ]}
+          numberOfLines={useGrid ? 3 : undefined}
+        >
+          {optionText}
+        </Text>
+        {showFeedback && isCorrectOption && (
+          <IconSymbol ios_icon_name="checkmark.circle.fill" android_material_icon_name="check-circle" size={19} color="#10B981" style={useGrid ? styles.tileFbIcon : undefined} />
+        )}
+        {showFeedback && isSelected && !isCorrectOption && (
+          <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={19} color="#EF4444" style={useGrid ? styles.tileFbIcon : undefined} />
+        )}
+      </TouchableOpacity>
+    );
+  };
+
+  const consoleStrip = (
+    <View style={styles.ovcon} onLayout={(e) => setConsoleH(e.nativeEvent.layout.height)}>
+      <BlurView intensity={26} tint="dark" style={StyleSheet.absoluteFill} />
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: visual.console[0] + '6E' }]} />
+      <View style={styles.ovRow}>
+        <Text style={styles.ovStat}>
+          Q{examState.currentIndex + 1}
+          <Text style={styles.ovStatSmall}>/{examState.questions.length}</Text>
+        </Text>
         {timeLimitSeconds > 0 ? (
-          <View style={[styles.timerContainer, isTimeLow && styles.timerLow]}>
-            <IconSymbol ios_icon_name="timer" android_material_icon_name="timer" size={18} color={isTimeLow ? '#EF4444' : colors.primary} />
-            <Text style={[styles.timerText, { color: isTimeLow ? '#EF4444' : colors.primary }]}>
+          <View style={styles.ovTimer}>
+            <IconSymbol ios_icon_name="clock" android_material_icon_name="schedule" size={13} color={isTimeLow ? '#FFB4B4' : 'rgba(255,255,255,0.8)'} />
+            <Text style={[styles.ovTimerText, isTimeLow && { color: '#FFB4B4' }]}>
               {formatTime(timeRemaining)}
             </Text>
           </View>
         ) : (
-          <View style={styles.timerContainer}>
-            <IconSymbol ios_icon_name="infinity" android_material_icon_name="all-inclusive" size={18} color={colors.primary} />
-            <Text style={[styles.timerText, { color: colors.primary }]}>{isSpanish ? 'Sin Límite' : 'No Limit'}</Text>
+          <View style={styles.ovTimer}>
+            <IconSymbol ios_icon_name="infinity" android_material_icon_name="all-inclusive" size={15} color="rgba(255,255,255,0.8)" />
           </View>
         )}
+        {!isPreview && rewardsEnabled ? (
+          <Text style={styles.ovStat}>
+            <Text style={styles.ovStatSmall}>$ </Text>
+            {bankedSoFar % 1 === 0 ? bankedSoFar : bankedSoFar.toFixed(2)}
+          </Text>
+        ) : (
+          <View style={styles.ovStatSpacer} />
+        )}
+      </View>
+      <View style={styles.ovMeter}>
+        <LinearGradient
+          colors={[CONSOLE_COUNTDOWN_GOLD, '#FFFFFF']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={[styles.ovMeterFill, { width: `${(examState.currentIndex / examState.questions.length) * 100}%` }]}
+        />
+        {[25, 50, 75].map((pct) => (
+          <View key={pct} style={[styles.ovMeterTick, { left: `${pct}%` }]} />
+        ))}
+      </View>
+    </View>
+  );
+
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Slim header — deliberately NO back control: a live quiz is locked in. */}
+      <View style={styles.playHeader}>
+        <View style={styles.playHeaderSpacer} />
+        <View style={styles.playHeaderMid}>
+          <Text style={[styles.playEyebrow, { color: colors.tint }]}>
+            {t('weekly_quizzes.title').toUpperCase()}
+          </Text>
+          <Text style={[styles.playTitle, { color: colors.text }]} numberOfLines={1}>
+            {quizTitle}
+          </Text>
+        </View>
+        <View style={[styles.shieldChip, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
+          <IconSymbol ios_icon_name="lock.shield" android_material_icon_name="shield" size={15} color={visual.accent} />
+        </View>
       </View>
 
-      {/* Question Content */}
-      {currentQuestion && (
-        <View style={styles.questionContainer}>
-          {/* Question number + bonus badge */}
-          <View style={styles.questionMeta}>
-            <Text style={[styles.questionCounter, { color: colors.textSecondary }]}>
-              {isSpanish ? `Pregunta ${examState.currentIndex + 1} de ${examState.questions.length}` : `Question ${examState.currentIndex + 1} of ${examState.questions.length}`}
-            </Text>
-            {currentQuestion.is_bonus && (
-              <View style={[styles.bonusBadge, { backgroundColor: '#F59E0B' }]}>
-                <Text style={styles.bonusBadgeText}>{isSpanish ? 'BONO' : 'BONUS'} +${currentQuestion.bonus_bucks_value}</Text>
-              </View>
-            )}
-          </View>
-
-          {/* Question card */}
-          <View style={[
-            styles.questionCard,
-            { backgroundColor: colors.card },
-            currentQuestion.is_bonus && { borderWidth: 2, borderColor: '#F59E0B' },
-          ]}>
-            {currentQuestion.question_image_url && (
-              <StorageImage
-                source={{ uri: currentQuestion.question_image_url }}
-                style={styles.questionImage}
-                resizeMode="cover"
-              />
-            )}
-            <Text style={[styles.questionText, { color: colors.text }]}>
-              {isSpanish && currentQuestion.question_text_es ? currentQuestion.question_text_es : currentQuestion.question_text}
-            </Text>
-          </View>
-
-          {/* Options */}
-          <View style={styles.optionsContainer}>
-            {(['A', 'B', 'C', 'D'] as const).map(letter => {
-              const optionKey = `option_${letter.toLowerCase()}` as keyof ExamQuestion;
-              const optionKeyEs = `${optionKey}_es` as keyof ExamQuestion;
-              const optionText = (isSpanish && currentQuestion[optionKeyEs]) ? (currentQuestion[optionKeyEs] as string) : currentQuestion[optionKey] as string;
-              const isSelected = examState.selectedOption === letter;
-              const showFeedback = phase === 'feedback';
-              const isCorrectOption = letter === currentQuestion.correct_option;
-
-              let optionBg = colors.card;
-              let optionBorder = colors.border;
-              let textColor = colors.text;
-
-              if (showFeedback) {
-                if (isCorrectOption) {
-                  optionBg = '#10B98120';
-                  optionBorder = '#10B981';
-                  textColor = '#10B981';
-                } else if (isSelected && !isCorrectOption) {
-                  optionBg = '#EF444420';
-                  optionBorder = '#EF4444';
-                  textColor = '#EF4444';
-                }
-              } else if (isSelected) {
-                optionBg = colors.primary + '15';
-                optionBorder = colors.primary;
-                textColor = colors.primary;
-              }
-
-              return (
-                <TouchableOpacity
-                  key={letter}
-                  style={[styles.optionCard, { backgroundColor: optionBg, borderColor: optionBorder }]}
-                  onPress={() => handleSelectOption(letter)}
-                  disabled={phase === 'feedback'}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.optionLetterCircle, { backgroundColor: isSelected ? colors.primary : colors.background, borderColor: optionBorder }]}>
-                    <Text style={[styles.optionLetterText, { color: isSelected ? colors.fireText : colors.textSecondary }]}>{letter}</Text>
-                  </View>
-                  <Text style={[styles.optionCardText, { color: textColor }]} numberOfLines={3}>{optionText}</Text>
-                  {showFeedback && isCorrectOption && (
-                    <IconSymbol ios_icon_name="checkmark.circle.fill" android_material_icon_name="check-circle" size={22} color="#10B981" />
-                  )}
-                  {showFeedback && isSelected && !isCorrectOption && (
-                    <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={22} color="#EF4444" />
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          {/* Next Button */}
-          {phase === 'playing' && (
-            <TouchableOpacity
-              style={[
-                styles.nextButton,
-                { backgroundColor: examState.selectedOption ? colors.primary : colors.border },
-              ]}
-              onPress={handleNext}
-              disabled={!examState.selectedOption}
-            >
-              <Text style={[styles.nextButtonText, { color: examState.selectedOption ? colors.fireText : colors.textSecondary }]}>
-                {examState.currentIndex >= examState.questions.length - 1
-                  ? (isSpanish ? 'Enviar' : 'Submit')
-                  : (isSpanish ? 'Siguiente' : 'Next')}
-              </Text>
-              <IconSymbol
-                ios_icon_name="arrow.right"
-                android_material_icon_name="arrow-forward"
-                size={20}
-                color={examState.selectedOption ? colors.fireText : colors.textSecondary}
-              />
-            </TouchableOpacity>
-          )}
+      {isPreview && (
+        <View style={styles.previewStrip}>
+          <Text style={styles.previewStripText}>{t('exam_play.preview_pill').toUpperCase()}</Text>
         </View>
       )}
+
+      <ScrollView contentContainerStyle={styles.playContent} showsVerticalScrollIndicator={false}>
+        {currentQuestion && (
+          <>
+            {/* ── The full-bleed hero (PT geometry) ── */}
+            <View style={[styles.hero, hasPhoto ? styles.heroPhoto : styles.heroBoard]}>
+              {hasPhoto ? (
+                <StorageImage
+                  source={{ uri: currentQuestion.question_image_url! }}
+                  style={StyleSheet.absoluteFill}
+                  resizeMode="cover"
+                />
+              ) : (
+                <LinearGradient
+                  colors={[boardColors[0], boardColors[1], boardColors[2]]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                />
+              )}
+
+              {consoleStrip}
+
+              {/* The gold toast pops down from the console. */}
+              <View style={[styles.toastAnchor, { top: consoleH + 8 }]}>
+                <GameToast message={toast} onDone={() => setToast(null)} />
+              </View>
+
+              {hasPhoto ? (
+                <View style={styles.qPanel}>
+                  <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                  <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(10,14,16,0.38)' }]} />
+                  {catLabel && (
+                    <View style={styles.qPanelChip}>
+                      <Text style={styles.qPanelChipText}>{catLabel}</Text>
+                    </View>
+                  )}
+                  <Text style={styles.qPanelText}>{questionText}</Text>
+                </View>
+              ) : (
+                <View style={styles.heroQ} pointerEvents="none">
+                  {catLabel && (
+                    <View style={[styles.heroChip, { borderColor: boardInk + '59' }]}>
+                      <Text style={[styles.heroChipText, { color: boardInk }]}>{catLabel}</Text>
+                    </View>
+                  )}
+                  <Text style={[styles.heroQText, { color: boardInk }]}>{questionText}</Text>
+                  {currentQuestion.is_bonus && (
+                    <View style={styles.bonusPill}>
+                      <IconSymbol ios_icon_name="star.fill" android_material_icon_name="star" size={11} color="#F59E0B" />
+                      <Text style={styles.bonusPillText}>
+                        {t('exam_play.bonus_chip', { amount: currentQuestion.bonus_bucks_value ?? 0 })}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {hasPhoto && currentQuestion.is_bonus && (
+                <View style={[styles.bonusPill, styles.bonusPillOverPhoto]}>
+                  <IconSymbol ios_icon_name="star.fill" android_material_icon_name="star" size={11} color="#F59E0B" />
+                  <Text style={styles.bonusPillText}>
+                    {t('exam_play.bonus_chip', { amount: currentQuestion.bonus_bucks_value ?? 0 })}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {/* ── Answers — deterministic 2×2 pairs, or full-width rows ── */}
+            <View style={styles.answers}>
+              {useGrid ? (
+                <>
+                  <View style={styles.ansPair}>
+                    {renderAnswer('A')}
+                    {renderAnswer('B')}
+                  </View>
+                  <View style={styles.ansPair}>
+                    {renderAnswer('C')}
+                    {renderAnswer('D')}
+                  </View>
+                </>
+              ) : (
+                (['A', 'B', 'C', 'D'] as const).map(renderAnswer)
+              )}
+
+              {phase === 'playing' && (
+                <TouchableOpacity
+                  style={[
+                    styles.nextBtn,
+                    examState.selectedOption
+                      ? { backgroundColor: visual.accent }
+                      : { backgroundColor: colors.glass, borderWidth: 1, borderColor: colors.glassBorder },
+                  ]}
+                  onPress={handleNext}
+                  disabled={!examState.selectedOption}
+                >
+                  <Text style={[styles.nextBtnText, { color: examState.selectedOption ? '#FFFFFF' : colors.textSecondary }]}>
+                    {examState.currentIndex >= examState.questions.length - 1
+                      ? t('exam_play.submit')
+                      : t('exam_play.next')}
+                  </Text>
+                  <IconSymbol
+                    ios_icon_name="arrow.right"
+                    android_material_icon_name="arrow-forward"
+                    size={18}
+                    color={examState.selectedOption ? '#FFFFFF' : colors.textSecondary}
+                  />
+                </TouchableOpacity>
+              )}
+            </View>
+          </>
+        )}
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -757,172 +986,313 @@ export default function ExamPlayScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
 
-  // Preview banner
-  previewBanner: {
+  // ── Intro / threshold ──
+  introContent: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 20, paddingVertical: 24 },
+  previewPill: {
+    alignSelf: 'center',
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 999,
+    paddingHorizontal: 13,
+    paddingVertical: 5,
+    marginBottom: 12,
+    backgroundColor: 'rgba(245,158,11,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(245,158,11,0.45)',
+  },
+  previewPillText: { fontFamily: fonts.mono.semibold, fontSize: 9, letterSpacing: 0.8, color: '#F59E0B' },
+  startCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 22,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  startRing: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
-    gap: 8,
+    overflow: 'hidden',
+    marginBottom: 12,
   },
-  previewBannerText: { color: '#FFF', fontSize: 13, fontWeight: '700' },
-
-  // Top bar
-  topBar: {
+  startTitle: { fontFamily: fonts.display.bold, fontSize: 23, textAlign: 'center' },
+  startSub: { fontFamily: fonts.mono.semibold, fontSize: 10.5, letterSpacing: 0.6, marginTop: 5, marginBottom: 16, textAlign: 'center' },
+  infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
+    gap: 9,
+    borderRadius: 11,
+    borderWidth: 1,
+    paddingHorizontal: 11,
+    paddingVertical: 9,
+    width: '100%',
+    marginBottom: 6,
   },
-  indicatorRow: { flexDirection: 'row', gap: 6, flex: 1 },
-  indicator: { width: 24, height: 8, borderRadius: 4 },
-  indicatorCorrect: { backgroundColor: '#10B981' },
-  indicatorWrong: { backgroundColor: '#EF4444' },
-  timerContainer: { flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 12 },
-  timerLow: {},
-  timerText: { fontSize: 18, fontWeight: 'bold' },
+  infoRowText: { flex: 1, fontFamily: fonts.body.semibold, fontSize: 12.5 },
+  splitNote: {
+    fontFamily: fonts.body.regular,
+    fontSize: 11,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    lineHeight: 15,
+    marginTop: 4,
+    marginBottom: 2,
+    paddingHorizontal: 6,
+  },
+  rules: { width: '100%', borderTopWidth: 1, marginTop: 10, paddingTop: 10, gap: 6 },
+  rule: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  ruleText: { flex: 1, fontFamily: fonts.body.regular, fontSize: 11.5, lineHeight: 16 },
+  cancelLink: { alignItems: 'center', paddingVertical: 14 },
+  cancelText: { fontFamily: fonts.body.regular, fontSize: 13.5 },
 
-  // Intro
-  introContent: { flex: 1, paddingHorizontal: 20, justifyContent: 'center' },
-  introCard: {
-    borderRadius: 20,
-    padding: 32,
+  // ── Play header ──
+  playHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 24,
-    boxShadow: '0px 4px 16px rgba(0, 0, 0, 0.1)',
-    elevation: 5,
+    paddingHorizontal: 16,
+    paddingTop: 6,
+    paddingBottom: 10,
+    gap: 8,
   },
-  introTitle: { fontSize: 24, fontWeight: 'bold', marginTop: 20, marginBottom: 4 },
-  introSubtitle: { fontSize: 16, marginBottom: 24 },
-  introInfoRow: {
+  playHeaderSpacer: { width: 38 },
+  playHeaderMid: { flex: 1, alignItems: 'center' },
+  playEyebrow: { fontFamily: fonts.mono.semibold, fontSize: 8.5, letterSpacing: 1.6 },
+  playTitle: { fontFamily: fonts.display.bold, fontSize: 19, marginTop: 1 },
+  shieldChip: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  previewStrip: {
+    alignItems: 'center',
+    paddingVertical: 5,
+    backgroundColor: '#F59E0B',
+  },
+  previewStripText: { fontFamily: fonts.mono.semibold, fontSize: 9.5, letterSpacing: 1, color: '#FFFFFF' },
+  playContent: { paddingBottom: 28 },
+
+  // ── Hero (full-bleed, PT geometry: no side margins, console on top edge) ──
+  hero: { overflow: 'hidden', marginBottom: 14 },
+  heroPhoto: { aspectRatio: 0.96, backgroundColor: '#241A14' },
+  heroBoard: { aspectRatio: 1.25 },
+  ovcon: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 4,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 11,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.18)',
+    overflow: 'hidden',
+  },
+  ovRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  ovStat: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 14,
+    color: '#FFFFFF',
+    fontVariant: ['tabular-nums'],
+    minWidth: 52,
+  },
+  ovStatSmall: { fontSize: 9.5, color: 'rgba(255,255,255,0.6)' },
+  ovStatSpacer: { minWidth: 52 },
+  ovTimer: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  ovTimerText: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 19,
+    letterSpacing: 0.5,
+    color: '#FFFFFF',
+    fontVariant: ['tabular-nums'],
+  },
+  ovMeter: {
+    marginTop: 9,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    overflow: 'visible',
+  },
+  ovMeterFill: { position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: 2 },
+  ovMeterTick: {
+    position: 'absolute',
+    top: -2,
+    width: 2,
+    height: 8,
+    borderRadius: 1,
+    backgroundColor: 'rgba(255,255,255,0.35)',
+  },
+  toastAnchor: { position: 'absolute', left: 0, right: 0, zIndex: 6, alignItems: 'center' },
+
+  // Photo question panel (fixed-dark glass over the image — literals by design)
+  qPanel: {
+    position: 'absolute',
+    left: 14,
+    right: 14,
+    bottom: 12,
+    zIndex: 3,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+    paddingHorizontal: 13,
+    paddingVertical: 11,
+    overflow: 'hidden',
+  },
+  qPanelText: { fontFamily: fonts.body.semibold, fontSize: 15, lineHeight: 20, color: '#FFFFFF' },
+  qPanelChip: {
+    alignSelf: 'flex-start',
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    marginBottom: 6,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.28)',
+  },
+  qPanelChipText: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 7.5,
+    letterSpacing: 0.8,
+    color: '#FFFFFF',
+  },
+  heroChip: {
+    alignSelf: 'flex-start',
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    marginBottom: 9,
+    borderWidth: 1,
+  },
+  heroChipText: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 8,
+    letterSpacing: 0.9,
+  },
+
+  // No-photo: the question IS the hero
+  heroQ: {
+    position: 'absolute',
+    left: 18,
+    right: 18,
+    top: '46%',
+    transform: [{ translateY: -30 }],
+    zIndex: 3,
+  },
+  heroQText: {
+    fontFamily: fonts.display.bold,
+    fontSize: 23,
+    lineHeight: 29,
+  },
+  bonusPill: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderRadius: 999,
+    paddingHorizontal: 11,
+    paddingVertical: 4,
+    marginTop: 10,
+    backgroundColor: 'rgba(245,158,11,0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(245,158,11,0.5)',
+  },
+  bonusPillOverPhoto: {
+    position: 'absolute',
+    left: 14,
+    bottom: 72,
+    zIndex: 4,
+    backgroundColor: 'rgba(16,14,20,0.6)',
+    marginTop: 0,
+  },
+  bonusPillText: { fontFamily: fonts.mono.semibold, fontSize: 9.5, letterSpacing: 0.7, color: '#F59E0B' },
+
+  // ── Answers ──
+  answers: { paddingHorizontal: 16 },
+  ansPair: { flexDirection: 'row', gap: 9, marginBottom: 9 },
+  ansTile: {
+    flex: 1,
+    borderRadius: 13,
+    borderWidth: 1.5,
+    padding: 11,
+    minHeight: 76,
+    gap: 7,
+  },
+  ansTileText: { fontFamily: fonts.body.semibold, fontSize: 12.5, lineHeight: 16 },
+  tileFbIcon: { position: 'absolute', top: 8, right: 8 },
+  ansRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    width: '100%',
-    marginBottom: 8,
-  },
-  introInfoText: { fontSize: 14, flex: 1 },
-  introSplitNote: {
-    fontSize: 12,
-    fontStyle: 'italic',
-    textAlign: 'center',
-    marginTop: 4,
-    marginBottom: 4,
-    paddingHorizontal: 8,
-    lineHeight: 16,
-  },
-  startButton: {
-    borderRadius: 14,
-    paddingVertical: 18,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  startButtonText: { color: '#FFF', fontSize: 18, fontWeight: '700' },
-  cancelLink: { alignItems: 'center', paddingVertical: 12 },
-  cancelText: { fontSize: 16 },
-
-  // Question content
-  questionContainer: { flex: 1, paddingHorizontal: 16, paddingTop: 16 },
-  questionMeta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  questionCounter: { fontSize: 14, fontWeight: '600' },
-  bonusBadge: { borderRadius: 8, paddingHorizontal: 12, paddingVertical: 4 },
-  bonusBadgeText: { color: '#FFF', fontSize: 12, fontWeight: '800' },
-  questionCard: {
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 3,
-  },
-  questionText: { fontSize: 18, fontWeight: '600', lineHeight: 26 },
-  questionImage: {
-    width: '100%',
-    aspectRatio: 16 / 10,
-    borderRadius: 12,
-    marginBottom: 14,
-    backgroundColor: '#00000010',
-  },
-
-  // Options
-  optionsContainer: { gap: 10 },
-  optionCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 14,
+    borderRadius: 13,
     borderWidth: 1.5,
-    padding: 14,
-    gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    marginBottom: 9,
   },
-  optionLetterCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1.5,
+  ansRowText: { flex: 1, fontFamily: fonts.body.semibold, fontSize: 13.5, lineHeight: 18 },
+  letterChip: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  optionLetterText: { fontSize: 16, fontWeight: '700' },
-  optionCardText: { flex: 1, fontSize: 15, lineHeight: 20 },
-
-  // Next button
-  nextButton: {
+  letterChipText: { fontFamily: fonts.mono.semibold, fontSize: 12 },
+  nextBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 14,
-    paddingVertical: 16,
-    marginTop: 20,
-    marginBottom: 32,
     gap: 8,
+    borderRadius: 13,
+    paddingVertical: 15,
+    marginTop: 16,
   },
-  nextButtonText: { fontSize: 17, fontWeight: '700' },
+  nextBtnText: { fontFamily: fonts.body.semibold, fontSize: 15.5 },
 
-  // Completed
+  // ── Completed ──
   completedContent: { flex: 1, paddingHorizontal: 20, justifyContent: 'center' },
   timeoutBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
     borderRadius: 12,
     paddingVertical: 12,
     marginBottom: 16,
-    gap: 8,
+    backgroundColor: '#EF4444',
   },
-  timeoutBannerText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
+  timeoutBannerText: { fontFamily: fonts.body.semibold, fontSize: 15, color: '#FFFFFF' },
   completedCard: {
     borderRadius: 20,
-    padding: 32,
+    borderWidth: 1,
+    padding: 30,
     alignItems: 'center',
-    marginBottom: 24,
-    boxShadow: '0px 4px 16px rgba(0, 0, 0, 0.1)',
-    elevation: 5,
+    marginBottom: 20,
   },
-  completedTitle: { fontSize: 24, fontWeight: 'bold', marginBottom: 20 },
+  completedTitle: { fontFamily: fonts.display.bold, fontSize: 23, marginBottom: 20 },
   scoreCircle: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: 116,
+    height: 116,
+    borderRadius: 58,
     borderWidth: 4,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 20,
+    marginBottom: 18,
   },
-  scoreNumber: { fontSize: 32, fontWeight: '800' },
+  scoreNumber: { fontFamily: fonts.mono.semibold, fontSize: 29 },
   bucksEarned: {
     borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
+    paddingVertical: 11,
+    paddingHorizontal: 22,
+    backgroundColor: 'rgba(16,185,129,0.11)',
+    borderWidth: 1,
+    borderColor: 'rgba(16,185,129,0.36)',
   },
-  bucksEarnedText: { color: '#10B981', fontSize: 20, fontWeight: '700' },
-  viewResultsButton: {
-    borderRadius: 14,
-    paddingVertical: 18,
-    alignItems: 'center',
-  },
-  viewResultsText: { color: '#FFF', fontSize: 18, fontWeight: '700' },
+  bucksEarnedText: { fontFamily: fonts.body.semibold, fontSize: 18, color: '#10B981' },
 });

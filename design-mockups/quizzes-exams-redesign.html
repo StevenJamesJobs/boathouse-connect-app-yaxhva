@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quizzes & Exams Concepts</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{min-height:100vh;display:flex;flex-direction:column;align-items:center;gap:14px;padding:24px 12px 60px;background:#0C0D11;
+  font-family:'Inter','SF Pro Text',system-ui,sans-serif}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+
+/* ---------- toolbar ---------- */
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center;max-width:980px}
+.grp{display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);padding:6px;border-radius:16px}
+.gl2{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:#6E7681;margin:0 4px 0 6px}
+.tb{background:rgba(255,255,255,0.06);color:#D6D9DE;border:1px solid rgba(255,255,255,0.10);border-radius:11px;padding:7px 11px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:.18s}
+.tb:hover{background:rgba(255,255,255,0.12)}
+.tb.on{background:#F4F6F8;color:#15171C;border-color:#F4F6F8}
+.tb:focus-visible{outline:2px solid #5C8DF0;outline-offset:2px}
+.tb.gone{display:none}
+.hint{color:#6E7681;font-size:11.5px;font-family:'JetBrains Mono',ui-monospace,monospace;text-align:center;max-width:840px;line-height:1.7}
+.hint b{color:#AEB4BD;font-weight:600}
+
+/* ---------- phone shell + theme palettes (the s76 kit) ---------- */
+.phone{
+  --bg:#181B21; --text:#F4F6F8; --muted:#9AA1A8; --fireText:#1A1E24; --tint:#FF7A2F;
+  --glass:rgba(255,255,255,0.07); --glassbd:rgba(255,255,255,0.12); --surf:rgba(255,255,255,0.045); --surfbd:rgba(255,255,255,0.09); --hair:rgba(255,255,255,0.07);
+  --glowA:rgba(230,234,238,0.12); --glowB:rgba(92,141,240,0.12);
+  position:relative;width:392px;height:840px;background:var(--bg);border-radius:46px;border:1px solid #2A2E36;overflow:hidden;
+  box-shadow:0 40px 90px -30px rgba(0,0,0,0.8);transition:background .3s;display:flex;flex-direction:column;color:var(--text)}
+.phone.t-mono-l{--bg:#ECECEE;--text:#22262C;--muted:#6E747C;--fireText:#FFFFFF;--tint:#EC6A1E;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.66);--surfbd:rgba(0,0,0,0.07);--hair:rgba(0,0,0,0.07);--glowA:rgba(58,66,80,0.10);--glowB:rgba(59,130,246,0.12)}
+.phone.t-ocean-d{--bg:#1A2332;--text:#FFFFFF;--muted:#A8B8D8;--fireText:#0A1422;--tint:#5DA0E5;--glass:rgba(255,255,255,0.07);--glassbd:rgba(255,255,255,0.13);--surf:rgba(255,255,255,0.05);--surfbd:rgba(255,255,255,0.10);--hair:rgba(255,255,255,0.08);--glowA:rgba(74,144,226,0.32);--glowB:rgba(93,173,226,0.16)}
+.phone.t-ocean-l{--bg:#E8F4F8;--text:#1A3A52;--muted:#4A6B7C;--fireText:#FFFFFF;--tint:#1976D2;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.7);--surfbd:rgba(13,71,161,0.10);--hair:rgba(13,71,161,0.08);--glowA:rgba(25,118,210,0.18);--glowB:rgba(66,165,245,0.13)}
+
+/* ---------- PER-ROLE accent scales (locked round 2): Server=Teal · Bartender=Navy · Host=Violet ---------- */
+.phone{--qz:#0D9488;--qzA:#0A5B51;--qzB:#17A896;--qzC0:#04332E;--qzC1:#0A5B51;--qzC2:#11857A;
+  --gold:#F59E0B;--ok:#10B981;--bad:#EF4444}
+.phone.r-bart{--qz:#4C5FC7;--qzA:#25348C;--qzB:#5B6FD8;--qzC0:#101A45;--qzC1:#25348C;--qzC2:#3D4E9E}
+.phone.r-host{--qz:#7C5CE0;--qzA:#4527A0;--qzB:#8B6FF0;--qzC0:#251161;--qzC1:#4527A0;--qzC2:#6A48D8}
+/* fixed per-role tile gradients (hub + shelf show all roles at once) */
+.tS{background:linear-gradient(150deg,#0A5B51,#17A896)}
+.tB{background:linear-gradient(150deg,#25348C,#5B6FD8)}
+.tH{background:linear-gradient(150deg,#4527A0,#8B6FF0)}
+/* theme-aware quiz board gradient (no-photo hero) */
+.phone{--qzBoard:linear-gradient(150deg,color-mix(in srgb,var(--qzC0) 92%,#000),var(--qzC1) 55%,var(--qzC2));--qzBoardInk:#EAFFF9;--qzBoardBd:rgba(255,255,255,0.16)}
+.phone.t-mono-l,.phone.t-ocean-l{--qzBoard:linear-gradient(150deg,color-mix(in srgb,var(--qzB) 12%,#FFF),color-mix(in srgb,var(--qzB) 22%,#FFF) 55%,color-mix(in srgb,var(--qzB) 34%,#FFF));--qzBoardInk:color-mix(in srgb,var(--qzC0) 88%,#000);--qzBoardBd:color-mix(in srgb,var(--qz) 26%,transparent)}
+
+.glow{position:absolute;top:-120px;right:-80px;width:360px;height:320px;border-radius:50%;background:radial-gradient(circle,var(--glowA),transparent 66%);z-index:0;pointer-events:none}
+.glow2{position:absolute;top:-70px;left:-90px;width:300px;height:280px;border-radius:50%;background:radial-gradient(circle,var(--glowB),transparent 68%);z-index:0;pointer-events:none}
+.sb{position:relative;z-index:3;display:flex;justify-content:space-between;align-items:center;padding:16px 30px 4px;font-size:13px;font-weight:600;font-family:'JetBrains Mono',ui-monospace,monospace;color:var(--text)}
+.screen{position:relative;z-index:2;flex:1;overflow-y:auto;overflow-x:hidden;padding:0 0 24px;scrollbar-width:none}
+.screen::-webkit-scrollbar{display:none}
+.design{display:none;padding:6px 16px 0;animation:fade .35s ease}
+.design.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.concept{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:7px;margin:4px 2px 12px}
+.concept b{color:var(--tint)}
+.concept .ln{flex:1;height:1px;background:var(--hair)}
+.bcap{font-size:10.5px;color:var(--muted);font-style:italic;margin:12px 2px 14px;line-height:1.5}
+.bcap b{font-style:normal;color:var(--text);font-weight:600}
+
+/* ---------- shared kit ---------- */
+.ic{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+.c38{width:38px;height:38px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;background:var(--glass);border:1px solid var(--glassbd);color:var(--text);cursor:pointer}
+.hdr{display:flex;align-items:center;gap:8px;margin:2px 0 12px;min-height:40px}
+.hmid{flex:1;text-align:center;min-width:0}
+.hspace{width:38px;flex:0 0 auto}
+.eyebrow{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;letter-spacing:1.6px;text-transform:uppercase;color:var(--tint);font-weight:600}
+.htitle{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:700;font-size:19px;letter-spacing:-0.3px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+
+.gcard{border-radius:16px;border:1px solid var(--surfbd);background:var(--surf);padding:14px;margin-bottom:10px}
+.blurb{display:flex;gap:10px;border-radius:14px;padding:11px 13px;margin-bottom:12px;background:color-mix(in srgb,var(--qz) 9%,transparent);border:1px solid color-mix(in srgb,var(--qz) 22%,transparent);align-items:flex-start}
+.blurb .ic{width:15px;height:15px;color:var(--qz);margin-top:1px}
+.blurb p{font-size:11.5px;line-height:1.5;color:var(--text)}
+.pill{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:3px 9px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase}
+.pill i{width:6px;height:6px;border-radius:3px;background:currentColor}
+.pill.live{color:var(--ok);background:color-mix(in srgb,var(--ok) 13%,transparent);border:1px solid color-mix(in srgb,var(--ok) 36%,transparent)}
+.pill.draft,.pill.paused{color:var(--gold);background:color-mix(in srgb,var(--gold) 13%,transparent);border:1px solid color-mix(in srgb,var(--gold) 36%,transparent)}
+.pill.off{color:var(--muted);background:var(--glass);border:1px solid var(--glassbd)}
+.chev{width:16px;height:16px;color:var(--muted)}
+.statline{display:flex;gap:12px;flex-wrap:wrap}
+.statline span{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;font-weight:600;letter-spacing:.4px;color:var(--muted);display:inline-flex;align-items:center;gap:5px}
+.statline .ic{width:12px;height:12px}
+.statline b{color:var(--text);font-weight:700}
+.hubtitle{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:600;font-size:15.5px}
+.hubsub{display:flex;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap}
+
+/* progress ring (the checklists' ProgressRing, in CSS) */
+.ring2{position:relative;width:54px;height:54px;border-radius:50%;flex:0 0 auto;cursor:pointer;
+  background:conic-gradient(var(--qz) calc(var(--p)*1%),var(--glassbd) 0)}
+.ring2 i{position:absolute;inset:5px;border-radius:50%;background:var(--bg)}
+.ring2 b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;font-weight:700;color:var(--text)}
+.ring2.gold{background:conic-gradient(var(--gold) calc(var(--p)*1%),var(--glassbd) 0)}
+.ring2.sm{width:38px;height:38px}
+.ring2.sm i{inset:4px}
+.ring2.sm b{font-size:9px}
+
+/* square tiles (game-hub grammar) */
+.qgrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;margin-bottom:10px}
+.qgrid.two{grid-template-columns:1fr 1fr}
+.qtile{position:relative;aspect-ratio:1;border-radius:16px;overflow:hidden;display:flex;align-items:center;justify-content:center;cursor:pointer;border:1px solid rgba(255,255,255,0.14)}
+.qtile.sel{outline:2px solid var(--tint);outline-offset:2px}
+.qtile .ic{width:28px;height:28px;color:rgba(255,255,255,0.92)}
+.qtile .foot{position:absolute;left:0;right:0;bottom:0;padding:5px 7px;background:rgba(10,12,14,0.42);display:flex;align-items:center;gap:4px}
+.qtile .foot span{color:#FFF;font-size:9.5px;font-weight:700;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qtile .foot em{display:inline-flex;align-items:center;gap:3px;font-style:normal;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:7px;font-weight:700;letter-spacing:.5px;color:#FFF;opacity:.95}
+.qtile .foot em i{width:5px;height:5px;border-radius:3px;flex:0 0 auto}
+.qtile .corner{position:absolute;top:6px;right:6px;width:20px;height:20px;border-radius:7px;background:rgba(10,12,14,0.4);display:flex;align-items:center;justify-content:center;color:#FFF}
+.qtile .corner .ic{width:11px;height:11px}
+.qtile.ghost{background:var(--glass);border:1.5px dashed var(--glassbd);flex-direction:column;gap:7px}
+.qtile.ghost .ic{color:var(--muted)}
+.qtile.ghost .mklab{font-size:10px;font-weight:700;color:var(--muted)}
+.qtile.wide{aspect-ratio:2.2;grid-column:1 / -1}
+.qtile.wide .ic{width:34px;height:34px}
+.qtile.done::after{content:"";position:absolute;inset:0;background:rgba(10,12,14,0.35)}
+.qtile.done .donebadge{position:absolute;top:6px;right:6px;z-index:2;width:20px;height:20px;border-radius:10px;background:var(--ok);display:flex;align-items:center;justify-content:center;color:#fff}
+.qtile.done .donebadge .ic{width:11px;height:11px}
+
+/* info rows */
+.irow{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:11px;background:var(--glass);border:1px solid var(--glassbd);margin-bottom:6px}
+.irow .ic{width:14px;height:14px;color:var(--qz)}
+.irow p{flex:1;font-size:12px;color:var(--text)}
+
+/* buttons */
+.cta{display:flex;align-items:center;justify-content:center;gap:8px;border-radius:13px;padding:14px;font-weight:700;font-size:15px;color:#fff;cursor:pointer;background:linear-gradient(135deg,var(--qzA),var(--qzB));box-shadow:0 10px 24px -12px color-mix(in srgb,var(--qz) 80%,transparent)}
+.cta .ic{width:16px;height:16px}
+.cta.green{background:linear-gradient(135deg,#0B7A5C,#12A97F);box-shadow:0 10px 24px -12px rgba(16,185,129,0.7)}
+.cta.gold{background:linear-gradient(135deg,#B45309,#F59E0B);box-shadow:0 10px 24px -12px rgba(245,158,11,0.7)}
+.btnrow{display:flex;gap:8px;margin-bottom:8px}
+.btnrow>*{flex:1}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.qbtn{display:flex;align-items:center;justify-content:center;gap:6px;border-radius:11px;padding:10px;font-weight:600;font-size:12.5px;cursor:pointer;background:var(--glass);border:1px solid var(--glassbd);color:var(--text)}
+.qbtn .ic{width:13px;height:13px}
+.qbtn.warn{color:var(--gold);border-color:color-mix(in srgb,var(--gold) 40%,transparent)}
+.qbtn.danger{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 40%,transparent)}
+.qbtn.tinted{color:var(--qz);border-color:color-mix(in srgb,var(--qz) 40%,transparent);background:color-mix(in srgb,var(--qz) 8%,transparent)}
+.dash{display:flex;align-items:center;justify-content:center;gap:6px;border-radius:12px;border:1.5px dashed color-mix(in srgb,var(--qz) 45%,transparent);background:color-mix(in srgb,var(--qz) 7%,transparent);color:var(--qz);padding:11px;font-size:12.5px;font-weight:600;cursor:pointer}
+.dash.gold{border-color:color-mix(in srgb,var(--gold) 50%,transparent);background:color-mix(in srgb,var(--gold) 8%,transparent);color:var(--gold)}
+.dash .ic{width:14px;height:14px}
+
+/* settings console + live console */
+.setcon{border-radius:16px;border:1px solid var(--surfbd);background:var(--surf);margin-bottom:12px;overflow:hidden}
+.setcon .schead{display:flex;align-items:center;gap:9px;padding:11px 13px;cursor:pointer}
+.setcon .schead .caret{margin-left:auto;transition:transform .25s}
+.setcon.open .schead .caret{transform:rotate(180deg)}
+.setcon .scsum{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;color:var(--muted);font-weight:600}
+.setcon .scbody{display:none;padding:2px 13px 13px}
+.setcon.open .scbody{display:block}
+.chipgrid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.schip{display:flex;align-items:center;gap:7px;border-radius:11px;padding:8px 10px;background:var(--glass);border:1px solid var(--glassbd);cursor:pointer}
+.schip .ic{width:13px;height:13px;color:var(--qz)}
+.schip .lab{font-size:9px;font-family:'JetBrains Mono',ui-monospace,monospace;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);display:block}
+.schip .v{font-size:11.5px;font-weight:700;color:var(--text)}
+.tgl{width:34px;height:20px;border-radius:11px;background:var(--glassbd);position:relative;flex:0 0 auto;margin-left:auto}
+.tgl::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:8px;background:#FFF;box-shadow:0 1px 3px rgba(0,0,0,0.3)}
+.tgl.on{background:var(--qz)}
+.tgl.on::after{left:auto;right:2px}
+.livecon{border-radius:16px;padding:12px 14px;margin-bottom:12px;border:1px solid rgba(255,255,255,0.14);color:#FFF;background:linear-gradient(135deg,var(--qzC0),var(--qzC1) 55%,var(--qzC2));box-shadow:0 10px 26px -14px rgba(0,0,0,0.55)}
+.conchip{display:inline-flex;align-items:center;gap:6px;border-radius:10px;padding:7px 11px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.28);color:#FFF;font-size:11.5px;font-weight:700;cursor:pointer}
+.conchip .ic{width:12px;height:12px}
+.sticklive{position:sticky;top:-2px;z-index:6;box-shadow:0 16px 34px -14px rgba(0,0,0,0.65)}
+
+/* question cards + fold */
+.qcard{border-radius:14px;border:1px solid var(--surfbd);background:var(--surf);padding:12px;margin-bottom:10px}
+.qcard.bonus{border-color:color-mix(in srgb,var(--gold) 45%,transparent);background:color-mix(in srgb,var(--gold) 6%,transparent)}
+.qhead{display:flex;align-items:center;gap:7px;margin-bottom:8px}
+.qnum{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;font-weight:700;color:var(--qz)}
+.qcard.bonus .qnum{color:var(--gold)}
+.catchip{display:inline-flex;align-items:center;gap:4px;border-radius:7px;padding:3px 7px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8px;font-weight:700;letter-spacing:.8px;color:var(--qz);background:color-mix(in srgb,var(--qz) 11%,transparent);border:1px solid color-mix(in srgb,var(--qz) 30%,transparent);cursor:pointer}
+.catchip .ic{width:9px;height:9px}
+.catchip.gold{color:var(--gold);background:color-mix(in srgb,var(--gold) 11%,transparent);border-color:color-mix(in srgb,var(--gold) 34%,transparent)}
+.qacts{margin-left:auto;display:flex;gap:4px}
+.qact{width:26px;height:26px;border-radius:9px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;justify-content:center;color:var(--muted);cursor:pointer}
+.qact .ic{width:12px;height:12px}
+.qact.danger{color:var(--bad)}
+.qtext{font-size:13.5px;font-weight:600;line-height:1.4;margin-bottom:8px}
+.qimg{border-radius:10px;aspect-ratio:16/7;margin-bottom:8px;background:radial-gradient(90% 100% at 30% 20%,rgba(232,168,124,0.9),rgba(140,58,58,0.85) 62%,rgba(60,26,20,0.95)),#241A14;border:1px solid var(--glassbd)}
+.qopt{display:flex;align-items:center;gap:7px;padding:5px 8px;border-radius:8px;font-size:12px;color:var(--text)}
+.qopt b{font-weight:600;color:var(--muted);width:14px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px}
+.qopt.right{background:color-mix(in srgb,var(--ok) 10%,transparent);color:var(--ok);font-weight:600}
+.qopt.right b{color:var(--ok)}
+.qopt .ic{width:13px;height:13px;color:var(--ok);margin-left:auto}
+.valchip{display:inline-flex;border-radius:7px;padding:3px 7px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;font-weight:700;color:var(--qz);background:color-mix(in srgb,var(--qz) 11%,transparent);border:1px solid color-mix(in srgb,var(--qz) 30%,transparent)}
+.valchip.gold{color:var(--gold);background:color-mix(in srgb,var(--gold) 12%,transparent);border-color:color-mix(in srgb,var(--gold) 36%,transparent)}
+.fold{border-radius:14px;border:1px solid var(--surfbd);background:var(--glass);margin-bottom:10px;overflow:hidden}
+.fold .fh{display:flex;align-items:center;gap:8px;padding:11px 13px;font-size:12.5px;font-weight:700;cursor:pointer}
+.fold .fh .n{margin-left:auto;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10.5px;color:var(--muted)}
+.fold .fh .ic{width:13px;height:13px}
+.fold .fh .caret{color:var(--muted);transition:transform .25s}
+.fold .fbody{display:none}
+.fold.open .fbody{display:block}
+.fold.open .fh .caret{transform:rotate(180deg)}
+.revitem{display:flex;gap:9px;padding:8px 12px;border-top:1px solid var(--hair);align-items:flex-start}
+.revitem .thumb{width:34px;height:34px;border-radius:8px;flex:0 0 auto;background:radial-gradient(80% 80% at 35% 30%,rgba(232,168,124,0.9),rgba(140,58,58,0.8) 70%),#241A14}
+.revitem .bd{flex:1;min-width:0}
+.revitem .n{font-size:11.5px;font-weight:700}
+.revitem .a{font-size:10.5px;color:var(--muted);margin-top:1px}
+.revitem .cor{font-size:10.5px;color:var(--ok);font-weight:700;margin-top:1px}
+
+/* tracker rows */
+.trow{display:flex;align-items:center;gap:10px;border-radius:13px;border:1px solid var(--surfbd);background:var(--surf);padding:10px 12px;margin-bottom:7px}
+.tav{width:34px;height:34px;border-radius:17px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;background:linear-gradient(135deg,var(--qzA),var(--qzB))}
+.tbd{flex:1;min-width:0}
+.tnm{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tjb{font-size:10px;color:var(--muted);margin-top:1px}
+.tsc{text-align:right}
+.tsc .s{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12.5px;font-weight:700;color:var(--ok)}
+.tsc .b{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;font-weight:700;color:var(--ok);opacity:.8}
+.tchips{display:flex;flex-direction:column;gap:4px;margin-left:2px}
+.tchip{display:flex;align-items:center;gap:4px;border-radius:7px;border:1px solid var(--glassbd);background:var(--glass);padding:3px 7px;font-size:9.5px;font-weight:700;color:var(--qz);cursor:pointer}
+.tchip .ic{width:9px;height:9px}
+.notyet{border-radius:8px;padding:5px 9px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;font-weight:700;letter-spacing:.6px;color:var(--bad);background:color-mix(in srgb,var(--bad) 11%,transparent);border:1px solid color-mix(in srgb,var(--bad) 32%,transparent)}
+
+/* dock */
+.dock{position:sticky;bottom:0;margin:8px -16px -24px;padding:10px 16px 22px;background:linear-gradient(to top,var(--bg) 55%,transparent);display:flex;gap:8px}
+.dock>*{flex:1}
+
+/* stepper + composer */
+.bignum{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:42px;font-weight:700;line-height:1;cursor:text}
+.stepbtn{width:36px;height:36px;border-radius:12px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;justify-content:center;color:var(--text);cursor:pointer;font-size:18px;font-weight:700}
+.sect{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);margin:14px 2px 8px;display:flex;align-items:center;gap:7px}
+.sect .ln{flex:1;height:1px;background:var(--hair)}
+.mixrow{display:flex;flex-wrap:wrap;gap:7px}
+.mix{display:inline-flex;align-items:center;gap:5px;border-radius:10px;border:1px solid var(--glassbd);background:var(--glass);padding:7px 11px;font-size:11.5px;font-weight:600;color:var(--muted);cursor:pointer}
+.mix .ic{width:12px;height:12px}
+.mix.on{color:var(--qz);border-color:color-mix(in srgb,var(--qz) 45%,transparent);background:color-mix(in srgb,var(--qz) 10%,transparent)}
+.seg3{display:flex;background:var(--glass);border:1px solid var(--glassbd);border-radius:11px;padding:3px}
+.seg3 span{flex:1;text-align:center;padding:7px 3px;border-radius:8px;font-size:10.5px;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap}
+.seg3 span.on{background:var(--qz);color:#FFF}
+.inline2{display:flex;gap:8px}
+.inline2>*{flex:1}
+.valfield{display:flex;align-items:center;gap:8px;border-radius:11px;border:1px solid var(--glassbd);background:var(--glass);padding:9px 11px}
+.valfield .ic{width:13px;height:13px;color:var(--qz)}
+.valfield .in{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:14px;font-weight:700;color:var(--qz)}
+.valfield .ph{font-size:10px;color:var(--muted);margin-left:auto;text-align:right;line-height:1.3}
+
+/* sheets */
+.dim{border-radius:32px;background:rgba(8,9,11,0.55);padding:100px 10px 0;margin:0 -16px;min-height:700px;display:flex;flex-direction:column;justify-content:flex-end}
+.sheet{border-radius:22px 22px 0 0;background:var(--bg);border:1px solid var(--surfbd);border-bottom:0;padding:10px 16px 26px;box-shadow:0 -18px 50px rgba(0,0,0,0.5)}
+.grab{width:38px;height:4px;border-radius:2px;background:var(--glassbd);margin:0 auto 12px}
+.shead{display:flex;align-items:center;margin-bottom:12px}
+.shead .t{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:17px;flex:1}
+.field label{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);display:block;margin:10px 0 5px}
+.input{border-radius:11px;border:1px solid var(--glassbd);background:var(--glass);padding:10px 12px;font-size:12.5px;color:var(--text)}
+.input.ta{min-height:52px}
+.input .phx{color:var(--muted)}
+.optline{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.optline .input{flex:1}
+.radio{border-radius:8px;padding:5px 9px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;font-weight:700;letter-spacing:.6px;color:var(--muted);background:var(--glass);border:1px solid var(--glassbd);cursor:pointer;white-space:nowrap}
+.radio.on{color:#FFF;background:var(--ok);border-color:var(--ok)}
+.trstub{display:flex;align-items:center;gap:8px;border-radius:11px;border:1px dashed var(--glassbd);padding:9px 11px;margin-top:12px;color:var(--muted);font-size:11px}
+.trstub .ic{width:13px;height:13px}
+.asheet{border-radius:18px;background:var(--bg);border:1px solid var(--surfbd);padding:8px;box-shadow:0 -18px 50px rgba(0,0,0,0.5);margin-bottom:10px}
+.asrow{display:flex;align-items:center;gap:10px;padding:13px 12px;border-radius:12px;font-size:13.5px;font-weight:600;cursor:pointer}
+.asrow:hover{background:var(--glass)}
+.asrow .ic{width:16px;height:16px;color:var(--qz)}
+.asrow .sub{display:block;font-size:10px;color:var(--muted);font-weight:500;margin-top:1px}
+.asrow.cancel{justify-content:center;color:var(--muted)}
+
+/* play — FULL-BLEED magazine hero (matches PT: no side margins, console strip on the top edge) */
+.heroFB{position:relative;margin:0 -16px 12px;overflow:hidden;border-top:1px solid var(--hair);border-bottom:1px solid var(--hair)}
+.heroFB.photo{aspect-ratio:0.96;background:
+  radial-gradient(120% 90% at 68% 78%,rgba(240,196,138,0.95),rgba(196,110,64,0.9) 42%,rgba(96,42,32,0.96) 78%,rgba(40,18,16,1)),#241A14}
+.heroFB.board{aspect-ratio:1.25;background:var(--qzBoard)}
+.ovcon{position:absolute;top:0;left:0;right:0;padding:10px 14px 11px;background:rgba(12,14,24,0.45);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid rgba(255,255,255,0.18)}
+.ovrow{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.ovstat{display:flex;align-items:center;gap:5px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:13px;font-weight:700;color:#FFF}
+.ovstat .ic{width:12px;height:12px;opacity:.8}
+.ovstat small{font-size:9px;opacity:.6;font-weight:600}
+.ovstat.big{font-size:18px;letter-spacing:.5px}
+.ovmeter{margin-top:8px;height:5px;border-radius:3px;background:rgba(255,255,255,0.18);position:relative}
+.ovmeter .fill{position:absolute;top:0;left:0;bottom:0;border-radius:3px;background:linear-gradient(90deg,#FFD48A,#FFF)}
+.ovmeter .tick{position:absolute;top:-2px;width:2px;height:9px;border-radius:1px;background:rgba(255,255,255,0.35)}
+.qpanel{position:absolute;left:12px;right:12px;bottom:12px;border-radius:14px;padding:11px 13px;background:rgba(10,14,16,0.5);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.2)}
+.qpanel .qq{color:#FFF;font-size:14.5px;font-weight:600;line-height:1.35}
+.heroq{position:absolute;left:18px;right:18px;top:54%;transform:translateY(-42%)}
+.heroq .bq{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:23px;line-height:1.22;color:var(--qzBoardInk);text-wrap:balance}
+.heroq .bl{margin-top:10px;display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 11px;background:color-mix(in srgb,var(--gold) 18%,transparent);border:1px solid color-mix(in srgb,var(--gold) 50%,transparent);color:var(--gold);font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;font-weight:700;letter-spacing:.8px}
+.heroq .bl .ic{width:11px;height:11px}
+.ansgrid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.anstile{position:relative;border-radius:13px;border:1px solid var(--surfbd);background:linear-gradient(150deg,color-mix(in srgb,var(--qzA) 13%,transparent),color-mix(in srgb,var(--qzB) 6%,transparent)),var(--surf);padding:11px;min-height:74px;display:flex;flex-direction:column;gap:7px;cursor:pointer}
+.anstile .lchip,.ansrow .lchip{width:24px;height:24px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;font-weight:700;color:var(--qz);background:color-mix(in srgb,var(--qz) 15%,transparent)}
+.anstile p{font-size:12.5px;font-weight:600;line-height:1.3}
+.anstile.right{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 11%,transparent)}
+.anstile.right .lchip{color:var(--ok);background:color-mix(in srgb,var(--ok) 16%,transparent)}
+.anstile.right p{color:var(--ok)}
+.anstile.dimmed{opacity:.5}
+.anstile .fbicon{position:absolute;top:8px;right:8px;width:16px;height:16px}
+.anstile .fbicon.okc{color:var(--ok)}
+.ansrow{display:flex;align-items:center;gap:10px;border-radius:13px;border:1px solid var(--surfbd);background:linear-gradient(150deg,color-mix(in srgb,var(--qzA) 13%,transparent),color-mix(in srgb,var(--qzB) 6%,transparent)),var(--surf);padding:11px 12px;margin-bottom:8px;cursor:pointer}
+.ansrow p{flex:1;font-size:13px;font-weight:600}
+.toastq{position:absolute;left:50%;transform:translateX(-50%);border-radius:999px;padding:6px 14px;background:rgba(16,18,20,0.72);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid color-mix(in srgb,var(--gold) 55%,transparent);color:var(--gold);font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;font-weight:700;white-space:nowrap;display:flex;align-items:center;gap:6px}
+.toastq .ic{width:12px;height:12px}
+
+/* results */
+.rwrap{border-radius:20px;border:1px solid var(--surfbd);background:var(--surf);padding:18px 16px 14px;position:relative;overflow:hidden}
+.rsplit{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.rsplit .rav{width:50px;height:50px;border-radius:25px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;color:#fff;background:linear-gradient(135deg,var(--qzA),var(--qzB));box-shadow:0 6px 18px -6px color-mix(in srgb,var(--qz) 55%,transparent)}
+.rsplit .rav .ic{width:22px;height:22px}
+.rsplit .lcol{flex:1.15;min-width:0}
+.rsplit .lcol .t{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:16.5px;line-height:1.15}
+.rsplit .lcol .s{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:24px;font-weight:700;margin-top:3px;color:var(--qz)}
+.rsplit .lcol .s.money{color:var(--ok)}
+.rsplit .rcol{flex:1;min-width:0;text-align:right;display:flex;flex-direction:column;gap:5px;align-items:flex-end}
+.rsplit .rcol .meta{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted)}
+.rsplit .rcol .big2{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:13px;font-weight:700}
+.rbox{border-radius:13px;background:var(--glass);border:1px solid var(--glassbd);padding:10px 13px;margin-bottom:12px}
+.rrow{display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:12.5px}
+.rrow .l{color:var(--muted)}
+.rrow .v{font-family:'JetBrains Mono',ui-monospace,monospace;font-weight:700}
+.totalpill{display:flex;align-items:center;justify-content:center;gap:8px;border-radius:12px;padding:11px;margin-bottom:12px;background:color-mix(in srgb,var(--ok) 11%,transparent);border:1px solid color-mix(in srgb,var(--ok) 36%,transparent);color:var(--ok);font-weight:700;font-size:14px}
+.totalpill .ic{width:15px;height:15px}
+.confetti,.mrain{position:absolute;inset:0;pointer-events:none;z-index:0}
+.confetti i{position:absolute;width:6px;height:10px;border-radius:2px;opacity:.85;animation:cfall 3.2s linear infinite}
+.mrain i{position:absolute;font-family:'JetBrains Mono',ui-monospace,monospace;font-weight:700;font-size:13px;color:var(--ok);opacity:.8;animation:cfall 3.4s linear infinite;font-style:normal}
+@keyframes cfall{0%{transform:translateY(-30px) rotate(0)}100%{transform:translateY(760px) rotate(340deg)}}
+
+/* user side */
+.uphead{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
+.cdown{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10.5px;font-weight:700}
+.uprows{margin-bottom:11px}
+.uprow{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);padding:3px 0}
+.uprow .ic{width:13px;height:13px;color:var(--qz)}
+.uprow.money{color:var(--ok)}
+.uprow.money .ic{color:var(--ok)}
+.scorebox{display:flex;justify-content:space-between;align-items:center;border-radius:11px;background:var(--glass);border:1px solid var(--glassbd);padding:10px 13px;margin-bottom:7px}
+.scorebox .l{font-size:12px;color:var(--muted)}
+.scorebox .v{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:14px;font-weight:700;color:var(--qz)}
+.scorebox .v.money{color:var(--ok)}
+
+/* start screen */
+.startwrap{display:flex;flex-direction:column;justify-content:center;min-height:640px}
+.prevpill{align-self:center;margin-bottom:12px;display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:5px 13px;background:color-mix(in srgb,var(--gold) 14%,transparent);border:1px solid color-mix(in srgb,var(--gold) 45%,transparent);color:var(--gold);font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;font-weight:700;letter-spacing:.8px}
+.prevpill .ic{width:11px;height:11px}
+.startcard{border-radius:20px;border:1px solid var(--surfbd);background:var(--surf);padding:24px 18px 18px;text-align:center;margin-bottom:14px}
+.ring{width:76px;height:76px;border-radius:38px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;color:#FFF;background:linear-gradient(135deg,var(--qzA),var(--qzB));box-shadow:0 14px 34px -14px color-mix(in srgb,var(--qz) 85%,transparent)}
+.ring .ic{width:32px;height:32px}
+.stitle{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:23px}
+.ssub{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;font-weight:600;color:var(--muted);margin:5px 0 16px}
+.srules{text-align:left;margin-top:12px;border-top:1px solid var(--hair);padding-top:11px}
+.srule{display:flex;gap:9px;align-items:flex-start;padding:5px 0;font-size:11.5px;color:var(--muted);line-height:1.45}
+.srule .ic{width:13px;height:13px;color:var(--qz);margin-top:1px}
+.cancel{align-self:center;color:var(--muted);font-size:13px;margin-top:12px;cursor:pointer}
+.shine{position:relative;overflow:hidden}
+.shine::after{content:"";position:absolute;top:-40%;bottom:-40%;width:38px;background:rgba(255,255,255,0.28);transform:rotate(18deg);left:-60px;animation:sh 3.2s ease-in-out infinite}
+@keyframes sh{0%,55%{left:-70px}85%,100%{left:120%}}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-back" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
+<symbol id="i-right" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+<symbol id="i-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+<symbol id="i-up" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M4 12.5l5.5 5.5L20 6.5"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+<symbol id="i-hour" viewBox="0 0 24 24"><path d="M7 3h10M7 21h10M8 3c0 8 8 8 8 18M16 3c0 8-8 8-8 18"/></symbol>
+<symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3l2.7 5.8 6.3.7-4.7 4.3 1.3 6.2L12 16.9 6.4 20l1.3-6.2L3 9.5l6.3-.7z"/></symbol>
+<symbol id="i-dollar" viewBox="0 0 24 24"><path d="M12 2v20M16.5 6.5c-1-1.3-2.6-2-4.5-2-2.6 0-4.5 1.4-4.5 3.5C7.5 12 12 11 12 11s4.5-.8 4.5 3c0 2.1-1.9 3.5-4.5 3.5-1.9 0-3.5-.7-4.5-2"/></symbol>
+<symbol id="i-pencil" viewBox="0 0 24 24"><path d="M4 20l1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19l-4 1z"/></symbol>
+<symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6.5 7l1 13h9l1-13M10 11v5M14 11v5"/></symbol>
+<symbol id="i-reset" viewBox="0 0 24 24"><path d="M4 5v5h5"/><path d="M4.6 10A8 8 0 1 0 7 5.2"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-pause" viewBox="0 0 24 24"><path d="M9 5v14M15 5v14"/></symbol>
+<symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5l12 7.5-12 7.5z"/></symbol>
+<symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6M10 20a2.2 2.2 0 0 0 4 0"/></symbol>
+<symbol id="i-wand" viewBox="0 0 24 24"><path d="M5 19L16 8M14 4l.7 2.1L17 7l-2.3.9L14 10l-.7-2.1L11 7l2.3-.9zM19 12l.5 1.5L21 14l-1.5.5L19 16l-.5-1.5L17 14l1.5-.5z"/></symbol>
+<symbol id="i-photo" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="M4.5 17l4.5-4 3 2.6L16.5 11l3 3.5"/></symbol>
+<symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></symbol>
+<symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19.5c0-3.2 2.5-5 5.5-5s5.5 1.8 5.5 5M16 5.6a3.1 3.1 0 0 1 0 5M17.8 14.8c1.9.6 3.2 2.1 3.2 4.7"/></symbol>
+<symbol id="i-tray" viewBox="0 0 24 24"><path d="M3 13h5l2 2h4l2-2h5M3 13v5a1.5 1.5 0 0 0 1.5 1.5h15A1.5 1.5 0 0 0 21 18v-5M5.5 13l2-7h9l2 7"/></symbol>
+<symbol id="i-glass" viewBox="0 0 24 24"><path d="M7 3h10l-1.2 8a3.9 3.9 0 0 1-7.6 0zM12 15v6M8.5 21h7"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 2.6v5.6c0 4.8-3 8-7 9.8-4-1.8-7-5-7-9.8V5.6z"/><path d="M9 12l2.2 2.2L15.5 9.8"/></symbol>
+<symbol id="i-quiz" viewBox="0 0 24 24"><path d="M9.5 9a2.6 2.6 0 0 1 5 .9c0 1.7-2.4 2-2.4 3.6M12 17h.01"/><rect x="3.5" y="3.5" width="17" height="17" rx="4"/></symbol>
+<symbol id="i-cap" viewBox="0 0 24 24"><path d="M2.5 9.5L12 5l9.5 4.5L12 14z"/><path d="M6.5 11.5V16c0 1.4 2.5 2.8 5.5 2.8s5.5-1.4 5.5-2.8v-4.5M21 10v5"/></symbol>
+<symbol id="i-infinity" viewBox="0 0 24 24"><path d="M8 8.5c-4.5 0-4.5 7 0 7 4 0 4-7 8-7 4.5 0 4.5 7 0 7-4 0-4-7-8-7z"/></symbol>
+<symbol id="i-cal" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/></symbol>
+<symbol id="i-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 7.8h.01"/></symbol>
+</defs></svg>
+
+<div class="toolbar">
+  <div class="grp"><span class="gl2">Screen</span>
+    <button class="tb scr on" data-s="hub">Hub</button>
+    <button class="tb scr" data-s="gen">Generate</button>
+    <button class="tb scr" data-s="ed">Editor</button>
+    <button class="tb scr" data-s="mod">Modals</button>
+    <button class="tb scr" data-s="play">Play</button>
+    <button class="tb scr" data-s="res">Results</button>
+    <button class="tb scr" data-s="usr">My Quizzes</button>
+    <button class="tb scr" data-s="start">Start</button>
+  </div>
+  <div class="grp"><span class="gl2">View</span>
+    <button class="tb des on" data-d="1">1</button>
+    <button class="tb des" data-d="2">2</button>
+    <button class="tb des" data-d="3">3</button>
+    <button class="tb des gone" data-d="4">4</button>
+  </div>
+  <div class="grp"><span class="gl2">Role</span>
+    <button class="tb rl on" data-r="">Server</button>
+    <button class="tb rl" data-r="r-bart">Bartender</button>
+    <button class="tb rl" data-r="r-host">Host</button>
+  </div>
+  <div class="grp"><span class="gl2">Theme</span>
+    <button class="tb th on" data-t="">Mono·D</button>
+    <button class="tb th" data-t="t-mono-l">Mono·L</button>
+    <button class="tb th" data-t="t-ocean-d">Ocean·D</button>
+    <button class="tb th" data-t="t-ocean-l">Ocean·L</button>
+  </div>
+</div>
+<div class="hint"><b>LOCKDOWN — Live·A wins. This page is now the build spec.</b> The Editor runs its three real states — Draft · Live · Paused —
+and the Live console carries all four actions in the 2×2, no dock. NEW in this cut: <b>the live console PINS</b> — expand the Questions and
+Tracker folds and scroll: the console stays planted while everything slides beneath it. In the build it mounts outside the scroll view,
+exactly like ScreenHeader chrome, so the pin is native and stutter-free. Everything else is your seven ✅s, untouched.</div>
+
+<div class="phone" id="phone">
+  <div class="glow"></div><div class="glow2"></div>
+  <div class="sb"><span>9:41</span><span>●●●</span></div>
+  <div class="screen">
+
+  <!-- ═════════════════ HUB — locked: arcade tiles + expanding detail ═════════════════ -->
+  <div class="design on" id="hub1">
+    <div class="concept"><b>HUB·FINAL</b> per-role tiles · status words · ring · 2×2 actions<span class="ln"></span></div>
+    <div class="hdr"><span class="c38"><svg class="ic"><use href="#i-back"/></svg></span>
+      <div class="hmid"><div class="eyebrow">Manage · Training</div><div class="htitle">Quizzes &amp; Exams</div></div>
+      <span class="hspace"></span></div>
+    <div class="blurb"><svg class="ic"><use href="#i-cap"/></svg><p>Build a quiz for each role, activate it when you're ready, and track who's taken it.</p></div>
+    <div class="qgrid">
+      <div class="qtile tS sel xt" data-x="hubx1"><svg class="ic"><use href="#i-tray"/></svg>
+        <span class="corner"><svg class="ic"><use href="#i-up"/></svg></span>
+        <div class="foot"><span>Server</span><em><i style="background:#34E0A1"></i>ACTIVE</em></div></div>
+      <div class="qtile tB xt" data-x="hubx2"><svg class="ic"><use href="#i-glass"/></svg>
+        <span class="corner"><svg class="ic"><use href="#i-down"/></svg></span>
+        <div class="foot"><span>Bartender</span><em><i style="background:#FFC24D"></i>DRAFT</em></div></div>
+      <div class="qtile ghost"><svg class="ic"><use href="#i-plus"/></svg><span class="mklab">Create Quiz</span>
+        <div class="foot"><span style="color:var(--muted)">Host</span></div></div>
+    </div>
+    <div class="gcard xp" id="hubx1">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+        <div style="flex:1;min-width:0">
+          <div class="hubtitle">Server Quiz</div>
+          <div class="hubsub"><span class="pill live"><i></i>Active</span><span class="cdown mono" style="color:var(--gold)">closes 2d 4h</span></div>
+          <div class="statline" style="margin-top:9px">
+            <span><svg class="ic"><use href="#i-list"/></svg><b>12</b> Qs</span>
+            <span><svg class="ic"><use href="#i-clock"/></svg><b>5:00</b></span>
+            <span><svg class="ic"><use href="#i-dollar"/></svg><b>$2</b>/Q</span>
+            <span><b>78%</b> avg</span>
+          </div>
+        </div>
+        <span class="ring2" style="--p:44"><i></i><b>4/9</b></span>
+      </div>
+      <div class="grid2" style="margin-bottom:0">
+        <span class="qbtn tinted"><svg class="ic"><use href="#i-pencil"/></svg>Open Editor</span>
+        <span class="qbtn warn"><svg class="ic"><use href="#i-pause"/></svg>Pause</span>
+        <span class="qbtn danger"><svg class="ic"><use href="#i-x"/></svg>Close</span>
+        <span class="qbtn"><svg class="ic"><use href="#i-reset"/></svg>Reset</span>
+      </div>
+    </div>
+    <div class="gcard xp" id="hubx2" style="display:none">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+        <div style="flex:1;min-width:0">
+          <div class="hubtitle">Bartender Quiz</div>
+          <div class="hubsub"><span class="pill draft"><i></i>Draft</span><span style="font-size:11px;color:var(--muted)">not live yet</span></div>
+          <div class="statline" style="margin-top:9px">
+            <span><svg class="ic"><use href="#i-list"/></svg><b>8</b> Qs ready</span>
+            <span><svg class="ic"><use href="#i-clock"/></svg><b>3:00</b></span>
+            <span><svg class="ic"><use href="#i-bell"/></svg>notify <b>armed</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="grid2" style="margin-bottom:0">
+        <span class="qbtn tinted" style="color:#5B6FD8;border-color:rgba(91,111,216,0.4);background:rgba(91,111,216,0.08)"><svg class="ic"><use href="#i-pencil"/></svg>Open Editor</span>
+        <span class="qbtn"><svg class="ic"><use href="#i-eye"/></svg>Preview</span>
+        <span class="qbtn" style="color:var(--ok);border-color:color-mix(in srgb,var(--ok) 40%,transparent)"><svg class="ic"><use href="#i-check"/></svg>Activate</span>
+        <span class="qbtn"><svg class="ic"><use href="#i-reset"/></svg>Reset</span>
+      </div>
+    </div>
+    <div class="bcap"><b>HUB·FINAL — every adjustment in:</b> tiles wear their role's hue (Server teal · Bartender navy · Host violet), the foot carries the <b>dot + word</b> (ACTIVE / DRAFT), and the empty Host tile says <b>Create Quiz</b> under its ＋. The expanded card swaps the bar for the <b>checklists' progress ring</b> (4/9 — tapping it jumps straight to that quiz's tracker), and actions sit in a clean <b>2×2 grid</b> — Open Editor · Pause · Close · Reset live, Open Editor · Preview · Activate · Reset in draft. Tap the Bartender tile to see the draft card.</div>
+  </div>
+
+  <!-- ═════════════════ GEN — locked hybrid: C's open page + B's dials ═════════════════ -->
+  <div class="design" id="gen1">
+    <div class="concept"><b>GEN·FINAL</b> open page · console count · B's dials · info chip<span class="ln"></span></div>
+    <div class="hdr"><span class="c38"><svg class="ic"><use href="#i-back"/></svg></span>
+      <div class="hmid"><div class="eyebrow">Quizzes &amp; Exams</div><div class="htitle"><span class="rolename">Server</span> Quiz</div></div>
+      <span class="c38"><svg class="ic" style="width:16px;height:16px;color:var(--qz)"><use href="#i-info"/></svg></span></div>
+    <div class="livecon" style="padding:16px 14px">
+      <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;letter-spacing:1.6px;font-weight:700;color:rgba(255,255,255,0.72);margin-bottom:8px">BUILD A <span class="rolename" style="text-transform:uppercase">SERVER</span> QUIZ</div>
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span class="stepbtn" style="background:rgba(255,255,255,0.14);border-color:rgba(255,255,255,0.25);color:#FFF">−</span>
+        <div style="text-align:center">
+          <div class="bignum mono" style="color:#FFF;border-bottom:2px dashed rgba(255,255,255,0.35);padding:0 8px 3px">12</div>
+          <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;letter-spacing:1.4px;color:rgba(255,255,255,0.65);margin-top:5px">QUESTIONS · TAP TO TYPE</div>
+        </div>
+        <span class="stepbtn" style="background:rgba(255,255,255,0.14);border-color:rgba(255,255,255,0.25);color:#FFF">＋</span>
+      </div>
+    </div>
+    <div class="sect" style="margin-top:4px">Pull questions from<span class="ln"></span></div>
+    <div class="mixrow">
+      <span class="mix on"><svg class="ic"><use href="#i-check"/></svg>Menu Items</span>
+      <span class="mix on"><svg class="ic"><use href="#i-check"/></svg>Wine &amp; Pairings</span>
+      <span class="mix on"><svg class="ic"><use href="#i-check"/></svg>Libation Recipes</span>
+      <span class="mix"><svg class="ic"><use href="#i-plus"/></svg>Cocktails A–Z</span>
+    </div>
+    <div class="sect">Photo questions<span class="ln"></span></div>
+    <div class="seg3"><span>None</span><span class="on">Some ⅕</span><span>Lots ⅗</span><span>All 5/5</span></div>
+    <div class="sect">Difficulty<span class="ln"></span></div>
+    <div class="seg3"><span>Standard</span><span class="on">Mixed</span><span>Advanced</span></div>
+    <div class="sect">Value &amp; time<span class="ln"></span></div>
+    <div class="inline2">
+      <div class="valfield"><svg class="ic"><use href="#i-dollar"/></svg><span class="in">$2</span><span class="ph">per correct<br>$0 = no reward</span></div>
+      <div class="valfield"><svg class="ic"><use href="#i-clock"/></svg><span class="in">5:00</span><span class="ph">time<br>limit</span></div>
+    </div>
+    <div class="cta shine" style="margin:14px 0 8px"><svg class="ic"><use href="#i-wand"/></svg>Generate 12 Questions</div>
+    <div class="qbtn" style="margin-bottom:4px"><svg class="ic"><use href="#i-pencil"/></svg>Start from a blank quiz instead</div>
+    <div class="bcap"><b>GEN·FINAL:</b> B's dials living directly on the page — no wrapper card — under C's gradient console. The big number takes <b>−/＋ AND direct typing</b> (the dashed underline is the tell). Photo ratio now runs <b>None · Some ⅕ · Lots ⅗ · All 5/5</b>. The value field accepts <b>$0</b> — a $0 quiz simply pays nothing per correct (the Award-Bucks toggle in the editor stays the master switch, and a $0 quiz celebrates with confetti, not money rain). Top-right: the <b>ⓘ chip</b> — opens a legend explaining every dial (View 2).</div>
+  </div>
+
+  <!-- ═════════════════ GEN 2 — the info legend sheet ═════════════════ -->
+  <div class="design" id="gen2">
+    <div class="concept"><b>GEN·ⓘ</b> the info legend the chip opens<span class="ln"></span></div>
+    <div class="dim" style="padding-top:80px"><div class="sheet">
+      <div class="grab"></div>
+      <div class="shead"><span class="t">How generation works</span><span class="c38" style="width:30px;height:30px"><svg class="ic" style="width:14px;height:14px"><use href="#i-x"/></svg></span></div>
+      <div class="irow"><svg class="ic"><use href="#i-list"/></svg><p><b>Questions</b> — how many to build. Use −/＋ or tap the number to type. You can add, delete and edit after.</p></div>
+      <div class="irow"><svg class="ic"><use href="#i-grid"/></svg><p><b>Sources</b> — where questions come from: your menus, wine list &amp; pairings, libation recipes, cocktails and checklists. Only what you turn on gets used.</p></div>
+      <div class="irow"><svg class="ic"><use href="#i-photo"/></svg><p><b>Photo questions</b> — "which dish is this?" style, from items with photos. The ratio sets how many of your questions get one.</p></div>
+      <div class="irow"><svg class="ic"><use href="#i-star"/></svg><p><b>Difficulty</b> — Standard keeps it friendly (prices, sections, dietary); Advanced digs into ingredients; Mixed blends both.</p></div>
+      <div class="irow"><svg class="ic"><use href="#i-dollar"/></svg><p><b>Value</b> — Bucks paid per correct answer. Set $0 for a practice quiz with no payout. Any question can override its own value later.</p></div>
+      <div class="irow"><svg class="ic"><use href="#i-clock"/></svg><p><b>Time limit</b> — the countdown once an employee starts. ∞ means untimed.</p></div>
+      <div class="cta" style="margin-top:12px">Got it</div>
+    </div></div>
+    <div class="bcap"><b>GEN·ⓘ:</b> the legend behind the info chip — one glass sheet, one row per dial, written for a manager who's never built a quiz. Same sheet grammar as everything else.</div>
+  </div>
+
+  <!-- ═════════════════ ED 1 — DRAFT ═════════════════ -->
+  <div class="design" id="ed1">
+    <div class="concept"><b>ED·DRAFT</b> settings console + collapsible questions<span class="ln"></span></div>
+    <div class="hdr"><span class="c38"><svg class="ic"><use href="#i-back"/></svg></span>
+      <div class="hmid"><div class="eyebrow">Quizzes &amp; Exams</div><div class="htitle"><span class="rolename">Server</span> Quiz</div></div>
+      <span class="hspace"></span></div>
+    <div class="setcon open">
+      <div class="schead" onclick="this.parentElement.classList.toggle('open')">
+        <span class="pill draft"><i></i>Draft</span>
+        <span class="scsum">12 Qs · 5:00 · closes Sun 11:59p</span>
+        <svg class="ic caret" style="width:14px;height:14px;color:var(--muted)"><use href="#i-down"/></svg>
+      </div>
+      <div class="scbody">
+        <div class="chipgrid">
+          <span class="schip"><svg class="ic"><use href="#i-clock"/></svg><span><span class="lab">Time limit</span><span class="v">5:00</span></span></span>
+          <span class="schip"><svg class="ic"><use href="#i-cal"/></svg><span><span class="lab">Closes</span><span class="v">Sun 11:59 PM</span></span></span>
+          <span class="schip"><svg class="ic"><use href="#i-dollar"/></svg><span><span class="lab">Per correct</span><span class="v">$2</span></span></span>
+          <span class="schip"><svg class="ic"><use href="#i-bell"/></svg><span><span class="lab">Notify staff</span><span class="v">On activate</span></span><span class="tgl on"></span></span>
+        </div>
+        <div class="schip" style="margin-top:7px"><svg class="ic"><use href="#i-star"/></svg><span style="flex:1"><span class="lab">Award Bucks</span><span class="v">On — 12 × $2 + $10 bonus = up to $34</span></span><span class="tgl on"></span></div>
+      </div>
+    </div>
+    <div class="fold open">
+      <div class="fh" onclick="this.parentElement.classList.toggle('open')"><svg class="ic" style="color:var(--qz)"><use href="#i-list"/></svg>Questions<span class="n">12 + bonus</span><svg class="ic caret"><use href="#i-down"/></svg></div>
+      <div class="fbody" style="padding:4px 10px 10px">
+        <div class="qcard" style="margin-top:4px">
+          <div class="qhead"><span class="qnum">Q3</span><span class="catchip">WINE PAIRINGS<svg class="ic"><use href="#i-down"/></svg></span><span class="valchip">$2</span>
+            <span class="qacts"><span class="qact" style="color:var(--qz)"><svg class="ic"><use href="#i-reset"/></svg></span><span class="qact"><svg class="ic"><use href="#i-pencil"/></svg></span><span class="qact danger"><svg class="ic"><use href="#i-trash"/></svg></span></span></div>
+          <div class="qtext">Which wine do we pair with the Grilled Branzino?</div>
+          <div class="qopt"><b>A</b>Duckhorn Merlot</div>
+          <div class="qopt right"><b>B</b>Sancerre, Loire<svg class="ic"><use href="#i-check"/></svg></div>
+          <div class="qopt"><b>C</b>La Crema Pinot</div>
+          <div class="qopt"><b>D</b>House Prosecco</div>
+        </div>
+        <div class="qcard">
+          <div class="qhead"><span class="qnum">Q4</span><span class="catchip">MENU ITEMS<svg class="ic"><use href="#i-down"/></svg></span><span class="valchip">$5</span>
+            <span class="qacts"><span class="qact" style="color:var(--qz)"><svg class="ic"><use href="#i-reset"/></svg></span><span class="qact"><svg class="ic"><use href="#i-pencil"/></svg></span><span class="qact danger"><svg class="ic"><use href="#i-trash"/></svg></span></span></div>
+          <div class="qimg"></div>
+          <div class="qtext">Which dish is this?</div>
+          <div class="qopt right"><b>A</b>Harissa Chicken Skewers<svg class="ic"><use href="#i-check"/></svg></div>
+          <div class="qopt"><b>B</b>Steak Frites</div>
+        </div>
+        <div class="qcard bonus" style="margin-bottom:2px">
+          <div class="qhead"><span class="qnum">★</span><span class="catchip gold">BONUS</span><span class="valchip gold">$10</span>
+            <span class="qacts"><span class="qact"><svg class="ic"><use href="#i-pencil"/></svg></span><span class="qact danger"><svg class="ic"><use href="#i-trash"/></svg></span></span></div>
+          <div class="qtext">Which nights feature live music on the deck?</div>
+          <div class="qopt right"><b>B</b>Fri &amp; Sat<svg class="ic"><use href="#i-check"/></svg></div>
+        </div>
+      </div>
+    </div>
+    <div class="btnrow">
+      <span class="dash"><svg class="ic"><use href="#i-plus"/></svg>Custom</span>
+      <span class="dash gold"><svg class="ic"><use href="#i-star"/></svg>Bonus</span>
+    </div>
+    <div class="btnrow">
+      <span class="qbtn"><svg class="ic"><use href="#i-eye"/></svg>Preview</span>
+      <span class="qbtn"><svg class="ic"><use href="#i-reset"/></svg>Start over</span>
+    </div>
+    <div class="cta green shine"><svg class="ic"><use href="#i-check"/></svg>Activate Quiz</div>
+    <div class="bcap"><b>ED·DRAFT:</b> your B console on top, and the questions list is now its own <b>collapsible fold</b> — snap it shut and the launch row (Custom · Bonus · Preview · Start over · Activate) is right there, no scrolling past twelve cards. Flip through <b>Live</b> and <b>Paused</b> to watch this exact page morph.</div>
+  </div>
+
+  <!-- ═════════════════ ED 2 — LIVE·A (everything on the console) ═════════════════ -->
+  <div class="design" id="ed2">
+    <div class="concept"><b>ED·LIVE</b> locked · the pinned command console<span class="ln"></span></div>
+    <div class="hdr"><span class="c38"><svg class="ic"><use href="#i-back"/></svg></span>
+      <div class="hmid"><div class="eyebrow">Quizzes &amp; Exams</div><div class="htitle"><span class="rolename">Server</span> Quiz</div></div>
+      <span class="hspace"></span></div>
+    <div class="livecon sticklive">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:9px">
+        <span style="width:8px;height:8px;border-radius:4px;background:#34E0A1;box-shadow:0 0 8px #34E0A1"></span>
+        <span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1.6px;font-weight:700;color:rgba(255,255,255,0.85)">LIVE NOW</span>
+        <span class="mono" style="margin-left:auto;font-size:14px;font-weight:700;color:#FFD48A"><svg class="ic" style="width:12px;height:12px;vertical-align:-2px"><use href="#i-hour"/></svg> 2d 4h</span>
+      </div>
+      <div style="display:flex;gap:15px;margin-bottom:11px">
+        <span class="mono" style="font-size:13px;font-weight:700">12 <small style="font-size:9px;opacity:.6">QS</small></span>
+        <span class="mono" style="font-size:13px;font-weight:700">4/9 <small style="font-size:9px;opacity:.6">TAKEN</small></span>
+        <span class="mono" style="font-size:13px;font-weight:700">78% <small style="font-size:9px;opacity:.6">AVG</small></span>
+        <span class="mono" style="font-size:13px;font-weight:700">$61 <small style="font-size:9px;opacity:.6">PAID</small></span>
+      </div>
+      <div class="grid2" style="margin-bottom:0">
+        <span class="conchip" style="justify-content:center"><svg class="ic"><use href="#i-pause"/></svg>Pause</span>
+        <span class="conchip" style="justify-content:center"><svg class="ic"><use href="#i-eye"/></svg>Preview</span>
+        <span class="conchip" style="justify-content:center;color:#FFB4B4;border-color:rgba(255,150,150,0.42)"><svg class="ic"><use href="#i-x"/></svg>Close</span>
+        <span class="conchip" style="justify-content:center"><svg class="ic"><use href="#i-reset"/></svg>New Quiz</span>
+      </div>
+    </div>
+    <div class="fold">
+      <div class="fh" onclick="this.parentElement.classList.toggle('open')"><svg class="ic" style="color:var(--muted)"><use href="#i-list"/></svg>Questions<span class="n">12 · locked while live</span><svg class="ic caret"><use href="#i-down"/></svg></div>
+      <div class="fbody" style="padding:2px 12px 12px">
+        <div class="qcard" style="margin-top:6px;opacity:.75">
+          <div class="qhead"><span class="qnum">Q3</span><span class="catchip">WINE PAIRINGS</span><span class="valchip">$2</span></div>
+          <div class="qtext">Which wine do we pair with the Grilled Branzino?</div>
+          <div class="qopt right"><b>B</b>Sancerre, Loire<svg class="ic"><use href="#i-check"/></svg></div>
+        </div>
+        <div style="font-size:10.5px;color:var(--muted);font-style:italic">Read-only while live — pause the quiz to edit.</div>
+      </div>
+    </div>
+    <div class="fold">
+      <div class="fh" onclick="this.parentElement.classList.toggle('open')" style="padding-top:8px;padding-bottom:8px"><svg class="ic" style="color:var(--qz)"><use href="#i-users"/></svg>Tracker<span class="n">taken so far</span><span class="ring2 sm" style="--p:44"><i></i><b>4/9</b></span><svg class="ic caret"><use href="#i-down"/></svg></div>
+      <div class="fbody" style="padding:2px 10px 10px">
+        <div class="trow" style="margin-top:6px">
+          <span class="tav">AR</span>
+          <div class="tbd"><div class="tnm">Ava Robinson</div><div class="tjb">Lead Server</div></div>
+          <div class="tsc"><div class="s">12/12</div><div class="b">+$24</div></div>
+          <div class="tchips"><span class="tchip"><svg class="ic"><use href="#i-eye"/></svg>View</span><span class="tchip"><svg class="ic"><use href="#i-reset"/></svg>Retake</span></div>
+        </div>
+        <div class="trow">
+          <span class="tav" style="background:linear-gradient(135deg,#28246E,#6663E0)">DD</span>
+          <div class="tbd"><div class="tnm">Daisy Dukes</div><div class="tjb">Server</div></div>
+          <div class="tsc"><div class="s" style="color:var(--gold)">7/12</div><div class="b">+$14</div></div>
+          <div class="tchips"><span class="tchip"><svg class="ic"><use href="#i-eye"/></svg>View</span><span class="tchip"><svg class="ic"><use href="#i-reset"/></svg>Retake</span></div>
+        </div>
+        <div class="trow" style="margin-bottom:2px">
+          <span class="tav" style="background:linear-gradient(135deg,#0B5E86,#41B4E8)">SF</span>
+          <div class="tbd"><div class="tnm">Sam Fields</div><div class="tjb">Runner</div></div>
+          <span class="notyet">NOT TAKEN</span>
+        </div>
+      </div>
+    </div>
+    <div class="bcap"><b>ED·LIVE — locked:</b> all four actions ride the console in the 2×2, no dock — and <b>the console PINS: expand Questions and Tracker, then scroll; it stays planted while they slide beneath it</b> (in the build it mounts outside the scroll view, under ScreenHeader — native fixed chrome, no scroll-linked morphing). Tracker sleeps collapsed with the <b>ring in its header, in both states</b>. Your thumb-logic sealed it: the bottom edge is where thumbs scroll; the console is deliberate reach.</div>
+  </div>
+
+  <!-- ═════════════════ ED 3 — PAUSED ═════════════════ -->
+  <div class="design" id="ed3">
+    <div class="concept"><b>ED·PAUSED</b> resume at top AND bottom<span class="ln"></span></div>
+    <div class="hdr"><span class="c38"><svg class="ic"><use href="#i-back"/></svg></span>
+      <div class="hmid"><div class="eyebrow">Quizzes &amp; Exams</div><div class="htitle"><span class="rolename">Server</span> Quiz</div></div>
+      <span class="hspace"></span></div>
+    <div class="setcon open">
+      <div class="schead" onclick="this.parentElement.classList.toggle('open')">
+        <span class="pill paused"><i></i>Paused</span>
+        <span style="display:inline-flex;align-items:center;gap:4px;border-radius:9px;padding:4px 9px;background:color-mix(in srgb,var(--ok) 12%,transparent);border:1px solid color-mix(in srgb,var(--ok) 42%,transparent);color:var(--ok);font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;font-weight:700;letter-spacing:.6px"><svg class="ic" style="width:10px;height:10px"><use href="#i-play"/></svg>RESUME</span>
+        <span class="scsum">12 Qs · 4/9 so far</span>
+        <svg class="ic caret" style="width:14px;height:14px;color:var(--muted)"><use href="#i-down"/></svg>
+      </div>
+      <div class="scbody">
+        <div class="chipgrid">
+          <span class="schip"><svg class="ic"><use href="#i-clock"/></svg><span><span class="lab">Time limit</span><span class="v">5:00</span></span></span>
+          <span class="schip"><svg class="ic"><use href="#i-cal"/></svg><span><span class="lab">Closes</span><span class="v">Sun 11:59 PM</span></span></span>
+          <span class="schip"><svg class="ic"><use href="#i-dollar"/></svg><span><span class="lab">Per correct</span><span class="v">$2</span></span></span>
+          <span class="schip"><svg class="ic"><use href="#i-users"/></svg><span><span class="lab">Tracker</span><span class="v">4 of 9 so far</span></span></span>
+        </div>
+      </div>
+    </div>
+    <div class="fold open">
+      <div class="fh" onclick="this.parentElement.classList.toggle('open')"><svg class="ic" style="color:var(--qz)"><use href="#i-list"/></svg>Questions<span class="n">12 · editable again</span><svg class="ic caret"><use href="#i-down"/></svg></div>
+      <div class="fbody" style="padding:4px 10px 10px">
+        <div class="qcard" style="margin-top:4px;margin-bottom:2px">
+          <div class="qhead"><span class="qnum">Q3</span><span class="catchip">WINE PAIRINGS<svg class="ic"><use href="#i-down"/></svg></span><span class="valchip">$2</span>
+            <span class="qacts"><span class="qact" style="color:var(--qz)"><svg class="ic"><use href="#i-reset"/></svg></span><span class="qact"><svg class="ic"><use href="#i-pencil"/></svg></span><span class="qact danger"><svg class="ic"><use href="#i-trash"/></svg></span></span></div>
+          <div class="qtext">Which wine do we pair with the Grilled Branzino?</div>
+          <div class="qopt right"><b>B</b>Sancerre, Loire<svg class="ic"><use href="#i-check"/></svg></div>
+        </div>
+      </div>
+    </div>
+    <div class="btnrow">
+      <span class="qbtn danger"><svg class="ic"><use href="#i-x"/></svg>Close</span>
+      <span class="qbtn"><svg class="ic"><use href="#i-reset"/></svg>New Quiz</span>
+    </div>
+    <div class="dock">
+      <span class="cta green shine" style="flex:1"><svg class="ic"><use href="#i-play"/></svg>Resume Quiz</span>
+    </div>
+    <div class="bcap"><b>ED·PAUSED:</b> per your note, Resume now lives in <b>both places</b> — a green RESUME chip right beside the PAUSED pill in the glass console, and the big Resume riding the <b>sticky bottom dock</b>, always at the thumb. Questions unlocked with their full action chips (edit works in paused today, so this is honest); Close and New share a quiet in-flow row. Resuming morphs straight back to the Live deck.</div>
+  </div>
+
+  <!-- ═════════════════ MOD 1 — edit sheet ═════════════════ -->
+  <div class="design" id="mod1">
+    <div class="concept"><b>MOD·EDIT</b> photo + value share a row · shine on save<span class="ln"></span></div>
+    <div class="dim"><div class="sheet">
+      <div class="grab"></div>
+      <div class="shead"><span class="t">Edit Question</span><span class="c38" style="width:30px;height:30px"><svg class="ic" style="width:14px;height:14px"><use href="#i-x"/></svg></span></div>
+      <div class="field">
+        <div class="inline2" style="margin-top:2px">
+          <div>
+            <label style="margin-top:0">Bucks value</label>
+            <div class="valfield"><svg class="ic"><use href="#i-dollar"/></svg><span class="in" style="color:var(--muted);font-weight:600;font-size:12px">$2 · default</span></div>
+          </div>
+          <div>
+            <label style="margin-top:0">Photo · optional</label>
+            <div class="qbtn tinted" style="padding:9px"><svg class="ic"><use href="#i-photo"/></svg>Add photo</div>
+          </div>
+        </div>
+        <label>Question</label>
+        <div class="input ta">Which wine do we pair with the Grilled Branzino?</div>
+        <label>Answers</label>
+        <div class="optline"><div class="input">Duckhorn Merlot</div><span class="radio">SET</span></div>
+        <div class="optline"><div class="input" style="border-color:color-mix(in srgb,var(--ok) 45%,transparent)">Sancerre, Loire Valley</div><span class="radio on">✓ CORRECT</span></div>
+        <div class="optline"><div class="input">La Crema Pinot Noir</div><span class="radio">SET</span></div>
+        <div class="optline"><div class="input">House Prosecco</div><span class="radio">SET</span></div>
+        <div class="trstub"><svg class="ic"><use href="#i-cap"/></svg>Español — auto-fills on save, tap to review</div>
+        <div class="cta shine" style="margin-top:14px">Save Changes</div>
+      </div>
+    </div></div>
+    <div class="bcap"><b>MOD·EDIT:</b> Bucks value and Add photo now <b>share one row</b>, and Save wears the traveling shine. To your question: <b>an override touches only that question</b> — the quiz default lives on the quiz row, each question's value is its own column (blank = default), so overriding Q4 to $5 never moves the other eleven.</div>
+  </div>
+
+  <!-- ═════════════════ MOD 2 — bonus sheet ═════════════════ -->
+  <div class="design" id="mod2">
+    <div class="concept"><b>MOD·BONUS</b> photo + translation added · one-shot rule<span class="ln"></span></div>
+    <div class="dim"><div class="sheet" style="border-color:color-mix(in srgb,var(--gold) 30%,transparent)">
+      <div class="grab"></div>
+      <div class="shead"><span class="t" style="color:var(--gold)">Add Bonus Question</span><span class="c38" style="width:30px;height:30px"><svg class="ic" style="width:14px;height:14px"><use href="#i-x"/></svg></span></div>
+      <div class="field">
+        <div class="inline2" style="margin-top:2px">
+          <div>
+            <label style="margin-top:0">Bonus value</label>
+            <div class="valfield" style="border-color:color-mix(in srgb,var(--gold) 45%,transparent);background:color-mix(in srgb,var(--gold) 8%,transparent)">
+              <svg class="ic" style="color:var(--gold)"><use href="#i-star"/></svg>
+              <span class="in" style="color:var(--gold);font-size:16px">$10</span>
+            </div>
+          </div>
+          <div>
+            <label style="margin-top:0">Photo · optional</label>
+            <div class="qbtn" style="padding:9px;color:var(--gold);border-color:color-mix(in srgb,var(--gold) 40%,transparent)"><svg class="ic"><use href="#i-photo"/></svg>Add photo</div>
+          </div>
+        </div>
+        <div style="font-size:10px;color:var(--muted);margin-top:6px;line-height:1.45">Pays in full — and it's <b style="color:var(--gold)">one shot</b>: staff with multiple quizzes only ever see one bonus. Answered anywhere, right or wrong, it won't appear in their other quizzes.</div>
+        <label>Question</label>
+        <div class="input ta"><span class="phx">Something only your best people know…</span></div>
+        <label>Answers</label>
+        <div class="optline"><div class="input"><span class="phx">Option A</span></div><span class="radio on">✓ CORRECT</span></div>
+        <div class="optline"><div class="input"><span class="phx">Option B</span></div><span class="radio">SET</span></div>
+        <div class="optline"><div class="input"><span class="phx">Option C</span></div><span class="radio">SET</span></div>
+        <div class="optline"><div class="input"><span class="phx">Option D</span></div><span class="radio">SET</span></div>
+        <div class="trstub"><svg class="ic"><use href="#i-cap"/></svg>Español — auto-fills on save, tap to review</div>
+        <div class="cta gold shine" style="margin-top:14px">Add Bonus Question</div>
+      </div>
+    </div></div>
+    <div class="bcap"><b>MOD·BONUS:</b> Add-photo and the TranslationSection join the gold sheet, shine on the CTA — and the copy now states your new rule: <b>the bonus is one-shot across all of an employee's quizzes</b>. Build-side: when a multi-quiz employee loads a quiz, we check whether any of their completed (or queued-offline) attempts already contained a bonus this round and quietly drop it from the question list; their total shows /11 instead of /12 in that case, tracker stays per-person accurate.</div>
+  </div>
+
+  <!-- ═════════════════ MOD 3 — regenerate ═════════════════ -->
+  <div class="design" id="mod3">
+    <div class="concept"><b>MOD·REGEN</b> locked as-is<span class="ln"></span></div>
+    <div class="dim" style="padding-top:340px"><div style="padding:0 6px">
+      <div class="asheet">
+        <div style="text-align:center;padding:10px 12px 6px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1.4px;font-weight:700;color:var(--muted)">REGENERATE Q3</div>
+        <div class="asrow"><svg class="ic"><use href="#i-reset"/></svg><span>Same category<span class="sub">A fresh Wine Pairings question</span></span></div>
+        <div class="asrow"><svg class="ic"><use href="#i-grid"/></svg><span>Pick a category…<span class="sub">Menu · Wine · Libations · Checklists · Custom</span></span></div>
+        <div class="asrow"><svg class="ic"><use href="#i-wand"/></svg><span>Surprise me<span class="sub">Any template, any source</span></span></div>
+      </div>
+      <div class="asheet"><div class="asrow cancel">Cancel</div></div>
+    </div></div>
+    <div class="bcap"><b>MOD·REGEN:</b> unchanged from round 1 — your "no changes needed, love the Surprise me." Kept here so the modal set stays complete.</div>
+  </div>
+
+  <!-- ═════════════════ PLAY 1 — photo · FULL BLEED ═════════════════ -->
+  <div class="design" id="play1">
+    <div class="concept"><b>PLAY·PHOTO</b> edge-to-edge, exactly like Picture This!<span class="ln"></span></div>
+    <div class="hdr"><span class="hspace"></span>
+      <div class="hmid"><div class="eyebrow">Quizzes &amp; Exams</div><div class="htitle"><span class="rolename">Server</span> Quiz</div></div>
+      <span class="c38"><svg class="ic" style="width:16px;height:16px;color:var(--qz)"><use href="#i-shield"/></svg></span></div>
+    <div class="heroFB photo">
+      <div class="ovcon">
+        <div class="ovrow">
+          <span class="ovstat">Q4<small>/12</small></span>
+          <span class="ovstat big"><svg class="ic"><use href="#i-clock"/></svg>3:12</span>
+          <span class="ovstat"><svg class="ic"><use href="#i-dollar"/></svg>6</span>
+        </div>
+        <div class="ovmeter">
+          <span class="fill" style="width:25%"></span>
+          <span class="tick" style="left:25%"></span><span class="tick" style="left:50%"></span><span class="tick" style="left:75%"></span>
+        </div>
+      </div>
+      <div class="qpanel"><div class="qq">Which dish is this?</div></div>
+    </div>
+    <div class="ansgrid">
+      <div class="anstile"><span class="lchip">A</span><p>Harissa Chicken Skewers</p></div>
+      <div class="anstile"><span class="lchip">B</span><p>Steak Frites</p></div>
+      <div class="anstile"><span class="lchip">C</span><p>Crispy Duck Tacos</p></div>
+      <div class="anstile"><span class="lchip">D</span><p>Lamb Kofta Plate</p></div>
+    </div>
+    <div class="bcap"><b>PLAY·PHOTO:</b> your question answered in pixels — the hero is now <b>full-bleed edge-to-edge, exactly Picture This!'s geometry</b> (0.96 photo, no side margins), and the frosted console is the full-width strip glued to the photo's top edge, PT-style — not the floating card from round 1. Vitals: question count · countdown · Bucks banked, meter beneath.</div>
+  </div>
+
+  <!-- ═════════════════ PLAY 2 — no photo ═════════════════ -->
+  <div class="design" id="play2">
+    <div class="concept"><b>PLAY·NO-PHOTO</b> the typographic hero, full bleed<span class="ln"></span></div>
+    <div class="hdr"><span class="hspace"></span>
+      <div class="hmid"><div class="eyebrow">Quizzes &amp; Exams</div><div class="htitle"><span class="rolename">Server</span> Quiz</div></div>
+      <span class="c38"><svg class="ic" style="width:16px;height:16px;color:var(--qz)"><use href="#i-shield"/></svg></span></div>
+    <div class="heroFB board">
+      <div class="ovcon">
+        <div class="ovrow">
+          <span class="ovstat">Q12<small>/12</small></span>
+          <span class="ovstat big"><svg class="ic"><use href="#i-clock"/></svg>0:41</span>
+          <span class="ovstat"><svg class="ic"><use href="#i-dollar"/></svg>16</span>
+        </div>
+        <div class="ovmeter">
+          <span class="fill" style="width:92%"></span>
+          <span class="tick" style="left:25%"></span><span class="tick" style="left:50%"></span><span class="tick" style="left:75%"></span>
+        </div>
+      </div>
+      <div class="heroq">
+        <div class="bq">Which nights feature live music on the deck?</div>
+        <span class="bl"><svg class="ic"><use href="#i-star"/></svg>BONUS · +$10</span>
+      </div>
+    </div>
+    <div class="ansrow"><span class="lchip">A</span><p>Monday &amp; Tuesday</p></div>
+    <div class="ansrow"><span class="lchip">B</span><p>Friday &amp; Saturday</p></div>
+    <div class="ansrow"><span class="lchip">C</span><p>Sundays only</p></div>
+    <div class="ansrow"><span class="lchip">D</span><p>Every night in summer</p></div>
+    <div class="bcap"><b>PLAY·NO-PHOTO:</b> the locked solution — the question set big on the theme-aware quiz-gradient board, same full-bleed frame, console never moves. The hero runs a touch shorter (1.25 vs 0.96) so text questions don't feel padded. Bonus wears its gold pill in the hero.</div>
+  </div>
+
+  <!-- ═════════════════ PLAY 3 — feedback ═════════════════ -->
+  <div class="design" id="play3">
+    <div class="concept"><b>PLAY·FEEDBACK</b> the beat + gold toast<span class="ln"></span></div>
+    <div class="hdr"><span class="hspace"></span>
+      <div class="hmid"><div class="eyebrow">Quizzes &amp; Exams</div><div class="htitle"><span class="rolename">Server</span> Quiz</div></div>
+      <span class="c38"><svg class="ic" style="width:16px;height:16px;color:var(--qz)"><use href="#i-shield"/></svg></span></div>
+    <div class="heroFB photo">
+      <div class="ovcon">
+        <div class="ovrow">
+          <span class="ovstat">Q4<small>/12</small></span>
+          <span class="ovstat big"><svg class="ic"><use href="#i-clock"/></svg>3:04</span>
+          <span class="ovstat"><svg class="ic"><use href="#i-dollar"/></svg>8</span>
+        </div>
+        <div class="ovmeter">
+          <span class="fill" style="width:33%"></span>
+          <span class="tick" style="left:25%"></span><span class="tick" style="left:50%"></span><span class="tick" style="left:75%"></span>
+        </div>
+      </div>
+      <div class="toastq" style="top:72px"><svg class="ic"><use href="#i-check"/></svg>Nice — +$2 banked</div>
+      <div class="qpanel"><div class="qq">Which dish is this?</div></div>
+    </div>
+    <div class="ansgrid">
+      <div class="anstile right"><span class="lchip">A</span><p>Harissa Chicken Skewers</p><svg class="ic fbicon okc"><use href="#i-check"/></svg></div>
+      <div class="anstile dimmed"><span class="lchip">B</span><p>Steak Frites</p></div>
+      <div class="anstile dimmed"><span class="lchip">C</span><p>Crispy Duck Tacos</p></div>
+      <div class="anstile dimmed"><span class="lchip">D</span><p>Lamb Kofta Plate</p></div>
+    </div>
+    <div class="bcap"><b>PLAY·FEEDBACK:</b> as approved — green reveal, dimmed misses, and the gold GameToast popping down from the console with the Bucks banked. Advances itself after the beat.</div>
+  </div>
+
+  <!-- ═════════════════ RES 1 — no-bucks · confetti ═════════════════ -->
+  <div class="design" id="res1">
+    <div class="concept"><b>RES·NO-BUCKS</b> confetti &gt;50% · both folds<span class="ln"></span></div>
+    <div class="rwrap">
+      <div class="confetti" id="cf1"></div>
+      <div style="position:relative;z-index:1">
+        <div class="rsplit">
+          <div class="rav"><svg class="ic"><use href="#i-cap"/></svg></div>
+          <div class="lcol">
+            <div class="t">Quiz Complete!</div>
+            <div class="s">10/12</div>
+          </div>
+          <div class="rcol">
+            <span class="meta"><span class="rolename">Server</span> Quiz · 5:00 cap</span>
+            <span class="big2" style="color:var(--ok)">83% correct</span>
+            <span class="big2" style="color:var(--muted)">3:12 on the clock</span>
+          </div>
+        </div>
+        <div class="rbox">
+          <div class="rrow"><span class="l">Correct</span><span class="v" style="color:var(--ok)">10</span></div>
+          <div class="rrow"><span class="l">Missed</span><span class="v" style="color:var(--bad)">2</span></div>
+          <div class="rrow"><span class="l">Time</span><span class="v">3:12</span></div>
+        </div>
+        <div class="fold open">
+          <div class="fh" onclick="this.parentElement.classList.toggle('open')"><svg class="ic" style="color:var(--bad)"><use href="#i-x"/></svg>Review these<span class="n">2</span><svg class="ic caret"><use href="#i-down"/></svg></div>
+          <div class="fbody">
+            <div class="revitem"><span class="thumb"></span><div class="bd"><div class="n">Which dish is this?</div><div class="a">You said Steak Frites</div><div class="cor">→ Harissa Chicken Skewers</div></div></div>
+            <div class="revitem"><div class="bd"><div class="n">Which wine pairs with the Branzino?</div><div class="a">You said La Crema Pinot</div><div class="cor">→ Sancerre, Loire Valley</div></div></div>
+          </div>
+        </div>
+        <div class="fold">
+          <div class="fh" onclick="this.parentElement.classList.toggle('open')"><svg class="ic" style="color:var(--ok)"><use href="#i-check"/></svg>Correct<span class="n">10</span><svg class="ic caret"><use href="#i-down"/></svg></div>
+          <div class="fbody">
+            <div class="revitem"><div class="bd"><div class="n">What is the price of the Lobster Roll?</div><div class="cor">$26</div></div></div>
+            <div class="revitem"><div class="bd"><div class="n">Which nights feature live music on the deck?</div><div class="cor">Fri &amp; Sat</div></div></div>
+          </div>
+        </div>
+        <div class="cta shine" style="margin-top:12px">Done</div>
+      </div>
+    </div>
+    <div class="bcap"><b>RES·NO-BUCKS:</b> as approved — confetti above 50%, quiet below, misses-first review. Both folds present and correct.</div>
+  </div>
+
+  <!-- ═════════════════ RES 2 — bucks · money rain ═════════════════ -->
+  <div class="design" id="res2">
+    <div class="concept"><b>RES·BUCKS</b> money rain ≥$1 · both folds now<span class="ln"></span></div>
+    <div class="rwrap">
+      <div class="mrain" id="mr1"></div>
+      <div style="position:relative;z-index:1">
+        <div class="rsplit">
+          <div class="rav" style="background:linear-gradient(135deg,#0B7A5C,#12A97F);box-shadow:0 6px 18px -6px rgba(16,185,129,0.55)"><svg class="ic"><use href="#i-dollar"/></svg></div>
+          <div class="lcol">
+            <div class="t">Quiz Complete!</div>
+            <div class="s money">+$21</div>
+          </div>
+          <div class="rcol">
+            <span class="meta"><span class="rolename">Server</span> Quiz · Bucks on</span>
+            <span class="big2">10/12 · 83%</span>
+            <span class="big2" style="color:var(--muted)">3:12 on the clock</span>
+          </div>
+        </div>
+        <div class="rbox">
+          <div class="rrow"><span class="l">Standard · 8 × $2</span><span class="v" style="color:var(--ok)">+$16</span></div>
+          <div class="rrow"><span class="l">Bonus question</span><span class="v" style="color:var(--gold)">+$5</span></div>
+          <div class="rrow"><span class="l">Missed</span><span class="v" style="color:var(--bad)">2</span></div>
+        </div>
+        <div class="totalpill"><svg class="ic"><use href="#i-star"/></svg>+$21 Bucks banked to Rewards</div>
+        <div class="fold open">
+          <div class="fh" onclick="this.parentElement.classList.toggle('open')"><svg class="ic" style="color:var(--bad)"><use href="#i-x"/></svg>Review these<span class="n">2</span><svg class="ic caret"><use href="#i-down"/></svg></div>
+          <div class="fbody">
+            <div class="revitem"><span class="thumb"></span><div class="bd"><div class="n">Which dish is this?</div><div class="a">You said Steak Frites</div><div class="cor">→ Harissa Chicken Skewers</div></div></div>
+            <div class="revitem"><div class="bd"><div class="n">Which wine pairs with the Branzino?</div><div class="a">You said La Crema Pinot</div><div class="cor">→ Sancerre, Loire Valley</div></div></div>
+          </div>
+        </div>
+        <div class="fold">
+          <div class="fh" onclick="this.parentElement.classList.toggle('open')"><svg class="ic" style="color:var(--ok)"><use href="#i-check"/></svg>Correct<span class="n">10</span><svg class="ic caret"><use href="#i-down"/></svg></div>
+          <div class="fbody">
+            <div class="revitem"><div class="bd"><div class="n">What is the price of the Lobster Roll?</div><div class="cor">$26</div></div></div>
+          </div>
+        </div>
+        <div class="cta shine" style="margin-top:12px">Done</div>
+      </div>
+    </div>
+    <div class="bcap"><b>RES·BUCKS:</b> the money rain, firing on <b>any award of $1 or more</b> (locked) — and the missing <b>Correct fold is now in</b>, matching the no-bucks screen. Review anatomy identical across both.</div>
+  </div>
+
+  <!-- ═════════════════ USR 1 — shelf (multi-quiz) ═════════════════ -->
+  <div class="design" id="usr1">
+    <div class="concept"><b>USR·SHELF</b> per-role tiles + detail (2+ quizzes)<span class="ln"></span></div>
+    <div class="hdr"><span class="c38"><svg class="ic"><use href="#i-back"/></svg></span>
+      <div class="hmid"><div class="eyebrow">Your Training</div><div class="htitle">Quizzes &amp; Exams</div></div>
+      <span class="hspace"></span></div>
+    <div class="qgrid two">
+      <div class="qtile tS sel xt" data-x="usrx1"><svg class="ic"><use href="#i-tray"/></svg>
+        <span class="corner"><svg class="ic"><use href="#i-up"/></svg></span>
+        <div class="foot"><span>Server</span><em><i style="background:#34E0A1"></i>ACTIVE</em></div></div>
+      <div class="qtile tB done xt" data-x="usrx2"><svg class="ic"><use href="#i-glass"/></svg>
+        <span class="donebadge"><svg class="ic"><use href="#i-check"/></svg></span>
+        <div class="foot"><span>Bartender</span><em>DONE</em></div></div>
+    </div>
+    <div class="gcard xp" id="usrx1">
+      <div class="uphead" style="margin-bottom:8px"><span class="pill live"><i></i>Active</span><span class="cdown" style="color:var(--gold)">closes in 2d 4h</span></div>
+      <div class="uprows">
+        <div class="uprow"><svg class="ic"><use href="#i-list"/></svg>12 questions · 5:00 limit</div>
+        <div class="uprow money"><svg class="ic"><use href="#i-dollar"/></svg>Earn $2 per correct answer</div>
+        <div class="uprow"><svg class="ic"><use href="#i-shield"/></svg>One attempt — no going back mid-quiz</div>
+      </div>
+      <div class="cta shine">Take Quiz<svg class="ic"><use href="#i-right"/></svg></div>
+    </div>
+    <div class="gcard xp" id="usrx2" style="display:none">
+      <div class="uphead" style="margin-bottom:8px"><span class="pill off"><svg class="ic" style="width:10px;height:10px;color:var(--ok)"><use href="#i-check"/></svg>Completed</span></div>
+      <div class="scorebox"><span class="l">Score</span><span class="v" style="color:#5B6FD8">9/10</span></div>
+      <div class="scorebox"><span class="l">Earned</span><span class="v money">+$14 Bucks</span></div>
+      <div class="qbtn tinted" style="margin-top:3px;color:#5B6FD8;border-color:rgba(91,111,216,0.4);background:rgba(91,111,216,0.08)"><svg class="ic"><use href="#i-eye"/></svg>Review Answers</div>
+    </div>
+    <div class="bcap"><b>USR·SHELF:</b> your pick, with the roles wearing their own hues here too — teal Server live, navy Bartender done (checked scrim + DONE in the foot). The detail card swaps beneath; tap the Bartender tile. Flip to <b>View 2</b> for the one-quiz case.</div>
+  </div>
+
+  <!-- ═════════════════ USR 2 — solo (one quiz) ═════════════════ -->
+  <div class="design" id="usr2">
+    <div class="concept"><b>USR·SOLO</b> the dynamic one-quiz tile<span class="ln"></span></div>
+    <div class="hdr"><span class="c38"><svg class="ic"><use href="#i-back"/></svg></span>
+      <div class="hmid"><div class="eyebrow">Your Training</div><div class="htitle">Quizzes &amp; Exams</div></div>
+      <span class="hspace"></span></div>
+    <div class="qgrid two">
+      <div class="qtile tS wide sel"><svg class="ic"><use href="#i-tray"/></svg>
+        <span class="corner"><svg class="ic"><use href="#i-up"/></svg></span>
+        <div class="foot"><span>Server</span><em><i style="background:#34E0A1"></i>ACTIVE</em></div></div>
+    </div>
+    <div class="gcard">
+      <div class="uphead" style="margin-bottom:8px"><span class="pill live"><i></i>Active</span><span class="cdown" style="color:var(--gold)">closes in 2d 4h</span></div>
+      <div class="uprows">
+        <div class="uprow"><svg class="ic"><use href="#i-list"/></svg>12 questions · 5:00 limit</div>
+        <div class="uprow money"><svg class="ic"><use href="#i-dollar"/></svg>Earn $2 per correct answer</div>
+        <div class="uprow"><svg class="ic"><use href="#i-shield"/></svg>One attempt — no going back mid-quiz</div>
+      </div>
+      <div class="cta shine">Take Quiz<svg class="ic"><use href="#i-right"/></svg></div>
+    </div>
+    <div class="bcap"><b>USR·SOLO:</b> one eligible quiz = the tile stretches full-width (aspect ~2.2) and its card arrives already open. Nothing looks lonely, nothing looks cramped — the same screen, just flexing to the roster. Two quizzes shelve 2-up (View 1); three shelve 3-up like the manager hub.</div>
+  </div>
+
+  <!-- ═════════════════ START — locked ═════════════════ -->
+  <div class="design" id="start1">
+    <div class="concept"><b>START·FINAL</b> locked from round 1<span class="ln"></span></div>
+    <div class="startwrap">
+      <span class="prevpill"><svg class="ic"><use href="#i-eye"/></svg>MANAGER PREVIEW — NOTHING SAVES</span>
+      <div class="startcard">
+        <div class="ring"><svg class="ic"><use href="#i-cap"/></svg></div>
+        <div class="stitle"><span class="rolename">Server</span> Quiz</div>
+        <div class="ssub">12 QUESTIONS · 5:00 LIMIT</div>
+        <div class="irow" style="text-align:left"><svg class="ic"><use href="#i-hour"/></svg><p>Closes in <b>2d 4h</b></p></div>
+        <div class="irow" style="text-align:left"><svg class="ic" style="color:var(--ok)"><use href="#i-dollar"/></svg><p>Earn <b>$2</b> per correct answer</p></div>
+        <div class="srules">
+          <div class="srule"><svg class="ic"><use href="#i-right"/></svg>One way through — you can't return to a question, and the clock keeps running once you start.</div>
+          <div class="srule"><svg class="ic"><use href="#i-shield"/></svg>Your score stays between you and your managers.</div>
+        </div>
+      </div>
+      <div class="cta shine" style="font-size:16px;padding:16px">Start Quiz<svg class="ic"><use href="#i-right"/></svg></div>
+      <span class="cancel">Not yet — take me back</span>
+    </div>
+    <div class="bcap"><b>START·FINAL:</b> untouched from round 1, per your "simple, easy, everything we need" — now inheriting each role's hue automatically (flip the Role group).</div>
+  </div>
+
+  </div><!-- /screen -->
+</div><!-- /phone -->
+
+<script>
+/* ---------- confetti + money rain ---------- */
+(function(){
+  var cf = document.getElementById('cf1');
+  if (cf) {
+    var cols = ['#0D9488','#17A896','#5EEAD4','#F59E0B','#FDE68A'];
+    for (var i=0;i<26;i++){var p=document.createElement('i');p.style.left=(Math.random()*100)+'%';p.style.top=(-Math.random()*140)+'px';p.style.background=cols[i%cols.length];p.style.animationDelay=(Math.random()*3)+'s';p.style.animationDuration=(2.6+Math.random()*1.6)+'s';cf.appendChild(p);}
+  }
+  var mr = document.getElementById('mr1');
+  if (mr) {
+    for (var j=0;j<20;j++){var d=document.createElement('i');d.textContent='$';d.style.left=(Math.random()*100)+'%';d.style.top=(-Math.random()*160)+'px';d.style.fontSize=(11+Math.random()*7)+'px';d.style.animationDelay=(Math.random()*3.2)+'s';d.style.animationDuration=(2.8+Math.random()*1.8)+'s';mr.appendChild(d);}
+  }
+})();
+
+/* ---------- expandable tiles ---------- */
+document.querySelectorAll('.xt').forEach(function(tile){
+  tile.addEventListener('click', function(){
+    var scope = tile.closest('.design');
+    scope.querySelectorAll('.xt').forEach(function(t){t.classList.remove('sel');});
+    tile.classList.add('sel');
+    scope.querySelectorAll('.xp').forEach(function(p){p.style.display='none';});
+    var panel = document.getElementById(tile.dataset.x);
+    if (panel) panel.style.display='block';
+  });
+});
+
+/* ---------- toolbar ---------- */
+var phone = document.getElementById('phone');
+var LABELS = {hub:['Final'], gen:['Screen','Info sheet'], ed:['Draft','Live','Paused'], mod:['Edit','Bonus','Regen'],
+  play:['Photo','No photo','Feedback'], res:['No-Bucks','Bucks'], usr:['Shelf','Solo'], start:['Final']};
+var ROLENAME = {'':'Server','r-bart':'Bartender','r-host':'Host'};
+var S='hub', D='1', RL='', TH='';
+function sync(){
+  document.querySelectorAll('.design').forEach(function(d){d.classList.remove('on');});
+  var el = document.getElementById(S+D) || document.getElementById(S+'1');
+  if (el) el.classList.add('on');
+  var labs = LABELS[S] || ['1'];
+  document.querySelectorAll('.des').forEach(function(b,i){
+    b.classList.toggle('gone', i >= labs.length);
+    if (i < labs.length) b.textContent = labs[i];
+  });
+  phone.className = 'phone' + (TH?' '+TH:'') + (RL?' '+RL:'');
+  document.querySelectorAll('.rolename').forEach(function(s){s.textContent = ROLENAME[RL];});
+  phone.querySelector('.screen').scrollTop = 0;
+}
+document.querySelectorAll('.scr').forEach(function(b){b.addEventListener('click',function(){
+  document.querySelectorAll('.scr').forEach(function(x){x.classList.remove('on');});b.classList.add('on');
+  S=b.dataset.s; D='1';
+  document.querySelectorAll('.des').forEach(function(x,i){x.classList.toggle('on',i===0);});
+  sync();
+});});
+document.querySelectorAll('.des').forEach(function(b){b.addEventListener('click',function(){
+  document.querySelectorAll('.des').forEach(function(x){x.classList.remove('on');});b.classList.add('on');
+  D=b.dataset.d; sync();
+});});
+document.querySelectorAll('.rl').forEach(function(b){b.addEventListener('click',function(){
+  document.querySelectorAll('.rl').forEach(function(x){x.classList.remove('on');});b.classList.add('on');
+  RL=b.dataset.r; sync();
+});});
+document.querySelectorAll('.th').forEach(function(b){b.addEventListener('click',function(){
+  document.querySelectorAll('.th').forEach(function(x){x.classList.remove('on');});b.classList.add('on');
+  TH=b.dataset.t; sync();
+});});
+sync();
+</script>
+</body>
+</html>

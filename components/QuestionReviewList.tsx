@@ -32,7 +32,7 @@ interface Props {
 
 export default function QuestionReviewList({ questions }: Props) {
   const colors = useThemeColors();
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const isSpanish = i18n.language === 'es';
 
   return (
@@ -42,8 +42,8 @@ export default function QuestionReviewList({ questions }: Props) {
           key={q.id}
           style={[
             styles.reviewCard,
-            { backgroundColor: colors.card },
-            q.is_bonus && { borderWidth: 2, borderColor: '#F59E0B' },
+            { backgroundColor: colors.surface, borderColor: colors.surfaceBorder },
+            q.is_bonus && { borderColor: '#F59E0B99', backgroundColor: '#F59E0B0F' },
           ]}
         >
           <View style={styles.reviewHeader}>
@@ -66,14 +66,12 @@ export default function QuestionReviewList({ questions }: Props) {
                     { color: q.is_correct ? '#10B981' : '#EF4444' },
                   ]}
                 >
-                  {q.is_correct
-                    ? isSpanish ? 'Correcto' : 'Correct'
-                    : isSpanish ? 'Incorrecto' : 'Wrong'}
+                  {q.is_correct ? t('exam_review.correct') : t('exam_review.wrong')}
                 </Text>
               </View>
               {q.is_bonus && (
                 <View style={[styles.bonusChip, { backgroundColor: '#F59E0B20' }]}>
-                  <Text style={styles.bonusChipText}>{isSpanish ? 'BONO' : 'BONUS'}</Text>
+                  <Text style={styles.bonusChipText}>{t('exam_results.bonus_tag').toUpperCase()}</Text>
                 </View>
               )}
             </View>
@@ -146,7 +144,7 @@ export default function QuestionReviewList({ questions }: Props) {
                 {icon}
                 {isUserAnswer && (
                   <Text style={[styles.yourAnswerTag, { color: rowTextColor }]}>
-                    {isSpanish ? 'Tu respuesta' : 'Your answer'}
+                    {t('exam_review.your_answer')}
                   </Text>
                 )}
               </View>
@@ -161,10 +159,9 @@ export default function QuestionReviewList({ questions }: Props) {
 const styles = StyleSheet.create({
   reviewCard: {
     borderRadius: 14,
-    padding: 16,
-    marginBottom: 12,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 3,
+    borderWidth: 1,
+    padding: 15,
+    marginBottom: 10,
   },
   reviewHeader: {
     flexDirection: 'row',
