@@ -59,7 +59,7 @@ export default function EmployeeToolsScreen() {
 
   // Role-based assistants fill remaining rows
   if (canSee('check_outs')) {
-    allItems.push({ id: 'check-outs-calculator', label: 'Check Outs Calculator', iosIcon: 'dollarsign.circle.fill', androidIcon: 'calculate', route: '/check-out-calculator' });
+    allItems.push({ id: 'check-outs-calculator', label: t('tips_checkouts.title'), iosIcon: 'dollarsign.circle.fill', androidIcon: 'calculate', route: '/tips-and-checkouts' });
   }
   if (canSee('bartender')) {
     allItems.push({ id: 'bartender', label: t('employee_tools.bartender_assistant'), iosIcon: 'wineglass.fill', androidIcon: 'local-bar', route: '/bartender-assistant' });

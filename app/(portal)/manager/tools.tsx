@@ -55,7 +55,7 @@ export default function ManagerToolsScreen() {
   ];
 
   if (canSee('check_outs')) {
-    fixedItems.push({ id: 'check-outs-calculator', label: t('checkout_calculator.title'), iosIcon: 'dollarsign.circle.fill', androidIcon: 'calculate', route: '/check-out-calculator' });
+    fixedItems.push({ id: 'check-outs-calculator', label: t('tips_checkouts.title'), iosIcon: 'dollarsign.circle.fill', androidIcon: 'calculate', route: '/tips-and-checkouts' });
   }
   fixedItems.push({ id: 'rewards-reviews', label: t('manager_tools.rewards_reviews'), iosIcon: 'gift.fill', androidIcon: 'card-giftcard', route: '/rewards-and-reviews-editor' });
 
