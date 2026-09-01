@@ -1,154 +1,272 @@
-
-import React from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  Dimensions,
-} from 'react-native';
-import { useThemeColors } from '@/hooks/useThemeColors';
-import { IconSymbol } from '@/components/IconSymbol';
+/**
+ * Manager Tools (s79 — the Tools Page wave, lockdown build). Same bones as the
+ * employee page (that is the wave's point): header → Priority Hero → tinted
+ * command tiles → the SAME AssistantRail. Manager differences: Quizzes routes
+ * to the hub editor (premium-locked on base tier — locked, NOT hidden, the
+ * manager-permissions grammar), and Rewards + Reviews takes the full-width
+ * tile with the approvals pulse (the ONE owner of the approvals story — the
+ * hero deliberately never duplicates it, Steve's r3 call).
+ *
+ * Manager hero ladder: new reviews (device-side detection, clears when acted
+ * on) > fresh guides > the Today card. Premium never heroes.
+ */
+import React, { useMemo } from 'react';
+import { Dimensions, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useAuth } from '@/contexts/AuthContext';
-import { useSubscription } from '@/contexts/SubscriptionContext';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
+import { useSubscription } from '@/contexts/SubscriptionContext';
+import { useThemeColors } from '@/hooks/useThemeColors';
+import { useAppTheme } from '@/contexts/ThemeContext';
 import { useToolVisibility } from '@/hooks/useToolVisibility';
 import { usePendingApprovals } from '@/hooks/usePendingApprovals';
 import { useUnreadLeaderboardPasses } from '@/hooks/useUnreadLeaderboardPasses';
-import { MessageBadge } from '@/components/MessageBadge';
+import { useToolsPageData, markReviewsSeen } from '@/hooks/useToolsPageData';
+import PriorityHero, { PriorityCard } from '@/components/tools/PriorityHero';
+import CommandTile from '@/components/tools/CommandTile';
+import AssistantRail, { AssistantRailItem } from '@/components/tools/AssistantRail';
+import { SectionRule } from '@/components/tools/ToolsBits';
+import { FAMILY_ACCENTS } from '@/components/tools/toolsVisuals';
+import { IconSymbol } from '@/components/IconSymbol';
+import { fonts } from '@/constants/fonts';
 
-// ─── Grid layout constants (matching Manage page) ────────────────────────────
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const GRID_PADDING = 16;
-const GRID_GAP = 12;
-const NUM_COLUMNS = 3;
-const ITEM_WIDTH = (SCREEN_WIDTH - GRID_PADDING * 2 - GRID_GAP * (NUM_COLUMNS - 1)) / NUM_COLUMNS;
-
-interface GridItem {
-  id: string;
-  label: string;
-  iosIcon: string;
-  androidIcon: string;
-  route: string;
-  isPremium?: boolean; // dim + lock badge on base; the destination screen enforces the gate
-}
+const GRID_GAP = 10;
+const TILE_WIDTH = (SCREEN_WIDTH - GRID_PADDING * 2 - GRID_GAP) / 2;
 
 export default function ManagerToolsScreen() {
-  const colors = useThemeColors();
   const router = useRouter();
-  const { user } = useAuth();
-  const { hasPremium } = useSubscription();
   const { t } = useTranslation();
-  const { pendingCount } = usePendingApprovals();
-  const { unreadCount: unreadLeaderboardCount } = useUnreadLeaderboardPasses();
+  const colors = useThemeColors();
+  const { mode } = useAppTheme();
+  const scheme = mode === 'dark' ? 'dark' : 'light';
+  const { user } = useAuth();
+  const { organization } = useOrganization();
+  const { hasPremium } = useSubscription();
 
   const { canSee } = useToolVisibility();
+  const canSeeTips = canSee('check_outs');
+  const { pendingCount } = usePendingApprovals();
+  const { unreadCount: unreadPassCount } = useUnreadLeaderboardPasses();
+  const data = useToolsPageData({ manager: true, includeTips: canSeeTips });
 
-  // ─── Build tile lists ────────────────────────────────────────────────────────
+  const firstName = (user?.name || '').trim().split(/\s+/)[0];
+  const quizLocked = !hasPremium;
+  const goldAccent = FAMILY_ACCENTS.rewards[scheme];
 
-  const fixedItems: GridItem[] = [
-    { id: 'guides-training', label: t('manager_tools.guides_training'), iosIcon: 'book.fill', androidIcon: 'menu-book', route: '/guides-and-training' },
-    { id: 'game-hub', label: t('employee_tools.game_hub'), iosIcon: 'gamecontroller.fill', androidIcon: 'sports-esports', route: '/game-hub' },
-    { id: 'weekly-quizzes', label: t('quick_tools.weekly_quizzes'), iosIcon: 'questionmark.circle.fill', androidIcon: 'quiz', route: '/quiz-hub-editor', isPremium: true },
-  ];
+  // ---- Priority Hero ladder (approvals live on the pulsing tile, never here) ----
+  const heroCards = useMemo<PriorityCard[]>(() => {
+    const cards: PriorityCard[] = [];
+    if (data.reviews.newCount > 0) {
+      cards.push({
+        key: 'reviews',
+        gradient: 'rewards',
+        iosIcon: 'star.fill',
+        androidIcon: 'star',
+        eyebrow: t('manager_tools.rewards_reviews'),
+        title: t('tools_page.hero_reviews_title', { count: data.reviews.newCount }),
+        sub:
+          data.reviews.avg !== null
+            ? t('tools_page.hero_reviews_sub', { avg: data.reviews.avg.toFixed(1) })
+            : '',
+        onPress: () => {
+          markReviewsSeen(data.reviews.count);
+          router.push('/rewards-and-reviews-editor');
+        },
+      });
+    }
+    if (data.guides.newThisWeek > 0) {
+      cards.push({
+        key: 'guides',
+        gradient: 'guides',
+        iosIcon: 'book.fill',
+        androidIcon: 'menu-book',
+        eyebrow: t('manager_tools.guides_training'),
+        title: t('tools_page.hero_guides_title', { count: data.guides.newThisWeek }),
+        sub: t('tools_page.hero_guides_sub'),
+        onPress: () => router.push('/guides-and-training'),
+      });
+    }
+    const { announcements, specials, events } = data.todayCounts;
+    if (announcements + specials + events > 0) {
+      const parts: string[] = [];
+      if (announcements > 0) parts.push(t('tools_page.today_ann', { count: announcements }));
+      if (specials > 0) parts.push(t('tools_page.today_spec', { count: specials }));
+      if (events > 0) parts.push(t('tools_page.today_ev', { count: events }));
+      cards.push({
+        key: 'today',
+        gradient: 'slate',
+        iosIcon: 'calendar',
+        androidIcon: 'event',
+        eyebrow: t('tools_page.hero_today_eyebrow', { org: organization?.name || '' }),
+        title: t('tools_page.hero_today_title'),
+        sub: parts.join(' · '),
+        onPress: () => router.push('/(portal)/manager'),
+      });
+    }
+    return cards;
+  }, [data, organization?.name, router, t]);
 
-  if (canSee('check_outs')) {
-    fixedItems.push({ id: 'check-outs-calculator', label: t('tips_checkouts.title'), iosIcon: 'dollarsign.circle.fill', androidIcon: 'calculate', route: '/tips-and-checkouts' });
-  }
-  fixedItems.push({ id: 'rewards-reviews', label: t('manager_tools.rewards_reviews'), iosIcon: 'gift.fill', androidIcon: 'card-giftcard', route: '/rewards-and-reviews-editor' });
+  // ---- Assistants — the SAME rail employees get (O/M see every active one) ----
+  const assistantItems = useMemo<AssistantRailItem[]>(() => {
+    const items: AssistantRailItem[] = [];
+    if (canSee('kitchen')) {
+      items.push({
+        key: 'kitchen',
+        label: t('tools_page.assistant_kitchen'),
+        iosIcon: 'flame.fill',
+        androidIcon: 'local-fire-department',
+        onPress: () => router.push('/kitchen-assistant'),
+      });
+    }
+    if (canSee('bartender')) {
+      items.push({
+        key: 'bartender',
+        label: t('tools_page.assistant_bar'),
+        iosIcon: 'wineglass.fill',
+        androidIcon: 'local-bar',
+        onPress: () => router.push('/bartender-assistant'),
+      });
+    }
+    if (canSee('host')) {
+      items.push({
+        key: 'host',
+        label: t('tools_page.assistant_host'),
+        iosIcon: 'person.2.fill',
+        androidIcon: 'people',
+        onPress: () => router.push('/host-assistant'),
+      });
+    }
+    return items;
+  }, [canSee, router, t]);
 
-  // Assistants section (visually distinct)
-  const assistantItems: GridItem[] = [];
-  if (canSee('kitchen')) {
-    assistantItems.push({ id: 'kitchen', label: t('employee_tools.kitchen_assistant'), iosIcon: 'flame.fill', androidIcon: 'local-fire-department', route: '/kitchen-assistant' });
-  }
-  if (canSee('host')) {
-    assistantItems.push({ id: 'host', label: t('employee_tools.host_assistant'), iosIcon: 'person.2.fill', androidIcon: 'people', route: '/host-assistant' });
-  }
-  if (canSee('bartender')) {
-    assistantItems.push({ id: 'bartender', label: t('employee_tools.bartender_assistant'), iosIcon: 'wineglass.fill', androidIcon: 'local-bar', route: '/bartender-assistant' });
-  }
-
-  // ─── Grid rendering ─────────────────────────────────────────────────────────
-
-  const renderGridItem = (item: GridItem) => {
-    const showApprovalsBadge = item.id === 'rewards-reviews' && pendingCount > 0;
-    const showGameHubBadge = item.id === 'game-hub' && unreadLeaderboardCount > 0;
-    const isLocked = item.isPremium && !hasPremium;
-    return (
-      <TouchableOpacity
-        key={item.id}
-        style={[styles.gridItem, { backgroundColor: colors.card, width: ITEM_WIDTH }, isLocked && { opacity: 0.7 }]}
-        onPress={() => router.push(item.route as any)}
-        activeOpacity={0.7}
-      >
-        <View style={[styles.iconContainer, { backgroundColor: colors.primary + '15' }]}>
-          <IconSymbol
-            ios_icon_name={item.iosIcon as any}
-            android_material_icon_name={item.androidIcon as any}
-            size={28}
-            color={colors.primary}
-          />
-          {showApprovalsBadge && (
-            <View style={styles.tileBadge}>
-              <MessageBadge count={pendingCount} size="small" />
-            </View>
-          )}
-          {showGameHubBadge && (
-            <View style={styles.tileBadge}>
-              <MessageBadge count={unreadLeaderboardCount} size="small" />
-            </View>
-          )}
-          {isLocked && (
-            <View style={styles.tileBadge}>
-              <IconSymbol ios_icon_name="lock.fill" android_material_icon_name="lock" size={14} color={colors.textSecondary} />
-            </View>
-          )}
-        </View>
-        <Text style={[styles.gridLabel, { color: colors.text }]} numberOfLines={2}>
-          {item.label}
-        </Text>
-      </TouchableOpacity>
-    );
-  };
+  const guidesSub =
+    data.guides.newThisWeek > 0
+      ? t('tools_page.guides_sub_fresh', { sets: data.guides.sets, fresh: data.guides.newThisWeek })
+      : t('tools_page.guides_sub', { sets: data.guides.sets });
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* User's Name Header */}
-      <View style={[styles.nameHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <Text style={[styles.nameHeaderText, { color: colors.text }]}>{user?.name}&apos;s Tools</Text>
-      </View>
+    <View style={styles.root}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.thead}>
+          <Text style={[styles.eyebrow, { color: colors.tint }]} numberOfLines={1}>
+            {(organization?.name || '').toUpperCase()}
+          </Text>
+          <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
+            {firstName ? t('tools_page.title_named', { name: firstName }) : t('manager_tools.title')}
+          </Text>
+        </View>
 
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-        <View style={styles.gridContainer}>
-          {fixedItems.map(renderGridItem)}
+        <PriorityHero cards={heroCards} />
+
+        <SectionRule label={t('tools_page.your_tools')} />
+        <View style={styles.grid}>
+          <CommandTile
+            accent={colors.tint}
+            iosIcon="book.fill"
+            androidIcon="menu-book"
+            title={t('manager_tools.guides_training')}
+            big={t('tools_page.guides_big', { count: data.guides.count })}
+            sub={guidesSub}
+            width={TILE_WIDTH}
+            onPress={() => router.push('/guides-and-training')}
+          />
+          <CommandTile
+            accent={FAMILY_ACCENTS.game[scheme]}
+            iosIcon="gamecontroller.fill"
+            androidIcon="sports-esports"
+            title={t('employee_tools.game_hub')}
+            big={
+              data.gameRank ? (
+                <>
+                  {t('tools_page.game_rank_prefix')}{' '}
+                  <Text style={{ color: goldAccent }}>#{data.gameRank.rank}</Text>{' '}
+                  {t('tools_page.game_rank_suffix', { total: data.gameRank.total })}
+                </>
+              ) : (
+                t('tools_page.game_big_fallback')
+              )
+            }
+            sub={data.gameRank ? t('tools_page.game_jump_sub') : t('tools_page.game_sub')}
+            width={TILE_WIDTH}
+            badgeCount={unreadPassCount}
+            pulse={unreadPassCount > 0}
+            onPress={() => router.push('/game-hub')}
+          />
+          <CommandTile
+            accent={FAMILY_ACCENTS.quiz[scheme]}
+            iosIcon="graduationcap.fill"
+            androidIcon="school"
+            title={t('quick_tools.weekly_quizzes')}
+            big={quizLocked ? t('tools_page.premium_big') : t('tools_page.quiz_mgr_big', { count: data.quizLive })}
+            sub={quizLocked ? t('tools_page.premium_quiz_sub') : t('tools_page.quiz_mgr_sub', { total: 3 })}
+            width={TILE_WIDTH}
+            locked={quizLocked}
+            lockedAccent={goldAccent}
+            onPress={() => router.push('/quiz-hub-editor')}
+          />
+          {canSeeTips && (
+            <CommandTile
+              accent={FAMILY_ACCENTS.tips[scheme]}
+              iosIcon="dollarsign.circle.fill"
+              androidIcon="calculate"
+              title={t('tips_checkouts.title')}
+              big={`$${Math.round(data.tips.weekTotal)}`}
+              sub={
+                data.tips.weekShifts > 0
+                  ? t('tools_page.tips_sub', { count: data.tips.weekShifts })
+                  : t('tools_page.tips_sub_empty')
+              }
+              width={TILE_WIDTH}
+              onPress={() => router.push('/tips-and-checkouts')}
+            />
+          )}
+          <CommandTile
+            accent={goldAccent}
+            iosIcon="gift.fill"
+            androidIcon="card-giftcard"
+            title={t('manager_tools.rewards_reviews')}
+            big={
+              pendingCount > 0
+                ? t('tools_page.rewards_big_waiting', { count: pendingCount })
+                : t('tools_page.rewards_big_clear')
+            }
+            sub={pendingCount > 0 ? t('tools_page.rewards_sub_waiting') : t('tools_page.rewards_sub_clear')}
+            wide
+            badgeCount={pendingCount}
+            pulse={pendingCount > 0}
+            rightBlock={
+              <View style={styles.ratingBlock}>
+                <View style={styles.ratingRow}>
+                  <IconSymbol
+                    ios_icon_name="star.fill"
+                    android_material_icon_name="star"
+                    size={13}
+                    color={goldAccent}
+                  />
+                  <Text style={[styles.ratingValue, { color: goldAccent }]}>
+                    {data.reviews.avg !== null ? data.reviews.avg.toFixed(1) : '—'}
+                  </Text>
+                </View>
+                <Text style={[styles.ratingCount, { color: colors.textSecondary }]}>
+                  {t('tools_page.reviews_right_sub', { count: data.reviews.count })}
+                </Text>
+              </View>
+            }
+            onPress={() => router.push('/rewards-and-reviews-editor')}
+          />
         </View>
 
         {assistantItems.length > 0 && (
           <>
-            <Text style={[styles.sectionHeader, { color: colors.text }]}>Assistants</Text>
-            <View style={styles.assistantsRow}>
-              {assistantItems.map((item) => (
-                <TouchableOpacity
-                  key={item.id}
-                  style={[styles.assistantButton, { backgroundColor: colors.primary + '20' }]}
-                  onPress={() => router.push(item.route as any)}
-                  activeOpacity={0.7}
-                >
-                  <IconSymbol
-                    ios_icon_name={item.iosIcon as any}
-                    android_material_icon_name={item.androidIcon as any}
-                    size={24}
-                    color={colors.primary}
-                  />
-                  <Text style={[styles.assistantLabel, { color: colors.text }]} numberOfLines={2}>
-                    {item.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            <SectionRule label={t('tools_page.assistants')} />
+            <AssistantRail items={assistantItems} />
           </>
         )}
       </ScrollView>
@@ -157,85 +275,54 @@ export default function ManagerToolsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+  scroll: {
     flex: 1,
   },
-  nameHeader: {
-    paddingHorizontal: 16,
-    paddingTop: 20,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-  },
-  nameHeaderText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  contentContainer: {
-    paddingTop: 16,
+  content: {
+    paddingTop: 8,
     paddingHorizontal: GRID_PADDING,
-    paddingBottom: 100,
+    paddingBottom: 120,
   },
-  // ─── Grid ──────────────────────────────────────────────────────────────────
-  gridContainer: {
+  thead: {
+    paddingHorizontal: 2,
+    paddingTop: 4,
+    paddingBottom: 12,
+  },
+  eyebrow: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 8.5,
+    letterSpacing: 1.7,
+  },
+  title: {
+    fontFamily: fonts.display.bold,
+    fontSize: 25,
+    letterSpacing: -0.5,
+    marginTop: 3,
+  },
+  grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: GRID_GAP,
   },
-  gridItem: {
-    borderRadius: 16,
-    paddingVertical: 20,
-    paddingHorizontal: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.15)',
-    elevation: 3,
+  ratingBlock: {
+    alignItems: 'flex-end',
   },
-  iconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 10,
-    position: 'relative',
-  },
-  tileBadge: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-  },
-  gridLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    textAlign: 'center',
-    lineHeight: 16,
-  },
-  sectionHeader: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginTop: 24,
-    marginBottom: 12,
-  },
-  assistantsRow: {
+  ratingRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  assistantButton: {
-    flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 4,
+    gap: 4,
   },
-  assistantLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    marginTop: 6,
-    textAlign: 'center',
+  ratingValue: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 15,
+  },
+  ratingCount: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 8,
+    marginTop: 2,
   },
 });

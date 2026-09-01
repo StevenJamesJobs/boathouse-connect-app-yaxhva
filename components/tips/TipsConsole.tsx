@@ -30,11 +30,21 @@ export interface StripStat {
   value: string;
 }
 
+export interface StripMode {
+  /** e.g. "CHECKOUT" — the mono eyebrow the capsule balances against. */
+  eyebrow: string;
+  pooled: boolean;
+  soloLabel: string;
+  poolLabel: string;
+  onChange: (pooled: boolean) => void;
+}
+
 export function ConsoleStrip({
   stats,
   verdict,
   amount,
   owes,
+  mode,
 }: {
   /** Left column — "OUT / $161.20", "DECL / $297.60" (+ "POOL / 3"). */
   stats: StripStat[];
@@ -47,6 +57,13 @@ export function ConsoleStrip({
    * red — no waiting for the results screen to find out.
    */
   owes?: boolean;
+  /**
+   * The Solo|Pool capsule in the console's top-right corner (s79 presets
+   * phase — it moved OUT of the ScreenHeader so the house-defaults gear fits
+   * on both tabs without truncating the title; Steve's placement pick). Adds
+   * one slim header row; omit and the strip renders exactly as before.
+   */
+  mode?: StripMode;
 }) {
   const slab = owes ? TIPS_CONSOLE_OWE : TIPS_VISUALS.console;
   const verdictInk =
@@ -59,27 +76,85 @@ export function ConsoleStrip({
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
-      <View style={styles.stripLeft}>
-        {stats.map((stat) => (
-          <View key={stat.label} style={styles.stripStatRow}>
-            <Text style={styles.stripStatLabel} numberOfLines={1}>
-              {stat.label}
-            </Text>
-            <Text style={styles.stripStatValue} numberOfLines={1}>
-              {stat.value}
-            </Text>
+      {mode && (
+        <View style={styles.stripHead}>
+          <Text style={styles.stripHeadEyebrow} numberOfLines={1}>
+            {mode.eyebrow}
+          </Text>
+          <View style={styles.modeCap}>
+            <ModeCapHalf
+              on={!mode.pooled}
+              label={mode.soloLabel}
+              iosIcon="person.fill"
+              androidIcon="person"
+              onPress={() => mode.onChange(false)}
+            />
+            <ModeCapHalf
+              on={mode.pooled}
+              label={mode.poolLabel}
+              iosIcon="person.2.fill"
+              androidIcon="people"
+              onPress={() => mode.onChange(true)}
+            />
           </View>
-        ))}
-      </View>
-      <View style={styles.stripRight}>
-        <Text style={[styles.stripVerdict, { color: verdictInk }]} numberOfLines={1}>
-          {verdict}
-        </Text>
-        <Text style={styles.stripAmount} numberOfLines={1}>
-          {amount === null ? '$—' : formatMoney(amount)}
-        </Text>
+        </View>
+      )}
+      <View style={styles.stripBody}>
+        <View style={styles.stripLeft}>
+          {stats.map((stat) => (
+            <View key={stat.label} style={styles.stripStatRow}>
+              <Text style={styles.stripStatLabel} numberOfLines={1}>
+                {stat.label}
+              </Text>
+              <Text style={styles.stripStatValue} numberOfLines={1}>
+                {stat.value}
+              </Text>
+            </View>
+          ))}
+        </View>
+        <View style={styles.stripRight}>
+          <Text style={[styles.stripVerdict, { color: verdictInk }]} numberOfLines={1}>
+            {verdict}
+          </Text>
+          <Text style={styles.stripAmount} numberOfLines={1}>
+            {amount === null ? '$—' : formatMoney(amount)}
+          </Text>
+        </View>
       </View>
     </View>
+  );
+}
+
+/** Fixed-dark mini capsule half — literal white inks on the emerald/red slab. */
+function ModeCapHalf({
+  on,
+  label,
+  iosIcon,
+  androidIcon,
+  onPress,
+}: {
+  on: boolean;
+  label: string;
+  iosIcon: string;
+  androidIcon: string;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={[styles.modeCapHalf, on && styles.modeCapHalfOn]}
+      hitSlop={6}
+    >
+      <IconSymbol
+        ios_icon_name={iosIcon as any}
+        android_material_icon_name={androidIcon as any}
+        size={11}
+        color={on ? '#FFFFFF' : 'rgba(255,255,255,0.55)'}
+      />
+      <Text style={[styles.modeCapLabel, on && styles.modeCapLabelOn]} numberOfLines={1}>
+        {label}
+      </Text>
+    </TouchableOpacity>
   );
 }
 
@@ -167,9 +242,6 @@ export function SettledConsole({
 
 const styles = StyleSheet.create({
   stripShell: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
     borderRadius: 15,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.14)',
@@ -177,6 +249,56 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     overflow: 'hidden',
     marginBottom: 12,
+  },
+  stripBody: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  stripHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginBottom: 9,
+    paddingBottom: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255,255,255,0.18)',
+  },
+  stripHeadEyebrow: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 8.5,
+    letterSpacing: 1.4,
+    color: TIPS_CONSOLE_EMBER,
+    flexShrink: 1,
+  },
+  modeCap: {
+    flexDirection: 'row',
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.22)',
+    overflow: 'hidden',
+  },
+  modeCapHalf: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  modeCapHalfOn: {
+    backgroundColor: 'rgba(255,255,255,0.24)',
+  },
+  modeCapLabel: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 9,
+    letterSpacing: 0.8,
+    color: 'rgba(255,255,255,0.55)',
+    textTransform: 'uppercase',
+  },
+  modeCapLabelOn: {
+    color: '#FFFFFF',
   },
   stripLeft: { flex: 1, minWidth: 0, gap: 3 },
   stripStatRow: { flexDirection: 'row', alignItems: 'baseline', gap: 7 },

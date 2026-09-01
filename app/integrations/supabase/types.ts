@@ -4647,6 +4647,18 @@ export type Database = {
         Args: { p_actor_id: string; p_bartender: boolean; p_item_id: string }
         Returns: boolean
       }
+      get_checkout_defaults: {
+        Args: { p_actor_id: string }
+        Returns: {
+          // PostgREST serializes NUMERIC as a string — callers must coerce.
+          declare_pct: number | string
+          tip_outs: Json
+        }[]
+      }
+      set_checkout_defaults: {
+        Args: { p_actor_id: string; p_declare_pct: number; p_tip_outs: Json }
+        Returns: undefined
+      }
       get_cocktails: {
         Args: { p_actor_id: string; p_source_org?: string }
         Returns: {

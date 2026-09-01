@@ -23,7 +23,9 @@ import GlassSheet, { useSheetHandoff } from '@/components/GlassSheet';
 import GameToast from '@/components/game/GameToast';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { useAuth } from '@/contexts/AuthContext';
 import { useOrgJobTitles } from '@/hooks/useOrgJobTitles';
+import { fetchHouseDefaults } from '@/utils/tips/houseDefaults';
 import { useTipsAccent } from '@/components/tips/useTipsAccent';
 import { ConsoleStrip, SettledConsole, type StripStat } from '@/components/tips/TipsConsole';
 import PercentWheelSheet from '@/components/tips/PercentWheelSheet';
@@ -80,15 +82,19 @@ const DECLARE_CHIPS = [0.12, 0.08];
 
 export default function CheckoutView({
   mode,
+  onModeChange,
   onDone,
 }: {
   mode: CheckoutMode;
+  /** The Solo|Pool capsule lives in the ConsoleStrip's header row (s79). */
+  onModeChange: (mode: CheckoutMode) => void;
   /** Done key on the settled slab — the screen flips back to the Tracker. */
   onDone: () => void;
 }) {
   const { t, i18n } = useTranslation();
   const colors = useThemeColors();
   const accent = useTipsAccent();
+  const { user } = useAuth();
   const { activeJobTitles, isLoading: rolesLoading } = useOrgJobTitles();
   const locale = i18n.language === 'es' ? 'es' : 'en-US';
 
@@ -129,18 +135,34 @@ export default function CheckoutView({
   const [avgTipOutRate, setAvgTipOutRate] = useState<number | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  // Remembered setup arrives once per mount (percentages editable anytime).
+  // Baseline arrives once per mount. HOUSE DEFAULTS WIN when the org has them
+  // (s79 seed-every-checkout semantics: they are the standing baseline each
+  // run — day-of edits never persist); otherwise the device-remembered setup;
+  // otherwise the canonical trio seed below.
+  const [houseActive, setHouseActive] = useState(false);
   useEffect(() => {
     let alive = true;
-    loadCheckoutPrefs().then((prefs) => {
+    const actorId = user?.id;
+    Promise.all([
+      loadCheckoutPrefs(),
+      actorId ? fetchHouseDefaults(actorId) : Promise.resolve(null),
+    ]).then(([prefs, house]) => {
       if (!alive) return;
-      if (prefs) {
-        setDeclarePct(prefs.declarePct);
-        setTipOuts(prefs.tipOuts);
-        if (!DECLARE_CHIPS.includes(prefs.declarePct)) {
+      const applyDeclare = (pct: number) => {
+        setDeclarePct(pct);
+        if (!DECLARE_CHIPS.includes(pct)) {
           setCustomDeclareOn(true);
-          setCustomDeclareText(String(Math.round(prefs.declarePct * 1000) / 10));
+          setCustomDeclareText(String(Math.round(pct * 1000) / 10));
         }
+      };
+      if (house) {
+        setHouseActive(true);
+        applyDeclare(house.declarePct);
+        setTipOuts(house.tipOuts);
+        setPrefsState('found');
+      } else if (prefs) {
+        applyDeclare(prefs.declarePct);
+        setTipOuts(prefs.tipOuts);
         setPrefsState('found');
       } else {
         setPrefsState('empty');
@@ -149,21 +171,25 @@ export default function CheckoutView({
     return () => {
       alive = false;
     };
-  }, []);
+  }, [user?.id]);
 
-  // First run: seed Busser → Runner → Bartender IF those roles exist among the
-  // org's job titles — whichever exist, in that order; none if none (Steve's
-  // punch-round spec). The org's own casing is adopted.
+  // First run, no house defaults: the canonical trio ALWAYS seeds, in this
+  // order — Busser → Runner → Bartender (Steve's presets-round call: every org
+  // starts from the three mains; O/M hides them via House Defaults, not by
+  // deleting job titles). The org's own casing is adopted when a matching
+  // title exists; the canonical EN name stands in otherwise (data values stay
+  // EN-canonical per the translation architecture).
   useEffect(() => {
     if (prefsState !== 'empty' || rolesLoading) return;
     const seeds: TipOutLine[] = [];
-    const grab = (want: string, pct: number) => {
+    const grab = (want: string, canonical: string, pct: number) => {
       const match = activeJobTitles.find((title) => title.toLowerCase().includes(want));
-      if (match && !seeds.some((seed) => seed.title === match)) seeds.push({ title: match, pct });
+      const title = match ?? canonical;
+      if (!seeds.some((seed) => seed.title === title)) seeds.push({ title, pct });
     };
-    grab('busser', 0.035);
-    grab('runner', 0.01);
-    grab('bartender', 0.02);
+    grab('busser', 'Busser', 0.035);
+    grab('runner', 'Runner', 0.01);
+    grab('bartender', 'Bartender', 0.02);
     setTipOuts(seeds);
     setPrefsState('found');
   }, [prefsState, rolesLoading, activeJobTitles]);
@@ -299,7 +325,9 @@ export default function CheckoutView({
     setSettledSnapshot(snapshot);
     setStep(4);
     // Remembered for next checkout + import-row fuel; failures are silent.
-    saveCheckoutPrefs({ declarePct, tipOuts, mode });
+    // With house defaults active, day-of edits deliberately DON'T persist —
+    // the house baseline restores on the next checkout (Steve's semantics).
+    if (!houseActive) saveCheckoutPrefs({ declarePct, tipOuts, mode });
     stashTodayCheckout(dateKey(new Date()), snapshot);
     // Tonight vs your average: tip-out rate across the last 28 logged days.
     const entries = await loadEntries();
@@ -368,7 +396,19 @@ export default function CheckoutView({
   return (
     <View>
       {step < 4 ? (
-        <ConsoleStrip stats={stripStats} verdict={stripVerdict} amount={stripAmount} owes={stripOwes} />
+        <ConsoleStrip
+          stats={stripStats}
+          verdict={stripVerdict}
+          amount={stripAmount}
+          owes={stripOwes}
+          mode={{
+            eyebrow: t('tips_checkouts.console_eyebrow'),
+            pooled: isPooled,
+            soloLabel: t('tips_checkouts.mode_solo'),
+            poolLabel: t('tips_checkouts.mode_pool'),
+            onChange: (pooled) => onModeChange(pooled ? 'pooled' : 'solo'),
+          }}
+        />
       ) : (
         <SettledConsole
           owesHouse={owesHouse}
