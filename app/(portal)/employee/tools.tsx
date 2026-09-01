@@ -1,177 +1,307 @@
-
-import React from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  Dimensions,
-} from 'react-native';
-import { useThemeColors } from '@/hooks/useThemeColors';
-import { IconSymbol } from '@/components/IconSymbol';
+/**
+ * Employee Tools (s79 — the Tools Page wave, lockdown build). The page reads
+ * top-down: local glass header → Priority Hero (the rotisserie — ONE thing
+ * now) → tinted command tiles (live line each, whole face navigates, family
+ * pulse on waiting badges) → the shared AssistantRail (same band O/M get —
+ * the wave's unification fix; the old page mixed assistants into the grid).
+ *
+ * Employee hero ladder: due quiz > leaderboard pass > the close-out window
+ * (evening, tips visible, nothing settled today) > fresh guides > the Today
+ * card (announcements/specials/events → the Welcome page). Premium never
+ * heroes. Empty ladder = no hero at all.
+ */
+import React, { useMemo } from 'react';
+import { Dimensions, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useAuth } from '@/contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
-import { hasAnyQuizEligibleRole } from '@/app/weekly-quizzes';
+import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
+import { useThemeColors } from '@/hooks/useThemeColors';
+import { useAppTheme } from '@/contexts/ThemeContext';
 import { useToolVisibility } from '@/hooks/useToolVisibility';
 import { useUnreadQuizzes } from '@/hooks/useUnreadQuizzes';
 import { useUnreadLeaderboardPasses } from '@/hooks/useUnreadLeaderboardPasses';
+import { useToolsPageData } from '@/hooks/useToolsPageData';
+import { hasAnyQuizEligibleRole } from '@/app/weekly-quizzes';
+import PriorityHero, { PriorityCard } from '@/components/tools/PriorityHero';
+import CommandTile from '@/components/tools/CommandTile';
+import AssistantRail, { AssistantRailItem } from '@/components/tools/AssistantRail';
+import { SectionRule } from '@/components/tools/ToolsBits';
+import { FAMILY_ACCENTS } from '@/components/tools/toolsVisuals';
+import { fonts } from '@/constants/fonts';
 
-// ─── Grid layout constants (matching Manage page) ────────────────────────────
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const GRID_PADDING = 16;
-const GRID_GAP = 12;
-const NUM_COLUMNS = 3;
-const ITEM_WIDTH = (SCREEN_WIDTH - GRID_PADDING * 2 - GRID_GAP * (NUM_COLUMNS - 1)) / NUM_COLUMNS;
-
-interface GridItem {
-  id: string;
-  label: string;
-  iosIcon: string;
-  androidIcon: string;
-  route: string;
-  badge?: boolean;
-}
+const GRID_GAP = 10;
+const TILE_WIDTH = (SCREEN_WIDTH - GRID_PADDING * 2 - GRID_GAP) / 2;
 
 export default function EmployeeToolsScreen() {
   const router = useRouter();
-  const { user } = useAuth();
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const { mode } = useAppTheme();
+  const scheme = mode === 'dark' ? 'dark' : 'light';
+  const { user } = useAuth();
+  const { organization } = useOrganization();
 
-  const jobTitles = user?.jobTitles || [];
   const { canSee } = useToolVisibility();
-  const canSeeWeeklyQuizzes = hasAnyQuizEligibleRole(jobTitles);
+  const canSeeQuizzes = hasAnyQuizEligibleRole(user?.jobTitles || []);
+  const canSeeTips = canSee('check_outs');
   const { unreadCount: unreadQuizCount } = useUnreadQuizzes();
-  const { unreadCount: unreadLeaderboardCount } = useUnreadLeaderboardPasses();
+  const { unreadCount: unreadPassCount } = useUnreadLeaderboardPasses();
+  const data = useToolsPageData({ manager: false, includeTips: canSeeTips });
 
-  // ─── Build flat tile list ────────────────────────────────────────────────────
+  const firstName = (user?.name || '').trim().split(/\s+/)[0];
 
-  // Fixed top row: Guides & Training → Game Hub → Quizzes & Exams (when eligible)
-  const allItems: GridItem[] = [
-    { id: 'guides-training', label: t('employee_tools.guides_training'), iosIcon: 'book.fill', androidIcon: 'menu-book', route: '/guides-and-training' },
-    { id: 'game-hub', label: t('employee_tools.game_hub'), iosIcon: 'gamecontroller.fill', androidIcon: 'sports-esports', route: '/game-hub', badge: unreadLeaderboardCount > 0 },
-  ];
-  if (canSeeWeeklyQuizzes) {
-    allItems.push({ id: 'weekly-quizzes', label: t('employee_tools.weekly_quizzes'), iosIcon: 'questionmark.circle.fill', androidIcon: 'quiz', route: '/weekly-quizzes', badge: unreadQuizCount > 0 });
-  }
+  // ---- Priority Hero ladder ----
+  const heroCards = useMemo<PriorityCard[]>(() => {
+    const cards: PriorityCard[] = [];
+    if (canSeeQuizzes && unreadQuizCount > 0) {
+      cards.push({
+        key: 'quiz',
+        gradient: 'quiz',
+        iosIcon: 'graduationcap.fill',
+        androidIcon: 'school',
+        eyebrow: t('employee_tools.weekly_quizzes'),
+        title: t('tools_page.hero_quiz_title', { count: unreadQuizCount }),
+        sub: t('tools_page.hero_quiz_sub'),
+        onPress: () => router.push('/weekly-quizzes'),
+      });
+    }
+    if (unreadPassCount > 0) {
+      cards.push({
+        key: 'pass',
+        gradient: 'game',
+        iosIcon: 'trophy.fill',
+        androidIcon: 'emoji-events',
+        eyebrow: t('employee_tools.game_hub'),
+        title: t('tools_page.hero_pass_title'),
+        sub: t('tools_page.hero_pass_sub'),
+        onPress: () => router.push('/game-hub'),
+      });
+    }
+    if (canSeeTips && new Date().getHours() >= 16 && !data.tips.hasEntryToday) {
+      cards.push({
+        key: 'closeout',
+        gradient: 'tips',
+        iosIcon: 'dollarsign.circle.fill',
+        androidIcon: 'calculate',
+        eyebrow: t('tips_checkouts.title'),
+        title: t('tools_page.hero_closeout_title'),
+        sub:
+          data.tips.weekTotal > 0
+            ? t('tools_page.hero_closeout_sub', { amount: `$${Math.round(data.tips.weekTotal)}` })
+            : t('tools_page.hero_closeout_sub_fresh'),
+        onPress: () => router.push('/tips-and-checkouts'),
+      });
+    }
+    if (data.guides.newThisWeek > 0) {
+      cards.push({
+        key: 'guides',
+        gradient: 'guides',
+        iosIcon: 'book.fill',
+        androidIcon: 'menu-book',
+        eyebrow: t('employee_tools.guides_training'),
+        title: t('tools_page.hero_guides_title', { count: data.guides.newThisWeek }),
+        sub: t('tools_page.hero_guides_sub'),
+        onPress: () => router.push('/guides-and-training'),
+      });
+    }
+    const { announcements, specials, events } = data.todayCounts;
+    if (announcements + specials + events > 0) {
+      const parts: string[] = [];
+      if (announcements > 0) parts.push(t('tools_page.today_ann', { count: announcements }));
+      if (specials > 0) parts.push(t('tools_page.today_spec', { count: specials }));
+      if (events > 0) parts.push(t('tools_page.today_ev', { count: events }));
+      cards.push({
+        key: 'today',
+        gradient: 'slate',
+        iosIcon: 'calendar',
+        androidIcon: 'event',
+        eyebrow: t('tools_page.hero_today_eyebrow', { org: organization?.name || '' }),
+        title: t('tools_page.hero_today_title'),
+        sub: parts.join(' · '),
+        onPress: () => router.push('/(portal)/employee'),
+      });
+    }
+    return cards;
+  }, [canSeeQuizzes, unreadQuizCount, unreadPassCount, canSeeTips, data, organization?.name, router, t]);
 
-  // Role-based assistants fill remaining rows
-  if (canSee('check_outs')) {
-    allItems.push({ id: 'check-outs-calculator', label: t('tips_checkouts.title'), iosIcon: 'dollarsign.circle.fill', androidIcon: 'calculate', route: '/tips-and-checkouts' });
-  }
-  if (canSee('bartender')) {
-    allItems.push({ id: 'bartender', label: t('employee_tools.bartender_assistant'), iosIcon: 'wineglass.fill', androidIcon: 'local-bar', route: '/bartender-assistant' });
-  }
-  if (canSee('host')) {
-    allItems.push({ id: 'host', label: t('employee_tools.host_assistant'), iosIcon: 'person.2.fill', androidIcon: 'people', route: '/host-assistant' });
-  }
-  if (canSee('kitchen')) {
-    allItems.push({ id: 'kitchen', label: t('employee_tools.kitchen_assistant'), iosIcon: 'flame.fill', androidIcon: 'local-fire-department', route: '/kitchen-assistant' });
-  }
+  // ---- Assistants (shared band; membership from the same visibility rules) ----
+  const assistantItems = useMemo<AssistantRailItem[]>(() => {
+    const items: AssistantRailItem[] = [];
+    if (canSee('kitchen')) {
+      items.push({
+        key: 'kitchen',
+        label: t('tools_page.assistant_kitchen'),
+        iosIcon: 'flame.fill',
+        androidIcon: 'local-fire-department',
+        onPress: () => router.push('/kitchen-assistant'),
+      });
+    }
+    if (canSee('bartender')) {
+      items.push({
+        key: 'bartender',
+        label: t('tools_page.assistant_bar'),
+        iosIcon: 'wineglass.fill',
+        androidIcon: 'local-bar',
+        onPress: () => router.push('/bartender-assistant'),
+      });
+    }
+    if (canSee('host')) {
+      items.push({
+        key: 'host',
+        label: t('tools_page.assistant_host'),
+        iosIcon: 'person.2.fill',
+        androidIcon: 'people',
+        onPress: () => router.push('/host-assistant'),
+      });
+    }
+    return items;
+  }, [canSee, router, t]);
 
-  // ─── Grid rendering ─────────────────────────────────────────────────────────
-
-  const renderGridItem = (item: GridItem) => (
-    <TouchableOpacity
-      key={item.id}
-      style={[styles.gridItem, { backgroundColor: colors.card, width: ITEM_WIDTH }]}
-      onPress={() => router.push(item.route as any)}
-      activeOpacity={0.7}
-    >
-      <View style={[styles.iconContainer, { backgroundColor: colors.primary + '15' }]}>
-        <IconSymbol
-          ios_icon_name={item.iosIcon as any}
-          android_material_icon_name={item.androidIcon as any}
-          size={28}
-          color={colors.primary}
-        />
-        {item.badge && <View style={styles.badgeDot} />}
-      </View>
-      <Text style={[styles.gridLabel, { color: colors.text }]} numberOfLines={2}>
-        {item.label}
-      </Text>
-    </TouchableOpacity>
-  );
+  const guidesSub =
+    data.guides.newThisWeek > 0
+      ? t('tools_page.guides_sub_fresh', { sets: data.guides.sets, fresh: data.guides.newThisWeek })
+      : t('tools_page.guides_sub', { sets: data.guides.sets });
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* User's Name Header */}
-      <View style={[styles.nameHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <Text style={[styles.nameHeaderText, { color: colors.text }]}>{user?.name}&apos;s Tools</Text>
-      </View>
-
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-        <View style={styles.gridContainer}>
-          {allItems.map(renderGridItem)}
+    <View style={styles.root}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.thead}>
+          <Text style={[styles.eyebrow, { color: colors.tint }]} numberOfLines={1}>
+            {(organization?.name || '').toUpperCase()}
+          </Text>
+          <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
+            {firstName ? t('tools_page.title_named', { name: firstName }) : t('employee_tools.title')}
+          </Text>
         </View>
+
+        <PriorityHero cards={heroCards} />
+
+        <SectionRule label={t('tools_page.your_tools')} />
+        <View style={styles.grid}>
+          <CommandTile
+            accent={colors.tint}
+            iosIcon="book.fill"
+            androidIcon="menu-book"
+            title={t('employee_tools.guides_training')}
+            big={t('tools_page.guides_big', { count: data.guides.count })}
+            sub={guidesSub}
+            width={TILE_WIDTH}
+            onPress={() => router.push('/guides-and-training')}
+          />
+          <CommandTile
+            accent={FAMILY_ACCENTS.game[scheme]}
+            iosIcon="gamecontroller.fill"
+            androidIcon="sports-esports"
+            title={t('employee_tools.game_hub')}
+            big={
+              unreadPassCount > 0 ? (
+                t('tools_page.game_passed_big')
+              ) : data.gameRank ? (
+                <>
+                  {t('tools_page.game_rank_prefix')}{' '}
+                  <Text style={{ color: FAMILY_ACCENTS.rewards[scheme] }}>
+                    #{data.gameRank.rank}
+                  </Text>{' '}
+                  {t('tools_page.game_rank_suffix', { total: data.gameRank.total })}
+                </>
+              ) : (
+                t('tools_page.game_big_fallback')
+              )
+            }
+            sub={
+              unreadPassCount > 0
+                ? t('tools_page.game_passed_sub')
+                : data.gameRank
+                ? t('tools_page.game_jump_sub')
+                : t('tools_page.game_sub')
+            }
+            width={TILE_WIDTH}
+            badgeCount={unreadPassCount}
+            pulse={unreadPassCount > 0}
+            onPress={() => router.push('/game-hub')}
+          />
+          {canSeeQuizzes && (
+            <CommandTile
+              accent={FAMILY_ACCENTS.quiz[scheme]}
+              iosIcon="graduationcap.fill"
+              androidIcon="school"
+              title={t('employee_tools.weekly_quizzes')}
+              big={t('tools_page.quiz_big', { count: unreadQuizCount })}
+              sub={t('tools_page.quiz_sub')}
+              width={TILE_WIDTH}
+              badgeCount={unreadQuizCount}
+              pulse={unreadQuizCount > 0}
+              onPress={() => router.push('/weekly-quizzes')}
+            />
+          )}
+          {canSeeTips && (
+            <CommandTile
+              accent={FAMILY_ACCENTS.tips[scheme]}
+              iosIcon="dollarsign.circle.fill"
+              androidIcon="calculate"
+              title={t('tips_checkouts.title')}
+              big={`$${Math.round(data.tips.weekTotal)}`}
+              sub={
+                data.tips.weekShifts > 0
+                  ? t('tools_page.tips_sub', { count: data.tips.weekShifts })
+                  : t('tools_page.tips_sub_empty')
+              }
+              width={TILE_WIDTH}
+              onPress={() => router.push('/tips-and-checkouts')}
+            />
+          )}
+        </View>
+
+        {assistantItems.length > 0 && (
+          <>
+            <SectionRule label={t('tools_page.assistants')} />
+            <AssistantRail items={assistantItems} />
+          </>
+        )}
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+  scroll: {
     flex: 1,
   },
-  nameHeader: {
-    paddingHorizontal: 16,
-    paddingTop: 20,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-  },
-  nameHeaderText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  contentContainer: {
-    paddingTop: 16,
+  content: {
+    paddingTop: 8,
     paddingHorizontal: GRID_PADDING,
-    paddingBottom: 100,
+    paddingBottom: 120,
   },
-  // ─── Grid ──────────────────────────────────────────────────────────────────
-  gridContainer: {
+  thead: {
+    paddingHorizontal: 2,
+    paddingTop: 4,
+    paddingBottom: 12,
+  },
+  eyebrow: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 8.5,
+    letterSpacing: 1.7,
+  },
+  title: {
+    fontFamily: fonts.display.bold,
+    fontSize: 25,
+    letterSpacing: -0.5,
+    marginTop: 3,
+  },
+  grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: GRID_GAP,
-  },
-  gridItem: {
-    borderRadius: 16,
-    paddingVertical: 20,
-    paddingHorizontal: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.15)',
-    elevation: 3,
-  },
-  iconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 10,
-    position: 'relative',
-  },
-  badgeDot: {
-    position: 'absolute',
-    top: -2,
-    right: -2,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#EF4444',
-    borderWidth: 2,
-    borderColor: '#FFF',
-  },
-  gridLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    textAlign: 'center',
-    lineHeight: 16,
   },
 });

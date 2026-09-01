@@ -1,9 +1,12 @@
 /**
- * Tips & Checkouts (s78) — the renamed section, replacing the pre-glass
- * check-out-calculator screen. Two views under one pushed screen: the Tips
- * Tracker (DEFAULT — Steve's call) and the Checkouts ritual. The Solo|Pool
- * capsule lives in the ScreenHeader's right slot, visible only on the
- * Checkouts tab, and SAYS it in words + icons for first-timers.
+ * Tips & Checkouts (s78, presets phase s79) — two views under one pushed
+ * screen: the Tips Tracker (DEFAULT — Steve's call) and the Checkouts ritual.
+ *
+ * s79 header rework: the Solo|Pool capsule moved INTO the ConsoleStrip's
+ * header row (gear + capsule together truncated the title in both languages —
+ * measured, Steve's placement pick), which frees the standard 38pt right slot
+ * for the HOUSE DEFAULTS gear on BOTH tabs. The gear renders for O/M only and
+ * opens the Checkout Defaults sheet (declare %, tip-out positions/order/%).
  */
 import React, { useState } from 'react';
 import {
@@ -21,8 +24,10 @@ import AmbientGlow from '@/components/AmbientGlow';
 import ScreenHeader from '@/components/ScreenHeader';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { useAuth } from '@/contexts/AuthContext';
 import TrackerView from '@/components/tips/TrackerView';
 import CheckoutView, { type CheckoutMode } from '@/components/tips/CheckoutView';
+import HouseDefaultsSheet from '@/components/tips/HouseDefaultsSheet';
 import { TIPS_VISUALS } from '@/components/tips/tipsVisuals';
 import { fonts } from '@/constants/fonts';
 
@@ -31,33 +36,35 @@ type Tab = 'tracker' | 'checkouts';
 export default function TipsAndCheckoutsScreen() {
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const { user } = useAuth();
   const [tab, setTab] = useState<Tab>('tracker');
   const [mode, setMode] = useState<CheckoutMode>('solo');
+  const [defaultsOpen, setDefaultsOpen] = useState(false);
+  // Remounts CheckoutView after a defaults save so the new house baseline
+  // seeds immediately (its baseline loads once per mount by design).
+  const [checkoutEpoch, setCheckoutEpoch] = useState(0);
+
+  const isManagerOrOwner = user?.role === 'owner' || user?.role === 'manager';
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <AmbientGlow />
       <ScreenHeader
         title={t('tips_checkouts.title')}
-        rightWide={tab === 'checkouts'}
         right={
-          tab === 'checkouts' ? (
-            <View style={[styles.modeCap, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
-              <ModeHalf
-                on={mode === 'solo'}
-                label={t('tips_checkouts.mode_solo')}
-                iosIcon="person.fill"
-                androidIcon="person"
-                onPress={() => setMode('solo')}
+          isManagerOrOwner ? (
+            <TouchableOpacity
+              onPress={() => setDefaultsOpen(true)}
+              hitSlop={8}
+              style={[styles.gearChip, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
+            >
+              <IconSymbol
+                ios_icon_name="gearshape.fill"
+                android_material_icon_name="settings"
+                size={18}
+                color={colors.text}
               />
-              <ModeHalf
-                on={mode === 'pooled'}
-                label={t('tips_checkouts.mode_pool')}
-                iosIcon="person.2.fill"
-                androidIcon="people"
-                onPress={() => setMode('pooled')}
-              />
-            </View>
+            </TouchableOpacity>
           ) : undefined
         }
       />
@@ -92,10 +99,23 @@ export default function TipsAndCheckoutsScreen() {
           {tab === 'tracker' ? (
             <TrackerView active={tab === 'tracker'} />
           ) : (
-            <CheckoutView mode={mode} onDone={() => setTab('tracker')} />
+            <CheckoutView
+              key={checkoutEpoch}
+              mode={mode}
+              onModeChange={setMode}
+              onDone={() => setTab('tracker')}
+            />
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {isManagerOrOwner && (
+        <HouseDefaultsSheet
+          visible={defaultsOpen}
+          onClose={() => setDefaultsOpen(false)}
+          onSaved={() => setCheckoutEpoch((n) => n + 1)}
+        />
+      )}
     </View>
   );
 }
@@ -137,48 +157,19 @@ function SegTab({
   );
 }
 
-function ModeHalf({
-  on,
-  label,
-  iosIcon,
-  androidIcon,
-  onPress,
-}: {
-  on: boolean;
-  label: string;
-  iosIcon: string;
-  androidIcon: string;
-  onPress: () => void;
-}) {
-  const colors = useThemeColors();
-  return (
-    <TouchableOpacity onPress={onPress} style={styles.modeHalf}>
-      {on && (
-        <LinearGradient
-          colors={[TIPS_VISUALS.gradient[0], TIPS_VISUALS.gradient[1]]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
-      )}
-      <IconSymbol
-        ios_icon_name={iosIcon}
-        android_material_icon_name={androidIcon}
-        size={12}
-        color={on ? '#FFFFFF' : colors.textSecondary}
-      />
-      <Text style={[styles.modeText, { color: on ? '#FFFFFF' : colors.textSecondary }]} numberOfLines={1}>
-        {label}
-      </Text>
-    </TouchableOpacity>
-  );
-}
-
 const styles = StyleSheet.create({
   root: { flex: 1 },
   kav: { flex: 1 },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingBottom: 48 },
+  gearChip: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   seg: {
     flexDirection: 'row',
     borderRadius: 13,
@@ -198,19 +189,4 @@ const styles = StyleSheet.create({
   },
   segFill: { borderRadius: 10 },
   segText: { fontFamily: fonts.body.semibold, fontSize: 12.5 },
-  modeCap: {
-    flexDirection: 'row',
-    borderRadius: 12,
-    borderWidth: 1,
-    overflow: 'hidden',
-    height: 38,
-  },
-  modeHalf: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 9,
-    overflow: 'hidden',
-  },
-  modeText: { fontFamily: fonts.body.semibold, fontSize: 10.5 },
 });

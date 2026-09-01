@@ -165,12 +165,17 @@ export function calculatePooled(inputs: PooledInputs): PooledResult {
   };
 }
 
-/** Wheel options for tip-out percentages: 0–10% in 0.5 steps (as fractions). */
+/** Wheel options for tip-out percentages: 0–10% in 0.25 steps (as fractions).
+ * Finer than the s78 0.5 wheel by Steve's presets-round call — Boathouse
+ * servers tip Busser + Runner at 1.75% each, and a selectable 1.75 beat a
+ * combined-category data model. */
 export const TIP_OUT_WHEEL_STEPS: readonly number[] = Object.freeze(
-  Array.from({ length: 21 }, (_, i) => i * 0.005),
+  Array.from({ length: 41 }, (_, i) => i * 0.0025),
 );
 
 export function formatPct(pct: number): string {
-  const asPercent = pct * 100;
-  return `${Number.isInteger(asPercent) ? asPercent : asPercent.toFixed(1)}%`;
+  // Two decimals, trailing zeros trimmed: 2 → "2%", 1.5 → "1.5%", 1.75 → "1.75%"
+  // (a one-decimal round would lie about the quarter steps).
+  const asPercent = Math.round(pct * 10000) / 100;
+  return `${asPercent}%`;
 }

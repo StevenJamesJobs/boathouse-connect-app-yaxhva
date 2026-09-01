@@ -9,6 +9,7 @@ import { hexToRgba } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useUnreadMessages } from '@/hooks/useUnreadMessages';
 import { useUnreadQuizzes } from '@/hooks/useUnreadQuizzes';
+import { useUnreadLeaderboardPasses } from '@/hooks/useUnreadLeaderboardPasses';
 import { usePendingApprovals } from '@/hooks/usePendingApprovals';
 import { useUnreadAwards } from '@/hooks/useUnreadAwards';
 import { useUnreadQuizReward } from '@/hooks/useUnreadQuizReward';
@@ -49,6 +50,7 @@ export default function BottomNavBar({ activeTab }: BottomNavBarProps) {
   const { user } = useAuth();
   const { unreadCount } = useUnreadMessages();
   const { unreadCount: unreadQuizCount } = useUnreadQuizzes();
+  const { unreadCount: unreadPassCount } = useUnreadLeaderboardPasses();
   const { pendingCount: pendingApprovalsCount } = usePendingApprovals();
   const { count: awardsCount } = useUnreadAwards();
   const { count: quizRewardCount } = useUnreadQuizReward();
@@ -84,7 +86,12 @@ export default function BottomNavBar({ activeTab }: BottomNavBarProps) {
             const isProfileTab = tab.name === 'profile';
             const isToolsTab = tab.name === 'tools';
             const isRewardsTab = tab.name === 'rewards';
-            const toolsCount = (unreadQuizCount || 0) + (isManager ? pendingApprovalsCount || 0 : 0);
+            // Mirrors the portal layouts' aggregate exactly (quizzes + passes,
+            // + approvals for managers) — this bar lagged passes until s79.
+            const toolsCount =
+              (unreadQuizCount || 0) +
+              (unreadPassCount || 0) +
+              (isManager ? pendingApprovalsCount || 0 : 0);
 
             return (
               <TouchableOpacity
