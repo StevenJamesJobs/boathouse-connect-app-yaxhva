@@ -22,6 +22,12 @@
 import i18n from '@/i18n';
 
 const EXACT_MAP: Record<string, string> = {
+  // s80 content attachments / storage retire (set_content_attachment,
+  // retire_content_storage, ack_pending_deletes, replace_content_images)
+  'Only managers or owners can manage content attachments': 'server_errors.content_attachments_managers_only',
+  'Invalid content type': 'server_errors.invalid_content_type',
+  'Content item not found': 'server_errors.content_item_not_found',
+  'Content item is not in your organization': 'server_errors.content_item_other_org',
   // join_signup
   'Invalid join code': 'server_errors.invalid_join_code',
   'Self-registration is disabled for this organization': 'server_errors.self_signup_disabled',

@@ -15,6 +15,9 @@ export type UploadPurpose =
   | 'announcement_image'
   | 'special_feature_image'
   | 'upcoming_event_image'
+  | 'announcement_attachment'
+  | 'special_feature_attachment'
+  | 'upcoming_event_attachment'
   | 'host_section_image'
   | 'host_section_file'
   | 'menu_item_image'
@@ -285,5 +288,33 @@ export async function brokerDelete(
     }
   } catch (err) {
     console.error('storage-broker delete error:', err);
+  }
+}
+
+/**
+ * s80: the same broker delete, but REPORTS whether the broker confirmed it —
+ * the content retire path acks a pending-delete row only after a confirmed
+ * delete, so a failed call leaves the row for the next sweep to hand back.
+ * The broker accepts 1–10 urls per call; callers chunk.
+ */
+export async function brokerDeleteChecked(
+  bucket: string,
+  storedUrlsOrPaths: string[],
+  actorId: string
+): Promise<boolean> {
+  const urls = storedUrlsOrPaths.filter((u) => !!u);
+  if (urls.length === 0) return true;
+  try {
+    const { data, error } = await supabase.functions.invoke('storage-broker', {
+      body: { action: 'delete', actor_id: actorId, bucket, urls },
+    });
+    if (error || !data?.success) {
+      console.error('storage-broker delete failed:', error ?? data?.error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('storage-broker delete error:', err);
+    return false;
   }
 }

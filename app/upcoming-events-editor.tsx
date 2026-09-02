@@ -1,2187 +1,849 @@
-
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  TextInput,
-  Alert,
-  ActionSheetIOS,
-  Modal,
-  ActivityIndicator,
-  Platform,
-  KeyboardAvoidingView,
-  Switch,
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import { useThemeColors } from '@/hooks/useThemeColors';
-import { IconSymbol } from '@/components/IconSymbol';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { Alert } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotification } from '@/contexts/NotificationContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 import { bothLanguages } from '@/utils/notificationHelpers';
-import * as ImagePicker from 'expo-image-picker';
-import { brokerUploadImage, brokerDelete } from '@/utils/storageBroker';
-import { useFocusEffect } from '@react-navigation/native';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { useTranslation } from 'react-i18next';
-import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-native-draggable-flatlist';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { brokerUploadImage } from '@/utils/storageBroker';
+import { translateServerError } from '@/utils/serverErrors';
 import { saveTranslations, getLocalizedField } from '@/utils/translateContent';
 import { useTranslationSection } from '@/components/TranslationSection';
-import { useLanguage } from '@/contexts/LanguageContext';
 import { fetchContentImages, saveContentImages, uploadImageToStorage } from '@/utils/contentImages';
-import RichTextToolbar from '@/components/RichTextToolbar';
-import FormattedText from '@/components/FormattedText';
-import { useOrganization } from '@/contexts/OrganizationContext';
-import CollapsibleSection from '@/components/CollapsibleSection';
-import OrderPositionModal from '@/components/OrderPositionModal';
-import { StorageImage } from '@/components/StorageImage';
-import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
-import { translateServerError } from '@/utils/serverErrors';
+import {
+  brokerRetire,
+  fetchContentAttachmentsBatch,
+  retireContentStorage,
+  setContentAttachment,
+  sweepExpiredContent,
+  uploadContentAttachment,
+  type ContentAttachment,
+} from '@/utils/contentAttachments';
+import { useSheetHandoff } from '@/components/GlassSheet';
+import ContentListScreen, { type ContentListItem } from '@/components/content/ContentListScreen';
+import StepSheet, { type StepDef } from '@/components/content/StepSheet';
+import { FieldLabel, GlassTextInput, Hint, InfoRow, SegControl, StepTitle } from '@/components/content/FormKit';
+import CoverPhotoField, { type ThumbnailShape } from '@/components/content/CoverPhotoField';
+import RichTextField from '@/components/content/RichTextField';
+import AttachmentField, { type AttachmentDraft } from '@/components/content/AttachmentField';
+import DateTimeField from '@/components/content/DateTimeField';
+import ReviewStep, { type ReviewLine } from '@/components/content/ReviewStep';
+import type { GuidePick } from '@/components/content/GuidePickerSheet';
+import { CONTENT_CAPS, categoryHue, type EventCategory } from '@/components/content/contentVisuals';
+import { useIsDarkTheme } from '@/components/content/useIsDarkTheme';
 
+/** One get_upcoming_events row (the editor reads inactive rows too). */
 interface UpcomingEvent {
   id: string;
   title: string;
-  content: string;
+  content: string | null;
   message: string | null;
   thumbnail_url: string | null;
-  thumbnail_shape: string;
+  thumbnail_shape: string | null;
   start_date_time: string | null;
   end_date_time: string | null;
   display_order: number;
   is_active: boolean;
-  created_at: string;
   link: string | null;
   guide_file_id: string | null;
-  category: string;
-  title_es?: string | null;
-  content_es?: string | null;
+  guide_file: unknown;
+  category: string | null;
+  title_es: string | null;
+  content_es: string | null;
 }
 
-interface GuideFile {
-  id: string;
+/** The sheet's whole form. Reset on every open — the sheet owns no state. */
+interface Draft {
   title: string;
-  category: string;
-  file_name: string;
+  title_es: string;
+  message: string;
+  message_es: string;
+  shape: ThumbnailShape;
+  category: EventCategory;
+  link: string;
+  start: Date | null;
+  end: Date | null;
+  coverUri: string | null;
+  coverUrl: string | null;
+  extraUrls: string[];
+  extraUris: string[];
+  attachment: AttachmentDraft | null;
+  notify: boolean;
 }
 
-const GUIDE_CATEGORIES = ['Employee HandBooks', 'Full Menus', 'Cheat Sheets', 'Events Flyers'];
+const EMPTY_DRAFT: Draft = {
+  title: '',
+  title_es: '',
+  message: '',
+  message_es: '',
+  shape: 'square',
+  category: 'Event',
+  link: '',
+  start: null,
+  end: null,
+  coverUri: null,
+  coverUrl: null,
+  extraUrls: [],
+  extraUris: [],
+  attachment: null,
+  notify: true,
+};
+
+const [STEP_BASICS, STEP_WHEN, STEP_DETAILS, STEP_EXTRAS, STEP_REVIEW] = [0, 1, 2, 3, 4];
+const CAP = CONTENT_CAPS.upcoming_event;
+
+// Date formatting — locale from the app language, never a hardcoded 'en-US'.
+function fmtDay(d: Date, locale: string): string {
+  return d.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+function fmtTime(d: Date, locale: string): string {
+  return d.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' });
+}
+
+function fmtWhen(d: Date, locale: string): string {
+  return `${fmtDay(d, locale)} · ${fmtTime(d, locale)}`;
+}
+
+/** "Fri Sep 5 · 7:00 – 10:00 PM" on one day; two full stamps across days. */
+function fmtRange(start: Date, end: Date | null, locale: string): string {
+  if (!end) return fmtWhen(start, locale);
+  if (start.toDateString() !== end.toDateString()) return `${fmtWhen(start, locale)} – ${fmtWhen(end, locale)}`;
+  const a = fmtTime(start, locale);
+  const b = fmtTime(end, locale);
+  const suffix = a.match(/\s?[AP]\.?M\.?$/i)?.[0];
+  const head = suffix && b.endsWith(suffix) ? a.slice(0, -suffix.length) : a;
+  return `${fmtDay(start, locale)} · ${head} – ${b}`;
+}
+
+function asCategory(value: string | null | undefined): EventCategory {
+  return value === 'Entertainment' ? 'Entertainment' : 'Event';
+}
 
 export default function UpcomingEventsEditorScreen() {
   useRequireManagerRoute();
   const { t, i18n } = useTranslation();
-  const colors = useThemeColors();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const router = useRouter();
   const { user } = useAuth();
   const { sendNotification } = useNotification();
   const { organizationId } = useOrganization();
   const { language } = useLanguage();
-  const [events, setEvents] = useState<UpcomingEvent[]>([]);
-  const [guideFiles, setGuideFiles] = useState<GuideFile[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [editingEvent, setEditingEvent] = useState<UpcomingEvent | null>(null);
-  const [selectedGuideFile, setSelectedGuideFile] = useState<GuideFile | null>(null);
-  const [fileSearchQuery, setFileSearchQuery] = useState('');
-  const [showFileSection, setShowFileSection] = useState(false);
+  const isDark = useIsDarkTheme();
+  const locale = language === 'es' ? 'es' : 'en-US';
 
-  // Form state
-  const [formData, setFormData] = useState({
-    title: '',
-    message: '',
-    thumbnail_shape: 'square',
-    link: '',
-    category: 'Event',
-    title_es: '',
-    message_es: '',
-  });
-  const [startDateTime, setStartDateTime] = useState<Date | null>(null);
-  const [endDateTime, setEndDateTime] = useState<Date | null>(null);
-  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
-  const [showStartTimePicker, setShowStartTimePicker] = useState(false);
-  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
-  const [showEndTimePicker, setShowEndTimePicker] = useState(false);
-  const [uploadingImage, setUploadingImage] = useState(false);
-  const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
-  // Additional images state
-  const [additionalImageUrls, setAdditionalImageUrls] = useState<string[]>([]);
-  const [newAdditionalImageUris, setNewAdditionalImageUris] = useState<string[]>([]);
-  const [shouldSendNotification, setShouldSendNotification] = useState(true);
+  const [events, setEvents] = useState<UpcomingEvent[]>([]);
+  const [attachments, setAttachments] = useState<Map<string, ContentAttachment>>(new Map());
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+
+  // ── Sheet state ─────────────────────────────────────────────────────────────
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [editing, setEditing] = useState<UpcomingEvent | null>(null);
+  const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
+  const [step, setStep] = useState(STEP_BASICS);
+  const [visited, setVisited] = useState(STEP_BASICS);
+  const [busy, setBusy] = useState(false);
+  const addSessionRef = useRef(0);
+  // Whether the row being edited carried a one-time file when the sheet opened —
+  // the only case where a null / guide draft has to CLEAR the stored attachment.
+  const hadFileRef = useRef(false);
+  const patch = useCallback((p: Partial<Draft>) => setDraft((d) => ({ ...d, ...p })), []);
+
+  const closeSheet = useCallback(() => setSheetOpen(false), []);
+  // Success alerts fire AFTER the sheet is gone (the GlassSheet handoff race).
+  const { defer, onDismiss } = useSheetHandoff(closeSheet);
 
   // Hybrid bilingual authoring (s61): the primary inputs bind the device
   // language; the shared section shows the other-language preview + translate
   // button + pencil edit. resolveOnSave() runs the staleness rules.
   const isSpanishAuthor = i18n.language === 'es';
-  const addSessionRef = useRef(0);
   const translation = useTranslationSection({
     fields: [
       {
         key: 'title',
         labelKey: 'translation_section:field_title',
-        enValue: formData.title,
-        esValue: formData.title_es,
-        setEnValue: (v) => setFormData(prev => ({ ...prev, title: v })),
-        setEsValue: (v) => setFormData(prev => ({ ...prev, title_es: v })),
+        enValue: draft.title,
+        esValue: draft.title_es,
+        setEnValue: (v) => patch({ title: v }),
+        setEsValue: (v) => patch({ title_es: v }),
+        // Raw, UNCOLLAPSED column values: '' means the manager deliberately
+        // cleared this side, null means it was never authored (guides pattern).
+        enStored: editing ? editing.title : undefined,
+        esStored: editing ? editing.title_es ?? null : undefined,
       },
       {
         key: 'message',
         labelKey: 'translation_section:field_description',
-        enValue: formData.message,
-        esValue: formData.message_es,
-        setEnValue: (v) => setFormData(prev => ({ ...prev, message: v })),
-        setEsValue: (v) => setFormData(prev => ({ ...prev, message_es: v })),
+        enValue: draft.message,
+        esValue: draft.message_es,
+        setEnValue: (v) => patch({ message: v }),
+        setEsValue: (v) => patch({ message_es: v }),
         multiline: true,
+        enStored: editing ? editing.content ?? editing.message ?? null : undefined,
+        esStored: editing ? editing.content_es ?? null : undefined,
       },
     ],
-    sessionKey: editingEvent ? `edit:${editingEvent.id}` : `new:${addSessionRef.current}`,
-    active: showAddModal,
+    sessionKey: editing ? `edit:${editing.id}` : `new:${addSessionRef.current}`,
+    active: sheetOpen,
   });
 
-  const contentInputRef = useRef<TextInput>(null);
-  const [contentSelection, setContentSelection] = useState({ start: 0, end: 0 });
-  const [positionPicker, setPositionPicker] = useState<{
-    item: UpcomingEvent;
-    currentIndex: number;
-  } | null>(null);
+  // ── Loading ─────────────────────────────────────────────────────────────────
 
-  useEffect(() => {
-    loadEvents();
-    loadGuideFiles();
-    cleanupExpiredEvents();
-  }, []);
-
-  useFocusEffect(
-    React.useCallback(() => {
-      console.log('Upcoming events editor screen focused, refreshing data...');
-      loadEvents();
-      loadGuideFiles();
-      cleanupExpiredEvents();
-    }, [])
+  const resequence = useCallback(
+    async (orderedIds: string[]) => {
+      // One gated reorder RPC reindexes the whole list 0..N-1 server-side.
+      if (!user?.id || orderedIds.length === 0) return;
+      const { error } = await supabase.rpc('reorder_upcoming_events', {
+        p_actor_id: user.id,
+        p_ordered_ids: orderedIds,
+      });
+      if (error) console.error('Error resequencing event display orders:', error);
+    },
+    [user?.id]
   );
 
-  const loadGuideFiles = async () => {
-    try {
-      console.log('Loading guide files from database...');
-
-      // get_guides returns the org's active guides (SETOF rows) for the actor.
-      // Category narrowing + grouping stays client-side (groupedGuideFiles /
-      // GUIDE_CATEGORIES), same as before the RPC swap.
-      if (!user?.id) return;
-      const { data, error } = await supabase.rpc('get_guides', {
-        p_actor_id: user.id,
-      });
-
-      if (error) {
-        console.error('Error loading guide files:', error);
-        throw error;
+  const load = useCallback(
+    async (sweep = false) => {
+      // Logout race: an empty actor would reach the uuid RPC param as '' (22P02).
+      if (!user?.id) {
+        setLoading(false);
+        return;
       }
-
-      console.log('Guide files loaded successfully:', data?.length || 0, 'items');
-      setGuideFiles(data || []);
-    } catch (error) {
-      console.error('Error loading guide files:', error);
-    }
-  };
-
-  const resequenceDisplayOrders = async (currentEvents: UpcomingEvent[]) => {
-    // Assign sequential display_orders (0, 1, 2, ...) based on current sort order —
-    // one gated reorder RPC reindexes the whole list server-side.
-    if (!user?.id || currentEvents.length === 0) return;
-    const { error } = await supabase.rpc('reorder_upcoming_events', {
-      p_actor_id: user.id, p_ordered_ids: currentEvents.map((e) => e.id),
-    });
-    if (error) {
-      console.error('Error resequencing event display orders:', error);
-    } else {
-      console.log(`Resequenced ${currentEvents.length} event display orders`);
-    }
-  };
-
-  const cleanupExpiredEvents = async () => {
-    if (!user?.id) return;
-    try {
-      const { data, error } = await supabase.rpc('delete_expired_upcoming_events', { p_actor_id: user.id });
-      if (error) {
-        console.error('Error cleaning up expired events:', error);
-      } else {
-        console.log('Cleaned up expired events:', data);
-        // If events were deleted, reload and resequence to close gaps
-        if (data && data > 0) {
-          const { data: freshEvents } = await supabase.rpc('get_upcoming_events', {
-            p_actor_id: user.id,
-            p_include_inactive: true,
-          });
-          if (freshEvents) {
-            await resequenceDisplayOrders(freshEvents);
-          }
+      try {
+        setLoading(true);
+        // The expiry sweep replaces delete_expired_upcoming_events: it deletes
+        // expired specials + events server-side and hands back every pending
+        // file for the org, which a manager broker-deletes (fire-and-forget).
+        if (sweep) await sweepExpiredContent(user.id, true);
+        const { data, error } = await supabase.rpc('get_upcoming_events', {
+          p_actor_id: user.id,
+          p_include_inactive: true,
+        });
+        if (error) throw error;
+        const rows = (data || []) as UpcomingEvent[];
+        // Expiry leaves holes in display_order; close them exactly as the old
+        // cleanup did — the surviving ids, in order, to reorder_upcoming_events.
+        if (sweep && rows.some((r, i) => r.display_order !== i)) {
+          await resequence(rows.map((r) => r.id));
         }
-      }
-    } catch (error) {
-      console.error('Error cleaning up expired events:', error);
-    }
-  };
-
-  const loadEvents = async () => {
-    // Logout race: an empty actor would reach the uuid RPC param as '' (22P02).
-    if (!user?.id) {
-      setLoading(false);
-      return;
-    }
-    try {
-      setLoading(true);
-      console.log('Loading upcoming events from database...');
-
-      // Manager editor mode: inactive rows included (matches the old select('*')).
-      const { data, error } = await supabase.rpc('get_upcoming_events', {
-        p_actor_id: user.id,
-        p_include_inactive: true,
-      });
-
-      if (error) {
+        setEvents(rows);
+        setAttachments(await fetchContentAttachmentsBatch(user.id, 'upcoming_event', rows.map((r) => r.id)));
+      } catch (error) {
         console.error('Error loading upcoming events:', error);
-        throw error;
+        Alert.alert(t('common:error'), t('upcoming_events_editor:load_error'));
+      } finally {
+        setLoading(false);
       }
+    },
+    [user?.id, resequence, t]
+  );
 
-      console.log('Upcoming events loaded successfully:', data?.length || 0, 'items');
-      setEvents(data || []);
-    } catch (error) {
-      console.error('Error loading upcoming events:', error);
-      Alert.alert(t('common:error'), t('upcoming_events_editor:load_error'));
-    } finally {
-      setLoading(false);
-    }
+  // Fires on the initial focus too, so this is mount + every refocus.
+  useFocusEffect(useCallback(() => void load(true), [load]));
+
+  // ── Open / close ────────────────────────────────────────────────────────────
+
+  const openAdd = () => {
+    setEditing(null);
+    hadFileRef.current = false;
+    setDraft(EMPTY_DRAFT);
+    addSessionRef.current += 1;
+    setStep(STEP_BASICS);
+    setVisited(STEP_BASICS);
+    setSheetOpen(true);
   };
 
-  const pickImage = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: formData.thumbnail_shape === 'square' ? [1, 1] : [16, 9],
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        setSelectedImageUri(result.assets[0].uri);
-      }
-    } catch (error) {
-      console.error('Error picking image:', error);
-      Alert.alert(t('common:error'), t('upcoming_events_editor:pick_image_error'));
-    }
+  /** The row's guide, for the Extras chip: get_guides carries the category the
+   *  row's guide_file jsonb lacks; the jsonb is the fallback. */
+  const resolveGuide = async (ev: UpcomingEvent): Promise<GuidePick | null> => {
+    if (!ev.guide_file_id || !user?.id) return null;
+    const { data, error } = await supabase.rpc('get_guides', { p_actor_id: user.id });
+    if (error) console.error('Error loading guides for event:', error);
+    const g = (data || []).find((row) => row.id === ev.guide_file_id);
+    if (g) return { id: g.id, title: g.title, category: g.category ?? '', file_name: g.file_name ?? '' };
+    const json = ev.guide_file as { id?: string; title?: string; file_name?: string } | null;
+    return json?.id ? { id: json.id, title: json.title ?? '', category: '', file_name: json.file_name ?? '' } : null;
   };
 
-  const pickAdditionalImage = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: formData.thumbnail_shape === 'square' ? [1, 1] : [16, 9],
-        quality: 0.8,
-      });
-      if (!result.canceled && result.assets[0]) {
-        setNewAdditionalImageUris(prev => [...prev, result.assets[0].uri]);
-      }
-    } catch (error) {
-      console.error('Error picking additional image:', error);
-    }
+  const openEdit = async (item: ContentListItem) => {
+    const ev = events.find((e) => e.id === item.id);
+    if (!ev) return;
+    const stored = attachments.get(ev.id) ?? null;
+    hadFileRef.current = !!stored;
+    const [extraUrls, guide] = await Promise.all([
+      fetchContentImages(user?.id, 'upcoming_event', ev.id),
+      stored ? Promise.resolve(null) : resolveGuide(ev),
+    ]);
+    const attachment: AttachmentDraft | null = stored
+      ? { kind: 'file', ...stored, file_type: stored.file_type ?? 'application/octet-stream' }
+      : guide
+        ? { kind: 'guide', guide }
+        : null;
+    setEditing(ev);
+    setDraft({
+      title: ev.title ?? '',
+      title_es: ev.title_es ?? '',
+      message: ev.content || ev.message || '',
+      message_es: ev.content_es ?? '',
+      shape: ev.thumbnail_shape === 'banner' ? 'banner' : 'square',
+      category: asCategory(ev.category),
+      link: ev.link ?? '',
+      start: ev.start_date_time ? new Date(ev.start_date_time) : null,
+      end: ev.end_date_time ? new Date(ev.end_date_time) : null,
+      coverUri: null,
+      coverUrl: ev.thumbnail_url ?? null,
+      extraUrls,
+      extraUris: [],
+      attachment,
+      notify: false,
+    });
+    // Edit opens on Review with every step done — one tap deep to any line.
+    setStep(STEP_REVIEW);
+    setVisited(STEP_REVIEW);
+    setSheetOpen(true);
   };
 
-  const removeAdditionalImage = (index: number, isNew: boolean) => {
-    if (isNew) {
-      setNewAdditionalImageUris(prev => prev.filter((_, i) => i !== index));
-    } else {
-      setAdditionalImageUrls(prev => prev.filter((_, i) => i !== index));
-    }
+  const goTo = (i: number) => {
+    setStep(i);
+    setVisited((v) => Math.max(v, i));
   };
 
-  const uploadImage = async (uri: string): Promise<string | null> => {
-    if (!user?.id) return null;
-
-    try {
-      setUploadingImage(true);
-      console.log('Starting image upload for upcoming event');
-
-      const publicUrl = await brokerUploadImage('upcoming_event_image', uri, user.id);
-      if (!publicUrl) {
-        throw new Error('Image upload failed');
-      }
-
-      console.log('Public URL:', publicUrl);
-
-      return publicUrl;
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      Alert.alert(t('common:error'), t('upcoming_events_editor:upload_image_error'));
-      return null;
-    } finally {
-      setUploadingImage(false);
-    }
-  };
+  // ── Save ────────────────────────────────────────────────────────────────────
 
   const handleSave = async () => {
-    const authorTitle = isSpanishAuthor ? formData.title_es : formData.title;
-    const authorMessage = isSpanishAuthor ? formData.message_es : formData.message;
-    if (!authorTitle || !authorMessage) {
-      Alert.alert(t('common:error'), t('upcoming_events_editor:error_fill_fields'));
+    const authorTitle = isSpanishAuthor ? draft.title_es : draft.title;
+    const authorMessage = isSpanishAuthor ? draft.message_es : draft.message;
+    if (!authorTitle.trim()) {
+      goTo(STEP_BASICS);
+      Alert.alert(t('common:error'), t('content_editor.error_title_required'));
       return;
     }
-
+    if (!draft.start) {
+      goTo(STEP_WHEN);
+      Alert.alert(t('common:error'), t('content_editor.start_required'));
+      return;
+    }
+    if (!authorMessage.trim()) {
+      goTo(STEP_DETAILS);
+      Alert.alert(t('common:error'), t('content_editor.error_message_required'));
+      return;
+    }
     if (!user?.id) {
       Alert.alert(t('common:error'), t('upcoming_events_editor:error_not_authenticated'));
       return;
     }
-
-    if (!editingEvent && events.length >= 100) {
+    if (!editing && events.length >= CAP) {
       Alert.alert(t('upcoming_events_editor:limit_reached_title'), t('upcoming_events_editor:limit_reached_msg'));
       return;
     }
 
-    // Fill/refresh the other language per the s61 staleness rules (may ask once).
-    const resolved = await translation.resolveOnSave();
-    if (!resolved) return;
-
+    setBusy(true);
     try {
-      let thumbnailUrl = editingEvent?.thumbnail_url || null;
+      // Fill/refresh the other language per the s61 staleness rules (may ask once).
+      const resolved = await translation.resolveOnSave();
+      if (!resolved) return;
 
-      if (selectedImageUri) {
-        const uploadedUrl = await uploadImage(selectedImageUri);
-        if (uploadedUrl) {
-          thumbnailUrl = uploadedUrl;
-          console.log('New thumbnail URL:', thumbnailUrl);
-        }
+      // Non-fatal problems (a photo or file that would not upload) are reported
+      // AFTER the sheet closes — the row itself still saves.
+      const warnings: string[] = [];
+      let thumbnailUrl = editing?.thumbnail_url ?? null;
+      if (draft.coverUri) {
+        const uploaded = await brokerUploadImage('upcoming_event_image', draft.coverUri, user.id);
+        if (uploaded) thumbnailUrl = uploaded;
+        else warnings.push('upcoming_events_editor:upload_image_error');
       }
 
       // Prepend https:// when the entered link has no scheme, else it won't open (e.g. "kevahomes.com").
-      const rawLink = formData.link.trim();
+      const rawLink = draft.link.trim();
       const linkValue = rawLink ? (/^https?:\/\//i.test(rawLink) ? rawLink : `https://${rawLink}`) : null;
-      const guideFileId = selectedGuideFile?.id || null;
-
-      if (editingEvent) {
-        console.log('Updating upcoming event:', editingEvent.id);
+      // A guide pick links the row to Guides & Training; a one-time file (or
+      // nothing) leaves guide_file_id empty — the RPCs ASSIGN, so undefined clears.
+      const guideFileId = draft.attachment?.kind === 'guide' ? draft.attachment.guide.id : null;
+      const params = {
+        p_user_id: user.id,
+        p_organization_id: organizationId ?? undefined,
+        p_title: resolved.title.en,
+        p_message: resolved.message.en,
+        p_thumbnail_url: thumbnailUrl ?? undefined,
+        p_thumbnail_shape: draft.shape,
+        p_start_date_time: draft.start.toISOString(),
+        p_end_date_time: draft.end?.toISOString(),
+        p_link: linkValue ?? undefined,
+        p_guide_file_id: guideFileId ?? undefined,
+        p_category: draft.category,
+      };
+      let eventId: string;
+      if (editing) {
         const { error } = await supabase.rpc('update_upcoming_event', {
-          p_user_id: user.id,
-          p_organization_id: organizationId ?? undefined,
-          p_event_id: editingEvent.id,
-          p_title: resolved.title.en,
-          p_message: resolved.message.en,
-          p_thumbnail_url: thumbnailUrl ?? undefined,
-          p_thumbnail_shape: formData.thumbnail_shape,
-          p_start_date_time: startDateTime?.toISOString(),
-          p_end_date_time: endDateTime?.toISOString(),
-          p_display_order: editingEvent.display_order,
-          p_link: linkValue ?? undefined,
-          p_guide_file_id: guideFileId ?? undefined,
-          p_category: formData.category,
+          ...params,
+          p_event_id: editing.id,
+          p_display_order: editing.display_order,
         });
-
-        if (error) {
-          console.error('Error updating upcoming event:', error);
-          throw error;
-        }
-        console.log('Upcoming event updated successfully');
-        Alert.alert(t('common:success'), t('upcoming_events_editor:updated_success'));
-
-        // Save Spanish translations (server null semantics vary — most content tables COALESCE-keep when blank)
-        await saveTranslations('upcoming_events', editingEvent.id, {
-          title_es: resolved.title.es,
-          content_es: resolved.message.es,
-        }, user?.id);
-
-        // Upload new additional images and save all to content_images
-        const uploadedNewUrls: string[] = [];
-        for (const uri of newAdditionalImageUris) {
-          const url = await uploadImageToStorage(uri, 'upcoming_event', user.id);
-          if (url) uploadedNewUrls.push(url);
-        }
-        const allAdditionalUrls = [...additionalImageUrls, ...uploadedNewUrls];
-        if (allAdditionalUrls.length > 0 || additionalImageUrls.length > 0) {
-          await saveContentImages(user.id, 'upcoming_event', editingEvent.id, allAdditionalUrls);
-        }
+        if (error) throw error;
+        eventId = editing.id;
       } else {
-        console.log('Creating new upcoming event');
-        // create_upcoming_event has always returned the new row's uuid — use it
-        // instead of the racy "select newest row" follow-up read.
-        const { data: newEventId, error } = await supabase.rpc('create_upcoming_event', {
-          p_user_id: user.id,
-          p_organization_id: organizationId ?? undefined,
-          p_title: resolved.title.en,
-          p_message: resolved.message.en,
-          p_thumbnail_url: thumbnailUrl ?? undefined,
-          p_thumbnail_shape: formData.thumbnail_shape,
-          p_start_date_time: startDateTime?.toISOString(),
-          p_end_date_time: endDateTime?.toISOString(),
+        // create_upcoming_event returns the new row's uuid.
+        const { data, error } = await supabase.rpc('create_upcoming_event', {
+          ...params,
           p_display_order: events.length,
-          p_link: linkValue ?? undefined,
-          p_guide_file_id: guideFileId ?? undefined,
-          p_category: formData.category,
         });
+        if (error) throw error;
+        eventId = data as string;
+      }
 
-        if (error) {
-          console.error('Error creating upcoming event:', error);
-          throw error;
+      // The translations RPC COALESCE-keeps a null, so a blank normally means
+      // "leave alone". A field is DELIBERATELY CLEARED only when it held text
+      // before and resolves blank now — those go over as '' (guides pattern).
+      const cleared = (stored: string | null | undefined, next: string) => !!stored?.trim() && !next.trim();
+      const clearBlank = editing
+        ? [
+            cleared(editing.title_es, resolved.title.es) && 'title_es',
+            cleared(editing.content_es, resolved.message.es) && 'content_es',
+          ].filter((f): f is string => !!f)
+        : [];
+      await saveTranslations(
+        'upcoming_events',
+        eventId,
+        { title_es: resolved.title.es, content_es: resolved.message.es },
+        user.id,
+        clearBlank.length ? { clearBlank } : undefined
+      );
+
+      // Extra photos: upload the new ones, then replace the full ordered set
+      // (an edit always writes — an emptied rail has to clear the stored rows).
+      const uploadedExtras: string[] = [];
+      for (const uri of draft.extraUris) {
+        const url = await uploadImageToStorage(uri, 'upcoming_event', user.id);
+        if (url) uploadedExtras.push(url);
+      }
+      const allExtras = [...draft.extraUrls, ...uploadedExtras];
+      if (editing || allExtras.length > 0) {
+        await saveContentImages(user.id, 'upcoming_event', eventId, allExtras);
+      }
+
+      // One-time attachment: a fresh pick uploads + upserts; a stored file is
+      // untouched; removing it (or swapping to a guide) clears the row.
+      const att = draft.attachment;
+      if (att?.kind === 'file' && att.uri) {
+        const fileUrl = await uploadContentAttachment('upcoming_event', att.uri, att.file_name, att.file_type, user.id);
+        if (fileUrl) {
+          const { file_name, file_type, size_bytes } = att;
+          await setContentAttachment(user.id, 'upcoming_event', eventId, { file_url: fileUrl, file_name, file_type, size_bytes });
+        } else {
+          warnings.push('content_editor.error_upload_failed');
         }
-        console.log('Upcoming event created successfully');
+      } else if (att?.kind !== 'file' && hadFileRef.current) {
+        await setContentAttachment(user.id, 'upcoming_event', eventId, null);
+      }
 
-        // The new event shows in the notification shade live (via the upcoming_events
-        // table). No separate custom_notifications "log" row — that parallel
-        // Sent-History system was retired (it caused shade/history drift).
-
-        // Send the actual push only when toggle is on
-        if (shouldSendNotification) {
-          try {
-            const pushTitle = bothLanguages('notifications.new_event_title');
-            await sendNotification({
-              notificationType: 'event',
-              title: pushTitle.en,
-              body: resolved.title.en,
-              title_es: pushTitle.es,
-              // The authored Spanish title when it exists; empty falls back to EN.
-              body_es: resolved.title.es || undefined,
-              // type + the created row's uuid make the banner tap deep-link
-              // (NotificationContext routes to PortalHome's openEventId).
-              data: {
-                type: 'event',
-                eventId: newEventId,
-                category: formData.category,
-                startDateTime: startDateTime?.toISOString() || null,
-              },
-            });
-          } catch (notificationError) {
-            console.error('Failed to send push notification:', notificationError);
-          }
-        }
-        
-        Alert.alert(t('common:success'), t('upcoming_events_editor:created_success'));
-
-        // Save Spanish translations for newly created item
-        if (newEventId) {
-          await saveTranslations('upcoming_events', newEventId, {
-            title_es: resolved.title.es,
-            content_es: resolved.message.es,
-          }, user?.id);
-        }
-
-        // Upload and save additional images for newly created item (no longer
-        // nested under the translations branch — images used to be silently
-        // skipped unless a Spanish title/message was also entered).
-        if (newEventId && newAdditionalImageUris.length > 0) {
-          const uploadedNewUrls: string[] = [];
-          for (const uri of newAdditionalImageUris) {
-            const url = await uploadImageToStorage(uri, 'upcoming_event', user.id);
-            if (url) uploadedNewUrls.push(url);
-          }
-          if (uploadedNewUrls.length > 0) {
-            await saveContentImages(user.id, 'upcoming_event', newEventId, uploadedNewUrls);
-          }
+      // The new event shows in the notification shade live (via the
+      // upcoming_events table); the push itself goes out only when Notify is on.
+      if (!editing && draft.notify) {
+        try {
+          const pushTitle = bothLanguages('notifications.new_event_title');
+          await sendNotification({
+            notificationType: 'event',
+            title: pushTitle.en,
+            body: resolved.title.en,
+            title_es: pushTitle.es,
+            // The authored Spanish title when it exists; empty falls back to EN.
+            body_es: resolved.title.es || undefined,
+            // type + the created row's uuid make the banner tap deep-link
+            // (NotificationContext routes to PortalHome's openEventId).
+            data: {
+              type: 'event',
+              eventId,
+              category: draft.category,
+              startDateTime: draft.start.toISOString(),
+            },
+          });
+        } catch (notificationError) {
+          console.error('Failed to send push notification:', notificationError);
         }
       }
 
-      closeModal();
-      await loadEvents();
+      const wasEdit = !!editing;
+      defer(() => {
+        if (warnings.length > 0) {
+          Alert.alert(t('common:error'), warnings.map((k) => t(k)).join('\n'));
+        } else {
+          Alert.alert(
+            wasEdit ? t('content_editor.saved') : t('content_editor.posted'),
+            wasEdit ? t('upcoming_events_editor:updated_success') : t('upcoming_events_editor:created_success')
+          );
+        }
+      });
+      await load();
     } catch (error: any) {
       console.error('Error saving upcoming event:', error);
       Alert.alert(t('common:error'), translateServerError(error, t('upcoming_events_editor:save_error')));
+    } finally {
+      setBusy(false);
     }
   };
 
-  const handleDelete = async (event: UpcomingEvent) => {
-    Alert.alert(
-      t('upcoming_events_editor:delete_title'),
-      t('upcoming_events_editor:delete_confirm', { title: event.title }),
-      [
-        { text: t('common:cancel'), style: 'cancel' },
-        {
-          text: t('common:delete'),
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              if (!user?.id) {
-                Alert.alert(t('common:error'), t('upcoming_events_editor:error_not_authenticated'));
-                return;
-              }
+  // ── Delete / reorder ────────────────────────────────────────────────────────
 
-              console.log('Deleting upcoming event:', event.id);
-              
-              const { error } = await supabase.rpc('delete_upcoming_event', {
-                p_user_id: user.id,
-                p_organization_id: organizationId ?? undefined,
-                p_event_id: event.id,
-              });
-
-              if (error) {
-                console.error('Error deleting upcoming event:', error);
-                throw error;
-              }
-
-              if (event.thumbnail_url) {
-                await brokerDelete('upcoming-events', [event.thumbnail_url], user.id);
-              }
-
-              // content_images rows are cascaded by delete_upcoming_event server-side.
-
-              console.log('Upcoming event deleted successfully');
-
-              // Resequence remaining events to close gaps in display_order
-              const remainingEvents = events.filter(e => e.id !== event.id);
-              await resequenceDisplayOrders(remainingEvents);
-
-              Alert.alert(t('common:success'), t('upcoming_events_editor:deleted_success'));
-
-              await loadEvents();
-            } catch (error: any) {
-              console.error('Error deleting upcoming event:', error);
-              Alert.alert(t('common:error'), translateServerError(error, t('upcoming_events_editor:delete_error')));
-            }
-          },
+  const handleDelete = (item: ContentListItem) => {
+    const ev = events.find((e) => e.id === item.id);
+    if (!ev) return;
+    Alert.alert(t('content_editor.delete_confirm_title'), t('content_editor.delete_confirm_body'), [
+      { text: t('common:cancel'), style: 'cancel' },
+      {
+        text: t('common:delete'),
+        style: 'destructive',
+        onPress: async () => {
+          if (!user?.id) {
+            Alert.alert(t('common:error'), t('upcoming_events_editor:error_not_authenticated'));
+            return;
+          }
+          try {
+            // Queue thumbnail + extra images + attachment server-side FIRST —
+            // the URLs are unreachable once the row is gone.
+            const files = await retireContentStorage(user.id, 'upcoming_event', ev.id);
+            const { error } = await supabase.rpc('delete_upcoming_event', {
+              p_user_id: user.id,
+              p_organization_id: organizationId ?? undefined,
+              p_event_id: ev.id,
+            });
+            if (error) throw error;
+            await brokerRetire(user.id, files);
+            // Close the gap the row leaves in display_order.
+            await resequence(events.filter((e) => e.id !== ev.id).map((e) => e.id));
+            await load();
+          } catch (error: any) {
+            console.error('Error deleting upcoming event:', error);
+            Alert.alert(t('common:error'), translateServerError(error, t('upcoming_events_editor:delete_error')));
+          }
         },
-      ]
+      },
+    ]);
+  };
+
+  const handleReorder = async (orderedIds: string[]) => {
+    // Optimistic: reindex locally, persist, reload only on failure.
+    const byId = new Map(events.map((e) => [e.id, e]));
+    setEvents(
+      orderedIds.flatMap((id, i) => {
+        const ev = byId.get(id);
+        return ev ? [{ ...ev, display_order: i }] : [];
+      })
     );
-  };
-
-  const handleMoveUp = async (index: number) => {
-    if (index <= 0 || !user?.id) return;
-    const newEvents = [...events];
-    const currentOrder = newEvents[index].display_order;
-    const aboveOrder = newEvents[index - 1].display_order;
-    // Optimistic local update: swap positions
-    [newEvents[index], newEvents[index - 1]] = [newEvents[index - 1], newEvents[index]];
-    newEvents[index].display_order = currentOrder;
-    newEvents[index - 1].display_order = aboveOrder;
-    setEvents(newEvents);
-    // Persist the whole list's new order (reindexed 0..N-1) via the gated RPC
-    try {
-      const { error } = await supabase.rpc('reorder_upcoming_events', {
-        p_actor_id: user.id, p_ordered_ids: newEvents.map((e) => e.id),
-      });
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error moving event up:', error);
-      await loadEvents(); // Reload on error to restore correct state
-    }
-  };
-
-  const handleMoveDown = async (index: number) => {
-    if (index >= events.length - 1 || !user?.id) return;
-    const newEvents = [...events];
-    const currentOrder = newEvents[index].display_order;
-    const belowOrder = newEvents[index + 1].display_order;
-    // Optimistic local update: swap positions
-    [newEvents[index], newEvents[index + 1]] = [newEvents[index + 1], newEvents[index]];
-    newEvents[index].display_order = currentOrder;
-    newEvents[index + 1].display_order = belowOrder;
-    setEvents(newEvents);
-    try {
-      const { error } = await supabase.rpc('reorder_upcoming_events', {
-        p_actor_id: user.id, p_ordered_ids: newEvents.map((e) => e.id),
-      });
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error moving event down:', error);
-      await loadEvents(); // Reload on error to restore correct state
-    }
-  };
-
-  const handleDragEnd = async ({ data: reorderedData }: { data: UpcomingEvent[] }) => {
-    // Optimistically update local state
-    const updatedData = reorderedData.map((event, index) => ({
-      ...event,
-      display_order: index,
-    }));
-    setEvents(updatedData);
     if (!user?.id) return;
-    try {
-      const { error } = await supabase.rpc('reorder_upcoming_events', {
-        p_actor_id: user.id, p_ordered_ids: reorderedData.map((event) => event.id),
-      });
-      if (error) throw error;
-      console.log('Drag reorder persisted successfully');
-    } catch (error) {
-      console.error('Error persisting drag reorder:', error);
-      await loadEvents(); // Reload on error to restore correct state
-    }
-  };
-
-  const applyPositionChange = async (newPos: number) => {
-    if (!positionPicker) return;
-    const idx = events.findIndex(e => e.id === positionPicker.item.id);
-    if (idx === -1) { setPositionPicker(null); return; }
-    const reordered = [...events];
-    const [moved] = reordered.splice(idx, 1);
-    reordered.splice(newPos - 1, 0, moved);
-    const updated = reordered.map((item, i) => ({ ...item, display_order: i }));
-    setEvents(updated);
-    setPositionPicker(null);
-    if (!user?.id) return;
-    try {
-      const { error } = await supabase.rpc('reorder_upcoming_events', {
-        p_actor_id: user.id, p_ordered_ids: updated.map((item) => item.id),
-      });
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error applying position change:', error);
-      await loadEvents();
-    }
-  };
-
-  const openItemActions = (event: UpcomingEvent, index: number) => {
-    const isFirst = index === 0;
-    const isLast = index === events.length - 1;
-    const editLabel = t('common:edit');
-    const moveUpLabel = t('upcoming_events_editor:move_up');
-    const moveDownLabel = t('upcoming_events_editor:move_down');
-    const orderLabel = t('menu_editor:order_position');
-    const deleteLabel = t('common:delete');
-    const cancelLabel = t('common:cancel');
-
-    if (Platform.OS === 'ios') {
-      const options: string[] = [editLabel];
-      const actions: Array<() => void> = [() => openEditModal(event)];
-      if (!isFirst) { options.push(moveUpLabel); actions.push(() => handleMoveUp(index)); }
-      if (!isLast) { options.push(moveDownLabel); actions.push(() => handleMoveDown(index)); }
-      if (events.length > 1) { options.push(orderLabel); actions.push(() => setPositionPicker({ item: event, currentIndex: index })); }
-      options.push(deleteLabel); actions.push(() => handleDelete(event));
-      options.push(cancelLabel);
-      ActionSheetIOS.showActionSheetWithOptions(
-        { options, destructiveButtonIndex: options.length - 2, cancelButtonIndex: options.length - 1, title: event.title },
-        (buttonIndex) => { if (buttonIndex !== options.length - 1) actions[buttonIndex]?.(); }
-      );
-    } else {
-      const buttons: any[] = [{ text: editLabel, onPress: () => openEditModal(event) }];
-      if (!isFirst) buttons.push({ text: moveUpLabel, onPress: () => handleMoveUp(index) });
-      if (!isLast) buttons.push({ text: moveDownLabel, onPress: () => handleMoveDown(index) });
-      if (events.length > 1) buttons.push({ text: orderLabel, onPress: () => setPositionPicker({ item: event, currentIndex: index }) });
-      buttons.push({ text: deleteLabel, style: 'destructive', onPress: () => handleDelete(event) });
-      buttons.push({ text: cancelLabel, style: 'cancel' });
-      Alert.alert(event.title, undefined, buttons);
-    }
-  };
-
-  const openAddModal = () => {
-    setEditingEvent(null);
-    setFormData({
-      title: '',
-      message: '',
-      thumbnail_shape: 'square',
-      link: '',
-      category: 'Event',
-      title_es: '',
-      message_es: '',
+    const { error } = await supabase.rpc('reorder_upcoming_events', {
+      p_actor_id: user.id,
+      p_ordered_ids: orderedIds,
     });
-    setStartDateTime(null);
-    setEndDateTime(null);
-    setSelectedImageUri(null);
-    setAdditionalImageUrls([]);
-    setNewAdditionalImageUris([]);
-    setSelectedGuideFile(null);
-    setFileSearchQuery('');
-    setShowFileSection(false);
-    setShouldSendNotification(true);
-    addSessionRef.current += 1;
-    setShowAddModal(true);
-  };
-
-  const openEditModal = async (event: UpcomingEvent) => {
-    setEditingEvent(event);
-    setFormData({
-      title: event.title,
-      message: event.content || event.message || '',
-      thumbnail_shape: event.thumbnail_shape,
-      link: event.link || '',
-      category: event.category || 'Event',
-      title_es: event.title_es || '',
-      message_es: event.content_es || '',
-    });
-    setStartDateTime(event.start_date_time ? new Date(event.start_date_time) : null);
-    setEndDateTime(event.end_date_time ? new Date(event.end_date_time) : null);
-    setSelectedImageUri(null);
-    setNewAdditionalImageUris([]);
-    const existingImages = await fetchContentImages(user?.id, 'upcoming_event', event.id);
-    setAdditionalImageUrls(existingImages);
-
-    // Load the attached guide file if exists
-    if (event.guide_file_id) {
-      const guideFile = guideFiles.find(g => g.id === event.guide_file_id);
-      setSelectedGuideFile(guideFile || null);
-    } else {
-      setSelectedGuideFile(null);
+    if (error) {
+      console.error('Error persisting event reorder:', error);
+      await load();
     }
-    
-    setFileSearchQuery('');
-    setShowFileSection(false);
-    setShowAddModal(true);
   };
 
-  const closeModal = () => {
-    setShowAddModal(false);
-    setEditingEvent(null);
-    setSelectedImageUri(null);
-    setAdditionalImageUrls([]);
-    setNewAdditionalImageUris([]);
-    setSelectedGuideFile(null);
-    setStartDateTime(null);
-    setEndDateTime(null);
-    setShowStartDatePicker(false);
-    setShowStartTimePicker(false);
-    setShowEndDatePicker(false);
-    setShowEndTimePicker(false);
-    setFileSearchQuery('');
-    setShowFileSection(false);
-  };
+  // ── List rows ───────────────────────────────────────────────────────────────
 
-  const selectGuideFile = (file: GuideFile) => {
-    setSelectedGuideFile(file);
-    setShowFileSection(false);
-  };
-
-  const clearGuideFile = () => {
-    setSelectedGuideFile(null);
-  };
-
-  const handleBackPress = () => {
-    router.replace('/(portal)/manager/manage');
-  };
-
-  const getImageUrl = (url: string | null) => {
-    if (!url) return null;
-    return url;
-  };
-
-  const formatDateTime = (dateTime: string | null) => {
-    if (!dateTime) return 'Not set';
-    const date = new Date(dateTime);
-    return date.toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    });
-  };
-
-  const filteredGuideFiles = guideFiles.filter(file =>
-    file.title.toLowerCase().includes(fileSearchQuery.toLowerCase()) ||
-    file.category.toLowerCase().includes(fileSearchQuery.toLowerCase()) ||
-    file.file_name.toLowerCase().includes(fileSearchQuery.toLowerCase())
+  const categoryLabel = useCallback(
+    (c: EventCategory) => t(c === 'Entertainment' ? 'upcoming_events_editor:category_entertainment' : 'upcoming_events_editor:category_event'),
+    [t]
   );
 
-  const groupedGuideFiles = GUIDE_CATEGORIES.reduce((acc, category) => {
-    acc[category] = filteredGuideFiles.filter(f => f.category === category);
-    return acc;
-  }, {} as Record<string, GuideFile[]>);
+  const items = useMemo<ContentListItem[]>(() => {
+    const q = search.trim().toLowerCase();
+    const rows = events.map((ev, i) => {
+      const category = asCategory(ev.category);
+      const att = attachments.get(ev.id);
+      const meta = [`#${i + 1}`];
+      if (ev.start_date_time) meta.push(fmtWhen(new Date(ev.start_date_time), locale));
+      if (att) meta.push(t('content_editor.preview_file'));
+      else if (ev.guide_file_id) meta.push(t('content_editor.preview_guide'));
+      if (ev.link) meta.push(t('content_editor.preview_link'));
+      return {
+        row: ev,
+        item: {
+          id: ev.id,
+          title: getLocalizedField(ev, 'title', language) || t('content_editor.preview_untitled'),
+          meta: meta.join(' · '),
+          thumbnailUrl: ev.thumbnail_url ?? null,
+          shape: (ev.thumbnail_shape === 'banner' ? 'banner' : 'square') as ContentListItem['shape'],
+          pill: {
+            label: categoryLabel(category),
+            color: categoryHue(category, isDark),
+            iosIcon: category === 'Entertainment' ? 'music.note' : 'ticket.fill',
+            androidIcon: category === 'Entertainment' ? 'music-note' : 'confirmation-number',
+          },
+        },
+      };
+    });
+    if (!q) return rows.map((r) => r.item);
+    return rows
+      .filter(({ row }) =>
+        [row.title, row.title_es, row.content, row.message, row.content_es].some((s) => !!s && s.toLowerCase().includes(q))
+      )
+      .map((r) => r.item);
+  }, [events, attachments, search, language, locale, isDark, t, categoryLabel]);
 
-  const getCategoryBadgeColor = (category: string) => {
-    return category === 'Event' ? '#3498DB' : '#9B59B6';
+  // ── Sheet: steps, review lines, preview ─────────────────────────────────────
+
+  const steps = useMemo<StepDef[]>(
+    () => [
+      { key: 'basics', label: t('content_editor.step_basics') },
+      { key: 'when', label: t('content_editor.step_when') },
+      { key: 'details', label: t('content_editor.step_details') },
+      { key: 'extras', label: t('content_editor.step_extras') },
+      { key: 'review', label: t('content_editor.step_review') },
+    ],
+    [t]
+  );
+
+  const authorTitle = isSpanishAuthor ? draft.title_es : draft.title;
+  const authorMessage = isSpanishAuthor ? draft.message_es : draft.message;
+  const hasLink = draft.link.trim().length > 0;
+  const photoCount = (draft.coverUri || draft.coverUrl ? 1 : 0) + draft.extraUrls.length + draft.extraUris.length;
+  const bothLanguagesFilled = !!draft.title.trim() && !!draft.title_es.trim();
+  const attachmentLabel =
+    draft.attachment?.kind === 'guide'
+      ? t('content_editor.preview_guide')
+      : draft.attachment
+        ? t('content_editor.preview_file')
+        : null;
+
+  const reviewLines: ReviewLine[] = [
+    {
+      key: 'basics',
+      iosIcon: 'textformat',
+      androidIcon: 'title',
+      label: t('content_editor.step_basics'),
+      value: [
+        categoryLabel(draft.category),
+        draft.shape === 'banner' ? t('content_editor.shape_banner') : t('content_editor.shape_square'),
+        photoCount > 0 ? t('content_editor.photos_count', { count: photoCount }) : t('content_editor.no_photo'),
+      ].join(' · '),
+      onPress: () => goTo(STEP_BASICS),
+    },
+    {
+      key: 'when',
+      iosIcon: 'calendar',
+      androidIcon: 'event',
+      label: t('content_editor.step_when'),
+      value: draft.start ? fmtRange(draft.start, draft.end, locale) : t('content_editor.start_required'),
+      missing: !draft.start,
+      onPress: () => goTo(STEP_WHEN),
+    },
+    {
+      key: 'details',
+      iosIcon: 'doc.text',
+      androidIcon: 'article',
+      label: t('content_editor.step_details'),
+      value: bothLanguagesFilled ? t('content_editor.lang_en_es') : t('content_editor.lang_en_only'),
+      onPress: () => goTo(STEP_DETAILS),
+    },
+    {
+      key: 'extras',
+      iosIcon: 'paperclip',
+      androidIcon: 'attach-file',
+      label: t('content_editor.step_extras'),
+      value: [
+        hasLink ? t('content_editor.preview_link') : t('content_editor.no_link'),
+        draft.attachment?.kind === 'guide'
+          ? t('content_editor.guide_attached')
+          : draft.attachment
+            ? t('content_editor.file_attached')
+            : t('content_editor.no_attachment'),
+      ].join(' · '),
+      onPress: () => goTo(STEP_EXTRAS),
+    },
+  ];
+
+  const renderStep = () => {
+    switch (step) {
+      case STEP_BASICS:
+        return (
+          <>
+            <StepTitle title={t('content_editor.basics_title_event')} subtitle={t('content_editor.basics_subtitle_event')} />
+            <FieldLabel label={t('content_editor.field_title')} />
+            <GlassTextInput
+              value={authorTitle}
+              onChangeText={(text) => patch(isSpanishAuthor ? { title_es: text } : { title: text })}
+              placeholder={t('upcoming_events_editor:event_title_placeholder')}
+            />
+            <FieldLabel label={t('content_editor.field_category')} />
+            <SegControl<EventCategory>
+              value={draft.category}
+              onChange={(category) => patch({ category })}
+              options={[
+                {
+                  key: 'Event',
+                  label: t('upcoming_events_editor:category_event'),
+                  iosIcon: 'ticket.fill',
+                  androidIcon: 'confirmation-number',
+                  activeColor: categoryHue('Event', isDark),
+                },
+                {
+                  key: 'Entertainment',
+                  label: t('upcoming_events_editor:category_entertainment'),
+                  iosIcon: 'music.note',
+                  androidIcon: 'music-note',
+                  activeColor: categoryHue('Entertainment', isDark),
+                },
+              ]}
+            />
+            <CoverPhotoField
+              coverUri={draft.coverUri}
+              coverUrl={draft.coverUrl}
+              shape={draft.shape}
+              onShapeChange={(shape) => patch({ shape })}
+              onCoverPicked={(uri) => patch({ coverUri: uri })}
+              extraUrls={draft.extraUrls}
+              extraUris={draft.extraUris}
+              onExtraPicked={(uri) => setDraft((d) => ({ ...d, extraUris: [...d.extraUris, uri] }))}
+              onRemoveExtraUrl={(i) => setDraft((d) => ({ ...d, extraUrls: d.extraUrls.filter((_, k) => k !== i) }))}
+              onRemoveExtraUri={(i) => setDraft((d) => ({ ...d, extraUris: d.extraUris.filter((_, k) => k !== i) }))}
+            />
+          </>
+        );
+      case STEP_WHEN:
+        return (
+          <>
+            <StepTitle title={t('content_editor.when_title_event')} subtitle={t('content_editor.when_subtitle_event')} />
+            <DateTimeField
+              label={t('content_editor.field_starts')}
+              value={draft.start}
+              placeholder={t('content_editor.pick_date')}
+              // Keep end ≥ start: an end the new start has passed is dropped.
+              onChange={(start) =>
+                setDraft((d) => ({ ...d, start, end: d.end && start && d.end < start ? null : d.end }))
+              }
+            />
+            <DateTimeField
+              label={t('content_editor.field_ends')}
+              labelTrailing={t('content_editor.optional')}
+              value={draft.end}
+              placeholder={t('content_editor.pick_end_date')}
+              hint={t('content_editor.ends_hint_event')}
+              minimumDate={draft.start ?? undefined}
+              seed={draft.start ?? undefined}
+              onChange={(end) => patch({ end })}
+            />
+            {draft.start ? (
+              <InfoRow
+                iosIcon="calendar.badge.clock"
+                androidIcon="event-available"
+                title={t('content_editor.lands_on', {
+                  date: draft.start.toLocaleDateString(locale, { weekday: 'long', month: 'long', day: 'numeric' }),
+                })}
+                subtitle={t('content_editor.lands_on_hint')}
+              />
+            ) : (
+              <InfoRow iosIcon="calendar.badge.exclamationmark" androidIcon="event-busy" title={t('content_editor.start_required')} />
+            )}
+          </>
+        );
+      case STEP_DETAILS:
+        return (
+          <>
+            <StepTitle title={t('content_editor.details_title')} subtitle={t('content_editor.details_subtitle')} />
+            <RichTextField
+              label={t('content_editor.field_description')}
+              value={authorMessage}
+              onChangeText={(text) => patch(isSpanishAuthor ? { message_es: text } : { message: text })}
+              placeholder={t('upcoming_events_editor:description_placeholder')}
+            />
+            {translation.element}
+          </>
+        );
+      case STEP_EXTRAS:
+        return (
+          <>
+            <StepTitle title={t('content_editor.extras_title')} subtitle={t('content_editor.extras_subtitle')} />
+            <FieldLabel label={t('content_editor.field_link')} trailing={t('content_editor.optional')} />
+            <GlassTextInput
+              value={draft.link}
+              onChangeText={(link) => patch({ link })}
+              placeholder={t('upcoming_events_editor:link_placeholder')}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="url"
+            />
+            <Hint>{t('content_editor.link_hint')}</Hint>
+            {!!user?.id && (
+              <AttachmentField
+                contentKind="upcoming_event"
+                value={draft.attachment}
+                onChange={(attachment) => patch({ attachment })}
+                actorId={user.id}
+              />
+            )}
+          </>
+        );
+      default:
+        return (
+          <ReviewStep editing={!!editing}
+            preview={{
+              kind: 'upcoming_event',
+              title: authorTitle,
+              body: authorMessage,
+              coverUri: draft.coverUri,
+              coverUrl: draft.coverUrl,
+              shape: draft.shape,
+              category: draft.category,
+              startDateTime: draft.start,
+              endDateTime: draft.end,
+              hasLink,
+              attachmentLabel,
+              eyebrow: t('content_editor.preview_eyebrow_event'),
+            }}
+            lines={reviewLines}
+            notify={editing ? undefined : { value: draft.notify, onChange: (notify) => patch({ notify }) }}
+          />
+        );
+    }
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
-          <IconSymbol
-            ios_icon_name="chevron.left"
-            android_material_icon_name="arrow-back"
-            size={24}
-            color={colors.text}
-          />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('upcoming_events_editor:title')}</Text>
-        <View style={styles.backButton} />
-      </View>
-
-      <View style={styles.subHeader}>
-        <Text style={styles.headerSubtitle}>
-          {t('upcoming_events_editor:count', { count: events.length })}
-        </Text>
-      </View>
-
-      <TouchableOpacity
-        style={[styles.addNewItemButton, events.length >= 100 && styles.addNewItemButtonDisabled]}
-        onPress={openAddModal}
-        disabled={events.length >= 100}
+    <ContentListScreen
+      title={t('upcoming_events_editor:title')}
+      eyebrow={t('content_editor.eyebrow_manage')}
+      emptyIconIos="music.note.list"
+      emptyIconAndroid="event"
+      items={items}
+      total={events.length}
+      max={CAP}
+      loading={loading}
+      search={search}
+      onSearchChange={setSearch}
+      searchPlaceholder={t('upcoming_events_editor:search_placeholder')}
+      countLabel={t('upcoming_events_editor:count_label', { count: events.length })}
+      onAdd={openAdd}
+      onEdit={(item) => void openEdit(item)}
+      onDelete={handleDelete}
+      onReorder={(ids) => void handleReorder(ids)}
+      emptyTitle={t('upcoming_events_editor:empty_title')}
+      emptyBody={t('upcoming_events_editor:empty_body')}
+      limitTitle={t('upcoming_events_editor:limit_reached_title')}
+      limitMessage={t('upcoming_events_editor:limit_reached_msg')}
+    >
+      <StepSheet
+        visible={sheetOpen}
+        onClose={closeSheet}
+        onDismiss={onDismiss}
+        title={editing ? t('upcoming_events_editor:modal_edit') : t('upcoming_events_editor:modal_add')}
+        subtitle={editing ? t('content_editor.sheet_subtitle_edit') : t('content_editor.sheet_subtitle_new')}
+        steps={steps}
+        step={step}
+        onStepChange={goTo}
+        visited={visited}
+        primaryLabel={editing ? t('content_editor.save_changes') : t('content_editor.post_event')}
+        nextLabel={t('content_editor.next')}
+        backLabel={t('content_editor.back')}
+        cancelLabel={t('common:cancel')}
+        onPrimary={() => void handleSave()}
+        busy={busy}
       >
-        <IconSymbol
-          ios_icon_name="plus.circle.fill"
-          android_material_icon_name="add-circle"
-          size={24}
-          color={events.length >= 100 ? colors.textSecondary : colors.text}
-        />
-        <Text style={[styles.addNewItemButtonText, events.length >= 100 && styles.addNewItemButtonTextDisabled]}>
-          {events.length >= 100 ? t('upcoming_events_editor:limit_reached') : t('upcoming_events_editor:add_button')}
-        </Text>
-      </TouchableOpacity>
-
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>{t('upcoming_events_editor:loading')}</Text>
-        </View>
-      ) : events.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <IconSymbol
-            ios_icon_name="calendar"
-            android_material_icon_name="event"
-            size={64}
-            color={colors.textSecondary}
-          />
-          <Text style={styles.emptyText}>{t('upcoming_events_editor:empty_title')}</Text>
-          <Text style={styles.emptySubtext}>
-            {t('upcoming_events_editor:empty_subtitle')}
-          </Text>
-        </View>
-      ) : (
-        <View style={styles.itemsList}>
-          {events.length > 1 && (
-            <Text style={styles.reorderHint}>{t('upcoming_events_editor:reorder_hint')}</Text>
-          )}
-          <DraggableFlatList
-            data={events}
-            keyExtractor={(item) => item.id}
-            onDragEnd={handleDragEnd}
-            activationDistance={10}
-            contentContainerStyle={styles.itemsListContent}
-            renderItem={({ item: event, getIndex, drag, isActive }: RenderItemParams<UpcomingEvent>) => {
-              const index = getIndex() ?? 0;
-
-              return (
-                <ScaleDecorator>
-                  <View style={[styles.eventCard, isActive && styles.eventCardDragging]}>
-                    {/* Drag Handle */}
-                    <TouchableOpacity
-                      onLongPress={drag}
-                      disabled={isActive}
-                      style={styles.dragHandle}
-                    >
-                      <IconSymbol
-                        ios_icon_name="line.3.horizontal"
-                        android_material_icon_name="drag-indicator"
-                        size={18}
-                        color="#FFFFFF"
-                      />
-                    </TouchableOpacity>
-
-                    {/* Meatball Menu */}
-                    <TouchableOpacity
-                      onPress={() => openItemActions(event, index)}
-                      style={styles.meatballButton}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    >
-                      <IconSymbol
-                        ios_icon_name="ellipsis"
-                        android_material_icon_name="more-vert"
-                        size={18}
-                        color="#FFFFFF"
-                      />
-                    </TouchableOpacity>
-
-                    {event.thumbnail_shape === 'square' && event.thumbnail_url ? (
-                      <View style={styles.squareLayout}>
-                        <StorageImage
-                          key={getImageUrl(event.thumbnail_url)}
-                          source={{ uri: getImageUrl(event.thumbnail_url) }}
-                          style={styles.squareImage}
-                        />
-                        <View style={styles.squareContent}>
-                          <View style={styles.titleRow}>
-                            <Text style={styles.eventTitle}>{getLocalizedField(event, 'title', language)}</Text>
-                            <View style={styles.badgeContainer}>
-                              <View style={[styles.categoryBadge, { backgroundColor: getCategoryBadgeColor(event.category || 'Event') }]}>
-                                <Text style={styles.categoryBadgeText}>{event.category || 'Event'}</Text>
-                              </View>
-                            </View>
-                          </View>
-                          {(event.content || event.message) && (
-                            <FormattedText style={styles.squareMessage} numberOfLines={2}>
-                              {getLocalizedField(event, 'content', language) || event.message}
-                            </FormattedText>
-                          )}
-                          <View style={styles.eventMeta}>
-                            {event.start_date_time && (
-                              <View style={styles.metaItem}>
-                                <IconSymbol ios_icon_name="calendar" android_material_icon_name="event" size={14} color={colors.textSecondary} />
-                                <Text style={styles.metaText}>{formatDateTime(event.start_date_time)}</Text>
-                              </View>
-                            )}
-                            {event.end_date_time && (
-                              <View style={styles.metaItem}>
-                                <IconSymbol ios_icon_name="clock" android_material_icon_name="schedule" size={14} color={colors.textSecondary} />
-                                <Text style={styles.metaText}>{t('upcoming_events_editor:ends_label', { datetime: formatDateTime(event.end_date_time) })}</Text>
-                              </View>
-                            )}
-                          </View>
-                        </View>
-                      </View>
-                    ) : (
-                      <>
-                        {event.thumbnail_url && (
-                          <StorageImage
-                            key={getImageUrl(event.thumbnail_url)}
-                            source={{ uri: getImageUrl(event.thumbnail_url) }}
-                            style={styles.bannerImage}
-                          />
-                        )}
-                        <View style={styles.eventContent}>
-                          <View style={styles.titleRow}>
-                            <Text style={styles.eventTitle}>{getLocalizedField(event, 'title', language)}</Text>
-                            <View style={styles.badgeContainer}>
-                              <View style={[styles.categoryBadge, { backgroundColor: getCategoryBadgeColor(event.category || 'Event') }]}>
-                                <Text style={styles.categoryBadgeText}>{event.category || 'Event'}</Text>
-                              </View>
-                            </View>
-                          </View>
-                          {(event.content || event.message) && (
-                            <FormattedText style={styles.eventMessage}>
-                              {getLocalizedField(event, 'content', language) || event.message}
-                            </FormattedText>
-                          )}
-                          <View style={styles.eventMeta}>
-                            {event.start_date_time && (
-                              <View style={styles.metaItem}>
-                                <IconSymbol ios_icon_name="calendar" android_material_icon_name="event" size={14} color={colors.textSecondary} />
-                                <Text style={styles.metaText}>{formatDateTime(event.start_date_time)}</Text>
-                              </View>
-                            )}
-                            {event.end_date_time && (
-                              <View style={styles.metaItem}>
-                                <IconSymbol ios_icon_name="clock" android_material_icon_name="schedule" size={14} color={colors.textSecondary} />
-                                <Text style={styles.metaText}>{t('upcoming_events_editor:ends_label', { datetime: formatDateTime(event.end_date_time) })}</Text>
-                              </View>
-                            )}
-                          </View>
-                        </View>
-                      </>
-                    )}
-                  </View>
-                </ScaleDecorator>
-              );
-            }}
-          />
-        </View>
-      )}
-
-      {/* Add/Edit Modal */}
-      <Modal
-        visible={showAddModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={closeModal}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalContainer}
-          keyboardVerticalOffset={0}
-        >
-          <TouchableOpacity 
-            style={styles.modalBackdrop} 
-            activeOpacity={1} 
-            onPress={closeModal}
-          />
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {editingEvent ? t('upcoming_events_editor:modal_edit') : t('upcoming_events_editor:modal_add')}
-              </Text>
-              <TouchableOpacity onPress={closeModal}>
-                <IconSymbol
-                  ios_icon_name="xmark.circle.fill"
-                  android_material_icon_name="cancel"
-                  size={28}
-                  color="#666666"
-                />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView
-              style={styles.modalScroll}
-              contentContainerStyle={styles.modalScrollContent}
-              showsVerticalScrollIndicator={true}
-              bounces={false}
-              keyboardShouldPersistTaps="handled"
-            >
-              {/* Section 1: Details (open by default) */}
-              <CollapsibleSection
-                title={t('upcoming_events_editor:section_details')}
-                iconIos="doc.text.fill"
-                iconAndroid="article"
-                iconColor={colors.primary}
-                headerBackgroundColor="#FFFFFF"
-                headerTextColor="#1A1A1A"
-                contentBackgroundColor="#FFFFFF"
-                defaultExpanded
-              >
-                {/* Thumbnail + Title */}
-                <View style={styles.thumbAndNameRow}>
-                  <View style={styles.thumbColumn}>
-                    <TouchableOpacity style={styles.thumbSquare} onPress={pickImage}>
-                      {selectedImageUri || editingEvent?.thumbnail_url ? (
-                        <StorageImage
-                          source={{ uri: selectedImageUri || getImageUrl(editingEvent?.thumbnail_url || '') || '' }}
-                          style={styles.thumbImage}
-                          key={selectedImageUri || getImageUrl(editingEvent?.thumbnail_url || '')}
-                        />
-                      ) : (
-                        <View style={styles.thumbPlaceholder}>
-                          <IconSymbol
-                            ios_icon_name="photo"
-                            android_material_icon_name="add-photo-alternate"
-                            size={28}
-                            color="#999999"
-                          />
-                        </View>
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                  <View style={styles.nameColumn}>
-                    <Text style={styles.formLabel}>{t('upcoming_events_editor:event_title_label')}</Text>
-                    <TextInput
-                      style={styles.input}
-                      placeholder={t('upcoming_events_editor:event_title_placeholder')}
-                      placeholderTextColor="#999999"
-                      value={isSpanishAuthor ? formData.title_es : formData.title}
-                      onChangeText={(text) => setFormData(prev => isSpanishAuthor ? { ...prev, title_es: text } : { ...prev, title: text })}
-                    />
-                  </View>
-                </View>
-
-                {/* Square / Banner segmented control */}
-                <View style={styles.shapeSegmented}>
-                  <TouchableOpacity
-                    style={[styles.shapeSegment, formData.thumbnail_shape === 'square' && styles.shapeSegmentActive]}
-                    onPress={() => setFormData({ ...formData, thumbnail_shape: 'square' })}
-                  >
-                    <Text style={[styles.shapeSegmentText, formData.thumbnail_shape === 'square' && styles.shapeSegmentTextActive]}>
-                      {t('upcoming_events_editor:shape_square')}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.shapeSegment, formData.thumbnail_shape === 'banner' && styles.shapeSegmentActive]}
-                    onPress={() => setFormData({ ...formData, thumbnail_shape: 'banner' })}
-                  >
-                    <Text style={[styles.shapeSegmentText, formData.thumbnail_shape === 'banner' && styles.shapeSegmentTextActive]}>
-                      {t('upcoming_events_editor:shape_banner')}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* Additional Images */}
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>Additional Images</Text>
-                  <Text style={styles.formHint}>Add more images for a swipeable carousel in the detail view</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.additionalImagesScroll}>
-                    {additionalImageUrls.map((url, idx) => (
-                      <View key={`existing-${idx}`} style={styles.additionalImageContainer}>
-                        <StorageImage source={{ uri: getImageUrl(url) || url }} style={styles.additionalImageThumb} />
-                        <TouchableOpacity style={styles.removeImageButton} onPress={() => removeAdditionalImage(idx, false)}>
-                          <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={22} color="#E74C3C" />
-                        </TouchableOpacity>
-                      </View>
-                    ))}
-                    {newAdditionalImageUris.map((uri, idx) => (
-                      <View key={`new-${idx}`} style={styles.additionalImageContainer}>
-                        <StorageImage source={{ uri }} style={styles.additionalImageThumb} />
-                        <TouchableOpacity style={styles.removeImageButton} onPress={() => removeAdditionalImage(idx, true)}>
-                          <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={22} color="#E74C3C" />
-                        </TouchableOpacity>
-                        <View style={styles.newImageBadge}>
-                          <Text style={styles.newImageBadgeText}>NEW</Text>
-                        </View>
-                      </View>
-                    ))}
-                    <TouchableOpacity style={styles.addImageButton} onPress={pickAdditionalImage}>
-                      <IconSymbol ios_icon_name="plus.circle.fill" android_material_icon_name="add-circle" size={32} color="#D4A843" />
-                      <Text style={styles.addImageText}>Add</Text>
-                    </TouchableOpacity>
-                  </ScrollView>
-                </View>
-
-                {/* Event / Entertainment category */}
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>{t('upcoming_events_editor:category_label')}</Text>
-                  <View style={styles.categorySelector}>
-                    <TouchableOpacity
-                      style={[styles.categoryOption, formData.category === 'Event' && styles.categoryOptionActive]}
-                      onPress={() => setFormData({ ...formData, category: 'Event' })}
-                    >
-                      <Text style={[styles.categoryOptionText, formData.category === 'Event' && styles.categoryOptionTextActive]}>
-                        {t('upcoming_events_editor:category_event')}
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.categoryOption, formData.category === 'Entertainment' && styles.categoryOptionActive]}
-                      onPress={() => setFormData({ ...formData, category: 'Entertainment' })}
-                    >
-                      <Text style={[styles.categoryOptionText, formData.category === 'Entertainment' && styles.categoryOptionTextActive]}>
-                        {t('upcoming_events_editor:category_entertainment')}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                  <Text style={styles.formHint}>{t('upcoming_events_editor:category_hint')}</Text>
-                </View>
-
-              </CollapsibleSection>
-
-              {/* Section: Date & Time (collapsed by default) */}
-              <CollapsibleSection
-                title={t('upcoming_events_editor:section_date_time')}
-                iconIos="calendar.badge.clock"
-                iconAndroid="event"
-                iconColor={colors.primary}
-                headerBackgroundColor="#FFFFFF"
-                headerTextColor="#1A1A1A"
-                contentBackgroundColor="#FFFFFF"
-                defaultExpanded={false}
-              >
-                {/* Start Date/Time */}
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>{t('upcoming_events_editor:start_datetime_label')}</Text>
-                  <View style={[styles.dateTimeRow, startDateTime && styles.dateTimeRowSelected]}>
-                    {Platform.OS === 'ios' ? (
-                      <>
-                        <DateTimePicker
-                          value={startDateTime || new Date()}
-                          mode="date"
-                          display="compact"
-                          onChange={(event, selectedDate) => {
-                            if (selectedDate) {
-                              const newDate = startDateTime ? new Date(startDateTime) : new Date();
-                              newDate.setFullYear(selectedDate.getFullYear());
-                              newDate.setMonth(selectedDate.getMonth());
-                              newDate.setDate(selectedDate.getDate());
-                              setStartDateTime(newDate);
-                            }
-                          }}
-                        />
-                        <DateTimePicker
-                          value={startDateTime || new Date()}
-                          mode="time"
-                          display="compact"
-                          onChange={(event, selectedTime) => {
-                            if (selectedTime) {
-                              const newDate = startDateTime ? new Date(startDateTime) : new Date();
-                              newDate.setHours(selectedTime.getHours());
-                              newDate.setMinutes(selectedTime.getMinutes());
-                              setStartDateTime(newDate);
-                            }
-                          }}
-                        />
-                      </>
-                    ) : (
-                      <>
-                        <TouchableOpacity style={[styles.dateTimeButton, startDateTime && styles.dateTimeButtonSelected]} onPress={() => setShowStartDatePicker(true)}>
-                          <IconSymbol ios_icon_name="calendar" android_material_icon_name="event" size={20} color={startDateTime ? colors.primary : '#666666'} />
-                          <Text style={[styles.dateTimeButtonText, startDateTime && styles.dateTimeButtonTextSelected]}>
-                            {startDateTime ? startDateTime.toLocaleDateString() : t('upcoming_events_editor:select_date')}
-                          </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={[styles.dateTimeButton, startDateTime && styles.dateTimeButtonSelected]} onPress={() => setShowStartTimePicker(true)}>
-                          <IconSymbol ios_icon_name="clock" android_material_icon_name="schedule" size={20} color={startDateTime ? colors.primary : '#666666'} />
-                          <Text style={[styles.dateTimeButtonText, startDateTime && styles.dateTimeButtonTextSelected]}>
-                            {startDateTime ? startDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : t('upcoming_events_editor:select_time')}
-                          </Text>
-                        </TouchableOpacity>
-                      </>
-                    )}
-                    {startDateTime && (
-                      <TouchableOpacity style={styles.clearButtonInline} onPress={() => setStartDateTime(null)}>
-                        <Text style={styles.clearButtonText}>{t('common:clear')}</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                </View>
-
-                {/* End Date/Time */}
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>{t('upcoming_events_editor:end_datetime_label')}</Text>
-                  <View style={[styles.dateTimeRow, endDateTime && styles.dateTimeRowSelected]}>
-                    {Platform.OS === 'ios' ? (
-                      <>
-                        <DateTimePicker
-                          value={endDateTime || new Date()}
-                          mode="date"
-                          display="compact"
-                          onChange={(event, selectedDate) => {
-                            if (selectedDate) {
-                              const newDate = endDateTime ? new Date(endDateTime) : new Date();
-                              newDate.setFullYear(selectedDate.getFullYear());
-                              newDate.setMonth(selectedDate.getMonth());
-                              newDate.setDate(selectedDate.getDate());
-                              setEndDateTime(newDate);
-                            }
-                          }}
-                        />
-                        <DateTimePicker
-                          value={endDateTime || new Date()}
-                          mode="time"
-                          display="compact"
-                          onChange={(event, selectedTime) => {
-                            if (selectedTime) {
-                              const newDate = endDateTime ? new Date(endDateTime) : new Date();
-                              newDate.setHours(selectedTime.getHours());
-                              newDate.setMinutes(selectedTime.getMinutes());
-                              setEndDateTime(newDate);
-                            }
-                          }}
-                        />
-                      </>
-                    ) : (
-                      <>
-                        <TouchableOpacity style={[styles.dateTimeButton, endDateTime && styles.dateTimeButtonSelected]} onPress={() => setShowEndDatePicker(true)}>
-                          <IconSymbol ios_icon_name="calendar" android_material_icon_name="event" size={20} color={endDateTime ? colors.primary : '#666666'} />
-                          <Text style={[styles.dateTimeButtonText, endDateTime && styles.dateTimeButtonTextSelected]}>
-                            {endDateTime ? endDateTime.toLocaleDateString() : t('upcoming_events_editor:select_date')}
-                          </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={[styles.dateTimeButton, endDateTime && styles.dateTimeButtonSelected]} onPress={() => setShowEndTimePicker(true)}>
-                          <IconSymbol ios_icon_name="clock" android_material_icon_name="schedule" size={20} color={endDateTime ? colors.primary : '#666666'} />
-                          <Text style={[styles.dateTimeButtonText, endDateTime && styles.dateTimeButtonTextSelected]}>
-                            {endDateTime ? endDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : t('upcoming_events_editor:select_time')}
-                          </Text>
-                        </TouchableOpacity>
-                      </>
-                    )}
-                    {endDateTime && (
-                      <TouchableOpacity style={styles.clearButtonInline} onPress={() => setEndDateTime(null)}>
-                        <Text style={styles.clearButtonText}>{t('common:clear')}</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                </View>
-              </CollapsibleSection>
-
-              {/* Section 2: Description (collapsed by default) */}
-              <CollapsibleSection
-                title={t('upcoming_events_editor:section_description')}
-                iconIos="text.alignleft"
-                iconAndroid="description"
-                iconColor={colors.primary}
-                headerBackgroundColor="#FFFFFF"
-                headerTextColor="#1A1A1A"
-                contentBackgroundColor="#FFFFFF"
-                defaultExpanded={false}
-              >
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>{t('upcoming_events_editor:description_label')}</Text>
-                  <RichTextToolbar
-                    text={isSpanishAuthor ? formData.message_es : formData.message}
-                    onChangeText={(text) => setFormData(prev => isSpanishAuthor ? { ...prev, message_es: text } : { ...prev, message: text })}
-                    selection={contentSelection}
-                    onSelectionChange={setContentSelection}
-                    textInputRef={contentInputRef}
-                    accentColor={colors.highlight}
-                  />
-                  <TextInput
-                    ref={contentInputRef}
-                    style={[styles.input, styles.textArea]}
-                    placeholder={t('upcoming_events_editor:description_placeholder')}
-                    placeholderTextColor="#999999"
-                    value={isSpanishAuthor ? formData.message_es : formData.message}
-                    onChangeText={(text) => setFormData(prev => isSpanishAuthor ? { ...prev, message_es: text } : { ...prev, message: text })}
-                    multiline
-                    numberOfLines={4}
-                    onSelectionChange={(e) => setContentSelection(e.nativeEvent.selection)}
-                  />
-                </View>
-
-                {/* Bilingual authoring (s61 hybrid) */}
-                <View style={styles.formGroup}>
-                  {translation.element}
-                </View>
-              </CollapsibleSection>
-
-              {/* Section 3: Additional Info (collapsed by default) */}
-              <CollapsibleSection
-                title={t('upcoming_events_editor:section_additional_info')}
-                iconIos="info.circle.fill"
-                iconAndroid="info"
-                iconColor={colors.primary}
-                headerBackgroundColor="#FFFFFF"
-                headerTextColor="#1A1A1A"
-                contentBackgroundColor="#FFFFFF"
-                defaultExpanded={false}
-              >
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>{t('upcoming_events_editor:link_label')}</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder={t('upcoming_events_editor:link_placeholder')}
-                    placeholderTextColor="#999999"
-                    value={formData.link}
-                    onChangeText={(text) => setFormData({ ...formData, link: text })}
-                    autoCapitalize="none"
-                    keyboardType="url"
-                  />
-                  <Text style={styles.formHint}>{t('upcoming_events_editor:link_hint')}</Text>
-                </View>
-
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>{t('upcoming_events_editor:attach_file_label')}</Text>
-                  {selectedGuideFile ? (
-                    <View style={styles.selectedFileContainer}>
-                      <View style={styles.selectedFileInfo}>
-                        <IconSymbol ios_icon_name="doc.fill" android_material_icon_name="description" size={24} color={colors.primary} />
-                        <View style={styles.selectedFileText}>
-                          <Text style={styles.selectedFileTitle}>{selectedGuideFile.title}</Text>
-                          <Text style={styles.selectedFileCategory}>{selectedGuideFile.category}</Text>
-                        </View>
-                      </View>
-                      <TouchableOpacity onPress={clearGuideFile} style={styles.clearFileButton}>
-                        <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={24} color="#E74C3C" />
-                      </TouchableOpacity>
-                    </View>
-                  ) : (
-                    <TouchableOpacity style={styles.filePickerButton} onPress={() => setShowFileSection(!showFileSection)}>
-                      <IconSymbol
-                        ios_icon_name={showFileSection ? "chevron.up" : "chevron.down"}
-                        android_material_icon_name={showFileSection ? "expand-less" : "expand-more"}
-                        size={24}
-                        color={colors.primary}
-                      />
-                      <Text style={styles.filePickerButtonText}>
-                        {showFileSection ? t('upcoming_events_editor:hide_file_selection') : t('upcoming_events_editor:show_file_selection')}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                  {showFileSection && !selectedGuideFile && (
-                    <View style={styles.fileSelectionSection}>
-                      <View style={styles.searchContainer}>
-                        <IconSymbol ios_icon_name="magnifyingglass" android_material_icon_name="search" size={20} color="#666666" />
-                        <TextInput
-                          style={styles.searchInput}
-                          placeholder={t('upcoming_events_editor:search_files_placeholder')}
-                          placeholderTextColor="#999999"
-                          value={fileSearchQuery}
-                          onChangeText={setFileSearchQuery}
-                        />
-                        {fileSearchQuery.length > 0 && (
-                          <TouchableOpacity onPress={() => setFileSearchQuery('')}>
-                            <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={20} color="#999999" />
-                          </TouchableOpacity>
-                        )}
-                      </View>
-                      <ScrollView style={styles.fileList} nestedScrollEnabled={true}>
-                        {GUIDE_CATEGORIES.map((category, catIndex) => {
-                          const categoryFiles = groupedGuideFiles[category];
-                          if (categoryFiles.length === 0) return null;
-                          return (
-                            <View key={catIndex} style={styles.fileCategorySection}>
-                              <Text style={styles.fileCategoryTitle}>{category}</Text>
-                              {categoryFiles.map((file, fileIndex) => (
-                                <TouchableOpacity key={fileIndex} style={styles.fileItem} onPress={() => selectGuideFile(file)}>
-                                  <IconSymbol ios_icon_name="doc.fill" android_material_icon_name="description" size={24} color={colors.primary} />
-                                  <View style={styles.fileItemText}>
-                                    <Text style={styles.fileItemTitle}>{file.title}</Text>
-                                    <Text style={styles.fileItemName}>{file.file_name}</Text>
-                                  </View>
-                                  <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={20} color="#666666" />
-                                </TouchableOpacity>
-                              ))}
-                            </View>
-                          );
-                        })}
-                        {filteredGuideFiles.length === 0 && (
-                          <View style={styles.emptyFileList}>
-                            <IconSymbol ios_icon_name="doc" android_material_icon_name="description" size={48} color="#999999" />
-                            <Text style={styles.emptyFileListText}>{t('upcoming_events_editor:no_files_found')}</Text>
-                            <Text style={styles.emptyFileListSubtext}>{t('upcoming_events_editor:no_files_subtext')}</Text>
-                          </View>
-                        )}
-                      </ScrollView>
-                    </View>
-                  )}
-                  <Text style={styles.formHint}>{t('upcoming_events_editor:attach_file_hint')}</Text>
-                </View>
-              </CollapsibleSection>
-
-              {!editingEvent && (
-                <View style={styles.notificationToggleContainer}>
-                  <View style={styles.notificationToggleTextContainer}>
-                    <Text style={styles.notificationToggleLabel}>
-                      {t('upcoming_events_editor:send_notification_label')}
-                    </Text>
-                    <Text style={styles.notificationToggleHint}>
-                      {t('upcoming_events_editor:send_notification_hint')}
-                    </Text>
-                  </View>
-                  <Switch
-                    value={shouldSendNotification}
-                    onValueChange={setShouldSendNotification}
-                    trackColor={{ false: '#767577', true: colors.primary }}
-                    thumbColor="#f4f3f4"
-                  />
-                </View>
-              )}
-
-              <View style={styles.buttonRow}>
-                <TouchableOpacity
-                  style={styles.cancelButton}
-                  onPress={closeModal}
-                >
-                  <Text style={styles.cancelButtonText}>{t('upcoming_events_editor:cancel_button')}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.saveButton}
-                  onPress={handleSave}
-                  disabled={uploadingImage}
-                >
-                  {uploadingImage ? (
-                    <ActivityIndicator color={colors.fireText} />
-                  ) : (
-                    <Text style={styles.saveButtonText}>
-                      {editingEvent ? t('upcoming_events_editor:save_button') : t('upcoming_events_editor:add_save_button')}
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
-
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
-
-      <OrderPositionModal
-        visible={!!positionPicker}
-        title={t('menu_editor:order_position')}
-        subtitle={positionPicker?.item.title || ''}
-        count={events.length}
-        currentIndex={positionPicker?.currentIndex ?? 0}
-        onClose={() => setPositionPicker(null)}
-        onApply={applyPositionChange}
-      />
-
-      {/* Android Date/Time Pickers - Rendered as native dialogs */}
-      {Platform.OS === 'android' && showStartDatePicker && (
-        <DateTimePicker
-          value={startDateTime || new Date()}
-          mode="date"
-          display="default"
-          onChange={(event, selectedDate) => {
-            setShowStartDatePicker(false);
-            if (selectedDate) {
-              const newDate = startDateTime ? new Date(startDateTime) : new Date();
-              newDate.setFullYear(selectedDate.getFullYear());
-              newDate.setMonth(selectedDate.getMonth());
-              newDate.setDate(selectedDate.getDate());
-              setStartDateTime(newDate);
-            }
-          }}
-        />
-      )}
-
-      {Platform.OS === 'android' && showStartTimePicker && (
-        <DateTimePicker
-          value={startDateTime || new Date()}
-          mode="time"
-          display="default"
-          onChange={(event, selectedTime) => {
-            setShowStartTimePicker(false);
-            if (selectedTime) {
-              const newDate = startDateTime ? new Date(startDateTime) : new Date();
-              newDate.setHours(selectedTime.getHours());
-              newDate.setMinutes(selectedTime.getMinutes());
-              setStartDateTime(newDate);
-            }
-          }}
-        />
-      )}
-
-      {Platform.OS === 'android' && showEndDatePicker && (
-        <DateTimePicker
-          value={endDateTime || new Date()}
-          mode="date"
-          display="default"
-          onChange={(event, selectedDate) => {
-            setShowEndDatePicker(false);
-            if (selectedDate) {
-              const newDate = endDateTime ? new Date(endDateTime) : new Date();
-              newDate.setFullYear(selectedDate.getFullYear());
-              newDate.setMonth(selectedDate.getMonth());
-              newDate.setDate(selectedDate.getDate());
-              setEndDateTime(newDate);
-            }
-          }}
-        />
-      )}
-
-      {Platform.OS === 'android' && showEndTimePicker && (
-        <DateTimePicker
-          value={endDateTime || new Date()}
-          mode="time"
-          display="default"
-          onChange={(event, selectedTime) => {
-            setShowEndTimePicker(false);
-            if (selectedTime) {
-              const newDate = endDateTime ? new Date(endDateTime) : new Date();
-              newDate.setHours(selectedTime.getHours());
-              newDate.setMinutes(selectedTime.getMinutes());
-              setEndDateTime(newDate);
-            }
-          }}
-        />
-      )}
-    </View>
+        {renderStep()}
+      </StepSheet>
+    </ContentListScreen>
   );
 }
-
-const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'android' ? 48 : 60,
-    paddingBottom: 12,
-    backgroundColor: colors.card,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
-  },
-  backButton: {
-    padding: 8,
-    width: 40,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.text,
-  },
-  subHeader: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: colors.card,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: colors.textSecondary,
-  },
-  addNewItemButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.highlight,
-    marginHorizontal: 16,
-    marginTop: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
-    gap: 10,
-  },
-  addNewItemButtonDisabled: {
-    backgroundColor: colors.card,
-    opacity: 0.6,
-  },
-  addNewItemButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: colors.text,
-  },
-  addNewItemButtonTextDisabled: {
-    color: colors.textSecondary,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginTop: 12,
-  },
-  itemsList: {
-    flex: 1,
-    marginTop: 16,
-  },
-  itemsListContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 100,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 60,
-  },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.text,
-    marginTop: 16,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  eventCard: {
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    marginBottom: 16,
-    overflow: 'hidden',
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
-  },
-  eventCardDragging: {
-    opacity: 0.9,
-    boxShadow: '0px 4px 16px rgba(0, 0, 0, 0.5)',
-    elevation: 8,
-  },
-  squareLayout: {
-    flexDirection: 'row',
-    padding: 12,
-    gap: 12,
-  },
-  squareImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 12,
-    resizeMode: 'cover',
-  },
-  squareContent: {
-    flex: 1,
-    justifyContent: 'flex-start',
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-    gap: 8,
-  },
-  badgeContainer: {
-    alignItems: 'flex-end',
-    gap: 4,
-    marginTop: 28,
-  },
-  categoryBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-  },
-  categoryBadgeText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
-  meatballButton: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    padding: 6,
-    zIndex: 10,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    borderRadius: 14,
-  },
-  dateTimeRow: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    gap: 8,
-    borderRadius: 10,
-    padding: 8,
-    backgroundColor: '#F9F9F9',
-    borderWidth: 1,
-    borderColor: '#E8E8E8',
-  },
-  dateTimeRowSelected: {
-    backgroundColor: `${colors.primary}08`,
-    borderColor: `${colors.primary}40`,
-  },
-  dateTimeButtonSelected: {
-    borderColor: `${colors.primary}40`,
-    backgroundColor: `${colors.primary}08`,
-  },
-  dateTimeButtonTextSelected: {
-    color: colors.primary,
-  },
-  squareMessage: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    marginTop: 6,
-    lineHeight: 18,
-  },
-  bannerImage: {
-    width: '100%',
-    height: 200,
-    resizeMode: 'cover',
-  },
-  eventContent: {
-    padding: 16,
-  },
-  eventTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.text,
-    flex: 1,
-  },
-  eventMessage: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginBottom: 12,
-    lineHeight: 20,
-  },
-  eventMeta: {
-    gap: 8,
-    marginTop: 8,
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  metaText: {
-    fontSize: 12,
-    color: colors.textSecondary,
-  },
-  dragHandle: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    padding: 6,
-    zIndex: 10,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    borderRadius: 14,
-  },
-  reorderHint: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    fontStyle: 'italic',
-    textAlign: 'center',
-    paddingHorizontal: 16,
-    marginBottom: 8,
-    marginTop: 12,
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'flex-start',
-  },
-  modalBackdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-  },
-  modalContent: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    height: '95%',
-    marginTop: 'auto',
-    boxShadow: '0px -4px 20px rgba(0, 0, 0, 0.4)',
-    elevation: 10,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-    backgroundColor: '#FFFFFF',
-  },
-  modalTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1A1A1A',
-  },
-  modalScroll: {
-    flex: 1,
-    backgroundColor: '#EEEFF1',
-  },
-  modalScrollContent: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-  formGroup: {
-    marginBottom: 20,
-  },
-  formLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1A1A1A',
-    marginBottom: 8,
-  },
-  formHint: {
-    fontSize: 12,
-    color: '#666666',
-    marginTop: 6,
-    fontStyle: 'italic',
-  },
-  input: {
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-    color: '#1A1A1A',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  textArea: {
-    height: 100,
-    textAlignVertical: 'top',
-    paddingTop: 14,
-  },
-  thumbAndNameRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
-    alignItems: 'flex-start',
-  },
-  thumbColumn: {
-    width: 80,
-    alignItems: 'center',
-  },
-  nameColumn: {
-    flex: 1,
-  },
-  thumbSquare: {
-    width: 80,
-    height: 80,
-    borderRadius: 12,
-    backgroundColor: '#F5F5F5',
-    borderWidth: 2,
-    borderColor: '#E0E0E0',
-    borderStyle: 'dashed',
-    overflow: 'hidden',
-  },
-  thumbImage: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  thumbPlaceholder: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  shapeSegmented: {
-    flexDirection: 'row',
-    marginBottom: 16,
-    borderRadius: 10,
-    backgroundColor: '#F5F5F5',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    overflow: 'hidden',
-  },
-  shapeSegment: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  shapeSegmentActive: {
-    backgroundColor: colors.primary,
-  },
-  shapeSegmentText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666666',
-  },
-  shapeSegmentTextActive: {
-    color: colors.fireText,
-  },
-  categorySelector: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  categoryOption: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    backgroundColor: '#F5F5F5',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#E0E0E0',
-  },
-  categoryOptionActive: {
-    backgroundColor: '#3498DB',
-    borderColor: '#3498DB',
-  },
-  categoryOptionText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666666',
-  },
-  categoryOptionTextActive: {
-    color: '#FFFFFF',
-  },
-  selectedFileContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: colors.highlight,
-  },
-  selectedFileInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  selectedFileText: {
-    flex: 1,
-  },
-  selectedFileTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1A1A1A',
-  },
-  selectedFileCategory: {
-    fontSize: 12,
-    color: '#666666',
-    marginTop: 2,
-  },
-  clearFileButton: {
-    padding: 4,
-  },
-  filePickerButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderWidth: 2,
-    borderColor: '#E0E0E0',
-    borderStyle: 'dashed',
-    gap: 8,
-  },
-  filePickerButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.highlight,
-  },
-  fileSelectionSection: {
-    marginTop: 12,
-    backgroundColor: '#FAFAFA',
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 12,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    color: '#1A1A1A',
-  },
-  fileList: {
-    maxHeight: 300,
-  },
-  fileCategorySection: {
-    marginBottom: 16,
-  },
-  fileCategoryTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#1A1A1A',
-    marginBottom: 8,
-    paddingHorizontal: 4,
-  },
-  fileItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 6,
-    gap: 10,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  fileItemText: {
-    flex: 1,
-  },
-  fileItemTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1A1A1A',
-  },
-  fileItemName: {
-    fontSize: 11,
-    color: '#666666',
-    marginTop: 2,
-  },
-  emptyFileList: {
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  emptyFileListText: {
-    fontSize: 14,
-    color: '#999999',
-    marginTop: 12,
-    fontWeight: '600',
-  },
-  emptyFileListSubtext: {
-    fontSize: 12,
-    color: '#999999',
-    marginTop: 4,
-    textAlign: 'center',
-    paddingHorizontal: 20,
-  },
-  dateTimeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    gap: 12,
-  },
-  dateTimeButtonText: {
-    fontSize: 16,
-    color: '#1A1A1A',
-  },
-  clearButtonInline: {
-    backgroundColor: '#FFE5E5',
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  clearButtonText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#E74C3C',
-  },
-  notificationToggleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    padding: 16,
-    marginTop: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  notificationToggleTextContainer: {
-    flex: 1,
-    marginRight: 12,
-  },
-  notificationToggleLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  notificationToggleHint: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: 4,
-  },
-  buttonRow: {
-    flexDirection: 'row' as const,
-    gap: 12,
-    marginTop: 24,
-  },
-  saveButton: {
-    flex: 1,
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  saveButtonText: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: colors.fireText,
-  },
-  cancelButton: {
-    flex: 1,
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  cancelButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#666666',
-  },
-  additionalImagesScroll: {
-    marginTop: 10,
-  },
-  additionalImageContainer: {
-    position: 'relative',
-    marginRight: 12,
-  },
-  additionalImageThumb: {
-    width: 80,
-    height: 80,
-    borderRadius: 10,
-    backgroundColor: '#F5F5F5',
-  },
-  removeImageButton: {
-    position: 'absolute',
-    top: -6,
-    right: -6,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 11,
-    zIndex: 10,
-  },
-  newImageBadge: {
-    position: 'absolute',
-    bottom: 4,
-    left: 4,
-    backgroundColor: '#4CAF50',
-    borderRadius: 4,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-  },
-  newImageBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 8,
-    fontWeight: 'bold',
-  },
-  addImageButton: {
-    width: 80,
-    height: 80,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: '#E0E0E0',
-    borderStyle: 'dashed',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#FAFAFA',
-  },
-  addImageText: {
-    fontSize: 11,
-    color: '#999999',
-    marginTop: 2,
-  },
-});

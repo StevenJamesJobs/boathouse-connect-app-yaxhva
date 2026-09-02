@@ -4921,6 +4921,54 @@ export type Database = {
         }
         Returns: boolean
       }
+      get_content_attachments: {
+        Args: {
+          p_actor_id: string
+          p_content_ids: string[]
+          p_content_type: string
+        }
+        Returns: {
+          content_id: string
+          file_url: string
+          file_name: string
+          file_type: string | null
+          size_bytes: number | null
+        }[]
+      }
+      set_content_attachment: {
+        Args: {
+          p_actor_id: string
+          p_content_type: string
+          p_content_id: string
+          p_file_url: string | null
+          p_file_name: string | null
+          p_file_type?: string | null
+          p_size_bytes?: number | null
+        }
+        Returns: string[]
+      }
+      retire_content_storage: {
+        Args: {
+          p_actor_id: string
+          p_content_type: string
+          p_content_id: string
+        }
+        Returns: {
+          bucket: string
+          file_url: string
+        }[]
+      }
+      sweep_expired_content: {
+        Args: { p_actor_id: string }
+        Returns: {
+          bucket: string
+          file_url: string
+        }[]
+      }
+      ack_pending_deletes: {
+        Args: { p_actor_id: string; p_file_urls: string[] }
+        Returns: number
+      }
       reorder_announcements: {
         Args: { p_actor_id: string; p_ordered_ids: string[] }
         Returns: boolean

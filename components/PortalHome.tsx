@@ -39,6 +39,8 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import FormattedText from '@/components/FormattedText';
 import { stripFormattingTags } from '@/components/FormattedText';
 import { fetchContentImagesBatch, ContentType } from '@/utils/contentImages';
+import { fetchContentAttachmentsBatch, sweepExpiredContent, type ContentAttachment } from '@/utils/contentAttachments';
+import type { ContentKind } from '@/components/content/contentVisuals';
 import { getImageUrl } from '@/utils/imageUrl';
 import WelcomeHeader from '@/components/WelcomeHeader';
 import NotificationDropdown from '@/components/NotificationDropdown';
@@ -157,6 +159,28 @@ interface SpecialFeature {
 type PortalHomeRole = 'employee' | 'manager';
 interface PortalHomeProps { role: PortalHomeRole; }
 
+/** Attachment map key — ids are per-table, so scope by kind to be safe. */
+const attachmentKey = (kind: ContentKind, id: string) => `${kind}:${id}`;
+
+/**
+ * s80: a one-time attachment renders through the modal's existing guideFile
+ * View/Download pair — no prop widening. A linked guide (guide_file) wins.
+ */
+const resolveGuideFile = (
+  guideFile: GuideFile | null | undefined,
+  attachment: ContentAttachment | undefined
+): GuideFile | null =>
+  guideFile ||
+  (attachment
+    ? {
+        id: 'attachment',
+        title: attachment.file_name,
+        file_url: attachment.file_url,
+        file_name: attachment.file_name,
+        file_type: attachment.file_type ?? 'application/octet-stream',
+      }
+    : null);
+
 export default function PortalHome({ role }: PortalHomeProps) {
   const isManager = role === 'manager';
   const colors = useThemeColors();
@@ -242,6 +266,10 @@ export default function PortalHome({ role }: PortalHomeProps) {
 
   // Content images maps (content_id -> additional image URLs)
   const [contentImagesMap, setContentImagesMap] = useState<Map<string, string[]>>(new Map());
+  // One-time attachments (`kind:content_id` -> attachment), s80.
+  const [contentAttachmentsMap, setContentAttachmentsMap] = useState<Map<string, ContentAttachment>>(new Map());
+  // Owner/manager gate for the quick-add rows — NOT the `role` prop (it misses owners).
+  const canEditContent = isManagerOrOwner(user);
 
   // Detail modal state
   const [detailModalVisible, setDetailModalVisible] = useState(false);
@@ -322,7 +350,10 @@ export default function PortalHome({ role }: PortalHomeProps) {
         // matches the retired PostgREST embed.
         supabase.rpc('get_announcements', { p_actor_id: actorId, p_limit: 6 }),
         (async () => {
-          try { await supabase.rpc('delete_expired_upcoming_events', { p_actor_id: actorId }); } catch {}
+          // s80: the expiry sweep replaces delete_expired_upcoming_events — it
+          // also hands back retired files, which only a manager/owner may
+          // broker-delete (employees just refresh; the rows wait).
+          await sweepExpiredContent(actorId, isManagerOrOwner(user));
           return supabase.rpc('get_upcoming_events', { p_actor_id: actorId });
         })(),
         supabase.rpc('get_special_features', { p_actor_id: actorId, p_limit: 6 }),
@@ -339,29 +370,28 @@ export default function PortalHome({ role }: PortalHomeProps) {
       setSpecialFeatures(features as SpecialFeature[]);
 
       const newImagesMap = new Map<string, string[]>();
+      const newAttachmentsMap = new Map<string, ContentAttachment>();
       const imagePromises: Promise<void>[] = [];
 
-      if (anns.length > 0) {
+      // Images + one-time attachments, batched per kind and all in parallel.
+      const batchFor = (kind: ContentKind, ids: string[]) => {
+        if (ids.length === 0) return;
         imagePromises.push(
-          fetchContentImagesBatch(actorId, 'announcement', anns.map((a: any) => a.id))
+          fetchContentImagesBatch(actorId, kind, ids)
             .then(m => m.forEach((urls, id) => newImagesMap.set(id, urls)))
         );
-      }
-      if (events.length > 0) {
         imagePromises.push(
-          fetchContentImagesBatch(actorId, 'upcoming_event', events.map((e: any) => e.id))
-            .then(m => m.forEach((urls, id) => newImagesMap.set(id, urls)))
+          fetchContentAttachmentsBatch(actorId, kind, ids)
+            .then(m => m.forEach((att, id) => newAttachmentsMap.set(attachmentKey(kind, id), att)))
         );
-      }
-      if (features.length > 0) {
-        imagePromises.push(
-          fetchContentImagesBatch(actorId, 'special_feature', features.map((f: any) => f.id))
-            .then(m => m.forEach((urls, id) => newImagesMap.set(id, urls)))
-        );
-      }
+      };
+      batchFor('announcement', anns.map((a: any) => a.id));
+      batchFor('upcoming_event', events.map((e: any) => e.id));
+      batchFor('special_feature', features.map((f: any) => f.id));
 
       await Promise.all(imagePromises);
       setContentImagesMap(newImagesMap);
+      setContentAttachmentsMap(newAttachmentsMap);
     } catch (error) {
       console.error('Error loading content:', error);
     } finally {
@@ -394,7 +424,10 @@ export default function PortalHome({ role }: PortalHomeProps) {
             .rpc('get_announcements', { p_actor_id: actorId, p_id: String(openAnnouncementId) });
           const data = (rows?.[0] ?? null);
           if (data) {
-            const imgs = await fetchContentImagesBatch(actorId, 'announcement', [data.id]);
+            const [imgs, atts] = await Promise.all([
+              fetchContentImagesBatch(actorId, 'announcement', [data.id]),
+              fetchContentAttachmentsBatch(actorId, 'announcement', [data.id]),
+            ]);
             const additionalImgs = imgs.get(data.id);
             const allImgs = additionalImgs && additionalImgs.length > 0
               ? [data.thumbnail_url, ...additionalImgs].filter(Boolean) as string[]
@@ -407,7 +440,7 @@ export default function PortalHome({ role }: PortalHomeProps) {
               imageUrls: allImgs,
               priority: data.priority || undefined,
               link: data.link,
-              guideFile: data.guide_file as GuideFile | null,
+              guideFile: resolveGuideFile(data.guide_file as GuideFile | null, atts.get(data.id)),
             });
           }
         } else if (openEventId) {
@@ -415,7 +448,10 @@ export default function PortalHome({ role }: PortalHomeProps) {
             .rpc('get_upcoming_events', { p_actor_id: actorId, p_id: String(openEventId) });
           const data = (rows?.[0] ?? null);
           if (data) {
-            const imgs = await fetchContentImagesBatch(actorId, 'upcoming_event', [data.id]);
+            const [imgs, atts] = await Promise.all([
+              fetchContentImagesBatch(actorId, 'upcoming_event', [data.id]),
+              fetchContentAttachmentsBatch(actorId, 'upcoming_event', [data.id]),
+            ]);
             const additionalImgs = imgs.get(data.id);
             const allImgs = additionalImgs && additionalImgs.length > 0
               ? [data.thumbnail_url, ...additionalImgs].filter(Boolean) as string[]
@@ -429,7 +465,7 @@ export default function PortalHome({ role }: PortalHomeProps) {
               startDateTime: data.start_date_time,
               endDateTime: data.end_date_time,
               link: data.link,
-              guideFile: data.guide_file as GuideFile | null,
+              guideFile: resolveGuideFile(data.guide_file as GuideFile | null, atts.get(data.id)),
             });
           }
         } else if (openFeatureId) {
@@ -437,7 +473,10 @@ export default function PortalHome({ role }: PortalHomeProps) {
             .rpc('get_special_features', { p_actor_id: actorId, p_id: String(openFeatureId) });
           const data = (rows?.[0] ?? null);
           if (data) {
-            const imgs = await fetchContentImagesBatch(actorId, 'special_feature', [data.id]);
+            const [imgs, atts] = await Promise.all([
+              fetchContentImagesBatch(actorId, 'special_feature', [data.id]),
+              fetchContentAttachmentsBatch(actorId, 'special_feature', [data.id]),
+            ]);
             const additionalImgs = imgs.get(data.id);
             const allImgs = additionalImgs && additionalImgs.length > 0
               ? [data.thumbnail_url, ...additionalImgs].filter(Boolean) as string[]
@@ -451,7 +490,7 @@ export default function PortalHome({ role }: PortalHomeProps) {
               startDateTime: data.start_date_time,
               endDateTime: data.end_date_time,
               link: data.link,
-              guideFile: data.guide_file as GuideFile | null,
+              guideFile: resolveGuideFile(data.guide_file as GuideFile | null, atts.get(data.id)),
             });
           }
         }
@@ -532,7 +571,7 @@ export default function PortalHome({ role }: PortalHomeProps) {
   const formatDateTime = (dateTime: string | null) => {
     if (!dateTime) return null;
     const date = new Date(dateTime);
-    return date.toLocaleString('en-US', {
+    return date.toLocaleString(language === 'es' ? 'es' : 'en-US', {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
@@ -588,7 +627,7 @@ export default function PortalHome({ role }: PortalHomeProps) {
             startDateTime: event.start_date_time,
             endDateTime: event.end_date_time,
             link: event.link,
-            guideFile: event.guide_file || null,
+            guideFile: resolveGuideFile(event.guide_file, contentAttachmentsMap.get(attachmentKey('upcoming_event', event.id))),
           });
         }}
         activeOpacity={0.7}
@@ -724,7 +763,7 @@ export default function PortalHome({ role }: PortalHomeProps) {
           imageUrls: buildImageUrls(announcement.id, announcement.thumbnail_url, announcement.updated_at),
           priority: announcement.priority,
           link: announcement.link,
-          guideFile: announcement.guide_file || null,
+          guideFile: resolveGuideFile(announcement.guide_file, contentAttachmentsMap.get(attachmentKey('announcement', announcement.id))),
         });
       }}
       activeOpacity={0.7}
@@ -784,7 +823,7 @@ export default function PortalHome({ role }: PortalHomeProps) {
           startDateTime: feature.start_date_time,
           endDateTime: feature.end_date_time,
           link: feature.link,
-          guideFile: feature.guide_file || null,
+          guideFile: resolveGuideFile(feature.guide_file, contentAttachmentsMap.get(attachmentKey('special_feature', feature.id))),
         });
       }}
       activeOpacity={0.7}
@@ -969,6 +1008,40 @@ export default function PortalHome({ role }: PortalHomeProps) {
     );
   };
 
+  // s80 — Owner/Manager-only dashed quick-add row, rendered under the LAST card
+  // of each content tab (and under its empty state). Both Events and
+  // Entertainment go to the events editor.
+  type QuickAddKind = 'announcements' | 'specials' | 'events' | 'entertainment';
+  const QUICK_ADD_ROUTE = {
+    announcements: '/announcement-editor',
+    specials: '/special-features-editor',
+    events: '/upcoming-events-editor',
+    entertainment: '/upcoming-events-editor',
+  } as const;
+  const renderQuickAddRow = (kind: QuickAddKind) => {
+    if (!canEditContent) return null;
+    const label =
+      kind === 'announcements' ? t('manager_home.quick_add_announcements')
+      : kind === 'specials' ? t('manager_home.quick_add_specials')
+      : kind === 'events' ? t('manager_home.quick_add_events')
+      : t('manager_home.quick_add_entertainment');
+    return (
+      <TouchableOpacity
+        style={[styles.quickAddRow, { borderColor: colors.primary + '8C' }]}
+        onPress={() => router.push(QUICK_ADD_ROUTE[kind])}
+        activeOpacity={0.7}
+      >
+        <Text style={[styles.quickAddGlyph, { color: colors.primary }]}>＋</Text>
+        <Text style={[styles.quickAddText, { color: colors.primary }]} numberOfLines={1}>
+          {label}
+        </Text>
+        <Text style={[styles.quickAddWho, { color: colors.primary }]} numberOfLines={1}>
+          {t('manager_home.quick_add_who')}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
+
   // ===== SECTION RENDERERS =====
 
   // Today section: the "Happening Today" band (collapses) + the Announcements /
@@ -1080,27 +1153,56 @@ export default function PortalHome({ role }: PortalHomeProps) {
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="small" color={colors.primary} />
               </View>
-            ) : announcements.length === 0 ? (
-              <View style={styles.emptyContainer}>
-                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                  {t('manager_home.no_announcements', 'No announcements')}
-                </Text>
-              </View>
             ) : (
-              announcements.map((a, i) => renderAnnouncementCard(a, i))
+              <>
+                {announcements.length === 0 ? (
+                  <View style={styles.emptyContainer}>
+                    <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                      {t('manager_home.no_announcements', 'No announcements')}
+                    </Text>
+                  </View>
+                ) : (
+                  announcements.map((a, i) => renderAnnouncementCard(a, i))
+                )}
+                {renderQuickAddRow('announcements')}
+              </>
             )
           ) : loadingFeatures ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color={colors.primary} />
             </View>
-          ) : specialFeatures.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                {t('manager_home.no_features', 'No special features')}
-              </Text>
-            </View>
           ) : (
-            specialFeatures.map((f, i) => renderFeatureCard(f, i))
+            <>
+              {specialFeatures.length === 0 ? (
+                <View style={styles.emptyContainer}>
+                  <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                    {t('manager_home.no_features', 'No special features')}
+                  </Text>
+                </View>
+              ) : (
+                <>
+                  {/* Mirrors the Events strip's "View All" — this leaf is capped
+                      at 6 rows, the view-all page has them all. */}
+                  <TouchableOpacity
+                    style={styles.viewAllRow}
+                    onPress={() => router.push('/view-all-special-features')}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.viewAllText, { color: colors.primary }]}>
+                      {t('manager_home.view_all', 'View All')}
+                    </Text>
+                    <IconSymbol
+                      ios_icon_name="chevron.right"
+                      android_material_icon_name="chevron-right"
+                      size={13}
+                      color={colors.primary}
+                    />
+                  </TouchableOpacity>
+                  {specialFeatures.map((f, i) => renderFeatureCard(f, i))}
+                </>
+              )}
+              {renderQuickAddRow('specials')}
+            </>
           )}
         </View>
       </Animated.ScrollView>
@@ -1207,14 +1309,19 @@ export default function PortalHome({ role }: PortalHomeProps) {
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="small" color={colors.primary} />
               </View>
-            ) : displayList.length === 0 ? (
-              <View style={styles.emptyContainer}>
-                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                  {t('employee_home.no_events', 'No events')}
-                </Text>
-              </View>
             ) : (
-              displayList.map((event, index) => renderEventCard(event, index))
+              <>
+                {displayList.length === 0 ? (
+                  <View style={styles.emptyContainer}>
+                    <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                      {t('employee_home.no_events', 'No events')}
+                    </Text>
+                  </View>
+                ) : (
+                  displayList.map((event, index) => renderEventCard(event, index))
+                )}
+                {renderQuickAddRow(isEvent ? 'events' : 'entertainment')}
+              </>
             )}
           </View>
         </Animated.ScrollView>
@@ -1791,16 +1898,49 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     zIndex: 5,
   },
+  // Special Features › View All link row (top of the leaf, right-aligned).
   viewAllRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
-    paddingVertical: 8,
-    gap: 4,
+    paddingBottom: 8,
+    paddingHorizontal: 2,
+    gap: 2,
   },
   viewAllText: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontFamily: fonts.mono.semibold,
+    fontSize: 10,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  // s80 quick-add row (O/M only) — dashed 1.5pt primary@55%, r14, p12.
+  quickAddRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderRadius: 14,
+    padding: 12,
+    marginTop: 2,
+    marginBottom: 11,
+  },
+  quickAddGlyph: {
+    fontFamily: fonts.display.semibold,
+    fontSize: 15,
+    lineHeight: 18,
+  },
+  quickAddText: {
+    flex: 1,
+    fontFamily: fonts.body.semibold,
+    fontSize: 12.5,
+  },
+  quickAddWho: {
+    fontFamily: fonts.mono.medium,
+    fontSize: 8.5,
+    letterSpacing: 0.9,
+    textTransform: 'uppercase',
+    opacity: 0.8,
   },
   loadingContainer: {
     paddingVertical: 40,

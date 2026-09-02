@@ -30,6 +30,9 @@
 // v10 (session 70b): org_logo gains grantKey 'org_settings.branding' — a
 // branding-granted manager may upload the logo (set_org_logo enforces the same
 // grant server-side; the generic grantKey mechanism from v9 does the rest).
+//
+// v13 (session 80): three *_attachment purposes — one-time post attachments
+// (PDF/image, 20MB) in the post's own bucket under attachments/.
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -55,6 +58,8 @@ const MESSAGE_FILE_TYPES = [
   ...IMAGES,
 ];
 const UPLOAD_DOC_TYPES = ['application/pdf', ...IMAGES];
+// s80 content attachments: PDF or image only (the picker filters the same set).
+const ATTACHMENT_TYPES = ['application/pdf', ...IMAGES];
 
 const MB = 1024 * 1024;
 
@@ -90,6 +95,23 @@ const GATES: Record<string, Gate> = {
   upcoming_event_image: {
     bucket: 'upcoming-events', roles: 'manager', maxBytes: 10 * MB, mimes: IMAGES,
     path: (c) => `${c.orgId}/${c.ts}-${c.rand}.${c.ext}`,
+  },
+  // s80: one-time post attachments (PDF or image, 20MB — Steve's cap). They live
+  // in the post's own bucket under attachments/ so the SAME retire/sweep path
+  // (retire_content_storage / sweep_expired_content → broker delete) clears
+  // thumbnail, extra images and attachment alike. The buckets' own
+  // allowed_mime_types / file_size_limit were widened to match (s74 lesson).
+  announcement_attachment: {
+    bucket: 'announcements', roles: 'manager', maxBytes: 20 * MB, mimes: ATTACHMENT_TYPES,
+    path: (c) => `${c.orgId}/attachments/${c.ts}_${c.safeName}`,
+  },
+  special_feature_attachment: {
+    bucket: 'special-features', roles: 'manager', maxBytes: 20 * MB, mimes: ATTACHMENT_TYPES,
+    path: (c) => `${c.orgId}/attachments/${c.ts}_${c.safeName}`,
+  },
+  upcoming_event_attachment: {
+    bucket: 'upcoming-events', roles: 'manager', maxBytes: 20 * MB, mimes: ATTACHMENT_TYPES,
+    path: (c) => `${c.orgId}/attachments/${c.ts}_${c.safeName}`,
   },
   host_section_image: {
     bucket: 'host-section-images', roles: 'manager', maxBytes: 10 * MB, mimes: IMAGES,
