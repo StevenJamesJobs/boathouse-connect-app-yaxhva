@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Content & Posts Concepts</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{min-height:100vh;display:flex;flex-direction:column;align-items:center;gap:14px;padding:24px 12px 60px;background:#0C0D11;color:#D6D9DE;
+  font-family:'Inter','SF Pro Text',system-ui,sans-serif}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+
+/* ---------- toolbar ---------- */
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center;max-width:1000px}
+.grp{display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);padding:6px;border-radius:16px}
+.gl2{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:#6E7681;margin:0 4px 0 6px}
+.tb{background:rgba(255,255,255,0.06);color:#D6D9DE;border:1px solid rgba(255,255,255,0.10);border-radius:11px;padding:7px 11px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:.18s}
+.tb:hover{background:rgba(255,255,255,0.12)}
+.tb.on{background:#F4F6F8;color:#15171C;border-color:#F4F6F8}
+.tb:focus-visible{outline:2px solid #5C8DF0;outline-offset:2px}
+.hint{color:#6E7681;font-size:11.5px;font-family:'JetBrains Mono',ui-monospace,monospace;text-align:center;max-width:900px;line-height:1.7}
+.hint b{color:#AEB4BD;font-weight:600}
+.hint em{font-style:normal;color:#2FBF8F}
+.notes{max-width:900px;width:100%;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-top:6px}
+.note{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:12px 14px;font-size:11.5px;line-height:1.55;color:#AEB4BD}
+.note b{display:block;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:#FF8A4A;margin-bottom:5px}
+.note em{font-style:normal;color:#F4F6F8;font-weight:600}
+
+/* ---------- phone shell + theme palettes (the s76–s79 kit) ---------- */
+.phone{
+  --bg:#181B21; --text:#F4F6F8; --muted:#9AA1A8; --fireText:#1A1E24; --tint:#FF7A2F;
+  --glass:rgba(255,255,255,0.07); --glassbd:rgba(255,255,255,0.12); --surf:rgba(255,255,255,0.045); --surfbd:rgba(255,255,255,0.09); --hair:rgba(255,255,255,0.07);
+  --glowA:rgba(230,234,238,0.12); --glowB:rgba(59,130,246,0.10); --scrim:rgba(6,10,18,0.55); --thumb:#2C313A; --sheetbg:#20242B;
+  --azure:#3B82F6; --violet:#7C5CE0; --gold:#F59E0B; --bad:#EF4444; --blue:#3B82F6; --ember:#FFB07A; --ok:#10A56F;
+  position:relative;width:392px;height:840px;background:var(--bg);border-radius:46px;border:1px solid #2A2E36;overflow:hidden;
+  box-shadow:0 40px 90px -30px rgba(0,0,0,0.8);transition:background .3s;display:flex;flex-direction:column;color:var(--text)}
+.phone.t-mono-l{--bg:#ECECEE;--text:#22262C;--muted:#6E747C;--fireText:#FFFFFF;--tint:#EC6A1E;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.66);--surfbd:rgba(0,0,0,0.07);--hair:rgba(0,0,0,0.07);--glowA:rgba(58,66,80,0.10);--glowB:rgba(37,99,235,0.10);--scrim:rgba(20,24,32,0.35);--thumb:#D9DBDF;--sheetbg:#F6F6F8;--azure:#2563EB;--violet:#6D28D9;--gold:#B45309;--ok:#087A52}
+.phone.t-ocean-d{--bg:#1A2332;--text:#FFFFFF;--muted:#A8B8D8;--fireText:#0A1422;--tint:#5DA0E5;--glass:rgba(255,255,255,0.07);--glassbd:rgba(255,255,255,0.13);--surf:rgba(255,255,255,0.05);--surfbd:rgba(255,255,255,0.10);--hair:rgba(255,255,255,0.08);--glowA:rgba(74,144,226,0.32);--glowB:rgba(16,185,129,0.13);--thumb:#2A3A50;--sheetbg:#222E40}
+.phone.t-ocean-l{--bg:#E8F4F8;--text:#1A3A52;--muted:#4A6B7C;--fireText:#FFFFFF;--tint:#1976D2;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.7);--surfbd:rgba(13,71,161,0.10);--hair:rgba(13,71,161,0.08);--glowA:rgba(25,118,210,0.18);--glowB:rgba(5,150,105,0.13);--scrim:rgba(10,30,50,0.35);--thumb:#CFE0EA;--sheetbg:#F3F9FC;--azure:#2563EB;--violet:#6D28D9;--gold:#B45309;--ok:#087A52}
+
+.glow{position:absolute;top:-120px;right:-80px;width:360px;height:320px;border-radius:50%;background:radial-gradient(circle,var(--glowA),transparent 66%);z-index:0;pointer-events:none}
+.glow2{position:absolute;top:-70px;left:-90px;width:300px;height:280px;border-radius:50%;background:radial-gradient(circle,var(--glowB),transparent 68%);z-index:0;pointer-events:none}
+.sb{position:relative;z-index:3;display:flex;justify-content:space-between;align-items:center;padding:16px 30px 4px;font-size:13px;font-weight:600;font-family:'JetBrains Mono',ui-monospace,monospace;color:var(--text)}
+.screen{position:relative;z-index:2;flex:1;overflow-y:auto;overflow-x:hidden;padding:0;scrollbar-width:none}
+.screen::-webkit-scrollbar{display:none}
+.design{display:none;padding:6px 16px 112px;animation:fade .35s ease}
+.design.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.concept{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:7px;margin:4px 2px 12px}
+.concept b{color:var(--tint)}
+.concept .ln{flex:1;height:1px;background:var(--hair)}
+.bcap{font-size:10.5px;color:var(--muted);font-style:italic;margin:14px 2px 0;line-height:1.5}
+.bcap b{font-style:normal;color:var(--text);font-weight:600}
+.bcap em{font-style:normal;color:var(--ok);font-weight:600}
+
+/* ---------- shared kit ---------- */
+.ic{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.disp{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif}
+
+/* ScreenHeader (38 chip · title · 38 slot) */
+.hdr{display:flex;align-items:center;gap:12px;margin:2px 0 12px;min-height:40px}
+.hmid{flex:1;text-align:center;min-width:0}
+.c38{width:38px;height:38px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;background:var(--glass);border:1px solid var(--glassbd);color:var(--text);cursor:pointer}
+.c38 .ic{width:18px;height:18px}
+.hspace{width:38px;flex:0 0 auto}
+.eyebrow{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;letter-spacing:1.6px;text-transform:uppercase;color:var(--tint);font-weight:600;margin-top:2px}
+.htitle{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:700;font-size:20px;letter-spacing:-0.3px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* MenuSearchRow geometry: 46 field r13 · 46 ＋ */
+.srow{display:flex;gap:10px;margin:0 0 11px}
+.sfield{flex:1;display:flex;align-items:center;gap:8px;height:46px;border-radius:13px;padding:0 13px;background:var(--glass);border:1px solid var(--glassbd);color:var(--muted);font-size:14.5px}
+.sfield .ic{width:19px;height:19px}
+.sbtn{width:46px;height:46px;border-radius:13px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;cursor:pointer;background:color-mix(in srgb,var(--tint) 18%,transparent);border:1px solid color-mix(in srgb,var(--tint) 42%,transparent);color:var(--tint)}
+.sbtn .ic{width:22px;height:22px}
+.sbtn.dim{opacity:.4;cursor:default}
+
+/* count row — the cap counter (MINTED: "N / MAX" in the mono countRow voice) */
+.crow{display:flex;align-items:center;gap:8px;margin:0 2px 11px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);font-weight:600}
+.crow b{color:var(--text);font-weight:700}
+.crow .cap{margin-left:auto;display:flex;align-items:center;gap:6px}
+.crow .meter{width:54px;height:3px;border-radius:2px;background:var(--hair);overflow:hidden}
+.crow .meter i{display:block;height:100%;background:var(--tint);border-radius:2px}
+.crow.full .cap{color:var(--ember)}
+.crow.full .meter i{background:var(--ember)}
+
+/* row card — the guides editor grammar: grabber · thumb · mid · meatball (r17 surface) */
+.rc{display:flex;align-items:center;gap:12px;padding:12px;border-radius:17px;background:var(--surf);border:1px solid var(--surfbd);margin-bottom:10px;cursor:pointer}
+.rc .grab{color:var(--muted);cursor:grab;flex:0 0 auto}
+.rc .grab .ic{width:20px;height:20px}
+.rc .th{width:53px;height:53px;border-radius:13px;overflow:hidden;flex:0 0 auto;position:relative;background:var(--thumb);display:flex;align-items:center;justify-content:center}
+.rc .th.ban{width:84px}
+.rc .th .emoji{font-size:26px;filter:saturate(1.05)}
+.rc .th.empty{color:var(--muted)}
+.rc .mid{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.rc .ttl{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2}
+.rc .meta{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;letter-spacing:.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:5px}
+.rc .meta .ic{width:11px;height:11px}
+.pill{display:inline-flex;align-items:center;gap:4px;align-self:flex-start;padding:2px 7px;border-radius:7px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:.4px;font-weight:600;--pc:var(--tint);color:var(--pc);background:color-mix(in srgb,var(--pc) 12%,transparent);border:1px solid color-mix(in srgb,var(--pc) 42%,transparent)}
+.pill .ic{width:9px;height:9px}
+.pill.gold{--pc:var(--gold)}.pill.red{--pc:var(--bad)}.pill.blue{--pc:var(--azure)}.pill.violet{--pc:var(--violet)}.pill.mut{--pc:var(--muted)}
+.dots{width:32px;height:32px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;background:var(--glass);border:1px solid var(--glassbd);color:var(--text);cursor:pointer}
+.dots .ic{width:18px;height:18px}
+.rc.off{opacity:.55}
+.rc.off .th{filter:grayscale(1)}
+.dragtip{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;color:var(--muted);text-align:center;margin:2px 0 10px;letter-spacing:.4px}
+.empty{border-radius:17px;padding:26px 16px;text-align:center;color:var(--muted);font-size:12px;line-height:1.6;border:1.5px dashed var(--hair)}
+.empty b{color:var(--text);font-weight:600;display:block;font-family:'Bricolage Grotesque',system-ui,sans-serif;font-size:15px;margin-bottom:2px}
+
+/* section card (r17 surface) used by the view-all page + welcome tab */
+.sec{border-radius:17px;background:var(--surf);border:1px solid var(--surfbd);padding:12px;margin-bottom:12px}
+.week{display:flex;justify-content:space-between;margin:2px 0 10px}
+.day{display:flex;flex-direction:column;align-items:center;gap:4px;width:40px;padding:6px 0;border-radius:11px;cursor:pointer}
+.day small{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted)}
+.day b{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:14px;font-weight:700}
+.day i{width:4px;height:4px;border-radius:2px;background:var(--tint)}
+.day i.none{background:transparent}
+.day.on{background:color-mix(in srgb,var(--tint) 16%,transparent);border:1px solid color-mix(in srgb,var(--tint) 40%,transparent)}
+.day.on b{color:var(--tint)}
+.wkhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.wkhead .m{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:600;font-size:14px}
+.wkhead .va{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:1px;text-transform:uppercase;color:var(--tint);font-weight:600}
+.sfield.inbox{height:42px;background:var(--glass);margin:0 0 10px}
+.seg{display:flex;border-radius:12px;padding:3px;gap:3px;background:var(--glass);border:1px solid var(--glassbd)}
+.seg span{flex:1;text-align:center;padding:8px 6px;border-radius:9px;font-size:12.5px;color:var(--muted);cursor:pointer;font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:600;position:relative}
+.seg span.on{background:var(--tint);color:var(--fireText)}
+.seg span .nd{position:absolute;top:6px;right:8px;width:6px;height:6px;border-radius:3px;background:var(--bad)}
+.seg.hue span.on.ev{background:var(--azure);color:#fff}
+.seg.hue span.on.en{background:var(--violet);color:#fff}
+.vc{display:flex;gap:11px;padding:11px;border-radius:16px;background:var(--surf);border:1px solid var(--surfbd);margin-bottom:10px;cursor:pointer}
+.vc .th{width:64px;height:64px;border-radius:12px;background:var(--thumb);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.vc .th .emoji{font-size:30px}
+.vc .bd{flex:1;min-width:0}
+.vc .ttl{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:600;font-size:14.5px;display:flex;align-items:center;gap:6px}
+.vc .desc{font-size:11.5px;color:var(--muted);line-height:1.4;margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.vc .when{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;color:var(--tint);margin-top:5px;display:flex;align-items:center;gap:5px;letter-spacing:.3px}
+.vc .when .ic{width:11px;height:11px}
+.newpill{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8px;letter-spacing:.8px;font-weight:700;color:#fff;background:var(--bad);padding:2px 5px;border-radius:5px}
+.addrow{display:flex;align-items:center;justify-content:center;gap:7px;padding:12px;border-radius:14px;border:1.5px dashed color-mix(in srgb,var(--tint) 55%,transparent);color:var(--tint);font-weight:600;font-size:12.5px;cursor:pointer;margin-top:2px}
+.addrow .ic{width:15px;height:15px}
+.addrow.mgr{justify-content:flex-start;padding:11px 13px}
+.addrow.mgr small{margin-left:auto;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-weight:600}
+
+/* BottomNavBar */
+.bnav{position:absolute;left:14px;right:14px;bottom:16px;z-index:6;border-radius:24px;background:color-mix(in srgb,var(--bg) 88%,#7A828E);border:1px solid var(--glassbd);display:flex;padding:9px 8px;box-shadow:0 14px 30px -14px rgba(0,0,0,0.6)}
+.bni{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--muted);cursor:pointer;position:relative;border-radius:14px;padding:4px 0}
+.bni .ic{width:17px;height:17px}
+.bni span{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:7px;letter-spacing:.5px;font-weight:600;text-transform:uppercase}
+.bni.on{color:var(--tint);background:color-mix(in srgb,var(--tint) 11%,transparent)}
+
+/* ---------- overlays: sheets ---------- */
+.ovl{position:absolute;inset:0;z-index:50;display:none;flex-direction:column;justify-content:flex-end}
+.ovl.show{display:flex}
+.ovl .scr{position:absolute;inset:0;background:var(--scrim)}
+.sheet{position:relative;z-index:2;border-radius:26px 26px 0 0;padding:10px 18px 24px;max-height:88%;display:flex;flex-direction:column;animation:up .32s cubic-bezier(.32,.72,.28,1);
+  background:var(--sheetbg);border:1px solid var(--glassbd);border-bottom:0;box-shadow:0 -18px 44px rgba(0,0,0,0.35)}
+@keyframes up{from{transform:translateY(60px);opacity:0}to{transform:none;opacity:1}}
+.grabpill{width:40px;height:4px;border-radius:2px;background:var(--glassbd);margin:2px auto 10px;flex:0 0 auto}
+.shead{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex:0 0 auto}
+.shead .t{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:700;font-size:19px;letter-spacing:-0.2px;flex:1;min-width:0}
+.shead .sub{font-size:12.5px;color:var(--muted);margin-top:1px}
+.xbtn{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text);flex:0 0 auto;background:var(--glass);border:1px solid var(--glassbd)}
+.xbtn .ic{width:16px;height:16px}
+.sbody{flex:0 1 auto;min-height:0;overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column;gap:9px;padding-bottom:4px}
+.sbody::-webkit-scrollbar{display:none}
+.sfoot{flex:0 0 auto;display:flex;gap:11px;padding-top:12px}
+.fbtn{flex:1;height:47px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600;cursor:pointer;border:1px solid var(--glassbd);background:var(--glass);color:var(--text)}
+.fbtn.save{background:var(--tint);border-color:var(--tint);color:var(--fireText)}
+.fbtn.dim{opacity:.5}
+.fbtn .ic{width:16px;height:16px}
+
+/* action sheet rows (GlassActionSheet) */
+.arow{display:flex;align-items:center;gap:12px;padding:14px;border-radius:13px;background:var(--surf);border:1px solid var(--surfbd);font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:600;font-size:15px;cursor:pointer}
+.arow .ic{width:18px;height:18px;color:var(--tint)}
+.arow.red,.arow.red .ic{color:var(--bad)}
+.arow.dim{opacity:.35}
+.arow small{margin-left:auto;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;color:var(--muted);font-weight:500}
+
+/* ---------- form grammar (MenuItemEditSheet block) ---------- */
+.fl{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;letter-spacing:1.1px;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.fl .opt{margin-left:auto;text-transform:none;letter-spacing:.3px;font-weight:500;opacity:.8}
+.fb{display:flex;flex-direction:column}
+.inp{min-height:43px;border-radius:13px;padding:11px 13px;font-size:14px;color:var(--text);background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;gap:8px}
+.inp.ph{color:var(--muted)}
+.inp.ta{min-height:80px;align-items:flex-start;line-height:1.45}
+.inp .ic{width:17px;height:17px;color:var(--muted)}
+.inp .chev{margin-left:auto}
+.hintt{font-size:11.5px;line-height:16px;color:var(--muted);margin-top:6px}
+.two{display:flex;gap:10px}
+.two>*{flex:1;min-width:0}
+.fseg{display:flex;border-radius:12px;padding:3px;gap:3px;background:var(--surf);border:1px solid var(--surfbd)}
+.fseg span{flex:1;text-align:center;padding:9px 6px;border-radius:9px;font-size:12.5px;color:var(--muted);cursor:pointer;font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:600;display:flex;align-items:center;justify-content:center;gap:5px}
+.fseg span .ic{width:13px;height:13px}
+.fseg span.on{background:var(--tint);color:var(--fireText)}
+.fseg.hue span.on.ev{background:var(--azure);color:#fff}
+.fseg.hue span.on.en{background:var(--violet);color:#fff}
+.frow{display:flex;align-items:center;gap:12px;padding:11px 13px;border-radius:13px;background:var(--glass);border:1px solid var(--glassbd)}
+.frow .bd{flex:1;min-width:0}
+.frow .l1{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:600;font-size:14px}
+.frow .l2{font-size:11.5px;line-height:15px;color:var(--muted);margin-top:2px}
+.frow .ic{width:18px;height:18px;color:var(--tint)}
+.sw{width:44px;height:26px;border-radius:13px;background:var(--tint);position:relative;flex:0 0 auto;cursor:pointer}
+.sw::after{content:"";position:absolute;top:3px;right:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.3)}
+.sw.off{background:var(--thumb)}
+.sw.off::after{right:auto;left:3px}
+/* photo tiles */
+.prail{display:flex;gap:9px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.prail::-webkit-scrollbar{display:none}
+.pz{width:72px;height:72px;border-radius:13px;flex:0 0 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border:1px dashed color-mix(in srgb,var(--tint) 55%,transparent);color:var(--tint);font-size:10px;font-weight:600;cursor:pointer;position:relative;overflow:hidden}
+.pz .ic{width:18px;height:18px}
+.pz.has{border:1px solid var(--glassbd);background:var(--thumb)}
+.pz.has .emoji{font-size:30px}
+.pz.has.hero{width:96px;height:96px}
+.pz .rm{position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:9px;background:rgba(8,10,14,0.6);border:1px solid rgba(255,255,255,0.3);color:#fff;display:flex;align-items:center;justify-content:center}
+.pz .rm .ic{width:10px;height:10px}
+.pz .nw{position:absolute;left:4px;bottom:4px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:7.5px;letter-spacing:.8px;font-weight:700;color:#fff;background:var(--ok);padding:2px 4px;border-radius:4px}
+.pz .shape{position:absolute;left:4px;bottom:4px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:7.5px;letter-spacing:.8px;font-weight:700;color:#fff;background:rgba(8,10,14,0.6);padding:2px 4px;border-radius:4px}
+.hero-row{display:flex;gap:12px;align-items:flex-start}
+/* DateTimeField — MINTED glass date row */
+.dtf{display:flex;align-items:center;min-height:43px;border-radius:13px;background:var(--glass);border:1px solid var(--glassbd);overflow:hidden}
+.dtf .seg1{flex:1;display:flex;align-items:center;gap:8px;padding:0 13px;height:43px;font-size:14px;cursor:pointer;min-width:0}
+.dtf .seg1 .ic{width:16px;height:16px;color:var(--tint)}
+.dtf .seg1 b{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dtf .seg1.time{flex:0 0 auto;border-left:1px solid var(--hair);font-family:'JetBrains Mono',ui-monospace,monospace;font-size:13px}
+.dtf .seg1.ph{color:var(--muted)}
+.dtf .clr{width:36px;height:43px;display:flex;align-items:center;justify-content:center;color:var(--muted);border-left:1px solid var(--hair);cursor:pointer}
+.dtf .clr .ic{width:14px;height:14px}
+.dtf.ph .seg1{color:var(--muted)}
+/* rich text toolbar (themed — the fix) */
+.rtt{display:flex;gap:5px;padding:5px;border-radius:11px;background:var(--surf);border:1px solid var(--surfbd)}
+.rtt span{width:32px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:var(--glass);border:1px solid var(--glassbd);font-family:'Inter',system-ui,sans-serif;font-size:12.5px;font-weight:700;cursor:pointer}
+.rtt span.i{font-style:italic;font-weight:500}.rtt span.u{text-decoration:underline;font-weight:500}.rtt span.s{text-decoration:line-through;font-weight:500}
+.rtt .gap{flex:1}
+.rtt span.on{background:color-mix(in srgb,var(--tint) 18%,transparent);border-color:color-mix(in srgb,var(--tint) 42%,transparent);color:var(--tint)}
+/* translation section preview */
+.tsec{border-radius:13px;background:var(--surf);border:1px solid var(--surfbd);padding:11px 13px;display:flex;flex-direction:column;gap:7px}
+.tsec .th2{display:flex;align-items:center;gap:7px;font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:600;font-size:14px}
+.tsec .th2 .ic{width:15px;height:15px;color:var(--tint)}
+.tsec .th2 small{margin-left:auto;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--ok);font-weight:700}
+.tsec .tl{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
+.tsec .tl b{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1px;color:var(--text);flex:0 0 22px;font-weight:700}
+.tsec .tl span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text)}
+.tsec .tl .ic{width:13px;height:13px;color:var(--muted)}
+
+.pane{display:none;flex-direction:column;gap:12px}
+.pane.on{display:flex}
+/* steps rail (M) — the Checkouts ritual grammar */
+.rail{display:flex;align-items:center;gap:0;margin:2px 0 12px;flex:0 0 auto;position:relative}
+.step{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;position:relative;z-index:1}
+.step .n{width:24px;height:24px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;font-weight:700;background:var(--surf);border:1px solid var(--surfbd);color:var(--muted)}
+.step .n .ic{width:12px;height:12px}
+.step small{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8px;letter-spacing:.9px;text-transform:uppercase;color:var(--muted);font-weight:600}
+.step.done .n{background:color-mix(in srgb,var(--ok) 18%,transparent);border-color:color-mix(in srgb,var(--ok) 50%,transparent);color:var(--ok)}
+.step.on .n{background:var(--tint);border-color:var(--tint);color:var(--fireText)}
+.step.on small{color:var(--tint)}
+.rail .line{position:absolute;left:10%;right:10%;top:12px;height:1px;background:var(--hair);z-index:0}
+.rail .line i{display:block;height:100%;background:var(--ok);width:0}
+.stitle{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:16px;letter-spacing:-0.2px;margin-bottom:2px}
+.stitle small{display:block;font-family:'Inter',system-ui,sans-serif;font-weight:400;font-size:11.5px;color:var(--muted);margin-top:3px;letter-spacing:0}
+.review{display:flex;flex-direction:column;gap:8px}
+.rv{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:13px;background:var(--surf);border:1px solid var(--surfbd)}
+.rv .ic{width:15px;height:15px;color:var(--tint)}
+.rv .k{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-weight:600;flex:0 0 58px}
+.rv .v{flex:1;min-width:0;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rv .v.mis{color:var(--ember)}
+.rv .go{color:var(--muted)}
+.rv .go .ic{width:14px;height:14px;color:var(--muted)}
+.rv .v .mis{color:var(--ember)}
+/* attachment — chip + chooser tiles */
+.attch{display:flex;align-items:center;gap:10px;min-height:47px;border-radius:13px;padding:8px 11px;background:color-mix(in srgb,var(--tint) 10%,transparent);border:1px solid color-mix(in srgb,var(--tint) 38%,transparent)}
+.attch .ic{width:18px;height:18px;color:var(--tint)}
+.attch .bd{flex:1;min-width:0}
+.attch b{display:block;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.attch span{display:block;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;color:var(--muted);margin-top:2px}
+.attch .xs{width:26px;height:26px;border-radius:9px;display:flex;align-items:center;justify-content:center;background:var(--glass);border:1px solid var(--glassbd);color:var(--text);cursor:pointer}
+.attch .xs .ic{width:12px;height:12px;color:var(--text)}
+.attch.guide{background:color-mix(in srgb,var(--azure) 10%,transparent);border-color:color-mix(in srgb,var(--azure) 38%,transparent)}
+.attch.guide .ic{color:var(--azure)}
+.atile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:12px 8px;border-radius:13px;border:1px dashed color-mix(in srgb,var(--tint) 55%,transparent);cursor:pointer;text-align:center}
+.atile .ic{width:19px;height:19px;color:var(--tint);margin-bottom:2px}
+.atile b{font-size:12px;font-weight:600;line-height:1.2}
+.atile span{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;color:var(--muted);letter-spacing:.2px}
+/* review preview — the staff-facing Welcome card, framed */
+.prevwrap{border-radius:15px;padding:10px 10px 4px;background:var(--glass);border:1px solid var(--glassbd)}
+.peye{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;letter-spacing:1.4px;text-transform:uppercase;color:var(--tint);font-weight:600;margin:0 2px 8px}
+.vc.prev{margin-bottom:6px;cursor:default}
+</style>
+</head>
+<body>
+
+<svg style="display:none" aria-hidden="true"><defs>
+<symbol id="i-back" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
+<symbol id="i-chevr" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+<symbol id="i-chevd" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></symbol>
+<symbol id="i-grab" viewBox="0 0 24 24"><path d="M4 8h16M4 16h16"/></symbol>
+<symbol id="i-dots" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/></symbol>
+<symbol id="i-pencil" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></symbol>
+<symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></symbol>
+<symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></symbol>
+<symbol id="i-swap" viewBox="0 0 24 24"><path d="M7 4v16M7 20l-3-3M7 20l3-3M17 20V4M17 4l-3 3M17 4l3 3"/></symbol>
+<symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-eyeoff" viewBox="0 0 24 24"><path d="M17.9 17.9A10 10 0 0112 20c-7 0-11-8-11-8a18 18 0 015-5.9M9.9 4.2A9.1 9.1 0 0112 4c7 0 11 8 11 8a18 18 0 01-2.2 3.2M1 1l22 22"/></symbol>
+<symbol id="i-cal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="3"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+<symbol id="i-img" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></symbol>
+<symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 007.5.5l3-3a5 5 0 00-7-7l-1.5 1.5M14 11a5 5 0 00-7.5-.5l-3 3a5 5 0 007 7L12 19"/></symbol>
+<symbol id="i-doc" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></symbol>
+<symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0"/></symbol>
+<symbol id="i-star" viewBox="0 0 24 24"><path d="M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></symbol>
+<symbol id="i-mega" viewBox="0 0 24 24"><path d="M3 11v2a1 1 0 001 1h2l5 4V6L6 10H4a1 1 0 00-1 1zM15 9a3.5 3.5 0 010 6M18 6a7 7 0 010 12"/></symbol>
+<symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2zM19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z"/></symbol>
+<symbol id="i-ticket" viewBox="0 0 24 24"><path d="M3 9V6a1 1 0 011-1h16a1 1 0 011 1v3a2 2 0 000 4v3a1 1 0 01-1 1H4a1 1 0 01-1-1v-3a2 2 0 000-4zM13 5v14"/></symbol>
+<symbol id="i-music" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></symbol>
+<symbol id="i-type" viewBox="0 0 24 24"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></symbol>
+<symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
+<symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a2 2 0 01-2 2h-4v-7H9v7H5a2 2 0 01-2-2z"/></symbol>
+<symbol id="i-fork" viewBox="0 0 24 24"><path d="M7 2v20M4 2v6a3 3 0 006 0V2M17 2c-2 2-3 5-3 8s1 4 3 4v8"/></symbol>
+<symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></symbol>
+<symbol id="i-wrench" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.8-3.8a6 6 0 01-7.9 7.9l-7 7a2.1 2.1 0 01-3-3l7-7a6 6 0 017.9-7.9z"/></symbol>
+<symbol id="i-user" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+<symbol id="i-sq" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/></symbol>
+<symbol id="i-ban" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="10" rx="3"/></symbol>
+<symbol id="i-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></symbol>
+<symbol id="i-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></symbol>
+<symbol id="i-flag" viewBox="0 0 24 24"><path d="M4 22V4a1 1 0 011-1h10l1 2h4v10h-6l-1-2H4"/></symbol>
+</defs></svg>
+
+<div class="toolbar">
+  <div class="grp"><span class="gl2">Design</span>
+    <button class="tb des on" data-d="E">E · Editor page</button>
+    <button class="tb des" data-d="M">M · Add / Edit steps</button>
+    <button class="tb des" data-d="V">V · View All</button>
+    <button class="tb des" data-d="W">W · Welcome row</button>
+  </div>
+  <div class="grp" id="edgrp"><span class="gl2">Editor</span>
+    <button class="tb ed on" data-e="a">Announcements</button>
+    <button class="tb ed" data-e="s">Special Features</button>
+    <button class="tb ed" data-e="e">Events</button>
+  </div>
+  <div class="grp" id="stgrp"><span class="gl2">Step</span>
+    <button class="tb st on" data-s="basics">Basics</button>
+    <button class="tb st" data-s="when">When</button>
+    <button class="tb st" data-s="details">Details</button>
+    <button class="tb st" data-s="extras">Extras</button>
+    <button class="tb st" data-s="review">Review</button>
+  </div>
+  <div class="grp"><span class="gl2">Theme</span>
+    <button class="tb th on" data-t="">Mono dark</button>
+    <button class="tb th" data-t="t-mono-l">Mono light</button>
+    <button class="tb th" data-t="t-ocean-d">Ocean dark</button>
+    <button class="tb th" data-t="t-ocean-l">Ocean light</button>
+  </div>
+  <div class="grp" id="xgrp"><span class="gl2">Extras</span>
+    <button class="tb xt" data-x="menu">⋯ action sheet</button>
+    <button class="tb xt" data-x="full">At the cap</button>
+    <button class="tb xt" data-x="empty">Empty org</button>
+  </div>
+</div>
+<p class="hint"><b>Round 2 · lockdown.</b> <b>E</b> = one editor-page grammar × 3 (flip Editor). <b>M</b> = the stepped add/edit modal for all three — Announcements run <em>Basics · Details · Extras · Review</em>, Specials and Events add <em>When</em>. The Step chips (or the rail, or Next) walk it; Review carries the staff-facing preview card. <b>V</b> = View All with search in the box. <b>W</b> = the O/M quick-add row.</p>
+
+<div class="phone" id="phone">
+  <div class="glow"></div><div class="glow2"></div>
+  <div class="sb"><span>9:41</span><span>●●● ᯤ ▮</span></div>
+  <div class="screen">
+
+  <!-- ================= E · EDITOR PAGE ================= -->
+  <div class="design on" id="dE">
+    <div class="hdr"><span class="c38"><svg class="ic"><use href="#i-back"/></svg></span>
+      <div class="hmid"><div class="htitle" id="e-title">Announcements</div><div class="eyebrow">Manage · Content</div></div>
+      <span class="hspace"></span></div>
+    <div class="concept"><b>E</b> · search + ＋ · cap counter · row cards<span class="ln"></span></div>
+
+    <div class="srow"><div class="sfield"><svg class="ic"><use href="#i-search"/></svg><span id="e-ph">Search announcements</span></div><span class="sbtn" id="e-plus"><svg class="ic"><use href="#i-plus"/></svg></span></div>
+
+    <div class="crow" id="e-crow"><span id="e-count"><b>7</b> announcements</span><span class="cap"><span id="e-cap">7 / 25</span><span class="meter"><i id="e-meter" style="width:28%"></i></span></span></div>
+    <div class="dragtip" id="e-tip">Hold and drag to reorder · ⋯ for more</div>
+
+    <!-- Announcements list -->
+    <div id="list-a">
+      <div class="rc"><span class="grab"><svg class="ic"><use href="#i-grab"/></svg></span><div class="th"><span class="emoji">🦞</span></div>
+        <div class="mid"><span class="pill gold"><svg class="ic"><use href="#i-star"/></svg>NEW</span><div class="ttl">Lobster Night is back Thursdays</div><div class="meta">#1 · <svg class="ic"><use href="#i-eye"/></svg>Everyone · Sep 1</div></div>
+        <span class="dots"><svg class="ic"><use href="#i-dots"/></svg></span></div>
+      <div class="rc"><span class="grab"><svg class="ic"><use href="#i-grab"/></svg></span><div class="th ban"><span class="emoji">🧾</span></div>
+        <div class="mid"><span class="pill red">IMPORTANT</span><div class="ttl">New closing checklist starts Monday</div><div class="meta">#2 · <svg class="ic"><use href="#i-eye"/></svg>Employees · Aug 30</div></div>
+        <span class="dots"><svg class="ic"><use href="#i-dots"/></svg></span></div>
+      <div class="rc"><span class="grab"><svg class="ic"><use href="#i-grab"/></svg></span><div class="th"><span class="emoji">🅿️</span></div>
+        <div class="mid"><span class="pill blue">UPDATE</span><div class="ttl">Staff parking moves to the lower lot</div><div class="meta">#3 · <svg class="ic"><use href="#i-eye"/></svg>Everyone · Aug 28 · <svg class="ic"><use href="#i-doc"/></svg>Lot map</div></div>
+        <span class="dots"><svg class="ic"><use href="#i-dots"/></svg></span></div>
+      <div class="rc"><span class="grab"><svg class="ic"><use href="#i-grab"/></svg></span><div class="th empty"><svg class="ic"><use href="#i-mega"/></svg></div>
+        <div class="mid"><div class="ttl">Welcome our new bar manager, Ana</div><div class="meta">#4 · <svg class="ic"><use href="#i-eye"/></svg>Everyone · Aug 22</div></div>
+        <span class="dots"><svg class="ic"><use href="#i-dots"/></svg></span></div>
+      <div class="rc"><span class="grab"><svg class="ic"><use href="#i-grab"/></svg></span><div class="th"><span class="emoji">🍷</span></div>
+        <div class="mid"><div class="ttl">Wine training Sunday 3pm</div><div class="meta">#5 · <svg class="ic"><use href="#i-eye"/></svg>Employees · Aug 20 · <svg class="ic"><use href="#i-link"/></svg>Link</div></div>
+        <span class="dots"><svg class="ic"><use href="#i-dots"/></svg></span></div>
+      <div class="rc off"><span class="grab"><svg class="ic"><use href="#i-grab"/></svg></span><div class="th"><span class="emoji">🎆</span></div>
+        <div class="mid"><span class="pill mut"><svg class="ic"><use href="#i-eyeoff"/></svg>HIDDEN</span><div class="ttl">July 4th deck schedule</div><div class="meta">#6 · <svg class="ic"><use href="#i-eyeoff"/></svg>Nobody · Jul 1</div></div>
+        <span class="dots"><svg class="ic"><use href="#i-dots"/></svg></span></div>
+      <div class="rc"><span class="grab"><svg class="ic"><use href="#i-grab"/></svg></span><div class="th"><span class="emoji">🧊</span></div>
+        <div class="mid"><div class="ttl">Ice machine fixed — thank you Dan</div><div class="meta">#7 · <svg class="ic"><use href="#i-eye"/></svg>Everyone · Jun 12</div></div>
+        <span class="dots"><svg class="ic"><use href="#i-dots"/></svg></span></div>
+    </div>
+
+    <!-- Special Features list -->
+    <div id="list-s" style="display:none">
+      <div class="rc"><span class="grab"><svg class="ic"><use href="#i-grab"/></svg></span><div class="th ban"><span class="emoji">🦀</span></div>
+        <div class="mid"><span class="pill"><svg class="ic"><use href="#i-clock"/></svg>LIVE · ENDS SUN</span><div class="ttl">Crab Boil Weekend</div><div class="meta">#1 · Fri Sep 5 → Sun Sep 7</div></div>
+        <span class="dots"><svg class="ic"><use href="#i-dots"/></svg></span></div>
+      <div class="rc"><span class="grab"><svg class="ic"><use href="#i-grab"/></svg></span><div class="th"><span class="emoji">🍹</span></div>
+        <div class="mid"><span class="pill blue">UPCOMING</span><div class="ttl">Half-price Happy Hour cocktails</div><div class="meta">#2 · Mon Sep 8 · 4–6 PM</div></div>
+        <span class="dots"><svg class="ic"><use href="#i-dots"/></svg></span></div>
+      <div class="rc"><span class="grab"><svg class="ic"><use href="#i-grab"/></svg></span><div class="th"><span class="emoji">🥩</span></div>
+        <div class="mid"><div class="ttl">Prime Rib Sundays</div><div class="meta">#3 · No end date · <svg class="ic"><use href="#i-doc"/></svg>Sunday menu</div></div>
+        <span class="dots"><svg class="ic"><use href="#i-dots"/></svg></span></div>
+      <div class="rc"><span class="grab"><svg class="ic"><use href="#i-grab"/></svg></span><div class="th ban"><span class="emoji">🌅</span></div>
+        <div class="mid"><div class="ttl">Sunset Deck Dinners</div><div class="meta">#4 · Through Sep 30 · <svg class="ic"><use href="#i-link"/></svg>Reserve</div></div>
+        <span class="dots"><svg class="ic"><use href="#i-dots"/></svg></span></div>
+      <div class="rc off"><span class="grab"><svg class="ic"><use href="#i-grab"/></svg></span><div class="th"><span class="emoji">🎃</span></div>
+        <div class="mid"><span class="pill mut">DRAFT</span><div class="ttl">Halloween Bar Crawl</div><div class="meta">#5 · Not scheduled</div></div>
+        <span class="dots"><svg class="ic"><use href="#i-dots"/></svg></span></div>
+    </div>
+
+    <!-- Events list -->
+    <div id="list-e" style="display:none">
+      <div class="rc"><span class="grab"><svg class="ic"><use href="#i-grab"/></svg></span><div class="th"><span class="emoji">🎷</span></div>
+        <div class="mid"><span class="pill violet"><svg class="ic"><use href="#i-music"/></svg>ENTERTAINMENT</span><div class="ttl">Jazz on the Deck · The Tideway Trio</div><div class="meta">#1 · Fri Sep 5 · 7:00 PM</div></div>
+        <span class="dots"><svg class="ic"><use href="#i-dots"/></svg></span></div>
+      <div class="rc"><span class="grab"><svg class="ic"><use href="#i-grab"/></svg></span><div class="th ban"><span class="emoji">🦞</span></div>
+        <div class="mid"><span class="pill blue"><svg class="ic"><use href="#i-ticket"/></svg>EVENT</span><div class="ttl">Lobster Bake Fundraiser</div><div class="meta">#2 · Sat Sep 6 · 5:30 PM · <svg class="ic"><use href="#i-link"/></svg>Tickets</div></div>
+        <span class="dots"><svg class="ic"><use href="#i-dots"/></svg></span></div>
+      <div class="rc"><span class="grab"><svg class="ic"><use href="#i-grab"/></svg></span><div class="th"><span class="emoji">🎤</span></div>
+        <div class="mid"><span class="pill violet"><svg class="ic"><use href="#i-music"/></svg>ENTERTAINMENT</span><div class="ttl">Karaoke Night</div><div class="meta">#3 · Wed Sep 10 · 9:00 PM</div></div>
+        <span class="dots"><svg class="ic"><use href="#i-dots"/></svg></span></div>
+      <div class="rc"><span class="grab"><svg class="ic"><use href="#i-grab"/></svg></span><div class="th"><span class="emoji">🍁</span></div>
+        <div class="mid"><span class="pill blue"><svg class="ic"><use href="#i-ticket"/></svg>EVENT</span><div class="ttl">Fall Harvest Dinner</div><div class="meta">#4 · Sat Sep 20 · 6:00 PM · <svg class="ic"><use href="#i-doc"/></svg>Menu PDF</div></div>
+        <span class="dots"><svg class="ic"><use href="#i-dots"/></svg></span></div>
+      <div class="rc"><span class="grab"><svg class="ic"><use href="#i-grab"/></svg></span><div class="th empty"><svg class="ic"><use href="#i-music"/></svg></div>
+        <div class="mid"><span class="pill violet"><svg class="ic"><use href="#i-music"/></svg>ENTERTAINMENT</span><div class="ttl">Acoustic Sundays</div><div class="meta">#5 · Sun Sep 21 · 2:00 PM</div></div>
+        <span class="dots"><svg class="ic"><use href="#i-dots"/></svg></span></div>
+      <div class="rc"><span class="grab"><svg class="ic"><use href="#i-grab"/></svg></span><div class="th"><span class="emoji">🎃</span></div>
+        <div class="mid"><span class="pill blue"><svg class="ic"><use href="#i-ticket"/></svg>EVENT</span><div class="ttl">Halloween Costume Party</div><div class="meta">#6 · Fri Oct 31 · 8:00 PM</div></div>
+        <span class="dots"><svg class="ic"><use href="#i-dots"/></svg></span></div>
+    </div>
+
+    <div id="list-empty" style="display:none">
+      <div class="empty"><b id="empty-t">No announcements yet</b>Tap ＋ to post the first one. Staff see it on the Welcome page the moment you save.</div>
+    </div>
+
+    <p class="bcap"><b>Editor page, one grammar × 3.</b> AmbientGlow + ScreenHeader (no right chip — BottomNavBar carries navigation). MenuSearchRow with the ＋ in the right slot; the count row underneath becomes the <b>cap counter</b> (7 / 25 + a hairline meter, ember at the cap and the ＋ dims). Cards are the guides-editor row card: grabber · 53pt thumb (banner items get a 84pt wide crop so shape reads) · pill + title + mono meta (position · who sees it · date · attachments) · ⋯. The ⋯ opens the canonical 5-row GlassActionSheet (Extras → ⋯). Hidden items dim with a HIDDEN pill — the <em>is_active</em> flag finally gets a face.</p>
+  </div>
+
+  <!-- ================= V · VIEW ALL EVENTS ================= -->
+  <div class="design" id="dV">
+    <div class="hdr"><span class="c38"><svg class="ic"><use href="#i-back"/></svg></span>
+      <div class="hmid"><div class="htitle">Upcoming Events</div><div class="eyebrow">This week · 6</div></div>
+      <span class="hspace"></span></div>
+    <div class="concept"><b>V</b> · strip · search · tabs · one box<span class="ln"></span></div>
+    <div class="sec">
+      <div class="wkhead"><span class="m">September 2026</span><span class="va">Month ▾</span></div>
+      <div class="week">
+        <div class="day"><small>Mon</small><b>1</b><i class="none"></i></div>
+        <div class="day"><small>Tue</small><b>2</b><i class="none"></i></div>
+        <div class="day"><small>Wed</small><b>3</b><i></i></div>
+        <div class="day"><small>Thu</small><b>4</b><i class="none"></i></div>
+        <div class="day on"><small>Fri</small><b>5</b><i></i></div>
+        <div class="day"><small>Sat</small><b>6</b><i></i></div>
+        <div class="day"><small>Sun</small><b>7</b><i class="none"></i></div>
+      </div>
+      <div class="sfield inbox"><svg class="ic"><use href="#i-search"/></svg><span>Search events &amp; entertainment</span></div>
+      <div class="seg hue"><span class="on ev">Events</span><span class="en">Entertainment<i class="nd"></i></span></div>
+    </div>
+    <div class="vc"><div class="th"><span class="emoji">🦞</span></div><div class="bd"><div class="ttl">Lobster Bake Fundraiser <span class="newpill">NEW</span></div><div class="desc">Annual bake on the lawn benefiting the harbor rescue crew. Tickets at the host stand.</div><div class="when"><svg class="ic"><use href="#i-cal"/></svg>Sat Sep 6 · 5:30 PM</div></div></div>
+    <div class="vc"><div class="th"><span class="emoji">🍁</span></div><div class="bd"><div class="ttl">Fall Harvest Dinner</div><div class="desc">Five courses from the Belmont farms, paired by Ana. Seating at 6.</div><div class="when"><svg class="ic"><use href="#i-cal"/></svg>Sat Sep 20 · 6:00 PM</div></div></div>
+    <div class="vc"><div class="th"><span class="emoji">🎃</span></div><div class="bd"><div class="ttl">Halloween Costume Party</div><div class="desc">Prizes for best costume, DJ till close. 21+.</div><div class="when"><svg class="ic"><use href="#i-cal"/></svg>Fri Oct 31 · 8:00 PM</div></div></div>
+    <p class="bcap"><b>View All Events.</b> ScreenHeader + AmbientGlow; the calendar strip, the new search field and the Events | Entertainment capsule all live in ONE r17 section card so search never floats as a stranger. Search filters the active tab; picking a day still collapses both tabs into that day's merged list. <b>View All Special Features</b> is the same page minus the strip and tabs (header · section box with search · cards) — it also gains its first entry point: a "View all" link on the Welcome Special Features tab.</p>
+  </div>
+
+  <!-- ================= W · WELCOME ROW ================= -->
+  <div class="design" id="dW">
+    <div class="hdr" style="margin-bottom:4px"><div class="hmid" style="text-align:left"><div class="eyebrow">Good evening</div><div class="htitle">Steve · MyResto Test</div></div><span class="c38"><svg class="ic"><use href="#i-bell"/></svg></span></div>
+    <div class="concept"><b>W</b> · O/M quick add on the Today tab<span class="ln"></span></div>
+    <div class="seg" style="margin-bottom:10px"><span>Schedule</span><span class="on">Today</span><span>Events</span><span>Specials</span></div>
+    <div class="seg" style="margin-bottom:12px;background:transparent;border-color:transparent;padding:0"><span class="on" style="background:color-mix(in srgb,var(--tint) 16%,transparent);color:var(--tint)">Announcements</span><span>Special Features</span></div>
+    <div class="vc"><div class="th"><span class="emoji">🦞</span></div><div class="bd"><div class="ttl">Lobster Night is back Thursdays <span class="newpill">NEW</span></div><div class="desc">Two-pound lobsters, drawn butter, the whole deck. Push the surf &amp; turf.</div><div class="when"><svg class="ic"><use href="#i-star"/></svg>New · Sep 1</div></div></div>
+    <div class="vc"><div class="th"><span class="emoji">🧾</span></div><div class="bd"><div class="ttl">New closing checklist starts Monday</div><div class="desc">Bar and kitchen closers: the updated list is in Guides. Sign off in the app.</div><div class="when"><svg class="ic"><use href="#i-flag"/></svg>Important · Aug 30</div></div></div>
+    <div class="vc"><div class="th"><span class="emoji">🅿️</span></div><div class="bd"><div class="ttl">Staff parking moves to the lower lot</div><div class="desc">Starting Friday. Map attached.</div><div class="when"><svg class="ic"><use href="#i-info"/></svg>Update · Aug 28</div></div></div>
+    <div class="addrow mgr"><svg class="ic"><use href="#i-plus"/></svg>Add or edit announcements<small>Owners · Managers</small></div>
+    <p class="bcap"><b>Welcome quick add.</b> Below the last card on each content tab (Announcements · Special Features · Events · Entertainment) an O/M-only dashed row — the menu-categories "add tile" voice — jumps straight into that editor. On a fresh org it sits under the empty state as the only thing on the tab, which is exactly when it matters. Gate = <em>isManagerOrOwner(user)</em>, never the role prop (it misses owners). Cheap enough to ride this wave; Steve's call whether it waits for Schedule.</p>
+  </div>
+
+  </div><!-- /screen -->
+
+  <!-- BottomNavBar — manager tabs -->
+  <div class="bnav" id="nav">
+    <div class="bni"><svg class="ic"><use href="#i-home"/></svg><span>Home</span></div>
+    <div class="bni"><svg class="ic"><use href="#i-fork"/></svg><span>Menus</span></div>
+    <div class="bni on" id="nav-manage"><svg class="ic"><use href="#i-sliders"/></svg><span>Manage</span></div>
+    <div class="bni"><svg class="ic"><use href="#i-wrench"/></svg><span>Tools</span></div>
+    <div class="bni"><svg class="ic"><use href="#i-user"/></svg><span>Profile</span></div>
+  </div>
+
+  <!-- ================= ⋯ GlassActionSheet ================= -->
+  <div class="ovl" id="ov-menu"><div class="scr"></div>
+    <div class="sheet"><div class="grabpill"></div>
+      <div class="shead"><div><div class="t">Lobster Night is back Thursdays</div><div class="sub">Announcements · position 1 of 7</div></div><span class="xbtn"><svg class="ic"><use href="#i-x"/></svg></span></div>
+      <div class="sbody">
+        <div class="arow"><svg class="ic"><use href="#i-pencil"/></svg>Edit</div>
+        <div class="arow dim"><svg class="ic"><use href="#i-up"/></svg>Move up</div>
+        <div class="arow"><svg class="ic"><use href="#i-down"/></svg>Move down</div>
+        <div class="arow"><svg class="ic"><use href="#i-swap"/></svg>Order position<small>1 of 7</small></div>
+        <div class="arow red"><svg class="ic"><use href="#i-trash"/></svg>Delete</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= M · STEPS (locked) ================= -->
+  <!-- ---- Announcements: Basics · Details · Extras · Review ---- -->
+  <div class="ovl stepovl" id="ov-a" data-n="4"><div class="scr"></div>
+    <div class="sheet"><div class="grabpill"></div>
+      <div class="shead"><div><div class="t">New Announcement</div><div class="sub">One thing at a time · post at the end</div></div><span class="xbtn"><svg class="ic"><use href="#i-x"/></svg></span></div>
+      <div class="rail"><span class="line"><i></i></span>
+        <div class="step on" data-s="1" data-k="basics"><span class="n">1</span><small>Basics</small></div>
+        <div class="step" data-s="2" data-k="details"><span class="n">2</span><small>Details</small></div>
+        <div class="step" data-s="3" data-k="extras"><span class="n">3</span><small>Extras</small></div>
+        <div class="step" data-s="4" data-k="review"><span class="n">4</span><small>Review</small></div>
+      </div>
+      <div class="sbody">
+        <div class="pane on" data-s="1">
+          <div class="stitle">What's the news?<small>Title and the cover photo.</small></div>
+          <div class="fb"><div class="fl">Title</div><div class="inp">Lobster Night is back Thursdays</div></div>
+          <div class="fb"><div class="fl">Cover photo</div><div class="hero-row"><div class="pz has hero"><span class="emoji">🦞</span><span class="shape">SQUARE</span></div><div style="flex:1;display:flex;flex-direction:column;gap:10px"><div class="fseg"><span class="on"><svg class="ic"><use href="#i-sq"/></svg>Square</span><span><svg class="ic"><use href="#i-ban"/></svg>Banner</span></div><div class="prail"><div class="pz" style="width:56px;height:56px"><svg class="ic"><use href="#i-plus"/></svg></div><div class="pz has" style="width:56px;height:56px"><span class="emoji" style="font-size:22px">🍽️</span></div><div class="pz has" style="width:56px;height:56px"><span class="emoji" style="font-size:22px">🌊</span><span class="nw">NEW</span></div></div></div></div><div class="hintt">Extra photos become a swipeable carousel in the detail view.</div></div>
+        </div>
+        <div class="pane" data-s="2">
+          <div class="stitle">The details<small>What staff should know, and what to tell guests.</small></div>
+          <div class="fb"><div class="fl">Message</div><div class="rtt"><span>B</span><span class="i">I</span><span class="u">U</span><span class="s">S</span><span class="gap"></span><span style="font-size:10px">a</span><span style="font-size:14px">A</span></div><div class="inp ta" style="border-top-left-radius:6px;border-top-right-radius:6px;margin-top:4px">Two-pound lobsters, drawn butter, the whole deck open till 10. Push the surf &amp; turf pairing — it's on the specials board.</div></div>
+          <div class="tsec"><div class="th2"><svg class="ic"><use href="#i-globe"/></svg>Spanish<small>auto</small></div><div class="tl"><b>ES</b><span>Vuelve la Noche de Langosta los jueves</span><svg class="ic"><use href="#i-pencil"/></svg></div><div class="tl"><b>ES</b><span>Langostas de dos libras, mantequilla…</span><svg class="ic"><use href="#i-pencil"/></svg></div></div>
+        </div>
+        <div class="pane" data-s="3">
+          <div class="stitle">Extras<small>Badge, who sees it, and anything to attach.</small></div>
+          <div class="two"><div class="fb"><div class="fl">Badge</div><div class="inp"><svg class="ic" style="color:var(--gold)"><use href="#i-star"/></svg>New<svg class="ic chev"><use href="#i-chevd"/></svg></div></div><div class="fb"><div class="fl">Visible to</div><div class="inp"><svg class="ic"><use href="#i-eye"/></svg>Everyone<svg class="ic chev"><use href="#i-chevd"/></svg></div></div></div>
+          <div class="fb"><div class="fl">Link<span class="opt">optional</span></div><div class="inp ph"><svg class="ic"><use href="#i-link"/></svg>https://</div></div>
+          <div class="fb"><div class="fl">Attachment<span class="opt">optional</span></div>
+            <div class="attch"><svg class="ic"><use href="#i-file"/></svg><div class="bd"><b>Thursday lobster prep.pdf</b><span>1.2 MB · one-time upload</span></div><span class="xs"><svg class="ic"><use href="#i-x"/></svg></span></div>
+            <div class="hintt">Deleted with this announcement — it never lands in Guides &amp; Training.</div></div>
+        </div>
+        <div class="pane" data-s="4">
+          <div class="prevwrap"><div class="peye">How staff will see it · Welcome › Today</div>
+            <div class="vc prev"><div class="th"><span class="emoji">🦞</span></div><div class="bd"><div class="ttl">Lobster Night is back Thursdays <span class="newpill">NEW</span></div><div class="desc">Two-pound lobsters, drawn butter, the whole deck open till 10. Push the surf &amp; turf pairing…</div><div class="when"><svg class="ic"><use href="#i-star"/></svg>New · Today · <svg class="ic"><use href="#i-file"/></svg>1 file</div></div></div></div>
+          <div class="stitle">Ready to post<small>Tap any line to jump back and change it.</small></div>
+          <div class="review">
+            <div class="rv" data-go="1"><svg class="ic"><use href="#i-mega"/></svg><span class="k">Basics</span><span class="v">Lobster Night is back Thursdays · 3 photos</span><span class="go"><svg class="ic"><use href="#i-chevr"/></svg></span></div>
+            <div class="rv" data-go="2"><svg class="ic"><use href="#i-type"/></svg><span class="k">Details</span><span class="v">EN + ES</span><span class="go"><svg class="ic"><use href="#i-chevr"/></svg></span></div>
+            <div class="rv" data-go="3"><svg class="ic"><use href="#i-eye"/></svg><span class="k">Extras</span><span class="v">New · Everyone · 1 file · <span class="mis">no link</span></span><span class="go"><svg class="ic"><use href="#i-chevr"/></svg></span></div>
+          </div>
+          <div class="frow"><svg class="ic"><use href="#i-bell"/></svg><div class="bd"><div class="l1">Notify staff</div><div class="l2">Push goes out in each person's language when you post.</div></div><span class="sw"></span></div>
+        </div>
+      </div>
+      <div class="sfoot"><span class="fbtn back">Cancel</span><span class="fbtn save next">Next<svg class="ic" style="margin-left:6px"><use href="#i-chevr"/></svg></span></div>
+    </div>
+  </div>
+
+  <!-- ---- Special Features: Basics · When · Details · Extras · Review ---- -->
+  <div class="ovl stepovl" id="ov-s" data-n="5"><div class="scr"></div>
+    <div class="sheet"><div class="grabpill"></div>
+      <div class="shead"><div><div class="t">New Special Feature</div><div class="sub">One thing at a time · post at the end</div></div><span class="xbtn"><svg class="ic"><use href="#i-x"/></svg></span></div>
+      <div class="rail"><span class="line"><i></i></span>
+        <div class="step on" data-s="1" data-k="basics"><span class="n">1</span><small>Basics</small></div>
+        <div class="step" data-s="2" data-k="when"><span class="n">2</span><small>When</small></div>
+        <div class="step" data-s="3" data-k="details"><span class="n">3</span><small>Details</small></div>
+        <div class="step" data-s="4" data-k="extras"><span class="n">4</span><small>Extras</small></div>
+        <div class="step" data-s="5" data-k="review"><span class="n">5</span><small>Review</small></div>
+      </div>
+      <div class="sbody">
+        <div class="pane on" data-s="1">
+          <div class="stitle">What's the special?<small>Title and the cover photo.</small></div>
+          <div class="fb"><div class="fl">Title</div><div class="inp">Crab Boil Weekend</div></div>
+          <div class="fb"><div class="fl">Cover photo</div><div class="hero-row"><div class="pz has hero"><span class="emoji">🦀</span><span class="shape">BANNER</span></div><div style="flex:1;display:flex;flex-direction:column;gap:10px"><div class="fseg"><span><svg class="ic"><use href="#i-sq"/></svg>Square</span><span class="on"><svg class="ic"><use href="#i-ban"/></svg>Banner</span></div><div class="prail"><div class="pz" style="width:56px;height:56px"><svg class="ic"><use href="#i-plus"/></svg></div><div class="pz has" style="width:56px;height:56px"><span class="emoji" style="font-size:22px">🌽</span></div></div></div></div><div class="hintt">Banner crops 16:9 and runs full width on the Welcome card.</div></div>
+        </div>
+        <div class="pane" data-s="2">
+          <div class="stitle">When does it run?<small>Leave both empty and it stays up until you delete it.</small></div>
+          <div class="fb"><div class="fl">Starts</div><div class="dtf"><span class="seg1"><svg class="ic"><use href="#i-cal"/></svg><b>Fri, Sep 5</b></span><span class="seg1 time">4:00 PM</span><span class="clr"><svg class="ic"><use href="#i-x"/></svg></span></div></div>
+          <div class="fb"><div class="fl">Ends<span class="opt">optional</span></div><div class="dtf"><span class="seg1"><svg class="ic"><use href="#i-cal"/></svg><b>Sun, Sep 7</b></span><span class="seg1 time">10:00 PM</span><span class="clr"><svg class="ic"><use href="#i-x"/></svg></span></div></div>
+          <div class="frow"><svg class="ic"><use href="#i-clock"/></svg><div class="bd"><div class="l1">Runs 3 days</div><div class="l2">Removed on its own after Sunday 10 PM — attachment and photos go with it.</div></div></div>
+        </div>
+        <div class="pane" data-s="3">
+          <div class="stitle">The details<small>What staff should know, and what to tell guests.</small></div>
+          <div class="fb"><div class="fl">Description</div><div class="rtt"><span>B</span><span class="i">I</span><span class="u">U</span><span class="s">S</span><span class="gap"></span><span style="font-size:10px">a</span><span style="font-size:14px">A</span></div><div class="inp ta" style="border-top-left-radius:6px;border-top-right-radius:6px;margin-top:4px">Blue crab by the bushel, Old Bay corn, and the deck bar pouring Narragansett all weekend.</div></div>
+          <div class="tsec"><div class="th2"><svg class="ic"><use href="#i-globe"/></svg>Spanish<small>auto</small></div><div class="tl"><b>ES</b><span>Fin de semana de cangrejo hervido</span><svg class="ic"><use href="#i-pencil"/></svg></div><div class="tl"><b>ES</b><span>Cangrejo azul por fanega, maíz con Old Bay…</span><svg class="ic"><use href="#i-pencil"/></svg></div></div>
+        </div>
+        <div class="pane" data-s="4">
+          <div class="stitle">Extras<small>Both optional. Skip straight to review.</small></div>
+          <div class="fb"><div class="fl">Link<span class="opt">optional</span></div><div class="inp"><svg class="ic"><use href="#i-link"/></svg>myresto.test/crab-boil</div></div>
+          <div class="fb"><div class="fl">Attachment<span class="opt">optional</span></div>
+            <div class="two"><div class="atile"><svg class="ic"><use href="#i-doc"/></svg><b>From Guides &amp; Training</b><span>pick an existing guide</span></div><div class="atile"><svg class="ic"><use href="#i-upload"/></svg><b>Upload a file</b><span>PDF or image · one-time</span></div></div>
+            <div class="hintt">A one-time upload is deleted with the special — it never lands in Guides &amp; Training.</div></div>
+        </div>
+        <div class="pane" data-s="5">
+          <div class="prevwrap"><div class="peye">How staff will see it · Welcome › Specials</div>
+            <div class="vc prev"><div class="th"><span class="emoji">🦀</span></div><div class="bd"><div class="ttl">Crab Boil Weekend <span class="newpill">NEW</span></div><div class="desc">Blue crab by the bushel, Old Bay corn, and the deck bar pouring Narragansett all weekend.</div><div class="when"><svg class="ic"><use href="#i-cal"/></svg>Fri Sep 5 → Sun Sep 7 · <svg class="ic"><use href="#i-link"/></svg>Link</div></div></div></div>
+          <div class="stitle">Ready to post<small>Tap any line to jump back and change it.</small></div>
+          <div class="review">
+            <div class="rv" data-go="1"><svg class="ic"><use href="#i-spark"/></svg><span class="k">Basics</span><span class="v">Crab Boil Weekend · banner · 2 photos</span><span class="go"><svg class="ic"><use href="#i-chevr"/></svg></span></div>
+            <div class="rv" data-go="2"><svg class="ic"><use href="#i-cal"/></svg><span class="k">When</span><span class="v">Fri Sep 5 4:00 PM → Sun Sep 7 10:00 PM</span><span class="go"><svg class="ic"><use href="#i-chevr"/></svg></span></div>
+            <div class="rv" data-go="3"><svg class="ic"><use href="#i-type"/></svg><span class="k">Details</span><span class="v">EN + ES</span><span class="go"><svg class="ic"><use href="#i-chevr"/></svg></span></div>
+            <div class="rv" data-go="4"><svg class="ic"><use href="#i-link"/></svg><span class="k">Extras</span><span class="v">Link · <span class="mis">no attachment</span></span><span class="go"><svg class="ic"><use href="#i-chevr"/></svg></span></div>
+          </div>
+          <div class="frow"><svg class="ic"><use href="#i-bell"/></svg><div class="bd"><div class="l1">Notify staff</div><div class="l2">Push goes out in each person's language when you post.</div></div><span class="sw"></span></div>
+        </div>
+      </div>
+      <div class="sfoot"><span class="fbtn back">Cancel</span><span class="fbtn save next">Next<svg class="ic" style="margin-left:6px"><use href="#i-chevr"/></svg></span></div>
+    </div>
+  </div>
+
+  <!-- ---- Events: Basics · When · Details · Extras · Review ---- -->
+  <div class="ovl stepovl" id="ov-e" data-n="5"><div class="scr"></div>
+    <div class="sheet"><div class="grabpill"></div>
+      <div class="shead"><div><div class="t">New Event</div><div class="sub">One thing at a time · post at the end</div></div><span class="xbtn"><svg class="ic"><use href="#i-x"/></svg></span></div>
+      <div class="rail"><span class="line"><i></i></span>
+        <div class="step on" data-s="1" data-k="basics"><span class="n">1</span><small>Basics</small></div>
+        <div class="step" data-s="2" data-k="when"><span class="n">2</span><small>When</small></div>
+        <div class="step" data-s="3" data-k="details"><span class="n">3</span><small>Details</small></div>
+        <div class="step" data-s="4" data-k="extras"><span class="n">4</span><small>Extras</small></div>
+        <div class="step" data-s="5" data-k="review"><span class="n">5</span><small>Review</small></div>
+      </div>
+      <div class="sbody">
+        <div class="pane on" data-s="1">
+          <div class="stitle">What's happening?<small>Title, category and the cover photo.</small></div>
+          <div class="fb"><div class="fl">Title</div><div class="inp">Jazz on the Deck · The Tideway Trio</div></div>
+          <div class="fb"><div class="fl">Category</div><div class="fseg hue"><span class="ev"><svg class="ic"><use href="#i-ticket"/></svg>Event</span><span class="on en"><svg class="ic"><use href="#i-music"/></svg>Entertainment</span></div></div>
+          <div class="fb"><div class="fl">Cover photo</div><div class="hero-row"><div class="pz has hero"><span class="emoji">🎷</span><span class="shape">SQUARE</span></div><div style="flex:1;display:flex;flex-direction:column;gap:10px"><div class="fseg"><span class="on"><svg class="ic"><use href="#i-sq"/></svg>Square</span><span><svg class="ic"><use href="#i-ban"/></svg>Banner</span></div><div class="prail"><div class="pz" style="width:56px;height:56px"><svg class="ic"><use href="#i-plus"/></svg></div><div class="pz has" style="width:56px;height:56px"><span class="emoji" style="font-size:22px">🌅</span></div></div></div></div></div>
+        </div>
+        <div class="pane" data-s="2">
+          <div class="stitle">When is it?<small>Start is required. Add an end if it runs late.</small></div>
+          <div class="fb"><div class="fl">Starts</div><div class="dtf"><span class="seg1"><svg class="ic"><use href="#i-cal"/></svg><b>Fri, Sep 5</b></span><span class="seg1 time">7:00 PM</span><span class="clr"><svg class="ic"><use href="#i-x"/></svg></span></div></div>
+          <div class="fb"><div class="fl">Ends<span class="opt">optional</span></div><div class="dtf"><span class="seg1"><svg class="ic"><use href="#i-cal"/></svg><b>Fri, Sep 5</b></span><span class="seg1 time">10:00 PM</span><span class="clr"><svg class="ic"><use href="#i-x"/></svg></span></div></div>
+          <div class="frow"><svg class="ic"><use href="#i-cal"/></svg><div class="bd"><div class="l1">Lands on Fri Sep 5</div><div class="l2">Calendar dot + Happening Today band that morning. Removed after it ends — attachment goes with it.</div></div></div>
+        </div>
+        <div class="pane" data-s="3">
+          <div class="stitle">The details<small>What staff should know, and what to tell guests.</small></div>
+          <div class="fb"><div class="fl">Description</div><div class="rtt"><span>B</span><span class="i">I</span><span class="u">U</span><span class="s">S</span><span class="gap"></span><span style="font-size:10px">a</span><span style="font-size:14px">A</span></div><div class="inp ta" style="border-top-left-radius:6px;border-top-right-radius:6px;margin-top:4px">Three sets from 7. No cover. Deck bar runs the Jazz Night cocktail list — see the bartender assistant for the four specials.</div></div>
+          <div class="tsec"><div class="th2"><svg class="ic"><use href="#i-globe"/></svg>Spanish<small>auto</small></div><div class="tl"><b>ES</b><span>Jazz en la terraza · The Tideway Trio</span><svg class="ic"><use href="#i-pencil"/></svg></div><div class="tl"><b>ES</b><span>Tres sets desde las 7. Sin cover…</span><svg class="ic"><use href="#i-pencil"/></svg></div></div>
+        </div>
+        <div class="pane" data-s="4">
+          <div class="stitle">Extras<small>Both optional. Skip straight to review.</small></div>
+          <div class="fb"><div class="fl">Link<span class="opt">optional</span></div><div class="inp ph"><svg class="ic"><use href="#i-link"/></svg>Tickets, a playlist, the band's page…</div></div>
+          <div class="fb"><div class="fl">Attachment<span class="opt">optional</span></div>
+            <div class="attch guide"><svg class="ic"><use href="#i-doc"/></svg><div class="bd"><b>Jazz Night cocktail sheet</b><span>Guides &amp; Training · Cheat Sheets</span></div><span class="xs"><svg class="ic"><use href="#i-x"/></svg></span></div>
+            <div class="hintt">Linked from Guides &amp; Training — stays there when this event ends.</div></div>
+        </div>
+        <div class="pane" data-s="5">
+          <div class="prevwrap"><div class="peye">How staff will see it · Welcome › Events</div>
+            <div class="vc prev"><div class="th"><span class="emoji">🎷</span></div><div class="bd"><div class="ttl">Jazz on the Deck · The Tideway Trio <span class="newpill">NEW</span></div><div class="desc">Three sets from 7. No cover. Deck bar runs the Jazz Night cocktail list — see the bartender assistant…</div><div class="when"><svg class="ic"><use href="#i-cal"/></svg>Fri Sep 5 · 7:00 PM · <svg class="ic"><use href="#i-doc"/></svg>Guide</div></div></div></div>
+          <div class="stitle">Ready to post<small>Tap any line to jump back and change it.</small></div>
+          <div class="review">
+            <div class="rv" data-go="1"><svg class="ic"><use href="#i-music"/></svg><span class="k">Basics</span><span class="v">Entertainment · square · 2 photos</span><span class="go"><svg class="ic"><use href="#i-chevr"/></svg></span></div>
+            <div class="rv" data-go="2"><svg class="ic"><use href="#i-cal"/></svg><span class="k">When</span><span class="v">Fri Sep 5 · 7:00 – 10:00 PM</span><span class="go"><svg class="ic"><use href="#i-chevr"/></svg></span></div>
+            <div class="rv" data-go="3"><svg class="ic"><use href="#i-type"/></svg><span class="k">Details</span><span class="v">EN + ES</span><span class="go"><svg class="ic"><use href="#i-chevr"/></svg></span></div>
+            <div class="rv" data-go="4"><svg class="ic"><use href="#i-link"/></svg><span class="k">Extras</span><span class="v"><span class="mis">No link</span> · 1 guide attached</span><span class="go"><svg class="ic"><use href="#i-chevr"/></svg></span></div>
+          </div>
+          <div class="frow"><svg class="ic"><use href="#i-bell"/></svg><div class="bd"><div class="l1">Notify staff</div><div class="l2">Push goes out in each person's language when you post.</div></div><span class="sw"></span></div>
+        </div>
+      </div>
+      <div class="sfoot"><span class="fbtn back">Cancel</span><span class="fbtn save next">Next<svg class="ic" style="margin-left:6px"><use href="#i-chevr"/></svg></span></div>
+    </div>
+  </div>
+
+</div><!-- /phone -->
+
+<div class="notes">
+  <div class="note"><b>The locked modal</b>GlassSheet (88% max, pinned title + rail + footer, the shrinkable-scroll pair). Steps: Announcements <em>Basics · Details · Extras · Review</em>; Specials + Events add <em>When</em>. Rail = done ✓ / current / upcoming with the progress line; rail taps and Review lines jump anywhere. Footer = Cancel|Next → Back|Next → Back|Post. Edit mode opens the same sheet on Review with every step ✓, so a quick fix is one tap deep.</div>
+  <div class="note"><b>Review = preview + lines</b>Under the rail sits the exact Welcome-tab card (thumb, title, NEW pill, 2-line body, date/badge line, attachment glyph) inside a glass frame with a mono eyebrow saying WHERE it lands. Below it the per-step lines; gaps read ember. Notify staff lives here, create-only.</div>
+  <div class="note"><b>Attachments</b>Extras offers two tiles: <em>From Guides &amp; Training</em> (opens the grouped picker sheet) or <em>Upload a file</em> (PDF/image, one-time). A guide link stays in Guides when the post goes; a one-time upload is deleted with the post — on manual delete AND on auto-expiry. Server: one nullable attachment column + name per table (additive), a new broker purpose per content type, and the expiry sweep returning the URLs it retired so the client can broker-delete them (SQL can't touch storage).</div>
+  <div class="note"><b>Editor page + ⋯</b>Unchanged from round 1 except the ⋯ sheet is back to the canonical five rows — visibility stays a field in Extras (Announcements only). Cap counter 25 · 25 · 100, all client-side.</div>
+</div>
+
+<script>
+var phone=document.getElementById('phone');
+var D='E',TH='',ED='a',X='';
+var TITLES={a:'Announcements',s:'Special Features',e:'Upcoming Events'};
+var PH={a:'Search announcements',s:'Search special features',e:'Search events & entertainment'};
+var CNT={a:{n:7,max:25,w:'announcements'},s:{n:5,max:25,w:'special features'},e:{n:6,max:100,w:'events'}};
+var EMPTY={a:'No announcements yet',s:'No special features yet',e:'No events yet'};
+var STEP={a:1,s:1,e:1};
+function ovl(){return document.getElementById('ov-'+ED);}
+function setStep(k){
+  var o=ovl(); var n=+o.dataset.n; var S=k; STEP[ED]=S;
+  o.querySelectorAll('.step').forEach(function(st){var i=+st.dataset.s;st.classList.toggle('on',i===S);st.classList.toggle('done',i<S);
+    st.querySelector('.n').innerHTML = i<S ? '<svg class="ic"><use href="#i-check"/></svg>' : String(i);});
+  o.querySelector('.line i').style.width=((S-1)/(n-1)*100)+'%';
+  o.querySelectorAll('.pane').forEach(function(pn){pn.classList.toggle('on',pn.dataset.s==String(S));});
+  o.querySelector('.back').textContent = S===1?'Cancel':'Back';
+  o.querySelector('.next').innerHTML = S===n?('Post '+({a:'announcement',s:'special',e:'event'})[ED]):'Next<svg class="ic" style="margin-left:6px"><use href="#i-chevr"/></svg>';
+  o.querySelector('.sbody').scrollTop=0;
+  var key=o.querySelector('.step[data-s="'+S+'"]').dataset.k;
+  document.querySelectorAll('.st').forEach(function(b){b.classList.toggle('on',b.dataset.s===key);});
+}
+function sync(){
+  document.querySelectorAll('.design').forEach(function(d){d.classList.remove('on');});
+  var pageId = (D==='V')?'dV':(D==='W')?'dW':'dE';
+  document.getElementById(pageId).classList.add('on');
+  document.querySelectorAll('.ovl').forEach(function(o){o.classList.remove('show');});
+  if (D==='M') ovl().classList.add('show');
+  if (D==='E' && X==='menu') document.getElementById('ov-menu').classList.add('show');
+  document.getElementById('e-title').textContent=TITLES[ED];
+  document.getElementById('e-ph').textContent=PH[ED];
+  var c=CNT[ED]; var full=(X==='full'); var empty=(X==='empty');
+  var n = full? c.max : empty? 0 : c.n;
+  document.getElementById('e-count').innerHTML='<b>'+n+'</b> '+c.w;
+  document.getElementById('e-cap').textContent=n+' / '+c.max;
+  document.getElementById('e-meter').style.width=Math.round(100*n/c.max)+'%';
+  document.getElementById('e-crow').classList.toggle('full',full);
+  document.getElementById('e-plus').classList.toggle('dim',full);
+  document.getElementById('e-tip').style.display = empty?'none':'block';
+  ['a','s','e'].forEach(function(k){document.getElementById('list-'+k).style.display=(k===ED&&!empty)?'block':'none';});
+  document.getElementById('list-empty').style.display=empty?'block':'none';
+  document.getElementById('empty-t').textContent=EMPTY[ED];
+  document.getElementById('nav').style.display = (D==='W')?'none':'flex';
+  document.getElementById('nav-manage').classList.toggle('on', D!=='V');
+  document.getElementById('xgrp').style.display = (D==='E')?'flex':'none';
+  document.getElementById('stgrp').style.display = (D==='M')?'flex':'none';
+  document.getElementById('edgrp').style.display = (D==='V'||D==='W')?'none':'flex';
+  document.querySelector('.st[data-s="when"]').style.display = (ED==='a')?'none':'inline-block';
+  if (D==='M') setStep(STEP[ED]);
+  phone.className='phone'+(TH?' '+TH:'');
+  phone.querySelector('.screen').scrollTop=0;
+}
+document.querySelectorAll('.des').forEach(function(b){b.addEventListener('click',function(){
+  document.querySelectorAll('.des').forEach(function(x){x.classList.remove('on');});b.classList.add('on');D=b.dataset.d;sync();});});
+document.querySelectorAll('.th').forEach(function(b){b.addEventListener('click',function(){
+  document.querySelectorAll('.th').forEach(function(x){x.classList.remove('on');});b.classList.add('on');TH=b.dataset.t;sync();});});
+document.querySelectorAll('.ed').forEach(function(b){b.addEventListener('click',function(){
+  document.querySelectorAll('.ed').forEach(function(x){x.classList.remove('on');});b.classList.add('on');ED=b.dataset.e;sync();});});
+document.querySelectorAll('.st').forEach(function(b){b.addEventListener('click',function(){
+  var o=ovl(); var st=o.querySelector('.step[data-k="'+b.dataset.s+'"]'); if(st) setStep(+st.dataset.s);});});
+document.querySelectorAll('.xt').forEach(function(b){b.addEventListener('click',function(){
+  var was=b.classList.contains('on');
+  document.querySelectorAll('.xt').forEach(function(x){x.classList.remove('on');});
+  if(!was){b.classList.add('on');X=b.dataset.x;} else X='';
+  sync();});});
+document.querySelectorAll('.ovl .scr, .ovl .xbtn').forEach(function(el){el.addEventListener('click',function(){
+  if (D==='E'){X='';document.querySelectorAll('.xt').forEach(function(x){x.classList.remove('on');});}
+  else {D='E';document.querySelectorAll('.des').forEach(function(x){x.classList.toggle('on',x.dataset.d==='E');});}
+  sync();});});
+document.querySelectorAll('#dE .dots').forEach(function(el){el.addEventListener('click',function(ev){ev.stopPropagation();X='menu';
+  document.querySelectorAll('.xt').forEach(function(x){x.classList.toggle('on',x.dataset.x==='menu');});sync();});});
+// ＋ on the editor page opens the stepped sheet
+document.getElementById('e-plus').addEventListener('click',function(){if(X==='full')return;D='M';STEP[ED]=1;
+  document.querySelectorAll('.des').forEach(function(x){x.classList.toggle('on',x.dataset.d==='M');});sync();});
+// per-overlay wiring
+document.querySelectorAll('.stepovl').forEach(function(o){
+  o.querySelectorAll('.step').forEach(function(st){st.addEventListener('click',function(){setStep(+st.dataset.s);});});
+  o.querySelector('.next').addEventListener('click',function(){if(STEP[ED]<+o.dataset.n)setStep(STEP[ED]+1);});
+  o.querySelector('.back').addEventListener('click',function(){if(STEP[ED]>1)setStep(STEP[ED]-1);});
+  o.querySelectorAll('.rv').forEach(function(r){r.addEventListener('click',function(){setStep(+r.dataset.go);});});
+});
+sync();
+</script>
+</body>
+</html>

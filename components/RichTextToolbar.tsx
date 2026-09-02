@@ -8,6 +8,7 @@ import {
   NativeSyntheticEvent,
   TextInputSelectionChangeEventData,
 } from 'react-native';
+import { useThemeColors } from '@/hooks/useThemeColors';
 
 /**
  * A formatting toolbar for TextInput fields.
@@ -39,8 +40,11 @@ interface RichTextToolbarProps {
   selection: { start: number; end: number };
   onSelectionChange?: (selection: { start: number; end: number }) => void;
   textInputRef?: React.RefObject<TextInput | null>;
+  /** Kept for the eight existing callers; the toolbar has never read it. */
   accentColor?: string;
+  /** Defaults to the theme's surface (s80) — the old '#F0F0F0' was light-only. */
   backgroundColor?: string;
+  /** Defaults to the theme's text (s80). */
   textColor?: string;
 }
 
@@ -52,10 +56,17 @@ export default function RichTextToolbar({
   selection,
   onSelectionChange,
   textInputRef,
-  accentColor = '#4A90D9',
-  backgroundColor = '#F0F0F0',
-  textColor = '#1A1A1A',
+  backgroundColor,
+  textColor,
 }: RichTextToolbarProps) {
+  // s80: themed by default. Every caller used to pass its own three colours and
+  // STILL got white tiles, because the button fill below was a literal 60%
+  // white — invisible on light sheets, glaring on dark glass. The tiles are
+  // now the theme's glass tokens; the two overridable props keep working.
+  const theme = useThemeColors();
+  const bg = backgroundColor ?? theme.surface;
+  const ink = textColor ?? theme.text;
+  const tile = { backgroundColor: theme.glass, borderColor: theme.glassBorder };
   const applyFormat = useCallback(
     (tag: FormatTag) => {
       const { start, end } = selection;
@@ -133,65 +144,65 @@ export default function RichTextToolbar({
   );
 
   return (
-    <View style={[styles.toolbar, { backgroundColor }]}>
+    <View style={[styles.toolbar, { backgroundColor: bg, borderColor: theme.surfaceBorder }]}>
       {/* Bold */}
       <TouchableOpacity
-        style={styles.formatButton}
+        style={[styles.formatButton, tile]}
         onPress={() => applyFormat('b')}
         activeOpacity={0.6}
       >
-        <Text style={[styles.formatButtonText, styles.boldText, { color: textColor }]}>B</Text>
+        <Text style={[styles.formatButtonText, styles.boldText, { color: ink }]}>B</Text>
       </TouchableOpacity>
 
       {/* Italic */}
       <TouchableOpacity
-        style={styles.formatButton}
+        style={[styles.formatButton, tile]}
         onPress={() => applyFormat('i')}
         activeOpacity={0.6}
       >
-        <Text style={[styles.formatButtonText, styles.italicText, { color: textColor }]}>I</Text>
+        <Text style={[styles.formatButtonText, styles.italicText, { color: ink }]}>I</Text>
       </TouchableOpacity>
 
       {/* Underline */}
       <TouchableOpacity
-        style={styles.formatButton}
+        style={[styles.formatButton, tile]}
         onPress={() => applyFormat('u')}
         activeOpacity={0.6}
       >
-        <Text style={[styles.formatButtonText, styles.underlineText, { color: textColor }]}>U</Text>
+        <Text style={[styles.formatButtonText, styles.underlineText, { color: ink }]}>U</Text>
       </TouchableOpacity>
 
       {/* Divider */}
-      <View style={[styles.divider, { backgroundColor: textColor + '30' }]} />
+      <View style={[styles.divider, { backgroundColor: theme.hairline }]} />
 
       {/* Strikethrough */}
       <TouchableOpacity
-        style={styles.formatButton}
+        style={[styles.formatButton, tile]}
         onPress={() => applyFormat('s')}
         activeOpacity={0.6}
       >
-        <Text style={[styles.formatButtonText, styles.strikethroughText, { color: textColor }]}>S</Text>
+        <Text style={[styles.formatButtonText, styles.strikethroughText, { color: ink }]}>S</Text>
       </TouchableOpacity>
 
       {/* Divider */}
-      <View style={[styles.divider, { backgroundColor: textColor + '30' }]} />
+      <View style={[styles.divider, { backgroundColor: theme.hairline }]} />
 
       {/* Small text */}
       <TouchableOpacity
-        style={styles.formatButton}
+        style={[styles.formatButton, tile]}
         onPress={() => applyFormat('small')}
         activeOpacity={0.6}
       >
-        <Text style={[styles.sizeButtonText, styles.smallButtonText, { color: textColor }]}>A</Text>
+        <Text style={[styles.sizeButtonText, styles.smallButtonText, { color: ink }]}>A</Text>
       </TouchableOpacity>
 
       {/* Large text */}
       <TouchableOpacity
-        style={styles.formatButton}
+        style={[styles.formatButton, tile]}
         onPress={() => applyFormat('big')}
         activeOpacity={0.6}
       >
-        <Text style={[styles.sizeButtonText, styles.bigButtonText, { color: textColor }]}>A</Text>
+        <Text style={[styles.sizeButtonText, styles.bigButtonText, { color: ink }]}>A</Text>
       </TouchableOpacity>
     </View>
   );
@@ -200,19 +211,20 @@ export default function RichTextToolbar({
 const styles = StyleSheet.create({
   toolbar: {
     flexDirection: 'row',
-    borderRadius: 8,
-    padding: 4,
-    gap: 4,
+    borderRadius: 11,
+    padding: 5,
+    gap: 5,
     marginBottom: 6,
     alignItems: 'center',
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
   },
   formatButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 6,
+    width: 34,
+    height: 32,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.6)',
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
   },
   formatButtonText: {
     fontSize: 18,

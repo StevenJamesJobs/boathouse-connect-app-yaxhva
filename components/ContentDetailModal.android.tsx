@@ -22,11 +22,15 @@ import GlassCard from '@/components/GlassCard';
 import ImageCarousel from '@/components/ImageCarousel';
 import FormattedText from '@/components/FormattedText';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { fonts } from '@/constants/fonts';
 import { resolveForOpen } from '@/utils/storageResolver';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const DISMISS_THRESHOLD = 120;
+// Destructive/important red stays a literal: no palette carries a danger token,
+// and a status pill is the one place the glass language keeps saturation.
+const IMPORTANT_RED = '#E74C3C';
 
 interface GuideFile {
   id: string;
@@ -89,6 +93,7 @@ export default function ContentDetailModal({
 }: ContentDetailModalProps) {
   // ─── Pull-down-to-dismiss ─────────────────────────────────────────────────
   const { t } = useTranslation();
+  const { language } = useLanguage();
   // Glass tokens only — everything the `colors` PROP already covers keeps
   // reading from the prop, so a caller passing the five-key literal is unaffected.
   const theme = useThemeColors();
@@ -138,7 +143,7 @@ export default function ContentDetailModal({
     if (!dateTime) return null;
     try {
       const date = new Date(dateTime);
-      return date.toLocaleString('en-US', {
+      return date.toLocaleString(language === 'es' ? 'es' : 'en-US', {
         month: 'short',
         day: 'numeric',
         year: 'numeric',
@@ -158,8 +163,7 @@ export default function ContentDetailModal({
         // The palette's own "NEW / notification badge" hue.
         return theme.blue;
       case 'important':
-        // Destructive red stays a literal: no palette carries a danger token.
-        return '#E74C3C';
+        return IMPORTANT_RED;
       case 'update':
         return theme.tint;
       default:
@@ -190,7 +194,7 @@ export default function ContentDetailModal({
       await WebBrowser.openBrowserAsync(openUrl);
     } catch (error) {
       console.error('Error opening link:', error);
-      Alert.alert('Error', 'Could not open the link');
+      Alert.alert(t('content_detail.error_title'), t('content_detail.link_open_failed'));
     }
   };
 
@@ -202,7 +206,7 @@ export default function ContentDetailModal({
       await WebBrowser.openBrowserAsync(await resolveForOpen(guideFile.file_url, { tier: 'file' }));
     } catch (error) {
       console.error('Error opening file:', error);
-      Alert.alert('Error', 'Could not open the file');
+      Alert.alert(t('content_detail.error_title'), t('content_detail.file_open_failed'));
     }
   };
 
@@ -214,20 +218,20 @@ export default function ContentDetailModal({
 
       const isAvailable = await Sharing.isAvailableAsync();
       if (!isAvailable) {
-        Alert.alert('Not Available', 'Sharing is not available on this device. Please use the View button to open the file.');
+        Alert.alert(t('content_detail.sharing_unavailable_title'), t('content_detail.sharing_unavailable_msg'));
         return;
       }
 
       await WebBrowser.openBrowserAsync(await resolveForOpen(guideFile.file_url, { tier: 'file' }));
 
       Alert.alert(
-        'Download',
-        'The file will be downloaded by your browser. You can find it in your downloads folder.',
-        [{ text: 'OK' }]
+        t('content_detail.download_title'),
+        t('content_detail.download_msg'),
+        [{ text: t('content_detail.ok') }]
       );
     } catch (error) {
       console.error('Error downloading file:', error);
-      Alert.alert('Error', 'Could not download the file');
+      Alert.alert(t('content_detail.error_title'), t('content_detail.download_failed'));
     }
   };
 
@@ -318,7 +322,7 @@ export default function ContentDetailModal({
                       size={20}
                       color={colors.fireText}
                     />
-                    <Text style={[styles.actionButtonText, { color: colors.fireText }]}>View More Information</Text>
+                    <Text style={[styles.actionButtonText, { color: colors.fireText }]}>{t('content_detail.view_more')}</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -355,7 +359,7 @@ export default function ContentDetailModal({
                         size={20}
                         color={colors.fireText}
                       />
-                      <Text style={[styles.fileButtonText, { color: colors.fireText }]}>View</Text>
+                      <Text style={[styles.fileButtonText, { color: colors.fireText }]}>{t('content_detail.view')}</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -369,7 +373,7 @@ export default function ContentDetailModal({
                         size={20}
                         color={colors.text}
                       />
-                      <Text style={[styles.fileButtonText, { color: colors.text }]}>Download</Text>
+                      <Text style={[styles.fileButtonText, { color: colors.text }]}>{t('content_detail.download')}</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -405,7 +409,7 @@ export default function ContentDetailModal({
                         size={16}
                         color={colors.primary}
                       />
-                      <Text style={[styles.dateTimeLabel, { color: colors.textSecondary }]}>Start:</Text>
+                      <Text style={[styles.dateTimeLabel, { color: colors.textSecondary }]}>{t('content_detail.starts')}</Text>
                       <Text style={[styles.dateTimeText, { color: colors.text }]}>
                         {startDateTimeFormatted}
                       </Text>
@@ -419,7 +423,7 @@ export default function ContentDetailModal({
                         size={16}
                         color={colors.primary}
                       />
-                      <Text style={[styles.dateTimeLabel, { color: colors.textSecondary }]}>End:</Text>
+                      <Text style={[styles.dateTimeLabel, { color: colors.textSecondary }]}>{t('content_detail.ends')}</Text>
                       <Text style={[styles.dateTimeText, { color: colors.text }]}>
                         {endDateTimeFormatted}
                       </Text>

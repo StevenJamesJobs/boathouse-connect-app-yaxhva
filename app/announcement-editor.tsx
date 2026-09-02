@@ -1,51 +1,60 @@
-
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  TextInput,
-  Alert,
-  Modal,
-  ActivityIndicator,
-  Platform,
-  KeyboardAvoidingView,
-  Switch,
-  ActionSheetIOS,
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import { useThemeColors } from '@/hooks/useThemeColors';
-import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
-import { IconSymbol } from '@/components/IconSymbol';
-import { supabase } from '@/app/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
-import { useNotification } from '@/contexts/NotificationContext';
-import { bothLanguages } from '@/utils/notificationHelpers';
-import * as ImagePicker from 'expo-image-picker';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { View, Alert } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
-import { saveTranslations, getLocalizedField } from '@/utils/translateContent';
-import { useTranslationSection } from '@/components/TranslationSection';
-import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-native-draggable-flatlist';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { supabase } from '@/app/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useNotification } from '@/contexts/NotificationContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
+import { useThemeColors } from '@/hooks/useThemeColors';
+import { useSheetHandoff } from '@/components/GlassSheet';
+import SimpleSelectPicker from '@/components/SimpleSelectPicker';
+import { useTranslationSection } from '@/components/TranslationSection';
+import ContentListScreen, { type ContentListItem } from '@/components/content/ContentListScreen';
+import StepSheet from '@/components/content/StepSheet';
+import CoverPhotoField, { type ThumbnailShape } from '@/components/content/CoverPhotoField';
+import RichTextField from '@/components/content/RichTextField';
+import AttachmentField, { type AttachmentDraft } from '@/components/content/AttachmentField';
+import ReviewStep, { type ReviewLine } from '@/components/content/ReviewStep';
+import { FieldLabel, GlassTextInput, Hint, SelectRow, StepTitle, useFormStyles } from '@/components/content/FormKit';
+import {
+  CONTENT_CAPS,
+  PRIORITY_LEVELS,
+  VISIBILITY_OPTIONS,
+  priorityHue,
+  type AnnouncementPriority,
+  type AnnouncementVisibility,
+} from '@/components/content/contentVisuals';
+import { useIsDarkTheme } from '@/components/content/useIsDarkTheme';
+import {
+  brokerRetire,
+  fetchContentAttachmentsBatch,
+  retireContentStorage,
+  setContentAttachment,
+  uploadContentAttachment,
+  type ContentAttachment,
+} from '@/utils/contentAttachments';
 import { fetchContentImages, saveContentImages, uploadImageToStorage } from '@/utils/contentImages';
-import { brokerUploadImage, brokerDelete } from '@/utils/storageBroker';
-import RichTextToolbar from '@/components/RichTextToolbar';
-import FormattedText from '@/components/FormattedText';
-import CollapsibleSection from '@/components/CollapsibleSection';
-import OrderPositionModal from '@/components/OrderPositionModal';
-import SimpleSelectPicker, { SelectField } from '@/components/SimpleSelectPicker';
-import { StorageImage } from '@/components/StorageImage';
+import { brokerUploadImage } from '@/utils/storageBroker';
+import { getLocalizedField, saveTranslations } from '@/utils/translateContent';
+import { bothLanguages } from '@/utils/notificationHelpers';
 import { translateServerError } from '@/utils/serverErrors';
+import { formatShortDate } from '@/utils/dateUtils';
+
+interface GuideFileJson {
+  id: string;
+  title: string;
+  file_url: string | null;
+  file_name: string | null;
+  file_type: string | null;
+}
 
 interface Announcement {
   id: string;
   title: string;
-  content: string;
+  content: string | null;
   message: string | null;
   thumbnail_url: string | null;
   thumbnail_shape: string;
@@ -56,137 +65,148 @@ interface Announcement {
   created_at: string;
   link: string | null;
   guide_file_id: string | null;
+  guide_file?: GuideFileJson | null;
   title_es?: string | null;
   content_es?: string | null;
 }
 
-interface GuideFile {
-  id: string;
+interface FormState {
   title: string;
-  category: string;
-  file_name: string;
+  message: string;
+  title_es: string;
+  message_es: string;
+  priority: AnnouncementPriority;
+  visibility: AnnouncementVisibility;
+  shape: ThumbnailShape;
+  link: string;
 }
 
-const PRIORITY_LEVELS = ['none', 'new', 'important', 'update'];
-const VISIBILITY_OPTIONS = ['everyone', 'employees', 'managers', 'none'];
-const GUIDE_CATEGORIES = ['Employee HandBooks', 'Full Menus', 'Cheat Sheets', 'Events Flyers'];
+const EMPTY_FORM: FormState = {
+  title: '',
+  message: '',
+  title_es: '',
+  message_es: '',
+  priority: 'none',
+  visibility: 'everyone',
+  shape: 'square',
+  link: '',
+};
 
+const STEP_KEYS = ['basics', 'details', 'extras', 'review'] as const;
+const REVIEW_STEP = STEP_KEYS.length - 1;
+const MAX = CONTENT_CAPS.announcement;
+
+const PRIORITY_KEYS: Record<AnnouncementPriority, string> = {
+  none: 'common:priority_none',
+  new: 'common:priority_new',
+  important: 'common:priority_important',
+  update: 'common:priority_update',
+};
+const VISIBILITY_KEYS: Record<AnnouncementVisibility, string> = {
+  everyone: 'announcement_editor:visibility_everyone',
+  employees: 'announcement_editor:visibility_employees',
+  managers: 'announcement_editor:visibility_managers',
+  none: 'announcement_editor:visibility_none',
+};
+
+/** Prepend https:// when the entered link has no scheme, else it won't open. */
+function normalizeLink(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
+/**
+ * Announcements editor (s80) — the Content Kit's list page plus the stepped
+ * sheet: Basics · Details · Extras · Review (no "When": announcements do not
+ * expire). Data flows are the pre-glass file's, minus the old ActionSheetIOS /
+ * inline guide list, plus the one-time attachment and the retire-on-delete path.
+ */
 export default function AnnouncementEditorScreen() {
   useRequireManagerRoute();
   const { t, i18n } = useTranslation();
   const colors = useThemeColors();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const router = useRouter();
+  const isDark = useIsDarkTheme();
+  const fs = useFormStyles(colors);
   const { user } = useAuth();
   const { sendNotification } = useNotification();
   const { language } = useLanguage();
   const { organizationId } = useOrganization();
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [guideFiles, setGuideFiles] = useState<GuideFile[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null);
-  const [selectedGuideFile, setSelectedGuideFile] = useState<GuideFile | null>(null);
-  const [fileSearchQuery, setFileSearchQuery] = useState('');
-  const [showFileSection, setShowFileSection] = useState(false);
 
-  // Form state
-  const [formData, setFormData] = useState({
-    title: '',
-    message: '',
-    priority: 'none',
-    visibility: 'everyone',
-    thumbnail_shape: 'square',
-    link: '',
-    title_es: '',
-    message_es: '',
-  });
-  const [uploadingImage, setUploadingImage] = useState(false);
-  const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
-  const [shouldSendNotification, setShouldSendNotification] = useState(true);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [attachments, setAttachments] = useState<Map<string, ContentAttachment>>(new Map());
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+
+  // ── Sheet state ─────────────────────────────────────────────────────────────
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [editing, setEditing] = useState<Announcement | null>(null);
+  const [step, setStep] = useState(0);
+  const [visited, setVisited] = useState(0);
+  const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [coverUri, setCoverUri] = useState<string | null>(null);
+  const [extraUrls, setExtraUrls] = useState<string[]>([]);
+  const [extraUris, setExtraUris] = useState<string[]>([]);
+  const [attachment, setAttachment] = useState<AttachmentDraft | null>(null);
+  const [notify, setNotify] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [badgePickerOpen, setBadgePickerOpen] = useState(false);
+  const [visibilityPickerOpen, setVisibilityPickerOpen] = useState(false);
+  const addSessionRef = useRef(0);
+
+  const closeSheet = useCallback(() => {
+    setSheetOpen(false);
+    setBadgePickerOpen(false);
+    setVisibilityPickerOpen(false);
+  }, []);
+  // An Alert issued during a Modal dismissal is dropped on iOS — hand it off.
+  const handoff = useSheetHandoff(closeSheet);
 
   // Hybrid bilingual authoring (s61): the primary inputs bind the device
   // language; the shared section shows the other-language preview + translate
   // button + pencil edit. resolveOnSave() runs the staleness rules.
   const isSpanishAuthor = i18n.language === 'es';
-  const addSessionRef = useRef(0);
   const translation = useTranslationSection({
     fields: [
       {
         key: 'title',
         labelKey: 'translation_section:field_title',
-        enValue: formData.title,
-        esValue: formData.title_es,
-        setEnValue: (v) => setFormData(prev => ({ ...prev, title: v })),
-        setEsValue: (v) => setFormData(prev => ({ ...prev, title_es: v })),
+        enValue: form.title,
+        esValue: form.title_es,
+        setEnValue: (v) => setForm((prev) => ({ ...prev, title: v })),
+        setEsValue: (v) => setForm((prev) => ({ ...prev, title_es: v })),
+        enStored: editing ? editing.title : undefined,
+        esStored: editing ? editing.title_es ?? null : undefined,
       },
       {
         key: 'message',
         labelKey: 'translation_section:field_description',
-        enValue: formData.message,
-        esValue: formData.message_es,
-        setEnValue: (v) => setFormData(prev => ({ ...prev, message: v })),
-        setEsValue: (v) => setFormData(prev => ({ ...prev, message_es: v })),
+        enValue: form.message,
+        esValue: form.message_es,
+        setEnValue: (v) => setForm((prev) => ({ ...prev, message: v })),
+        setEsValue: (v) => setForm((prev) => ({ ...prev, message_es: v })),
         multiline: true,
+        enStored: editing ? editing.content ?? editing.message ?? null : undefined,
+        esStored: editing ? editing.content_es ?? null : undefined,
       },
     ],
-    sessionKey: editingAnnouncement ? `edit:${editingAnnouncement.id}` : `new:${addSessionRef.current}`,
-    active: showAddModal,
+    sessionKey: editing ? `edit:${editing.id}` : `new:${addSessionRef.current}`,
+    active: sheetOpen,
   });
 
-  // Rich text toolbar state
-  const contentInputRef = useRef<TextInput>(null);
-  const [contentSelection, setContentSelection] = useState({ start: 0, end: 0 });
-
-  // Position picker state
-  const [positionPicker, setPositionPicker] = useState<{ item: Announcement; currentIndex: number } | null>(null);
-
-  // Dropdown picker visibility
-  const [showBadgePicker, setShowBadgePicker] = useState(false);
-  const [showVisibilityPicker, setShowVisibilityPicker] = useState(false);
-
-  // Additional images state
-  const [additionalImageUrls, setAdditionalImageUrls] = useState<string[]>([]);
-  const [newAdditionalImageUris, setNewAdditionalImageUris] = useState<string[]>([]);
-
-  useEffect(() => {
-    loadAnnouncements();
-    loadGuideFiles();
-  }, []);
-
-  useFocusEffect(
-    React.useCallback(() => {
-      console.log('Announcement editor screen focused, refreshing data...');
-      loadAnnouncements();
-      loadGuideFiles();
-    }, [])
+  // ── Labels ──────────────────────────────────────────────────────────────────
+  const priorityLabel = useCallback(
+    (priority: string) => (PRIORITY_KEYS[priority as AnnouncementPriority] ? t(PRIORITY_KEYS[priority as AnnouncementPriority]) : priority),
+    [t]
+  );
+  const visibilityLabel = useCallback(
+    (visibility: string) =>
+      VISIBILITY_KEYS[visibility as AnnouncementVisibility] ? t(VISIBILITY_KEYS[visibility as AnnouncementVisibility]) : visibility,
+    [t]
   );
 
-  const loadGuideFiles = async () => {
-    try {
-      console.log('Loading guide files from database...');
-
-      // get_guides returns the org's active guides (SETOF rows) for the actor.
-      // Category narrowing + grouping stays client-side (groupedGuideFiles /
-      // GUIDE_CATEGORIES), same as before the RPC swap.
-      if (!user?.id) return;
-      const { data, error } = await supabase.rpc('get_guides', {
-        p_actor_id: user.id,
-      });
-
-      if (error) {
-        console.error('Error loading guide files:', error);
-        throw error;
-      }
-      
-      console.log('Guide files loaded successfully:', data?.length || 0, 'items');
-      setGuideFiles(data || []);
-    } catch (error) {
-      console.error('Error loading guide files:', error);
-    }
-  };
-
-  const loadAnnouncements = async () => {
+  // ── Load ────────────────────────────────────────────────────────────────────
+  const load = useCallback(async () => {
     // Logout race: an empty actor would reach the uuid RPC param as '' (22P02).
     if (!user?.id) {
       setLoading(false);
@@ -194,114 +214,134 @@ export default function AnnouncementEditorScreen() {
     }
     try {
       setLoading(true);
-      console.log('Loading announcements from database...');
-
-      // Manager editor mode: every row, every visibility, inactive included
-      // (the old anon SELECT policy silently hid inactive rows from the editor).
+      // Manager editor mode: every row, every visibility, inactive included.
       const { data, error } = await supabase.rpc('get_announcements', {
         p_actor_id: user.id,
         p_include_inactive: true,
       });
-
-      if (error) {
-        console.error('Error loading announcements:', error);
-        throw error;
-      }
-
-      console.log('Announcements loaded successfully:', data?.length || 0, 'items');
-      setAnnouncements(data || []);
+      if (error) throw error;
+      const rows = (data || []) as unknown as Announcement[];
+      setAnnouncements(rows);
+      setAttachments(await fetchContentAttachmentsBatch(user.id, 'announcement', rows.map((r) => r.id)));
     } catch (error) {
       console.error('Error loading announcements:', error);
       Alert.alert(t('common:error'), t('announcement_editor:load_error'));
     } finally {
       setLoading(false);
     }
+  }, [user?.id, t]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
+
+  // ── Open / close ────────────────────────────────────────────────────────────
+  const openAdd = () => {
+    setEditing(null);
+    setForm(EMPTY_FORM);
+    setCoverUri(null);
+    setExtraUrls([]);
+    setExtraUris([]);
+    setAttachment(null);
+    setNotify(true);
+    setStep(0);
+    setVisited(0);
+    addSessionRef.current += 1;
+    setSheetOpen(true);
   };
 
-  const pickImage = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: formData.thumbnail_shape === 'square' ? [1, 1] : [16, 9],
-        quality: 0.8,
+  const openEdit = (item: ContentListItem) => {
+    const a = announcements.find((x) => x.id === item.id);
+    if (!a || !user?.id) return;
+    setEditing(a);
+    setForm({
+      title: a.title,
+      message: a.content || a.message || '',
+      title_es: a.title_es || '',
+      message_es: a.content_es || '',
+      priority: (PRIORITY_LEVELS as string[]).includes(a.priority) ? (a.priority as AnnouncementPriority) : 'none',
+      visibility: (VISIBILITY_OPTIONS as string[]).includes(a.visibility)
+        ? (a.visibility as AnnouncementVisibility)
+        : 'everyone',
+      shape: a.thumbnail_shape === 'banner' ? 'banner' : 'square',
+      link: a.link || '',
+    });
+    setCoverUri(null);
+    setExtraUrls([]);
+    setExtraUris([]);
+    setNotify(true);
+
+    // Seed the attachment: a stored one-time file wins; else the linked guide.
+    const stored = attachments.get(a.id);
+    if (stored) {
+      setAttachment({
+        kind: 'file',
+        file_url: stored.file_url,
+        file_name: stored.file_name,
+        file_type: stored.file_type ?? 'application/octet-stream',
+        size_bytes: stored.size_bytes,
       });
-
-      if (!result.canceled && result.assets[0]) {
-        setSelectedImageUri(result.assets[0].uri);
-      }
-    } catch (error) {
-      console.error('Error picking image:', error);
-      Alert.alert(t('common:error'), t('announcement_editor:pick_image_error'));
-    }
-  };
-
-  const pickAdditionalImage = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: formData.thumbnail_shape === 'square' ? [1, 1] : [16, 9],
-        quality: 0.8,
+    } else if (a.guide_file_id) {
+      // The row's guide_file jsonb carries no category — seed now, refine below.
+      setAttachment({
+        kind: 'guide',
+        guide: {
+          id: a.guide_file_id,
+          title: a.guide_file?.title ?? '',
+          category: '',
+          file_name: a.guide_file?.file_name ?? '',
+        },
       });
-
-      if (!result.canceled && result.assets[0]) {
-        setNewAdditionalImageUris(prev => [...prev, result.assets[0].uri]);
-      }
-    } catch (error) {
-      console.error('Error picking additional image:', error);
-      Alert.alert(t('common:error'), t('announcement_editor:pick_image_error'));
-    }
-  };
-
-  const removeAdditionalImage = (index: number, isNew: boolean) => {
-    if (isNew) {
-      setNewAdditionalImageUris(prev => prev.filter((_, i) => i !== index));
+      const guideId = a.guide_file_id;
+      supabase.rpc('get_guides', { p_actor_id: user.id }).then(({ data }) => {
+        const g = (data || []).find((row: any) => row.id === guideId);
+        if (!g) return;
+        setAttachment((prev) =>
+          prev?.kind === 'guide' && prev.guide.id === guideId
+            ? { kind: 'guide', guide: { id: g.id, title: g.title, category: g.category ?? '', file_name: g.file_name ?? '' } }
+            : prev
+        );
+      });
     } else {
-      setAdditionalImageUrls(prev => prev.filter((_, i) => i !== index));
+      setAttachment(null);
     }
+
+    // Edit opens straight on Review with every step done.
+    setStep(REVIEW_STEP);
+    setVisited(REVIEW_STEP);
+    setSheetOpen(true);
+    fetchContentImages(user.id, 'announcement', a.id).then((urls) => setExtraUrls(urls));
   };
 
-  const uploadImage = async (uri: string): Promise<string | null> => {
-    if (!user?.id) return null;
-    try {
-      setUploadingImage(true);
-      console.log('Starting image upload for announcement');
-
-      const publicUrl = await brokerUploadImage('announcement_image', uri, user.id);
-
-      if (!publicUrl) {
-        console.error('Error uploading image');
-        Alert.alert(t('common:error'), t('announcement_editor:upload_image_error'));
-        return null;
-      }
-
-      console.log('Public URL:', publicUrl);
-
-      return publicUrl;
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      Alert.alert(t('common:error'), t('announcement_editor:upload_image_error'));
-      return null;
-    } finally {
-      setUploadingImage(false);
-    }
+  const goToStep = (index: number) => {
+    const next = Math.max(0, Math.min(REVIEW_STEP, index));
+    setStep(next);
+    setVisited((v) => Math.max(v, next));
   };
 
+  // ── Save ────────────────────────────────────────────────────────────────────
   const handleSave = async () => {
-    const authorTitle = isSpanishAuthor ? formData.title_es : formData.title;
-    const authorMessage = isSpanishAuthor ? formData.message_es : formData.message;
-    if (!authorTitle || !authorMessage) {
-      Alert.alert(t('common:error'), t('announcement_editor:error_fill_fields'));
-      return;
-    }
-
     if (!user?.id) {
       Alert.alert(t('common:error'), t('announcement_editor:error_not_authenticated'));
       return;
     }
-
-    if (!editingAnnouncement && announcements.length >= 10) {
+    const authorTitle = (isSpanishAuthor ? form.title_es : form.title).trim();
+    const authorMessage = (isSpanishAuthor ? form.message_es : form.message).trim();
+    if (!authorTitle) {
+      goToStep(0);
+      Alert.alert(t('common:error'), t('content_editor.error_title_required'));
+      return;
+    }
+    if (!authorMessage) {
+      goToStep(1);
+      Alert.alert(t('common:error'), t('content_editor.error_message_required'));
+      return;
+    }
+    if (!editing && announcements.length >= MAX) {
       Alert.alert(t('announcement_editor:limit_reached_title'), t('announcement_editor:limit_reached_msg'));
       return;
     }
@@ -310,1708 +350,461 @@ export default function AnnouncementEditorScreen() {
     const resolved = await translation.resolveOnSave();
     if (!resolved) return;
 
+    setBusy(true);
+    let notice: { title: string; body: string } | null = null;
     try {
-      let thumbnailUrl = editingAnnouncement?.thumbnail_url || null;
-
-      if (selectedImageUri) {
-        const uploadedUrl = await uploadImage(selectedImageUri);
-        if (uploadedUrl) {
-          thumbnailUrl = uploadedUrl;
-          console.log('New thumbnail URL:', thumbnailUrl);
-        }
+      let thumbnailUrl = editing?.thumbnail_url || null;
+      if (coverUri) {
+        const uploaded = await brokerUploadImage('announcement_image', coverUri, user.id);
+        if (uploaded) thumbnailUrl = uploaded;
+        else Alert.alert(t('common:error'), t('announcement_editor:upload_image_error'));
       }
 
-      // Prepend https:// when the entered link has no scheme, else it won't open (e.g. "kevahomes.com").
-      const rawLink = formData.link.trim();
-      const linkValue = rawLink ? (/^https?:\/\//i.test(rawLink) ? rawLink : `https://${rawLink}`) : null;
-      const guideFileId = selectedGuideFile?.id || null;
+      const link = normalizeLink(form.link);
+      const guideFileId = attachment?.kind === 'guide' ? attachment.guide.id : null;
+      const shared = {
+        p_user_id: user.id,
+        p_organization_id: organizationId ?? undefined,
+        p_title: resolved.title.en,
+        p_message: resolved.message.en,
+        p_thumbnail_url: thumbnailUrl ?? undefined,
+        p_thumbnail_shape: form.shape,
+        p_priority: form.priority,
+        p_visibility: form.visibility,
+        p_link: link ?? undefined,
+        p_guide_file_id: guideFileId ?? undefined,
+      };
 
-      if (editingAnnouncement) {
-        console.log('Updating announcement:', editingAnnouncement.id);
+      let id: string;
+      if (editing) {
         const { error } = await supabase.rpc('update_announcement', {
-          p_user_id: user.id,
-          p_organization_id: organizationId ?? undefined,
-          p_announcement_id: editingAnnouncement.id,
-          p_title: resolved.title.en,
-          p_message: resolved.message.en,
-          p_thumbnail_url: thumbnailUrl ?? undefined,
-          p_thumbnail_shape: formData.thumbnail_shape,
-          p_priority: formData.priority,
-          p_visibility: formData.visibility,
-          p_display_order: editingAnnouncement.display_order,
-          p_link: linkValue ?? undefined,
-          p_guide_file_id: guideFileId ?? undefined,
+          ...shared,
+          p_announcement_id: editing.id,
+          p_display_order: editing.display_order,
         });
-
-        if (error) {
-          console.error('Error updating announcement:', error);
-          throw error;
-        }
-        console.log('Announcement updated successfully');
-        Alert.alert(t('common:success'), t('announcement_editor:updated_success'));
-
-        // Save Spanish translations (server null semantics vary — most content tables COALESCE-keep when blank)
-        await saveTranslations('announcements', editingAnnouncement.id, {
-          title_es: resolved.title.es,
-          content_es: resolved.message.es,
-        }, user?.id);
-
-        // Upload new additional images and save all to content_images
-        const uploadedNewUrls: string[] = [];
-        for (const uri of newAdditionalImageUris) {
-          const url = await uploadImageToStorage(uri, 'announcement', user.id);
-          if (url) uploadedNewUrls.push(url);
-        }
-        const allAdditionalUrls = [...additionalImageUrls, ...uploadedNewUrls];
-        if (allAdditionalUrls.length > 0 || additionalImageUrls.length > 0) {
-          await saveContentImages(user.id, 'announcement', editingAnnouncement.id, allAdditionalUrls);
-        }
+        if (error) throw error;
+        id = editing.id;
       } else {
-        console.log('Creating new announcement');
-        // The hardened RPC returns the new row's uuid — no more racy
-        // "select newest row" follow-up read.
-        const { data: newAnnouncementId, error } = await supabase.rpc('create_announcement', {
-          p_user_id: user.id,
-          p_organization_id: organizationId ?? undefined,
-          p_title: resolved.title.en,
-          p_message: resolved.message.en,
-          p_thumbnail_url: thumbnailUrl ?? undefined,
-          p_thumbnail_shape: formData.thumbnail_shape,
-          p_priority: formData.priority,
-          p_visibility: formData.visibility,
+        // The hardened RPC returns the new row's uuid.
+        const { data, error } = await supabase.rpc('create_announcement', {
+          ...shared,
           p_display_order: announcements.length,
-          p_link: linkValue ?? undefined,
-          p_guide_file_id: guideFileId ?? undefined,
         });
+        if (error) throw error;
+        id = data as string;
+      }
 
-        if (error) {
-          console.error('Error creating announcement:', error);
-          throw error;
+      // The translations RPC COALESCE-keeps a null, so a blank normally means
+      // "leave alone". A field is DELIBERATELY CLEARED only when it held text
+      // before and resolves blank now — those go over as '' (guides pattern;
+      // an unconditional clear would stamp '' over never-authored Spanish
+      // whenever machine translation failed and suppress future auto-fill).
+      const cleared = (stored: string | null | undefined, next: string) => !!stored?.trim() && !next.trim();
+      const clearBlank = editing
+        ? [
+            cleared(editing.title_es, resolved.title.es) && 'title_es',
+            cleared(editing.content_es, resolved.message.es) && 'content_es',
+          ].filter((f): f is string => !!f)
+        : [];
+      await saveTranslations(
+        'announcements',
+        id,
+        { title_es: resolved.title.es, content_es: resolved.message.es },
+        user.id,
+        clearBlank.length ? { clearBlank } : undefined
+      );
+
+      // Extra photos: upload the new ones, then replace the full set. An edit
+      // always writes so removing every photo actually clears the rows.
+      const uploadedExtras: string[] = [];
+      for (const uri of extraUris) {
+        const url = await uploadImageToStorage(uri, 'announcement', user.id);
+        if (url) uploadedExtras.push(url);
+      }
+      if (editing || uploadedExtras.length > 0) {
+        await saveContentImages(user.id, 'announcement', id, [...extraUrls, ...uploadedExtras]);
+      }
+
+      // One-time attachment: fresh file → upload + set; stored file → keep;
+      // none / guide where a file used to be → clear.
+      const hadFile = !!editing && attachments.has(editing.id);
+      if (attachment?.kind === 'file' && attachment.uri) {
+        const fileUrl = await uploadContentAttachment(
+          'announcement',
+          attachment.uri,
+          attachment.file_name,
+          attachment.file_type,
+          user.id
+        );
+        if (fileUrl) {
+          await setContentAttachment(user.id, 'announcement', id, {
+            file_url: fileUrl,
+            file_name: attachment.file_name,
+            file_type: attachment.file_type,
+            size_bytes: attachment.size_bytes,
+          });
+        } else {
+          notice = { title: t('common:error'), body: t('content_editor.error_upload_failed') };
         }
-        console.log('Announcement created successfully');
+      } else if (attachment?.kind !== 'file' && hadFile) {
+        await setContentAttachment(user.id, 'announcement', id, null);
+      }
 
-        // The new announcement shows in the notification shade live (via the
-        // announcements table). No separate custom_notifications "log" row — that
-        // parallel Sent-History system was retired (it caused shade/history drift).
-
-        // Send the actual push only when toggle is on
-        if (shouldSendNotification) {
-          try {
-            const pushTitle = bothLanguages('notifications.new_announcement_title');
-            await sendNotification({
-              notificationType: 'announcement',
-              title: pushTitle.en,
-              body: resolved.title.en,
-              title_es: pushTitle.es,
-              // The authored Spanish title when it exists; empty falls back to EN.
-              body_es: resolved.title.es || undefined,
-              // type + the created row's uuid make the banner tap deep-link
-              // (NotificationContext routes to PortalHome's openAnnouncementId).
-              data: {
-                type: 'announcement',
-                announcementId: newAnnouncementId,
-                priority: formData.priority,
-              },
-            });
-          } catch (notificationError) {
-            console.error('Failed to send push notification:', notificationError);
-          }
-        }
-        
-        Alert.alert(t('common:success'), t('announcement_editor:created_success'));
-
-        // Save Spanish translations for newly created item
-        if (newAnnouncementId) {
-          await saveTranslations('announcements', newAnnouncementId, {
-            title_es: resolved.title.es,
-            content_es: resolved.message.es,
-          }, user?.id);
-        }
-
-        // Upload and save additional images for newly created item
-        if (newAnnouncementId && newAdditionalImageUris.length > 0) {
-          const uploadedNewUrls: string[] = [];
-          for (const uri of newAdditionalImageUris) {
-            const url = await uploadImageToStorage(uri, 'announcement', user.id);
-            if (url) uploadedNewUrls.push(url);
-          }
-          if (uploadedNewUrls.length > 0) {
-            await saveContentImages(user.id, 'announcement', newAnnouncementId, uploadedNewUrls);
-          }
+      // Push on CREATE only, and only when the Notify switch is on.
+      if (!editing && notify) {
+        try {
+          const pushTitle = bothLanguages('notifications.new_announcement_title');
+          await sendNotification({
+            notificationType: 'announcement',
+            title: pushTitle.en,
+            body: resolved.title.en,
+            title_es: pushTitle.es,
+            // The authored Spanish title when it exists; empty falls back to EN.
+            body_es: resolved.title.es || undefined,
+            // type + the created row's uuid make the banner tap deep-link
+            // (NotificationContext routes to PortalHome's openAnnouncementId).
+            data: { type: 'announcement', announcementId: id, priority: form.priority },
+          });
+        } catch (notificationError) {
+          console.error('Failed to send push notification:', notificationError);
         }
       }
 
-      closeModal();
-      await loadAnnouncements();
+      if (notice) {
+        const n = notice;
+        handoff.defer(() => Alert.alert(n.title, n.body));
+      } else {
+        closeSheet();
+      }
+      await load();
     } catch (error: any) {
       console.error('Error saving announcement:', error);
       Alert.alert(t('common:error'), translateServerError(error, t('announcement_editor:save_error')));
+    } finally {
+      setBusy(false);
     }
   };
 
-  const handleDelete = async (announcement: Announcement) => {
-    Alert.alert(
-      t('announcement_editor:delete_title'),
-      t('announcement_editor:delete_confirm', { title: announcement.title }),
-      [
-        { text: t('announcement_editor:cancel_button'), style: 'cancel' },
-        {
-          text: t('common:delete'),
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              if (!user?.id) {
-                Alert.alert(t('common:error'), t('announcement_editor:error_not_authenticated'));
-                return;
-              }
-
-              console.log('Deleting announcement:', announcement.id);
-              
-              const { error } = await supabase.rpc('delete_announcement', {
-                p_user_id: user.id,
-                p_organization_id: organizationId ?? undefined,
-                p_announcement_id: announcement.id,
-              });
-
-              if (error) {
-                console.error('Error deleting announcement:', error);
-                throw error;
-              }
-
-              if (announcement.thumbnail_url) {
-                await brokerDelete('announcements', [announcement.thumbnail_url], user.id);
-              }
-
-              // content_images rows are cascaded by delete_announcement server-side.
-
-              console.log('Announcement deleted successfully');
-              Alert.alert(t('common:success'), t('announcement_editor:deleted_success'));
-              
-              await loadAnnouncements();
-            } catch (error: any) {
-              console.error('Error deleting announcement:', error);
-              Alert.alert(t('common:error'), translateServerError(error, t('announcement_editor:delete_error')));
-            }
-          },
+  // ── Delete / reorder ────────────────────────────────────────────────────────
+  const handleDelete = (item: ContentListItem) => {
+    const a = announcements.find((x) => x.id === item.id);
+    if (!a) return;
+    Alert.alert(t('content_editor.delete_confirm_title'), t('content_editor.delete_confirm_body'), [
+      { text: t('common:cancel'), style: 'cancel' },
+      {
+        text: t('common:delete'),
+        style: 'destructive',
+        onPress: async () => {
+          if (!user?.id) {
+            Alert.alert(t('common:error'), t('announcement_editor:error_not_authenticated'));
+            return;
+          }
+          try {
+            // Queue first, delete second — the URLs are unreachable once the row is gone.
+            const files = await retireContentStorage(user.id, 'announcement', a.id);
+            const { error } = await supabase.rpc('delete_announcement', {
+              p_user_id: user.id,
+              p_organization_id: organizationId ?? undefined,
+              p_announcement_id: a.id,
+            });
+            if (error) throw error;
+            await brokerRetire(user.id, files);
+            await load();
+          } catch (error: any) {
+            console.error('Error deleting announcement:', error);
+            Alert.alert(t('common:error'), translateServerError(error, t('announcement_editor:delete_error')));
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
-  const handleMoveUp = async (index: number) => {
-    if (index <= 0 || !user?.id) return;
-    const newAnnouncements = [...announcements];
-    const currentOrder = newAnnouncements[index].display_order;
-    const aboveOrder = newAnnouncements[index - 1].display_order;
-    [newAnnouncements[index], newAnnouncements[index - 1]] = [newAnnouncements[index - 1], newAnnouncements[index]];
-    newAnnouncements[index].display_order = currentOrder;
-    newAnnouncements[index - 1].display_order = aboveOrder;
-    setAnnouncements(newAnnouncements);
-    try {
-      // Persist the whole list's new order (reindexed 0..N-1) via the gated RPC.
-      const { error } = await supabase.rpc('reorder_announcements', {
-        p_actor_id: user.id, p_ordered_ids: newAnnouncements.map((a) => a.id),
-      });
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error moving announcement up:', error);
-      await loadAnnouncements();
-    }
-  };
-
-  const handleMoveDown = async (index: number) => {
-    if (index >= announcements.length - 1 || !user?.id) return;
-    const newAnnouncements = [...announcements];
-    const currentOrder = newAnnouncements[index].display_order;
-    const belowOrder = newAnnouncements[index + 1].display_order;
-    [newAnnouncements[index], newAnnouncements[index + 1]] = [newAnnouncements[index + 1], newAnnouncements[index]];
-    newAnnouncements[index].display_order = currentOrder;
-    newAnnouncements[index + 1].display_order = belowOrder;
-    setAnnouncements(newAnnouncements);
-    try {
-      const { error } = await supabase.rpc('reorder_announcements', {
-        p_actor_id: user.id, p_ordered_ids: newAnnouncements.map((a) => a.id),
-      });
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error moving announcement down:', error);
-      await loadAnnouncements();
-    }
-  };
-
-  const handleDragEnd = async ({ data: reorderedData }: { data: Announcement[] }) => {
+  const handleReorder = async (orderedIds: string[]) => {
     if (!user?.id) return;
-    const updatedData = reorderedData.map((item, index) => ({
-      ...item,
-      display_order: index,
-    }));
-    setAnnouncements(updatedData);
+    const byId = new Map(announcements.map((a) => [a.id, a]));
+    const reordered = orderedIds
+      .map((id, index) => {
+        const a = byId.get(id);
+        return a ? { ...a, display_order: index } : null;
+      })
+      .filter((a): a is Announcement => !!a);
+    setAnnouncements(reordered);
     try {
       const { error } = await supabase.rpc('reorder_announcements', {
-        p_actor_id: user.id, p_ordered_ids: reorderedData.map((item) => item.id),
-      });
-      if (error) throw error;
-      console.log('Drag reorder persisted successfully');
-    } catch (error) {
-      console.error('Error persisting drag reorder:', error);
-      await loadAnnouncements();
-    }
-  };
-
-  const openAddModal = () => {
-    setEditingAnnouncement(null);
-    setFormData({
-      title: '',
-      message: '',
-      priority: 'none',
-      visibility: 'everyone',
-      thumbnail_shape: 'square',
-      link: '',
-      title_es: '',
-      message_es: '',
-    });
-    setSelectedImageUri(null);
-    setAdditionalImageUrls([]);
-    setNewAdditionalImageUris([]);
-    setSelectedGuideFile(null);
-    setFileSearchQuery('');
-    setShowFileSection(false);
-    setShouldSendNotification(true);
-    addSessionRef.current += 1;
-    setShowAddModal(true);
-  };
-
-  const openEditModal = async (announcement: Announcement) => {
-    setEditingAnnouncement(announcement);
-    setFormData({
-      title: announcement.title,
-      message: announcement.content || announcement.message || '',
-      priority: announcement.priority,
-      visibility: announcement.visibility,
-      thumbnail_shape: announcement.thumbnail_shape,
-      link: announcement.link || '',
-      title_es: announcement.title_es || '',
-      message_es: announcement.content_es || '',
-    });
-    setSelectedImageUri(null);
-    setNewAdditionalImageUris([]);
-
-    // Load existing additional images
-    const existingImages = await fetchContentImages(user?.id, 'announcement', announcement.id);
-    setAdditionalImageUrls(existingImages);
-
-    // Load the attached guide file if exists
-    if (announcement.guide_file_id) {
-      const guideFile = guideFiles.find(g => g.id === announcement.guide_file_id);
-      setSelectedGuideFile(guideFile || null);
-    } else {
-      setSelectedGuideFile(null);
-    }
-    
-    setFileSearchQuery('');
-    setShowFileSection(false);
-    setShowAddModal(true);
-  };
-
-  const closeModal = () => {
-    setShowAddModal(false);
-    setEditingAnnouncement(null);
-    setSelectedImageUri(null);
-    setAdditionalImageUrls([]);
-    setNewAdditionalImageUris([]);
-    setSelectedGuideFile(null);
-    setFileSearchQuery('');
-    setShowFileSection(false);
-  };
-
-  const selectGuideFile = (file: GuideFile) => {
-    setSelectedGuideFile(file);
-    setShowFileSection(false);
-  };
-
-  const clearGuideFile = () => {
-    setSelectedGuideFile(null);
-  };
-
-  const handleBackPress = () => {
-    router.replace('/(portal)/manager/manage');
-  };
-
-  const applyPositionChange = async (newPosition: number) => {
-    if (!positionPicker || !user?.id) return;
-    const oldIndex = positionPicker.currentIndex;
-    const newIndex = newPosition - 1;
-    if (newIndex === oldIndex) { setPositionPicker(null); return; }
-    const reordered = [...announcements];
-    const [moved] = reordered.splice(oldIndex, 1);
-    reordered.splice(newIndex, 0, moved);
-    const updated = reordered.map((item, i) => ({ ...item, display_order: i }));
-    setAnnouncements(updated);
-    setPositionPicker(null);
-    try {
-      const { error } = await supabase.rpc('reorder_announcements', {
-        p_actor_id: user.id, p_ordered_ids: updated.map((item) => item.id),
+        p_actor_id: user.id,
+        p_ordered_ids: orderedIds,
       });
       if (error) throw error;
     } catch (error) {
-      console.error('Error applying position change:', error);
-      await loadAnnouncements();
+      console.error('Error reordering announcements:', error);
+      await load();
     }
   };
 
-  const openItemActions = (announcement: Announcement, index: number) => {
-    const isFirst = index === 0;
-    const isLast = index === announcements.length - 1;
+  // ── List rows ───────────────────────────────────────────────────────────────
+  const items = useMemo<ContentListItem[]>(() => {
+    const q = search.trim().toLowerCase();
+    const rows: ContentListItem[] = announcements.map((a, index) => {
+      const hidden = a.visibility === 'none';
+      const meta = [`#${index + 1}`, visibilityLabel(a.visibility), formatShortDate(a.created_at, language)];
+      if (attachments.has(a.id)) meta.push(t('content_editor.preview_file'));
+      else if (a.guide_file_id) meta.push(t('content_editor.preview_guide'));
+      if (a.link) meta.push(t('content_editor.preview_link'));
+      return {
+        id: a.id,
+        title: getLocalizedField(a, 'title', language) || t('content_editor.preview_untitled'),
+        meta: meta.join(' · '),
+        thumbnailUrl: a.thumbnail_url,
+        shape: a.thumbnail_shape === 'banner' ? 'banner' : 'square',
+        dim: hidden,
+        pill: hidden
+          ? { label: visibilityLabel('none'), color: colors.textSecondary, iosIcon: 'eye.slash', androidIcon: 'visibility-off' }
+          : a.priority && a.priority !== 'none'
+            ? { label: priorityLabel(a.priority), color: priorityHue(a.priority, colors, isDark), iosIcon: 'star.fill', androidIcon: 'star' }
+            : undefined,
+      };
+    });
+    if (!q) return rows;
+    return rows.filter((row, i) => {
+      const a = announcements[i];
+      return [a.title, a.title_es, a.content, a.content_es, a.message]
+        .some((s) => !!s && s.toLowerCase().includes(q));
+    });
+  }, [announcements, attachments, search, language, colors, isDark, t, priorityLabel, visibilityLabel]);
 
-    if (Platform.OS === 'ios') {
-      const options: string[] = [t('common:edit')];
-      if (!isFirst) options.push(t('upcoming_events_editor:move_up'));
-      if (!isLast) options.push(t('upcoming_events_editor:move_down'));
-      if (announcements.length > 1) options.push(t('menu_editor:order_position'));
-      options.push(t('common:delete'));
-      options.push(t('common:cancel'));
-      const destructiveIndex = options.indexOf(t('common:delete'));
-      const cancelIndex = options.length - 1;
-      ActionSheetIOS.showActionSheetWithOptions(
-        { options, destructiveButtonIndex: destructiveIndex, cancelButtonIndex: cancelIndex },
-        (buttonIndex) => {
-          const label = options[buttonIndex];
-          if (label === t('common:edit')) openEditModal(announcement);
-          else if (label === t('upcoming_events_editor:move_up')) handleMoveUp(index);
-          else if (label === t('upcoming_events_editor:move_down')) handleMoveDown(index);
-          else if (label === t('menu_editor:order_position')) setPositionPicker({ item: announcement, currentIndex: index });
-          else if (label === t('common:delete')) handleDelete(announcement);
-        }
-      );
-    } else {
-      const buttons: any[] = [
-        { text: t('common:edit'), onPress: () => openEditModal(announcement) },
-      ];
-      if (!isFirst) buttons.push({ text: t('upcoming_events_editor:move_up'), onPress: () => handleMoveUp(index) });
-      if (!isLast) buttons.push({ text: t('upcoming_events_editor:move_down'), onPress: () => handleMoveDown(index) });
-      if (announcements.length > 1) buttons.push({ text: t('menu_editor:order_position'), onPress: () => setPositionPicker({ item: announcement, currentIndex: index }) });
-      buttons.push({ text: t('common:delete'), style: 'destructive', onPress: () => handleDelete(announcement) });
-      buttons.push({ text: t('common:cancel'), style: 'cancel' });
-      Alert.alert(announcement.title, undefined, buttons);
-    }
-  };
+  // ── Review data ─────────────────────────────────────────────────────────────
+  const authorTitle = isSpanishAuthor ? form.title_es : form.title;
+  const authorMessage = isSpanishAuthor ? form.message_es : form.message;
+  const photoCount = (coverUri || editing?.thumbnail_url ? 1 : 0) + extraUrls.length + extraUris.length;
+  const hasSpanish = !!(form.title_es.trim() || form.message_es.trim());
+  const attachmentSummary =
+    attachment?.kind === 'file'
+      ? t('content_editor.file_attached')
+      : attachment?.kind === 'guide'
+        ? t('content_editor.guide_attached')
+        : t('content_editor.no_attachment');
 
-  const getImageUrl = (url: string | null) => {
-    if (!url) return null;
-    return url;
-  };
+  const reviewLines: ReviewLine[] = [
+    {
+      key: 'basics',
+      iosIcon: 'textformat',
+      androidIcon: 'title',
+      label: t('content_editor.step_basics'),
+      value: `${authorTitle.trim() || t('content_editor.preview_untitled')} · ${
+        photoCount > 0 ? t('content_editor.photos_count', { count: photoCount }) : t('content_editor.no_photo')
+      }`,
+      missing: !authorTitle.trim(),
+      onPress: () => goToStep(0),
+    },
+    {
+      key: 'details',
+      iosIcon: 'text.alignleft',
+      androidIcon: 'notes',
+      label: t('content_editor.step_details'),
+      value: hasSpanish ? t('content_editor.lang_en_es') : t('content_editor.lang_en_only'),
+      missing: !authorMessage.trim(),
+      onPress: () => goToStep(1),
+    },
+    {
+      key: 'extras',
+      iosIcon: 'star',
+      androidIcon: 'star-border',
+      label: t('content_editor.step_extras'),
+      value: [
+        priorityLabel(form.priority),
+        visibilityLabel(form.visibility),
+        attachmentSummary,
+        form.link.trim() ? t('content_editor.preview_link') : t('content_editor.no_link'),
+      ].join(' · '),
+      onPress: () => goToStep(2),
+    },
+  ];
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'new':
-        return '#3498DB';
-      case 'important':
-        return '#E74C3C';
-      case 'update':
-        return '#F39C12';
+  const steps = STEP_KEYS.map((key) => ({ key, label: t(`content_editor.step_${key}`) }));
+
+  // ── Panes ───────────────────────────────────────────────────────────────────
+  const renderPane = () => {
+    switch (step) {
+      case 0:
+        return (
+          <>
+            <StepTitle
+              title={t('content_editor.basics_title_announcement')}
+              subtitle={t('content_editor.basics_subtitle_announcement')}
+            />
+            <View>
+              <FieldLabel label={t('content_editor.field_title')} />
+              <GlassTextInput
+                value={authorTitle}
+                onChangeText={(text) =>
+                  setForm((prev) => (isSpanishAuthor ? { ...prev, title_es: text } : { ...prev, title: text }))
+                }
+                placeholder={t('announcement_editor:announcement_title_placeholder')}
+                maxLength={120}
+              />
+            </View>
+            <CoverPhotoField
+              coverUri={coverUri}
+              coverUrl={editing?.thumbnail_url ?? null}
+              shape={form.shape}
+              onShapeChange={(shape) => setForm((prev) => ({ ...prev, shape }))}
+              onCoverPicked={setCoverUri}
+              extraUrls={extraUrls}
+              extraUris={extraUris}
+              onExtraPicked={(uri) => setExtraUris((prev) => [...prev, uri])}
+              onRemoveExtraUrl={(i) => setExtraUrls((prev) => prev.filter((_, idx) => idx !== i))}
+              onRemoveExtraUri={(i) => setExtraUris((prev) => prev.filter((_, idx) => idx !== i))}
+            />
+          </>
+        );
+      case 1:
+        return (
+          <>
+            <StepTitle title={t('content_editor.details_title')} subtitle={t('content_editor.details_subtitle')} />
+            <RichTextField
+              label={t('content_editor.field_message')}
+              value={authorMessage}
+              onChangeText={(text) =>
+                setForm((prev) => (isSpanishAuthor ? { ...prev, message_es: text } : { ...prev, message: text }))
+              }
+              placeholder={t('announcement_editor:message_placeholder')}
+            />
+            {translation.element}
+          </>
+        );
+      case 2:
+        return (
+          <>
+            <StepTitle title={t('content_editor.extras_title')} subtitle={t('content_editor.extras_subtitle_announcement')} />
+            <View style={fs.twoCol}>
+              <View style={fs.twoColItem}>
+                <FieldLabel label={t('content_editor.field_badge')} />
+                <SelectRow
+                  iosIcon="star.fill"
+                  androidIcon="star"
+                  iconColor={priorityHue(form.priority, colors, isDark)}
+                  value={priorityLabel(form.priority)}
+                  onPress={() => setBadgePickerOpen(true)}
+                />
+              </View>
+              <View style={fs.twoColItem}>
+                <FieldLabel label={t('content_editor.field_visible_to')} />
+                <SelectRow
+                  iosIcon={form.visibility === 'none' ? 'eye.slash' : 'eye'}
+                  androidIcon={form.visibility === 'none' ? 'visibility-off' : 'visibility'}
+                  value={visibilityLabel(form.visibility)}
+                  onPress={() => setVisibilityPickerOpen(true)}
+                />
+              </View>
+            </View>
+            <View>
+              <FieldLabel label={t('content_editor.field_link')} trailing={t('content_editor.optional')} />
+              <GlassTextInput
+                value={form.link}
+                onChangeText={(link) => setForm((prev) => ({ ...prev, link }))}
+                placeholder={t('announcement_editor:link_placeholder')}
+                keyboardType="url"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <Hint>{t('content_editor.link_hint')}</Hint>
+            </View>
+            {!!user?.id && (
+              <AttachmentField contentKind="announcement" value={attachment} onChange={setAttachment} actorId={user.id} />
+            )}
+            <SimpleSelectPicker
+              visible={badgePickerOpen}
+              title={t('content_editor.field_badge')}
+              options={PRIORITY_LEVELS.map(priorityLabel)}
+              value={priorityLabel(form.priority)}
+              onSelect={(label) => {
+                const priority = PRIORITY_LEVELS.find((p) => priorityLabel(p) === label);
+                if (priority) setForm((prev) => ({ ...prev, priority }));
+              }}
+              onClose={() => setBadgePickerOpen(false)}
+            />
+            <SimpleSelectPicker
+              visible={visibilityPickerOpen}
+              title={t('content_editor.field_visible_to')}
+              options={VISIBILITY_OPTIONS.map(visibilityLabel)}
+              value={visibilityLabel(form.visibility)}
+              onSelect={(label) => {
+                const visibility = VISIBILITY_OPTIONS.find((v) => visibilityLabel(v) === label);
+                if (visibility) setForm((prev) => ({ ...prev, visibility }));
+              }}
+              onClose={() => setVisibilityPickerOpen(false)}
+            />
+          </>
+        );
       default:
-        return colors.textSecondary;
+        return (
+          <ReviewStep editing={!!editing}
+            preview={{
+              kind: 'announcement',
+              title: authorTitle,
+              body: authorMessage,
+              coverUri,
+              coverUrl: editing?.thumbnail_url ?? null,
+              shape: form.shape,
+              priority: form.priority,
+              hasLink: !!form.link.trim(),
+              attachmentLabel:
+                attachment?.kind === 'file'
+                  ? t('content_editor.preview_file')
+                  : attachment?.kind === 'guide'
+                    ? t('content_editor.preview_guide')
+                    : null,
+              eyebrow: t('content_editor.preview_eyebrow_announcement'),
+            }}
+            lines={reviewLines}
+            notify={editing ? undefined : { value: notify, onChange: setNotify }}
+          />
+        );
     }
   };
-
-  const getPriorityLabel = (priority: string) => {
-    switch (priority) {
-      case 'new':
-        return t('common:priority_new');
-      case 'important':
-        return t('common:priority_important');
-      case 'update':
-        return t('common:priority_update');
-      case 'none':
-        return t('common:priority_none');
-      default:
-        return priority.charAt(0).toUpperCase() + priority.slice(1);
-    }
-  };
-
-  const getVisibilityLabel = (visibility: string) => {
-    switch (visibility) {
-      case 'everyone':
-        return t('announcement_editor:visibility_everyone');
-      case 'employees':
-        return t('announcement_editor:visibility_employees');
-      case 'managers':
-        return t('announcement_editor:visibility_managers');
-      case 'none':
-        return t('announcement_editor:visibility_none');
-      default:
-        return visibility.charAt(0).toUpperCase() + visibility.slice(1);
-    }
-  };
-
-  const getVisibilityIcon = (visibility: string) => {
-    switch (visibility) {
-      case 'employees':
-        return 'person';
-      case 'managers':
-        return 'person.2';
-      case 'everyone':
-        return 'person.3';
-      case 'none':
-        return 'eye.slash';
-      default:
-        return 'person.3';
-    }
-  };
-
-  const filteredGuideFiles = guideFiles.filter(file =>
-    file.title.toLowerCase().includes(fileSearchQuery.toLowerCase()) ||
-    file.category.toLowerCase().includes(fileSearchQuery.toLowerCase()) ||
-    file.file_name.toLowerCase().includes(fileSearchQuery.toLowerCase())
-  );
-
-  const groupedGuideFiles = GUIDE_CATEGORIES.reduce((acc, category) => {
-    acc[category] = filteredGuideFiles.filter(f => f.category === category);
-    return acc;
-  }, {} as Record<string, GuideFile[]>);
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
-          <IconSymbol
-            ios_icon_name="chevron.left"
-            android_material_icon_name="arrow-back"
-            size={24}
-            color={colors.text}
-          />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('announcement_editor:title')}</Text>
-        <View style={styles.backButton} />
-      </View>
-
-      <View style={styles.subHeader}>
-        <Text style={styles.headerSubtitle}>
-          {t('announcement_editor:count', { count: announcements.length })}
-        </Text>
-      </View>
-
-      <TouchableOpacity 
-        style={[styles.addNewItemButton, announcements.length >= 10 && styles.addNewItemButtonDisabled]} 
-        onPress={openAddModal}
-        disabled={announcements.length >= 10}
+    <ContentListScreen
+      title={t('announcement_editor:title')}
+      eyebrow={t('content_editor.eyebrow_manage')}
+      emptyIconIos="megaphone.fill"
+      emptyIconAndroid="campaign"
+      items={items}
+      total={announcements.length}
+      max={MAX}
+      loading={loading}
+      search={search}
+      onSearchChange={setSearch}
+      searchPlaceholder={t('announcement_editor:search_placeholder')}
+      countLabel={t('announcement_editor:count_label', { count: announcements.length })}
+      onAdd={openAdd}
+      onEdit={openEdit}
+      onDelete={handleDelete}
+      onReorder={handleReorder}
+      emptyTitle={t('announcement_editor:empty_title')}
+      emptyBody={t('announcement_editor:empty_body')}
+      limitTitle={t('announcement_editor:limit_reached_title')}
+      limitMessage={t('announcement_editor:limit_reached_msg')}
+    >
+      <StepSheet
+        visible={sheetOpen}
+        onClose={closeSheet}
+        onDismiss={handoff.onDismiss}
+        title={editing ? t('announcement_editor:modal_edit') : t('announcement_editor:modal_add')}
+        subtitle={editing ? t('content_editor.sheet_subtitle_edit') : t('content_editor.sheet_subtitle_new')}
+        steps={steps}
+        step={step}
+        onStepChange={goToStep}
+        visited={visited}
+        primaryLabel={editing ? t('content_editor.save_changes') : t('content_editor.post_announcement')}
+        nextLabel={t('content_editor.next')}
+        backLabel={t('content_editor.back')}
+        cancelLabel={t('common:cancel')}
+        onPrimary={handleSave}
+        busy={busy}
       >
-        <IconSymbol
-          ios_icon_name="plus.circle.fill"
-          android_material_icon_name="add-circle"
-          size={24}
-          color={announcements.length >= 10 ? colors.textSecondary : colors.text}
-        />
-        <Text style={[styles.addNewItemButtonText, announcements.length >= 10 && styles.addNewItemButtonTextDisabled]}>
-          {announcements.length >= 10 ? t('announcement_editor:limit_reached') : t('announcement_editor:add_button')}
-        </Text>
-      </TouchableOpacity>
-
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>{t('announcement_editor:loading')}</Text>
-        </View>
-      ) : announcements.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <IconSymbol
-            ios_icon_name="plus.cirlce"
-            android_material_icon_name="campaign"
-            size={64}
-            color={colors.textSecondary}
-          />
-          <Text style={styles.emptyText}>{t('announcement_editor:empty_title')}</Text>
-          <Text style={styles.emptySubtext}>
-            {t('announcement_editor:empty_subtitle')}
-          </Text>
-        </View>
-      ) : (
-        <View style={styles.itemsList}>
-          {announcements.length > 1 && (
-            <Text style={styles.reorderHint}>{t('upcoming_events_editor:reorder_hint')}</Text>
-          )}
-          <DraggableFlatList
-            data={announcements}
-            keyExtractor={(item) => item.id}
-            onDragEnd={handleDragEnd}
-            activationDistance={10}
-            contentContainerStyle={styles.itemsListContent}
-            renderItem={({ item: announcement, getIndex, drag, isActive }: RenderItemParams<Announcement>) => {
-              const index = getIndex() ?? 0;
-
-              return (
-                <ScaleDecorator>
-                  <View style={[styles.announcementCard, isActive && styles.announcementCardDragging]}>
-                    {/* Drag Handle */}
-                    <TouchableOpacity
-                      onLongPress={drag}
-                      disabled={isActive}
-                      style={styles.dragHandle}
-                    >
-                      <IconSymbol
-                        ios_icon_name="line.3.horizontal"
-                        android_material_icon_name="drag-indicator"
-                        size={18}
-                        color="#FFFFFF"
-                      />
-                    </TouchableOpacity>
-
-                    {/* Meatball Menu */}
-                    <TouchableOpacity
-                      style={styles.meatballButton}
-                      onPress={() => openItemActions(announcement, index)}
-                    >
-                      <IconSymbol
-                        ios_icon_name="ellipsis"
-                        android_material_icon_name="more-vert"
-                        size={18}
-                        color="#FFFFFF"
-                      />
-                    </TouchableOpacity>
-
-                    {announcement.thumbnail_shape === 'square' && announcement.thumbnail_url ? (
-                      <View style={styles.squareLayout}>
-                        <StorageImage
-                          key={getImageUrl(announcement.thumbnail_url)}
-                          source={{ uri: getImageUrl(announcement.thumbnail_url) }}
-                          style={styles.squareImage}
-                        />
-                        <View style={styles.squareContent}>
-                          <View style={styles.announcementHeader}>
-                            <Text style={styles.announcementTitle}>{getLocalizedField(announcement, 'title', language)}</Text>
-                            {announcement.priority && announcement.priority !== 'none' && (
-                              <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(announcement.priority) }]}>
-                                {announcement.priority === 'new' && (
-                                  <IconSymbol
-                                    ios_icon_name="star.fill"
-                                    android_material_icon_name="star"
-                                    size={10}
-                                    color="#FFFFFF"
-                                  />
-                                )}
-                                <Text style={styles.priorityText}>{getPriorityLabel(announcement.priority).toUpperCase()}</Text>
-                              </View>
-                            )}
-                          </View>
-                          {(announcement.content || announcement.message) && (
-                            <FormattedText style={styles.squareMessage} numberOfLines={2}>
-                              {getLocalizedField(announcement, 'content', language) || announcement.message}
-                            </FormattedText>
-                          )}
-                          <View style={styles.announcementMeta}>
-                            <View style={styles.metaItem}>
-                              <IconSymbol
-                                ios_icon_name={getVisibilityIcon(announcement.visibility)}
-                                android_material_icon_name="visibility"
-                                size={16}
-                                color={colors.textSecondary}
-                              />
-                              <Text style={styles.metaText}>{getVisibilityLabel(announcement.visibility)}</Text>
-                            </View>
-                          </View>
-                        </View>
-                      </View>
-                    ) : (
-                      <>
-                        {announcement.thumbnail_url && (
-                          <StorageImage
-                            key={getImageUrl(announcement.thumbnail_url)}
-                            source={{ uri: getImageUrl(announcement.thumbnail_url) }}
-                            style={styles.bannerImage}
-                          />
-                        )}
-                        <View style={styles.announcementContent}>
-                          <View style={styles.announcementHeader}>
-                            <Text style={styles.announcementTitle}>{getLocalizedField(announcement, 'title', language)}</Text>
-                            {announcement.priority && announcement.priority !== 'none' && (
-                              <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(announcement.priority) }]}>
-                                {announcement.priority === 'new' && (
-                                  <IconSymbol
-                                    ios_icon_name="star.fill"
-                                    android_material_icon_name="star"
-                                    size={10}
-                                    color="#FFFFFF"
-                                  />
-                                )}
-                                <Text style={styles.priorityText}>{getPriorityLabel(announcement.priority).toUpperCase()}</Text>
-                              </View>
-                            )}
-                          </View>
-                          {(announcement.content || announcement.message) && (
-                            <FormattedText style={styles.announcementMessage}>
-                              {getLocalizedField(announcement, 'content', language) || announcement.message}
-                            </FormattedText>
-                          )}
-                          <View style={styles.announcementMeta}>
-                            <View style={styles.metaItem}>
-                              <IconSymbol
-                                ios_icon_name={getVisibilityIcon(announcement.visibility)}
-                                android_material_icon_name="visibility"
-                                size={16}
-                                color={colors.textSecondary}
-                              />
-                              <Text style={styles.metaText}>{getVisibilityLabel(announcement.visibility)}</Text>
-                            </View>
-                          </View>
-                        </View>
-                      </>
-                    )}
-                  </View>
-                </ScaleDecorator>
-              );
-            }}
-          />
-        </View>
-      )}
-
-      {/* Add/Edit Modal */}
-      <Modal
-        visible={showAddModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={closeModal}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalContainer}
-          keyboardVerticalOffset={0}
-        >
-          <TouchableOpacity 
-            style={styles.modalBackdrop} 
-            activeOpacity={1} 
-            onPress={closeModal}
-          />
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {editingAnnouncement ? t('announcement_editor:modal_edit') : t('announcement_editor:modal_add')}
-              </Text>
-              <TouchableOpacity onPress={closeModal}>
-                <IconSymbol
-                  ios_icon_name="xmark.circle.fill"
-                  android_material_icon_name="cancel"
-                  size={28}
-                  color="#666666"
-                />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView 
-              style={styles.modalScroll} 
-              contentContainerStyle={styles.modalScrollContent}
-              showsVerticalScrollIndicator={true}
-              bounces={false}
-              keyboardShouldPersistTaps="handled"
-            >
-              {/* === Section 1: Details === */}
-              <CollapsibleSection
-                title={t('announcement_editor:section_details')}
-                iconIos="info.circle"
-                iconAndroid="info"
-                iconColor={colors.primary}
-                headerBackgroundColor="#FFFFFF"
-                headerTextColor="#1A1A1A"
-                contentBackgroundColor="#FFFFFF"
-                defaultExpanded={true}
-              >
-                  {/* Thumbnail + Title */}
-                  <View style={styles.thumbAndNameRow}>
-                    <View style={styles.thumbColumn}>
-                      <TouchableOpacity style={styles.thumbSquare} onPress={pickImage}>
-                        {selectedImageUri || editingAnnouncement?.thumbnail_url ? (
-                          <StorageImage
-                            source={{ uri: selectedImageUri || getImageUrl(editingAnnouncement?.thumbnail_url || '') || '' }}
-                            style={styles.thumbImage}
-                            key={selectedImageUri || getImageUrl(editingAnnouncement?.thumbnail_url || '')}
-                          />
-                        ) : (
-                          <View style={styles.thumbPlaceholder}>
-                            <IconSymbol
-                              ios_icon_name="photo"
-                              android_material_icon_name="add-photo-alternate"
-                              size={28}
-                              color="#999999"
-                            />
-                          </View>
-                        )}
-                      </TouchableOpacity>
-                    </View>
-
-                    <View style={styles.nameColumn}>
-                      <Text style={styles.formLabel}>{t('announcement_editor:announcement_title_label')}</Text>
-                      <TextInput
-                        style={styles.input}
-                        placeholder={t('announcement_editor:announcement_title_placeholder')}
-                        placeholderTextColor="#999999"
-                        value={isSpanishAuthor ? formData.title_es : formData.title}
-                        onChangeText={(text) => setFormData(prev => isSpanishAuthor ? { ...prev, title_es: text } : { ...prev, title: text })}
-                      />
-                    </View>
-                  </View>
-
-                  {/* Square / Banner segmented control */}
-                  <View style={styles.shapeSegmented}>
-                    <TouchableOpacity
-                      style={[
-                        styles.shapeSegment,
-                        formData.thumbnail_shape === 'square' && styles.shapeSegmentActive,
-                      ]}
-                      onPress={() => setFormData({ ...formData, thumbnail_shape: 'square' })}
-                    >
-                      <Text
-                        style={[
-                          styles.shapeSegmentText,
-                          formData.thumbnail_shape === 'square' && styles.shapeSegmentTextActive,
-                        ]}
-                      >
-                        {t('announcement_editor:shape_square')}
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[
-                        styles.shapeSegment,
-                        formData.thumbnail_shape === 'banner' && styles.shapeSegmentActive,
-                      ]}
-                      onPress={() => setFormData({ ...formData, thumbnail_shape: 'banner' })}
-                    >
-                      <Text
-                        style={[
-                          styles.shapeSegmentText,
-                          formData.thumbnail_shape === 'banner' && styles.shapeSegmentTextActive,
-                        ]}
-                      >
-                        {t('announcement_editor:shape_banner')}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Additional Images */}
-                  <View style={styles.formGroup}>
-                    <Text style={styles.formLabel}>{t('common:additional_images')}</Text>
-                    <Text style={styles.formHint}>{t('common:additional_images_hint')}</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.additionalImagesScroll}>
-                      {additionalImageUrls.map((url, idx) => (
-                        <View key={`existing-${idx}`} style={styles.additionalImageContainer}>
-                          <StorageImage source={{ uri: getImageUrl(url) || url }} style={styles.additionalImageThumb} />
-                          <TouchableOpacity
-                            style={styles.removeImageButton}
-                            onPress={() => removeAdditionalImage(idx, false)}
-                          >
-                            <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={22} color="#E74C3C" />
-                          </TouchableOpacity>
-                        </View>
-                      ))}
-                      {newAdditionalImageUris.map((uri, idx) => (
-                        <View key={`new-${idx}`} style={styles.additionalImageContainer}>
-                          <StorageImage source={{ uri }} style={styles.additionalImageThumb} />
-                          <TouchableOpacity
-                            style={styles.removeImageButton}
-                            onPress={() => removeAdditionalImage(idx, true)}
-                          >
-                            <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={22} color="#E74C3C" />
-                          </TouchableOpacity>
-                          <View style={styles.newImageBadge}>
-                            <Text style={styles.newImageBadgeText}>{t('common:image_new_badge')}</Text>
-                          </View>
-                        </View>
-                      ))}
-                      <TouchableOpacity style={styles.addImageButton} onPress={pickAdditionalImage}>
-                        <IconSymbol ios_icon_name="plus.circle.fill" android_material_icon_name="add-circle" size={32} color="#D4A843" />
-                        <Text style={styles.addImageText}>{t('common:add')}</Text>
-                      </TouchableOpacity>
-                    </ScrollView>
-                  </View>
-              </CollapsibleSection>
-
-              {/* === Section 2: Description === */}
-              <CollapsibleSection
-                title={t('announcement_editor:section_description')}
-                iconIos="doc.text"
-                iconAndroid="description"
-                iconColor={colors.primary}
-                headerBackgroundColor="#FFFFFF"
-                headerTextColor="#1A1A1A"
-                contentBackgroundColor="#FFFFFF"
-                defaultExpanded={false}
-              >
-                  <View style={styles.formGroup}>
-                    <Text style={styles.formLabel}>{t('announcement_editor:message_label')}</Text>
-                    <RichTextToolbar
-                      text={isSpanishAuthor ? formData.message_es : formData.message}
-                      onChangeText={(text) => setFormData(prev => isSpanishAuthor ? { ...prev, message_es: text } : { ...prev, message: text })}
-                      selection={contentSelection}
-                      onSelectionChange={setContentSelection}
-                      textInputRef={contentInputRef}
-                      accentColor={colors.highlight}
-                    />
-                    <TextInput
-                      ref={contentInputRef}
-                      style={[styles.input, styles.textArea]}
-                      placeholder={t('announcement_editor:message_placeholder')}
-                      placeholderTextColor="#999999"
-                      value={isSpanishAuthor ? formData.message_es : formData.message}
-                      onChangeText={(text) => setFormData(prev => isSpanishAuthor ? { ...prev, message_es: text } : { ...prev, message: text })}
-                      multiline
-                      numberOfLines={4}
-                      onSelectionChange={(e) => setContentSelection(e.nativeEvent.selection)}
-                    />
-                  </View>
-
-                  {/* Bilingual authoring (s61 hybrid) */}
-                  <View style={styles.formGroup}>
-                    {translation.element}
-                  </View>
-              </CollapsibleSection>
-
-              {/* === Section 3: Additional Info === */}
-              <CollapsibleSection
-                title={t('announcement_editor:section_additional_info')}
-                iconIos="ellipsis.circle"
-                iconAndroid="more-horiz"
-                iconColor={colors.primary}
-                headerBackgroundColor="#FFFFFF"
-                headerTextColor="#1A1A1A"
-                contentBackgroundColor="#FFFFFF"
-                defaultExpanded={false}
-                >
-                  <View style={styles.formGroup}>
-                    <Text style={styles.formLabel}>{t('announcement_editor:link_label')}</Text>
-                    <TextInput
-                      style={styles.input}
-                      placeholder={t('announcement_editor:link_placeholder')}
-                      placeholderTextColor="#999999"
-                      value={formData.link}
-                      onChangeText={(text) => setFormData({ ...formData, link: text })}
-                      autoCapitalize="none"
-                      keyboardType="url"
-                    />
-                    <Text style={styles.formHint}>
-                      {t('announcement_editor:link_hint')}
-                    </Text>
-                  </View>
-
-                  <View style={styles.formGroup}>
-                    <Text style={styles.formLabel}>{t('announcement_editor:attach_file_label')}</Text>
-
-                    {selectedGuideFile ? (
-                      <View style={styles.selectedFileContainer}>
-                        <View style={styles.selectedFileInfo}>
-                          <IconSymbol
-                            ios_icon_name="doc.fill"
-                            android_material_icon_name="description"
-                            size={24}
-                            color={colors.primary}
-                          />
-                          <View style={styles.selectedFileText}>
-                            <Text style={styles.selectedFileTitle}>{selectedGuideFile.title}</Text>
-                            <Text style={styles.selectedFileCategory}>{selectedGuideFile.category}</Text>
-                          </View>
-                        </View>
-                        <TouchableOpacity onPress={clearGuideFile} style={styles.clearFileButton}>
-                          <IconSymbol
-                            ios_icon_name="xmark.circle.fill"
-                            android_material_icon_name="cancel"
-                            size={24}
-                            color="#E74C3C"
-                          />
-                        </TouchableOpacity>
-                      </View>
-                    ) : (
-                      <TouchableOpacity
-                        style={styles.filePickerButton}
-                        onPress={() => setShowFileSection(!showFileSection)}
-                      >
-                        <IconSymbol
-                          ios_icon_name={showFileSection ? "chevron.up" : "chevron.down"}
-                          android_material_icon_name={showFileSection ? "expand-less" : "expand-more"}
-                          size={24}
-                          color={colors.primary}
-                        />
-                        <Text style={styles.filePickerButtonText}>
-                          {showFileSection ? t('announcement_editor:hide_file_selection') : t('announcement_editor:show_file_selection')}
-                        </Text>
-                      </TouchableOpacity>
-                    )}
-
-                    {showFileSection && !selectedGuideFile && (
-                      <View style={styles.fileSelectionSection}>
-                        <View style={styles.searchContainer}>
-                          <IconSymbol
-                            ios_icon_name="magnifyingglass"
-                            android_material_icon_name="search"
-                            size={20}
-                            color="#666666"
-                          />
-                          <TextInput
-                            style={styles.searchInput}
-                            placeholder={t('announcement_editor:search_files_placeholder')}
-                            placeholderTextColor="#999999"
-                            value={fileSearchQuery}
-                            onChangeText={setFileSearchQuery}
-                          />
-                          {fileSearchQuery.length > 0 && (
-                            <TouchableOpacity onPress={() => setFileSearchQuery('')}>
-                              <IconSymbol
-                                ios_icon_name="xmark.circle.fill"
-                                android_material_icon_name="cancel"
-                                size={20}
-                                color="#999999"
-                              />
-                            </TouchableOpacity>
-                          )}
-                        </View>
-
-                        <ScrollView style={styles.fileList} nestedScrollEnabled={true}>
-                          {GUIDE_CATEGORIES.map((category, catIndex) => {
-                            const categoryFiles = groupedGuideFiles[category];
-                            if (categoryFiles.length === 0) return null;
-
-                            return (
-                              <View key={catIndex} style={styles.fileCategorySection}>
-                                <Text style={styles.fileCategoryTitle}>{category}</Text>
-                                {categoryFiles.map((file, fileIndex) => (
-                                  <TouchableOpacity
-                                    key={fileIndex}
-                                    style={styles.fileItem}
-                                    onPress={() => selectGuideFile(file)}
-                                  >
-                                    <IconSymbol
-                                      ios_icon_name="doc.fill"
-                                      android_material_icon_name="description"
-                                      size={24}
-                                      color={colors.primary}
-                                    />
-                                    <View style={styles.fileItemText}>
-                                      <Text style={styles.fileItemTitle}>{file.title}</Text>
-                                      <Text style={styles.fileItemName}>{file.file_name}</Text>
-                                    </View>
-                                    <IconSymbol
-                                      ios_icon_name="chevron.right"
-                                      android_material_icon_name="chevron-right"
-                                      size={20}
-                                      color="#666666"
-                                    />
-                                  </TouchableOpacity>
-                                ))}
-                              </View>
-                            );
-                          })}
-
-                          {filteredGuideFiles.length === 0 && (
-                            <View style={styles.emptyFileList}>
-                              <IconSymbol
-                                ios_icon_name="doc"
-                                android_material_icon_name="description"
-                                size={48}
-                                color="#999999"
-                              />
-                              <Text style={styles.emptyFileListText}>{t('announcement_editor:no_files_found')}</Text>
-                              <Text style={styles.emptyFileListSubtext}>
-                                {t('announcement_editor:no_files_subtext')}
-                              </Text>
-                            </View>
-                          )}
-                        </ScrollView>
-                      </View>
-                    )}
-
-                    <Text style={styles.formHint}>
-                      {t('announcement_editor:attach_file_hint')}
-                    </Text>
-                  </View>
-
-                  {/* Badge Type + Visible To — side-by-side dropdowns */}
-                  <View style={styles.formGroup}>
-                    <Text style={styles.formLabel}>{t('announcement_editor:badge_visibility_label')}</Text>
-                    <View style={styles.dropdownRow}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.formHint}>{t('announcement_editor:badge_label')}</Text>
-                        <SelectField
-                          value={getPriorityLabel(formData.priority)}
-                          placeholder={t('announcement_editor:badge_type_label')}
-                          onPress={() => setShowBadgePicker(true)}
-                        />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.formHint}>{t('announcement_editor:visible_to_label')}</Text>
-                        <SelectField
-                          value={getVisibilityLabel(formData.visibility)}
-                          placeholder={t('announcement_editor:visible_to_label')}
-                          onPress={() => setShowVisibilityPicker(true)}
-                        />
-                      </View>
-                    </View>
-                  </View>
-              </CollapsibleSection>
-
-              {!editingAnnouncement && (
-                <View style={styles.notificationToggleContainer}>
-                  <View style={styles.notificationToggleTextContainer}>
-                    <Text style={styles.notificationToggleLabel}>
-                      {t('announcement_editor:send_notification_label')}
-                    </Text>
-                    <Text style={styles.notificationToggleHint}>
-                      {t('announcement_editor:send_notification_hint')}
-                    </Text>
-                  </View>
-                  <Switch
-                    value={shouldSendNotification}
-                    onValueChange={setShouldSendNotification}
-                    trackColor={{ false: '#767577', true: colors.primary }}
-                    thumbColor="#f4f3f4"
-                  />
-                </View>
-              )}
-
-              <View style={styles.buttonRow}>
-                <TouchableOpacity
-                  style={styles.cancelButton}
-                  onPress={closeModal}
-                >
-                  <Text style={styles.cancelButtonText}>{t('announcement_editor:cancel_button')}</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.saveButton}
-                  onPress={handleSave}
-                  disabled={uploadingImage}
-                >
-                  {uploadingImage ? (
-                    <ActivityIndicator color={colors.fireText} />
-                  ) : (
-                    <Text style={styles.saveButtonText}>
-                      {editingAnnouncement ? t('announcement_editor:save_button') : t('announcement_editor:add_save_button')}
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
-
-            <SimpleSelectPicker
-              visible={showBadgePicker}
-              title={t('announcement_editor:badge_type_label')}
-              options={PRIORITY_LEVELS.map(p => getPriorityLabel(p))}
-              value={getPriorityLabel(formData.priority)}
-              onSelect={(label) => {
-                const match = PRIORITY_LEVELS.find(p => getPriorityLabel(p) === label);
-                if (match) setFormData(prev => ({ ...prev, priority: match }));
-              }}
-              onClose={() => setShowBadgePicker(false)}
-            />
-
-            <SimpleSelectPicker
-              visible={showVisibilityPicker}
-              title={t('announcement_editor:visible_to_label')}
-              options={VISIBILITY_OPTIONS.map(v => getVisibilityLabel(v))}
-              value={getVisibilityLabel(formData.visibility)}
-              onSelect={(label) => {
-                const match = VISIBILITY_OPTIONS.find(v => getVisibilityLabel(v) === label);
-                if (match) setFormData(prev => ({ ...prev, visibility: match }));
-              }}
-              onClose={() => setShowVisibilityPicker(false)}
-            />
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
-
-      <OrderPositionModal
-        visible={!!positionPicker}
-        title={t('menu_editor:order_position')}
-        subtitle={positionPicker?.item.title || ''}
-        count={announcements.length}
-        currentIndex={positionPicker?.currentIndex ?? 0}
-        onClose={() => setPositionPicker(null)}
-        onApply={applyPositionChange}
-      />
-    </View>
+        {renderPane()}
+      </StepSheet>
+    </ContentListScreen>
   );
 }
-
-const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'android' ? 48 : 60,
-    paddingBottom: 12,
-    backgroundColor: colors.card,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
-  },
-  backButton: {
-    padding: 8,
-    width: 40,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.text,
-  },
-  subHeader: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: colors.card,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: colors.textSecondary,
-  },
-  addNewItemButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.highlight,
-    marginHorizontal: 16,
-    marginTop: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
-    gap: 10,
-  },
-  addNewItemButtonDisabled: {
-    backgroundColor: colors.card,
-    opacity: 0.6,
-  },
-  addNewItemButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: colors.text,
-  },
-  addNewItemButtonTextDisabled: {
-    color: colors.textSecondary,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginTop: 12,
-  },
-  itemsList: {
-    flex: 1,
-    marginTop: 16,
-  },
-  itemsListContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 100,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 60,
-  },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.text,
-    marginTop: 16,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  announcementCard: {
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    marginBottom: 16,
-    overflow: 'hidden',
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
-  },
-  announcementCardDragging: {
-    opacity: 0.9,
-    transform: [{ scale: 1.02 }],
-  },
-  squareLayout: {
-    flexDirection: 'row',
-    padding: 12,
-    gap: 12,
-  },
-  squareImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 12,
-    resizeMode: 'cover',
-  },
-  squareContent: {
-    flex: 1,
-    justifyContent: 'flex-start',
-  },
-  squareMessage: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    marginTop: 6,
-    lineHeight: 18,
-  },
-  bannerImage: {
-    width: '100%',
-    height: 200,
-    resizeMode: 'cover',
-  },
-  announcementContent: {
-    padding: 16,
-  },
-  announcementHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  announcementTitle: {
-    flex: 1,
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.text,
-    marginRight: 12,
-  },
-  priorityBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginTop: 28,
-  },
-  priorityText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
-  announcementMessage: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginBottom: 12,
-    lineHeight: 20,
-  },
-  announcementMeta: {
-    flexDirection: 'row',
-    gap: 16,
-    marginTop: 8,
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  metaText: {
-    fontSize: 12,
-    color: colors.textSecondary,
-  },
-  meatballButton: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    padding: 6,
-    zIndex: 10,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    borderRadius: 14,
-  },
-  dragHandle: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    padding: 6,
-    zIndex: 10,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    borderRadius: 14,
-  },
-  reorderHint: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    fontStyle: 'italic',
-    textAlign: 'center',
-    paddingHorizontal: 16,
-    marginBottom: 8,
-    marginTop: 12,
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'flex-start',
-  },
-  modalBackdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-  },
-  modalContent: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    height: '95%',
-    marginTop: 'auto',
-    boxShadow: '0px -4px 20px rgba(0, 0, 0, 0.4)',
-    elevation: 10,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-    backgroundColor: '#FFFFFF',
-  },
-  modalTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1A1A1A',
-  },
-  modalScroll: {
-    flex: 1,
-    backgroundColor: '#EEEFF1',
-  },
-  modalScrollContent: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-  dropdownRow: {
-    flexDirection: 'row' as const,
-    gap: 12,
-    marginTop: 8,
-  },
-  formGroup: {
-    marginBottom: 20,
-  },
-  formLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1A1A1A',
-    marginBottom: 8,
-  },
-  formHint: {
-    fontSize: 12,
-    color: '#666666',
-    marginTop: 6,
-    fontStyle: 'italic',
-  },
-  input: {
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-    color: '#1A1A1A',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  textArea: {
-    height: 100,
-    textAlignVertical: 'top',
-    paddingTop: 14,
-  },
-  thumbAndNameRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
-    alignItems: 'flex-start',
-  },
-  thumbColumn: {
-    width: 80,
-    alignItems: 'center',
-  },
-  nameColumn: {
-    flex: 1,
-  },
-  thumbSquare: {
-    width: 80,
-    height: 80,
-    borderRadius: 12,
-    backgroundColor: '#F5F5F5',
-    borderWidth: 2,
-    borderColor: '#E0E0E0',
-    borderStyle: 'dashed',
-    overflow: 'hidden',
-  },
-  thumbImage: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  thumbPlaceholder: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  shapeSegmented: {
-    flexDirection: 'row',
-    marginBottom: 16,
-    borderRadius: 10,
-    backgroundColor: '#F5F5F5',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    overflow: 'hidden',
-  },
-  shapeSegment: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  shapeSegmentActive: {
-    backgroundColor: colors.primary,
-  },
-  shapeSegmentText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666666',
-  },
-  shapeSegmentTextActive: {
-    color: colors.fireText,
-  },
-  selectedFileContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: colors.highlight,
-  },
-  selectedFileInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  selectedFileText: {
-    flex: 1,
-  },
-  selectedFileTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1A1A1A',
-  },
-  selectedFileCategory: {
-    fontSize: 12,
-    color: '#666666',
-    marginTop: 2,
-  },
-  clearFileButton: {
-    padding: 4,
-  },
-  filePickerButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderWidth: 2,
-    borderColor: '#E0E0E0',
-    borderStyle: 'dashed',
-    gap: 8,
-  },
-  filePickerButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.highlight,
-  },
-  fileSelectionSection: {
-    marginTop: 12,
-    backgroundColor: '#FAFAFA',
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 12,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    color: '#1A1A1A',
-  },
-  fileList: {
-    maxHeight: 300,
-  },
-  fileCategorySection: {
-    marginBottom: 16,
-  },
-  fileCategoryTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#1A1A1A',
-    marginBottom: 8,
-    paddingHorizontal: 4,
-  },
-  fileItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 6,
-    gap: 10,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  fileItemText: {
-    flex: 1,
-  },
-  fileItemTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1A1A1A',
-  },
-  fileItemName: {
-    fontSize: 11,
-    color: '#666666',
-    marginTop: 2,
-  },
-  emptyFileList: {
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  emptyFileListText: {
-    fontSize: 14,
-    color: '#999999',
-    marginTop: 12,
-    fontWeight: '600',
-  },
-  emptyFileListSubtext: {
-    fontSize: 12,
-    color: '#999999',
-    marginTop: 4,
-    textAlign: 'center',
-    paddingHorizontal: 20,
-  },
-  notificationToggleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    padding: 16,
-    marginTop: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  notificationToggleTextContainer: {
-    flex: 1,
-    marginRight: 12,
-  },
-  notificationToggleLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  notificationToggleHint: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: 4,
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 24,
-  },
-  saveButton: {
-    flex: 1,
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  saveButtonText: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: colors.fireText,
-  },
-  cancelButton: {
-    flex: 1,
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  cancelButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#666666',
-  },
-  additionalImagesScroll: {
-    marginTop: 10,
-  },
-  additionalImageContainer: {
-    position: 'relative',
-    marginRight: 12,
-  },
-  additionalImageThumb: {
-    width: 80,
-    height: 80,
-    borderRadius: 10,
-    backgroundColor: '#F5F5F5',
-  },
-  removeImageButton: {
-    position: 'absolute',
-    top: -6,
-    right: -6,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 11,
-    zIndex: 10,
-  },
-  newImageBadge: {
-    position: 'absolute',
-    bottom: 4,
-    left: 4,
-    backgroundColor: '#4CAF50',
-    borderRadius: 4,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-  },
-  newImageBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 8,
-    fontWeight: 'bold',
-  },
-  addImageButton: {
-    width: 80,
-    height: 80,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: '#E0E0E0',
-    borderStyle: 'dashed',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#FAFAFA',
-  },
-  addImageText: {
-    fontSize: 11,
-    color: '#999999',
-    marginTop: 2,
-  },
-});
