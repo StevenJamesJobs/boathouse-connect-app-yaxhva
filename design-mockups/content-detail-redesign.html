@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Content Detail Concepts</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{min-height:100vh;display:flex;flex-direction:column;align-items:center;gap:14px;padding:24px 12px 60px;background:#0C0D11;color:#D6D9DE;
+  font-family:'Inter','SF Pro Text',system-ui,sans-serif}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+
+/* ---------- toolbar ---------- */
+h1{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:22px;letter-spacing:-0.3px;color:#F4F6F8}
+h1 span{color:#FF8A4A}
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center;max-width:1000px}
+.grp{display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);padding:6px;border-radius:16px}
+.gl2{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:#6E7681;margin:0 4px 0 6px}
+.tb{background:rgba(255,255,255,0.06);color:#D6D9DE;border:1px solid rgba(255,255,255,0.10);border-radius:11px;padding:7px 11px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:.18s}
+.tb:hover{background:rgba(255,255,255,0.12)}
+.tb.on{background:#F4F6F8;color:#15171C;border-color:#F4F6F8}
+.tb:focus-visible{outline:2px solid #5C8DF0;outline-offset:2px}
+.hint{color:#6E7681;font-size:11.5px;font-family:'JetBrains Mono',ui-monospace,monospace;text-align:center;max-width:900px;line-height:1.7}
+.hint b{color:#AEB4BD;font-weight:600}
+.hint em{font-style:normal;color:#2FBF8F}
+.row{display:flex;flex-wrap:wrap;gap:18px;justify-content:center;align-items:flex-start;max-width:1700px}
+.col{display:flex;flex-direction:column;gap:10px;align-items:center}
+.concept{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:#6E7681;display:flex;align-items:center;gap:8px;width:392px}
+.concept b{color:#FF8A4A}
+.concept .ln{flex:1;height:1px;background:rgba(255,255,255,0.08)}
+.bcap{width:392px;font-size:11px;color:#8A9098;line-height:1.55;font-style:italic}
+.bcap b{font-style:normal;color:#D6D9DE;font-weight:600}
+.bcap em{font-style:normal;color:#2FBF8F;font-weight:600}
+.notes{max-width:1000px;width:100%;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;margin-top:6px}
+.note{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:12px 14px;font-size:11.5px;line-height:1.55;color:#AEB4BD}
+.note b{display:block;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:#FF8A4A;margin-bottom:5px}
+.note em{font-style:normal;color:#F4F6F8;font-weight:600}
+
+/* ---------- phone shell + theme palettes (the s76–s80 kit) ---------- */
+.phone{
+  --bg:#181B21; --text:#F4F6F8; --muted:#9AA1A8; --fireText:#1A1E24; --tint:#FF7A2F;
+  --glass:rgba(255,255,255,0.07); --glassbd:rgba(255,255,255,0.12); --surf:rgba(255,255,255,0.045); --surfbd:rgba(255,255,255,0.09); --hair:rgba(255,255,255,0.07);
+  --glowA:rgba(230,234,238,0.12); --glowB:rgba(59,130,246,0.10); --scrim:rgba(6,10,18,0.55); --thumb:#2C313A; --sheetbg:#20242B;
+  --azure:#3B82F6; --violet:#7C5CE0; --gold:#F59E0B; --bad:#EF4444; --blue:#3B82F6; --ember:#FFB07A; --ok:#10A56F; --pdf:#E5484D;
+  position:relative;width:392px;height:840px;background:var(--bg);border-radius:46px;border:1px solid #2A2E36;overflow:hidden;
+  box-shadow:0 40px 90px -30px rgba(0,0,0,0.8);transition:background .3s;display:flex;flex-direction:column;color:var(--text)}
+.phone.t-mono-l{--bg:#ECECEE;--text:#22262C;--muted:#6E747C;--fireText:#FFFFFF;--tint:#EC6A1E;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.66);--surfbd:rgba(0,0,0,0.07);--hair:rgba(0,0,0,0.07);--glowA:rgba(58,66,80,0.10);--glowB:rgba(37,99,235,0.10);--scrim:rgba(20,24,32,0.35);--thumb:#D9DBDF;--sheetbg:#F6F6F8;--azure:#2563EB;--violet:#6D28D9;--gold:#B45309;--ok:#087A52;--pdf:#C9363B}
+.phone.t-ocean-d{--bg:#1A2332;--text:#FFFFFF;--muted:#A8B8D8;--fireText:#0A1422;--tint:#5DA0E5;--glass:rgba(255,255,255,0.07);--glassbd:rgba(255,255,255,0.13);--surf:rgba(255,255,255,0.05);--surfbd:rgba(255,255,255,0.10);--hair:rgba(255,255,255,0.08);--glowA:rgba(74,144,226,0.32);--glowB:rgba(16,185,129,0.13);--thumb:#2A3A50;--sheetbg:#222E40}
+.phone.t-ocean-l{--bg:#E8F4F8;--text:#1A3A52;--muted:#4A6B7C;--fireText:#FFFFFF;--tint:#1976D2;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.7);--surfbd:rgba(13,71,161,0.10);--hair:rgba(13,71,161,0.08);--glowA:rgba(25,118,210,0.18);--glowB:rgba(5,150,105,0.13);--scrim:rgba(10,30,50,0.35);--thumb:#CFE0EA;--sheetbg:#F3F9FC;--azure:#2563EB;--violet:#6D28D9;--gold:#B45309;--ok:#087A52;--pdf:#C9363B}
+
+.glow{position:absolute;top:-120px;right:-80px;width:360px;height:320px;border-radius:50%;background:radial-gradient(circle,var(--glowA),transparent 66%);z-index:0;pointer-events:none}
+.glow2{position:absolute;top:-70px;left:-90px;width:300px;height:280px;border-radius:50%;background:radial-gradient(circle,var(--glowB),transparent 68%);z-index:0;pointer-events:none}
+.sb{position:relative;z-index:3;display:flex;justify-content:space-between;align-items:center;padding:16px 30px 4px;font-size:13px;font-weight:600;font-family:'JetBrains Mono',ui-monospace,monospace;color:var(--text)}
+
+/* the Welcome page sleeping under the scrim */
+.under{position:absolute;inset:0;z-index:1;padding:64px 16px 0;display:flex;flex-direction:column;gap:10px;opacity:.9}
+.under .eyeb{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1.6px;text-transform:uppercase;color:var(--tint)}
+.under h2{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:26px;letter-spacing:-0.4px;color:var(--text)}
+.under .ucard{height:66px;border-radius:16px;background:var(--surf);border:1px solid var(--surfbd)}
+.scrim{position:absolute;inset:0;z-index:4;background:var(--scrim)}
+
+/* ---------- shared kit ---------- */
+.ic{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.disp{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif}
+
+/* painted stand-in photos (the real ones are private-bucket signed reads) */
+.ph{background:
+  radial-gradient(120% 80% at 20% 10%,rgba(255,196,120,.55),transparent 55%),
+  radial-gradient(90% 70% at 80% 80%,rgba(120,30,20,.9),transparent 60%),
+  radial-gradient(60% 50% at 60% 30%,rgba(255,110,60,.85),transparent 60%),
+  linear-gradient(160deg,#9C2E1F,#4A1410 70%,#2A0C0A)}
+.ph.p2{background:
+  radial-gradient(100% 70% at 70% 20%,rgba(160,230,255,.6),transparent 55%),
+  radial-gradient(80% 60% at 20% 90%,rgba(10,70,110,.95),transparent 60%),
+  linear-gradient(200deg,#2C8DB0,#0F3E5C 70%,#071F31)}
+.ph.p3{background:
+  radial-gradient(90% 70% at 30% 20%,rgba(255,236,160,.75),transparent 55%),
+  radial-gradient(70% 60% at 80% 85%,rgba(150,90,10,.9),transparent 60%),
+  linear-gradient(170deg,#E0A03A,#8A5210 70%,#4A2B08)}
+.ph::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(115deg,rgba(255,255,255,.035) 0 2px,transparent 2px 7px);mix-blend-mode:overlay;pointer-events:none}
+
+/* the sheet — GlassCard variant=glass r26 intensity 32, flush to the bottom edge */
+.sheet{position:absolute;left:0;right:0;bottom:0;z-index:5;height:88%;display:flex;flex-direction:column;
+  background:color-mix(in srgb,var(--sheetbg) 94%,transparent);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  border:1px solid var(--glassbd);border-bottom:0;border-radius:26px 26px 0 0;overflow:hidden;color:var(--text)}
+.grab{width:40px;height:4px;border-radius:2px;background:var(--glassbd);margin:10px auto 8px;flex:0 0 auto}
+.grab.over{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:6;background:rgba(255,255,255,.55);box-shadow:0 1px 3px rgba(0,0,0,.35);margin:0}
+.body{flex:1;overflow-y:auto;scrollbar-width:none;padding:0 18px 12px}
+.body::-webkit-scrollbar{display:none}
+.foot{flex:0 0 auto;padding:9px 18px 30px;display:flex;gap:11px}
+.closebtn{flex:1;height:47px;border-radius:13px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:15px;color:var(--muted)}
+.primary{flex:1.35;height:47px;border-radius:13px;background:var(--tint);color:var(--fireText);display:flex;align-items:center;justify-content:center;gap:8px;font-weight:600;font-size:15px;position:relative;overflow:hidden}
+.primary::after{content:"";position:absolute;left:0;top:0;bottom:0;width:38%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.28),transparent);transform:skewX(-18deg) translateX(-160%);animation:shine 4.5s ease-in-out infinite}
+@keyframes shine{0%,70%{transform:skewX(-18deg) translateX(-160%)}100%{transform:skewX(-18deg) translateX(420%)}}
+
+/* pills */
+.pill{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:7px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#fff}
+.pill.event{background:var(--azure)}
+.pill.ent{background:var(--violet)}
+.pill.imp{background:var(--bad)}
+.pill.new{background:var(--gold)}
+.pill.ghost{background:rgba(20,16,14,.55);border:1px solid rgba(255,255,255,.16);color:var(--ember);backdrop-filter:blur(6px)}
+.pill.soft{background:color-mix(in srgb,var(--tint) 14%,transparent);color:var(--tint);border:1px solid color-mix(in srgb,var(--tint) 26%,transparent)}
+.eyeb{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);font-weight:600}
+.eyeb.ember{color:var(--ember)}
+
+/* carousel */
+.car{position:relative;overflow:hidden;background:var(--thumb)}
+.car .track{display:flex;height:100%;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none}
+.car .track::-webkit-scrollbar{display:none}
+.car .slide{flex:0 0 100%;height:100%;scroll-snap-align:start;position:relative}
+.car .cnt{position:absolute;top:12px;right:12px;z-index:3;background:rgba(8,10,14,.55);color:#fff;border-radius:13px;padding:4px 10px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;font-weight:600;letter-spacing:.3px;backdrop-filter:blur(6px)}
+.dots{position:absolute;left:0;right:0;bottom:10px;z-index:3;display:flex;justify-content:center;gap:6px;pointer-events:none}
+.dots i{width:6px;height:6px;border-radius:3px;background:rgba(255,255,255,.45);transition:.2s}
+.dots i.on{width:18px;background:#fff}
+.hidedots .dots,.hidedots .cnt{display:none}
+
+/* description */
+.desc{font-size:15px;line-height:23px;color:var(--muted);white-space:pre-line}
+.desc b{color:var(--text);font-weight:600}
+.h{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;letter-spacing:-0.3px;color:var(--text);text-wrap:balance}
+
+/* glass rows */
+.grow{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:13px;background:var(--surf);border:1px solid var(--surfbd)}
+.grow .k{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-weight:600}
+.grow .v{font-size:13.5px;font-weight:500;color:var(--text)}
+.sq{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:var(--glass);border:1px solid var(--glassbd);color:var(--text);flex:0 0 auto}
+.sq.t{background:color-mix(in srgb,var(--tint) 16%,transparent);border-color:color-mix(in srgb,var(--tint) 30%,transparent);color:var(--tint)}
+.pdf{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:0 0 auto;background:color-mix(in srgb,var(--pdf) 16%,transparent);border:1px solid color-mix(in srgb,var(--pdf) 34%,transparent);color:var(--pdf);font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;font-weight:700;letter-spacing:.6px}
+.chip{display:inline-flex;align-items:center;gap:5px;height:30px;padding:0 10px;border-radius:9px;background:var(--glass);border:1px solid var(--glassbd);font-size:12px;font-weight:600;color:var(--text)}
+.chip.t{background:var(--tint);border-color:var(--tint);color:var(--fireText)}
+
+/* ================= C1 · HERO SHEET ================= */
+.c1 .hero{height:236px;flex:0 0 auto;position:relative}
+.c1 .hero .car{height:100%}
+.c1 .hero .scr{position:absolute;inset:0;z-index:2;background:linear-gradient(to top,rgba(14,11,9,.92) 0%,rgba(14,11,9,.45) 30%,transparent 58%);pointer-events:none}
+.c1 .hero .over{position:absolute;left:18px;right:18px;bottom:14px;z-index:3;display:flex;align-items:center;gap:8px}
+.c1 .hero .over .when{margin-left:auto;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--ember);font-weight:600}
+.c1 .title{font-size:23px;line-height:1.15;margin:16px 0 12px}
+.c1 .when2{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;padding:11px 13px;border-radius:14px;background:var(--surf);border:1px solid var(--surfbd);margin-bottom:14px}
+.c1 .when2 .cell{display:flex;flex-direction:column;gap:2px}
+.c1 .when2 .cell .k{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);font-weight:600}
+.c1 .when2 .cell .d{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:15px;color:var(--text)}
+.c1 .when2 .cell .tm{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11.5px;color:var(--tint);font-weight:600}
+.c1 .when2 .arrow{width:28px;height:28px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:var(--muted);background:var(--glass);border:1px solid var(--glassbd)}
+.c1 .sec{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);font-weight:600;margin:18px 2px 8px;display:flex;align-items:center;gap:8px}
+.c1 .sec i{flex:1;height:1px;background:var(--hair)}
+.c1 .att{display:flex;flex-direction:column;gap:8px}
+.c1 .att .grow .txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.c1 .att .grow .txt .n{font-size:13.5px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.c1 .att .grow .txt .m{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;color:var(--muted);letter-spacing:.3px}
+.c1 .att .acts{display:flex;gap:6px}
+/* no-photo state */
+.nophoto .c1 .hero{display:none}
+.nophoto .c1 .grab.over{display:none}
+.nophoto .c1 .grab.plain{display:block}
+.c1 .grab.plain{display:none}
+.nophoto .c1 .topline{display:flex}
+.c1 .topline{display:none;align-items:center;gap:8px;margin-top:6px}
+.c1 .topline .when{margin-left:auto;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--tint);font-weight:600}
+
+/* ================= C2 · TICKET ================= */
+.c2 .head{display:flex;align-items:center;justify-content:space-between;padding:2px 0 12px}
+.c2 .head .x{width:34px;height:34px;border-radius:10px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;justify-content:center;color:var(--muted)}
+.c2 .ticket{border-radius:18px;background:var(--surf);border:1px solid var(--surfbd);overflow:hidden;position:relative}
+.c2 .ticket .car{height:176px;border-radius:0}
+.c2 .stubhead{display:flex;gap:12px;padding:13px 14px 12px;align-items:flex-start}
+.c2 .datetile{flex:0 0 auto;width:58px;border-radius:12px;background:var(--tint);color:var(--fireText);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:7px 0 6px;box-shadow:0 6px 16px -6px color-mix(in srgb,var(--tint) 60%,transparent)}
+.c2 .datetile .mo{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1.4px;font-weight:700;opacity:.85}
+.c2 .datetile .dd{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:800;font-size:27px;line-height:1;margin-top:2px}
+.c2 .datetile .dw{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;letter-spacing:1px;font-weight:600;opacity:.85;margin-top:3px}
+.c2 .stubhead .t{flex:1;min-width:0}
+.c2 .stubhead .t .h{font-size:20px;line-height:1.12}
+.c2 .stubhead .t .tm{margin-top:6px;display:flex;align-items:center;gap:6px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11.5px;color:var(--tint);font-weight:600}
+.c2 .stubhead .t .tm .sep{color:var(--muted)}
+.c2 .stubhead .t .pl{margin-top:7px;display:flex;gap:5px}
+.c2 .perf{position:relative;height:0;border-top:1.5px dashed var(--glassbd);margin:2px 12px 0}
+.c2 .perf::before,.c2 .perf::after{content:"";position:absolute;top:-10px;width:20px;height:20px;border-radius:50%;background:var(--sheetbg);border:1px solid var(--surfbd)}
+.c2 .perf::before{left:-23px}.c2 .perf::after{right:-23px}
+.c2 .stub{padding:14px 14px 14px}
+.c2 .stub .desc{font-size:14px;line-height:21px}
+.c2 .acts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+.c2 .act{display:flex;align-items:center;gap:9px;padding:10px 11px;border-radius:12px;background:var(--glass);border:1px solid var(--glassbd)}
+.c2 .act .n{font-size:12.5px;font-weight:600;color:var(--text);line-height:1.15}
+.c2 .act .m{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;color:var(--muted);margin-top:2px;letter-spacing:.3px}
+.c2 .act.t{background:color-mix(in srgb,var(--tint) 14%,transparent);border-color:color-mix(in srgb,var(--tint) 30%,transparent)}
+.c2 .act.t .ico{color:var(--tint)}
+.c2 .act .dl{margin-left:auto;width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:var(--glass);border:1px solid var(--glassbd);color:var(--text)}
+.c2 .barcode{margin:14px 14px 12px;height:26px;background:repeating-linear-gradient(90deg,var(--text) 0 2px,transparent 2px 4px,var(--text) 4px 5px,transparent 5px 9px,var(--text) 9px 12px,transparent 12px 14px);opacity:.28;border-radius:2px}
+.c2 .bcl{display:flex;justify-content:space-between;padding:0 14px 12px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted)}
+.nophoto .c2 .ticket .car{display:none}
+
+/* ================= C3 · POSTER ================= */
+.c3 .poster{height:56%;flex:0 0 auto;position:relative}
+.c3 .poster .car{height:100%}
+.c3 .poster .scr{position:absolute;inset:0;z-index:2;background:linear-gradient(to top,rgba(14,11,9,.96) 0%,rgba(14,11,9,.62) 28%,rgba(14,11,9,.05) 60%);pointer-events:none}
+.c3 .poster .into{position:absolute;left:20px;right:20px;bottom:18px;z-index:3;color:#fff}
+.c3 .poster .into .line{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.c3 .poster .into .line .when{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:var(--ember);font-weight:600}
+.c3 .poster .into .h{color:#fff;font-size:30px;line-height:1.02;letter-spacing:-0.6px;font-weight:800}
+.c3 .poster .into .tm{margin-top:9px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;color:#F1E7DC;font-weight:600;display:flex;gap:8px;align-items:center}
+.c3 .poster .into .tm b{color:var(--ember);font-weight:600}
+.c3 .facts{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin:14px 0 14px}
+.c3 .fact{padding:9px 10px;border-radius:12px;background:var(--surf);border:1px solid var(--surfbd);display:flex;flex-direction:column;gap:3px;min-width:0}
+.c3 .fact .k{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);font-weight:600}
+.c3 .fact .v{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:13.5px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.c3 .fact .v small{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;color:var(--tint);font-weight:600;margin-left:4px}
+.c3 .dock{flex:0 0 auto;padding:10px 18px 30px;display:flex;gap:8px;border-top:1px solid var(--hair);background:color-mix(in srgb,var(--sheetbg) 70%,transparent)}
+.c3 .split{flex:1;height:47px;border-radius:13px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:stretch;overflow:hidden}
+.c3 .split .l{flex:1;display:flex;align-items:center;gap:8px;padding:0 12px;font-size:13.5px;font-weight:600;color:var(--text);min-width:0}
+.c3 .split .l span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.c3 .split .r{width:44px;display:flex;align-items:center;justify-content:center;border-left:1px solid var(--glassbd);color:var(--text)}
+.c3 .board{display:none;position:absolute;inset:0;background:linear-gradient(160deg,var(--azure),color-mix(in srgb,var(--azure) 55%,#0A1020))}
+.nophoto .c3 .board{display:block}
+.nophoto .c3 .poster{height:44%}
+.nophoto .c3 .poster .track,.nophoto .c3 .poster .cnt,.nophoto .c3 .poster .dots{display:none}
+
+/* ================= C4 · DOSSIER ================= */
+.c4 .top{display:flex;align-items:center;gap:8px;margin-top:4px}
+.c4 .top .x{margin-left:auto;width:34px;height:34px;border-radius:10px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;justify-content:center;color:var(--muted)}
+.c4 .title{font-size:27px;line-height:1.05;letter-spacing:-0.5px;margin:14px 0 6px;font-weight:800}
+.c4 .sub{font-size:13.5px;color:var(--muted);line-height:1.4;margin-bottom:14px}
+.c4 .ledger{border-top:1px solid var(--hair)}
+.c4 .lr{display:flex;align-items:center;gap:12px;padding:11px 2px;border-bottom:1px solid var(--hair);min-height:46px}
+.c4 .lr .k{width:58px;flex:0 0 auto;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);font-weight:600}
+.c4 .lr .v{flex:1;min-width:0;font-size:13.5px;color:var(--text);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.c4 .lr .v .tm{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11.5px;color:var(--tint);font-weight:600;margin-left:6px}
+.c4 .lr .v .m{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;color:var(--muted);margin-left:6px}
+.c4 .lr .a{display:flex;gap:6px;flex:0 0 auto}
+.c4 .film{margin:16px -18px 4px;padding:0 18px;display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none}
+.c4 .film::-webkit-scrollbar{display:none}
+.c4 .film .f{flex:0 0 236px;height:150px;border-radius:14px;position:relative;overflow:hidden;scroll-snap-align:start;border:1px solid var(--surfbd)}
+.c4 .film .f .n{position:absolute;left:10px;bottom:8px;z-index:2;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1px;color:#fff;background:rgba(8,10,14,.55);padding:3px 7px;border-radius:7px}
+.c4 .filmlbl{display:flex;align-items:center;justify-content:space-between;margin:12px 2px 0}
+.c4 .filmlbl .eyeb{color:var(--muted)}
+.c4 .filmlbl .sw{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:.8px;color:var(--tint);font-weight:600}
+.c4 .desc{margin-top:16px}
+.nophoto .c4 .film,.nophoto .c4 .filmlbl{display:none}
+
+/* ================= banner card panel ================= */
+.cardwrap{width:392px;padding:14px 16px 8px;display:flex;flex-direction:column;gap:12px;position:relative;z-index:2}
+.wcard{position:relative;border-radius:18px;overflow:hidden;height:150px;border:1px solid var(--surfbd)}
+.wcard .scr{position:absolute;inset:0;background:linear-gradient(to top,rgba(14,11,9,.93) 8%,rgba(14,11,9,.05) 64%)}
+.wcard .tl{position:absolute;top:11px;left:11px;z-index:2;display:flex;gap:6px}
+.wcard .tr{position:absolute;top:11px;right:11px;z-index:2}
+.wcard .bb{position:absolute;left:14px;right:14px;bottom:12px;z-index:2;color:#F4F2EE}
+.wcard .bb h3{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:19px;letter-spacing:-0.3px;line-height:1.1;color:#fff}
+.wcard .bb p{margin-top:4px;font-size:11.5px;color:#D7D0C6;line-height:1.35}
+.wcard .bb .tm{margin-top:5px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:.3px;color:var(--ember)}
+.vcard{border-radius:16px;overflow:hidden;background:var(--surf);border:1px solid var(--surfbd)}
+.vcard .img{height:150px;position:relative}
+.vcard .bar{padding:10px 12px 11px}
+.vcard .bar .r1{display:flex;align-items:center;gap:6px}
+.vcard .bar h3{flex:1;min-width:0;font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:600;font-size:14.5px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vcard .bar p{font-size:12px;line-height:16px;color:var(--muted);margin-top:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.vcard .bar .tm{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:.3px;color:var(--tint);margin-top:5px}
+.oldcard{border-radius:16px;background:var(--surf);border:1px solid var(--surfbd);padding:11px}
+.oldcard .img{height:120px;border-radius:10px;position:relative;overflow:hidden;margin-bottom:10px}
+.oldcard h3{font-size:15px;font-weight:600;color:var(--text)}
+.oldcard p{font-size:13px;line-height:18px;color:var(--muted);margin-top:4px}
+.lbl{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);font-weight:600;display:flex;align-items:center;gap:8px}
+.lbl b{color:var(--tint)}
+.lbl em{font-style:normal;color:var(--ok)}
+.lbl i{flex:1;height:1px;background:var(--hair)}
+.newp{padding:2px 5px;border-radius:5px;background:#EF4444;color:#fff;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8px;font-weight:600;letter-spacing:.8px}
+.phone.short{height:auto;min-height:0;padding-bottom:10px}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-cal" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1.5 1.5"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1.5-1.5"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-dl" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M4 19h16"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+  <symbol id="i-arr" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-out" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s7-6.5 7-11.5a7 7 0 0 0-14 0C5 14.5 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></symbol>
+  <symbol id="i-photo" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 8"/></symbol>
+</svg>
+
+<h1>Content Detail <span>Concepts</span></h1>
+<div class="toolbar">
+  <div class="grp"><span class="gl2">Theme</span>
+    <button class="tb on" data-theme="">Mono dark</button><button class="tb" data-theme="t-mono-l">Mono light</button><button class="tb" data-theme="t-ocean-d">Ocean dark</button><button class="tb" data-theme="t-ocean-l">Ocean light</button></div>
+  <div class="grp"><span class="gl2">Cover</span>
+    <button class="tb on" data-photo="on">3 photos</button><button class="tb" data-photo="off">No photo</button></div>
+</div>
+<p class="hint">Same post in all four — <b>Crab Boil Weekend</b> (Upcoming Event, 3 photos, link + PDF attachment). Announcements swap the category pill for the priority pill and the date block for “Today”; Specials keep dates. <em>Swipe / scroll the photos sideways — they page like the real carousel.</em></p>
+
+<div class="row">
+
+<!-- ========================= C1 ========================= -->
+<div class="col">
+  <div class="concept"><b>C1</b> Hero Sheet · the menu-item grammar, grown up <span class="ln"></span></div>
+  <div class="phone c1">
+    <div class="glow"></div><div class="glow2"></div>
+    <div class="sb"><span>9:41</span><span>●●● ▲ ▮</span></div>
+    <div class="under"><div class="eyeb">MyResto Test</div><h2>Welcome</h2><div class="ucard"></div><div class="ucard"></div><div class="ucard"></div></div>
+    <div class="scrim"></div>
+    <div class="sheet">
+      <div class="grab plain"></div>
+      <div class="hero">
+        <div class="grab over"></div>
+        <div class="car">
+          <div class="track"><div class="slide ph"></div><div class="slide ph p2"></div><div class="slide ph p3"></div></div>
+          <div class="cnt">1 / 3</div>
+          <div class="dots"><i class="on"></i><i></i><i></i></div>
+        </div>
+        <div class="scr"></div>
+        <div class="over"><span class="pill event">Event</span><span class="when">Sat · Sep 12</span></div>
+      </div>
+      <div class="body">
+        <div class="topline"><span class="pill event">Event</span><span class="when">Sat · Sep 12</span></div>
+        <div class="h title">Crab Boil Weekend</div>
+        <div class="when2">
+          <div class="cell"><span class="k">Starts</span><span class="d">Sat, Sep 12</span><span class="tm">4:00 PM</span></div>
+          <div class="arrow"><svg class="ic" style="width:15px;height:15px"><use href="#i-arr"/></svg></div>
+          <div class="cell" style="text-align:right"><span class="k">Ends</span><span class="d">Sat, Sep 12</span><span class="tm">9:00 PM</span></div>
+        </div>
+        <p class="desc">Two days of <b>all-you-can-eat blue crab</b> on the back patio, corn and red potatoes on every table, live music from 6. Servers: push the crab-boil bucket special and the pitcher pairing — <b>$5 bucks per bucket sold</b> this weekend.</p>
+        <div class="sec">Attached <i></i></div>
+        <div class="att">
+          <div class="grow"><div class="sq t"><svg class="ic" style="width:16px;height:16px"><use href="#i-globe"/></svg></div><div class="txt"><span class="n">myresto.com/crab-boil</span><span class="m">LINK · OPENS IN BROWSER</span></div><span class="chip">Open <svg class="ic" style="width:13px;height:13px"><use href="#i-out"/></svg></span></div>
+          <div class="grow"><div class="pdf">PDF</div><div class="txt"><span class="n">Crab Boil Menu.pdf</span><span class="m">2.1 MB · ONE-TIME UPLOAD</span></div><div class="acts"><span class="sq"><svg class="ic" style="width:16px;height:16px"><use href="#i-eye"/></svg></span><span class="sq"><svg class="ic" style="width:16px;height:16px"><use href="#i-dl"/></svg></span></div></div>
+        </div>
+      </div>
+      <div class="foot"><div class="closebtn">Close</div></div>
+    </div>
+  </div>
+  <p class="bcap"><b>Steve's brief, built:</b> GlassHeroSheet with the hero raised 196 → 236pt so a 16:9 cover is no longer cut, and the hero IS the carousel (swipe, dots + “1 / 3” on the photo). Category pill + date ride the scrim; title below. Dates become one <b>Starts → Ends</b> glass row. Link and file become an <b>Attached</b> list — the three orange buttons are gone: link row opens, file row carries eye + download as glass squares. Grab handle floats on the photo, pinned. <em>No-photo state: plain grab, pill + date line above the title.</em></p>
+</div>
+
+<!-- ========================= C2 ========================= -->
+<div class="col">
+  <div class="concept"><b>C2</b> The Ticket · a stub for the staff <span class="ln"></span></div>
+  <div class="phone c2">
+    <div class="glow"></div><div class="glow2"></div>
+    <div class="sb"><span>9:41</span><span>●●● ▲ ▮</span></div>
+    <div class="under"><div class="eyeb">MyResto Test</div><h2>Welcome</h2><div class="ucard"></div><div class="ucard"></div><div class="ucard"></div></div>
+    <div class="scrim"></div>
+    <div class="sheet">
+      <div class="grab"></div>
+      <div class="body">
+        <div class="head"><span class="eyeb">Upcoming event · Welcome › Events</span><span class="x"><svg class="ic" style="width:15px;height:15px"><use href="#i-x"/></svg></span></div>
+        <div class="ticket">
+          <div class="car">
+            <div class="track"><div class="slide ph"></div><div class="slide ph p2"></div><div class="slide ph p3"></div></div>
+            <div class="cnt">1 / 3</div>
+            <div class="dots"><i class="on"></i><i></i><i></i></div>
+          </div>
+          <div class="stubhead">
+            <div class="datetile"><span class="mo">SEP</span><span class="dd">12</span><span class="dw">SAT</span></div>
+            <div class="t">
+              <div class="h">Crab Boil Weekend</div>
+              <div class="tm"><svg class="ic" style="width:13px;height:13px"><use href="#i-clock"/></svg>4:00 PM <span class="sep">→</span> 9:00 PM</div>
+              <div class="pl"><span class="pill event">Event</span><span class="newp" style="align-self:center">NEW</span></div>
+            </div>
+          </div>
+          <div class="perf"></div>
+          <div class="stub">
+            <p class="desc">Two days of <b>all-you-can-eat blue crab</b> on the back patio, corn and red potatoes on every table, live music from 6. Servers: push the crab-boil bucket special and the pitcher pairing — <b>$5 bucks per bucket sold</b> this weekend.</p>
+            <div class="acts">
+              <div class="act t"><span class="ico"><svg class="ic"><use href="#i-globe"/></svg></span><div><div class="n">Open link</div><div class="m">myresto.com/crab-boil</div></div></div>
+              <div class="act"><div class="pdf" style="width:30px;height:30px;font-size:8px">PDF</div><div style="min-width:0"><div class="n" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Crab Boil Menu</div><div class="m">VIEW · 2.1 MB</div></div><span class="dl"><svg class="ic" style="width:14px;height:14px"><use href="#i-dl"/></svg></span></div>
+            </div>
+          </div>
+          <div class="barcode"></div>
+          <div class="bcl"><span>MyResto Test</span><span>Posted Sep 3 · Manager</span></div>
+        </div>
+      </div>
+      <div class="foot"><div class="closebtn">Close</div></div>
+    </div>
+  </div>
+  <p class="bcap"><b>The post as an object:</b> the photo carousel is the ticket's face, the <b>date tile</b> (tint block, big numeral) sits beside the title so “when” reads before the words, time range in mono, then a real <b>perforation</b> with notches into the stub that carries the copy and the two actions as tiles (link tinted, PDF with its own ↓). The barcode footer prints who posted and when. Distinctive; announcements print “TODAY” on the tile. <em>Most “designed”, least reusable.</em></p>
+</div>
+
+<!-- ========================= C3 ========================= -->
+<div class="col">
+  <div class="concept"><b>C3</b> Poster · title set into the photo <span class="ln"></span></div>
+  <div class="phone c3">
+    <div class="glow"></div><div class="glow2"></div>
+    <div class="sb"><span>9:41</span><span>●●● ▲ ▮</span></div>
+    <div class="under"><div class="eyeb">MyResto Test</div><h2>Welcome</h2><div class="ucard"></div><div class="ucard"></div><div class="ucard"></div></div>
+    <div class="scrim"></div>
+    <div class="sheet">
+      <div class="poster">
+        <div class="grab over"></div>
+        <div class="car">
+          <div class="board"></div>
+          <div class="track"><div class="slide ph"></div><div class="slide ph p2"></div><div class="slide ph p3"></div></div>
+          <div class="cnt">1 / 3</div>
+          <div class="dots"><i class="on"></i><i></i><i></i></div>
+        </div>
+        <div class="scr"></div>
+        <div class="into">
+          <div class="line"><span class="pill event">Event</span><span class="when">Sat · Sep 12</span></div>
+          <div class="h">Crab Boil Weekend</div>
+          <div class="tm"><svg class="ic" style="width:14px;height:14px"><use href="#i-clock"/></svg><b>4:00 PM</b> → <b>9:00 PM</b><span style="opacity:.6">·</span>Back patio</div>
+        </div>
+      </div>
+      <div class="body">
+        <div class="facts" style="grid-template-columns:1fr 1fr">
+          <div class="fact"><span class="k">Starts</span><span class="v">Sat, Sep 12<small>4:00 PM</small></span></div>
+          <div class="fact"><span class="k">Ends</span><span class="v">Sat, Sep 12<small>9:00 PM</small></span></div>
+        </div>
+        <div class="c1" style="display:contents">
+          <div class="sec" style="margin-top:4px">Attached <i></i></div>
+          <div class="att">
+            <div class="grow"><div class="sq t"><svg class="ic" style="width:16px;height:16px"><use href="#i-globe"/></svg></div><div class="txt"><span class="n">myresto.com/crab-boil</span><span class="m">LINK · OPENS IN BROWSER</span></div><span class="chip">Open <svg class="ic" style="width:13px;height:13px"><use href="#i-out"/></svg></span></div>
+            <div class="grow"><div class="pdf">PDF</div><div class="txt"><span class="n">Crab Boil Menu.pdf</span><span class="m">CRAB-BOIL-MENU.PDF</span></div><div class="acts"><span class="sq"><svg class="ic" style="width:16px;height:16px"><use href="#i-eye"/></svg></span><span class="sq"><svg class="ic" style="width:16px;height:16px"><use href="#i-dl"/></svg></span></div></div>
+          </div>
+        </div>
+        <p class="desc" style="margin-top:16px">Two days of <b>all-you-can-eat blue crab</b> on the back patio, corn and red potatoes on every table, live music from 6. Servers: push the crab-boil bucket special and the pitcher pairing — <b>$5 bucks per bucket sold</b> this weekend.</p>
+      </div>
+      <div class="foot"><div class="closebtn">Close</div></div>
+    </div>
+  </div>
+  <p class="bcap"><b>★ LOCKED (Steve, s81):</b> the photo takes ~46% of the window and the <b>title is set INTO it</b> (30pt display, ember date eyebrow above, time line under) — the banner scrim grammar at full size, photos paging inside the hero. Under it the Starts / Ends facts strip, then the <b>Attached rows lifted ABOVE the description</b> (Steve's note: never hidden at the bottom of a scroll) — then the copy and the standard Close. <em>No photo → a category / priority-hue board with the same title block.</em> Banner-shaped covers render contained over a blurred copy so nothing is cut. <b>Round 2 (built, not redrawn here):</b> the attachments are ONE row of two 44pt chips (link chip opens; file chip taps to view, its ↓ downloads), and the sheet is <b>the Poster collapse</b> — the photo stays PINNED while the title block + a glass details panel slide up over it, the photo blurring and darkening behind them; a pull restores the full photo, a second pull from rest dismisses. A runway under the copy means the panel can always be pulled up, even on a two-line post. <b>Round 3:</b> the title block is the <b>kind pill + title only</b> (Announcement · Special Feature · Event · Entertainment) — the date eyebrow and time line are gone — and the dates are <b>C1's when-row</b> (round 4: calendar tile · STARTS block · dotted travel line + chevron · ENDS block right-aligned; start-only = tile + one block, no connector).</p>
+</div>
+
+<!-- ========================= C4 ========================= -->
+<div class="col">
+  <div class="concept"><b>C4</b> Dossier · read first, photos as a filmstrip <span class="ln"></span></div>
+  <div class="phone c4">
+    <div class="glow"></div><div class="glow2"></div>
+    <div class="sb"><span>9:41</span><span>●●● ▲ ▮</span></div>
+    <div class="under"><div class="eyeb">MyResto Test</div><h2>Welcome</h2><div class="ucard"></div><div class="ucard"></div><div class="ucard"></div></div>
+    <div class="scrim"></div>
+    <div class="sheet">
+      <div class="grab"></div>
+      <div class="body">
+        <div class="top"><span class="pill event">Event</span><span class="eyeb">Upcoming · posted Sep 3</span><span class="x"><svg class="ic" style="width:15px;height:15px"><use href="#i-x"/></svg></span></div>
+        <div class="h title">Crab Boil Weekend</div>
+        <div class="sub">Sat, Sep 12 · 4:00 – 9:00 PM · back patio</div>
+        <div class="ledger">
+          <div class="lr"><span class="k">Starts</span><span class="v">Sat, Sep 12<span class="tm">4:00 PM</span></span></div>
+          <div class="lr"><span class="k">Ends</span><span class="v">Sat, Sep 12<span class="tm">9:00 PM</span></span></div>
+          <div class="lr"><span class="k">Link</span><span class="v">myresto.com/crab-boil</span><div class="a"><span class="chip">Open <svg class="ic" style="width:13px;height:13px"><use href="#i-out"/></svg></span></div></div>
+          <div class="lr"><span class="k">File</span><span class="v">Crab Boil Menu.pdf<span class="m">2.1 MB</span></span><div class="a"><span class="sq" style="width:30px;height:30px"><svg class="ic" style="width:15px;height:15px"><use href="#i-eye"/></svg></span><span class="sq" style="width:30px;height:30px"><svg class="ic" style="width:15px;height:15px"><use href="#i-dl"/></svg></span></div></div>
+        </div>
+        <div class="filmlbl"><span class="eyeb">3 photos</span><span class="sw">SWIPE →</span></div>
+        <div class="film"><div class="f ph"><span class="n">1 / 3</span></div><div class="f ph p2"><span class="n">2 / 3</span></div><div class="f ph p3"><span class="n">3 / 3</span></div></div>
+        <p class="desc">Two days of <b>all-you-can-eat blue crab</b> on the back patio, corn and red potatoes on every table, live music from 6. Servers: push the crab-boil bucket special and the pitcher pairing — <b>$5 bucks per bucket sold</b> this weekend.</p>
+      </div>
+      <div class="foot"><div class="closebtn">Close</div></div>
+    </div>
+  </div>
+  <p class="bcap"><b>The editorial one:</b> no hero. Pill + posted line, a 27pt title with a one-line summary, then a mono <b>ledger</b> (Starts / Ends / Link / File — the ReviewStep lines grammar) where the link and file rows carry their own actions inline. Photos are a horizontal <b>filmstrip</b> rail between the ledger and the copy (tap = full-screen). Nothing is ever cropped, everything scans in one glance; it is also the calmest with no photo at all — the row simply isn't there. <em>Best for text-heavy announcements.</em></p>
+</div>
+
+</div>
+
+<!-- ========================= banner card decision ========================= -->
+<div class="row" style="margin-top:12px">
+<div class="col">
+  <div class="concept"><b>Carry 1</b> Welcome banner cards · pick the grammar <span class="ln"></span></div>
+  <div class="phone short">
+    <div class="glow"></div>
+    <div class="cardwrap">
+      <div class="lbl">Today · what ships now <i></i></div>
+      <div class="oldcard"><div class="img ph"></div><h3>Crab Boil Weekend</h3><p>Two days of all-you-can-eat blue crab on the back patio, corn and red potatoes on every table…</p><div class="tm mono" style="font-size:11px;color:var(--muted);margin-top:4px">Sep 12, 2026, 4:00 PM</div></div>
+      <div class="lbl"><b>A</b> · photo IS the card · the menu banner grammar <i></i></div>
+      <div class="wcard ph"><div class="scr"></div><div class="tl"><span class="pill ghost">Sat · Sep 12 · 4:00 PM</span></div><div class="tr"><span class="newp">NEW</span></div><div class="bb"><h3>Crab Boil Weekend</h3><p>Two days of all-you-can-eat blue crab on the back patio, corn and red potatoes on every table…</p></div></div>
+      <div class="lbl"><b>B</b> · edge-to-edge photo on top · title bar below <em>★ locked</em> <i></i></div>
+      <div class="vcard"><div class="img ph p2"><div class="cnt" style="position:absolute;top:10px;right:10px"><span class="pill event">Event</span></div></div><div class="bar"><div class="r1"><h3>Crab Boil Weekend</h3><span class="newp">NEW</span></div><p>Two days of all-you-can-eat blue crab on the back patio, corn and red potatoes on every table…</p><div class="tm">Sat, Sep 12 · 4:00 PM</div></div></div>
+    </div>
+  </div>
+  <p class="bcap"><b>A</b> is what the locked Welcome mockup drew and what Menu Items and banner Specials already render (150pt, bottom scrim, ghost eyebrow pill = date / priority, NEW pill, title + 2 lines on the photo). <b>B</b> keeps the photo full-bleed at the top of a surface card with a title bar under it — the image never competes with the text. One <b>ContentBannerCard</b> component replaces the four hand-rolled copies (Welcome ×3, View All Events, View All Specials, the ReviewStep preview). <em>★ LOCKED: B (Steve, s81) — badge pill on the photo, NEW beside the title, the mono date line under the copy.</em></p>
+</div>
+<div class="col" style="max-width:392px">
+  <div class="concept"><b>Carry 2</b> View All Events calendar strip <span class="ln"></span></div>
+  <div class="notes" style="grid-template-columns:1fr">
+    <div class="note"><b>Why it's smaller</b>Same <em>WeeklyCalendarStrip</em> component both places. On Welcome it sits in its own box (16 margin + 8 inner). On View All it's nested <em>inside a padded GlassCard</em> (16 + 12 + 8) — 24pt narrower, so the 7 flex day tiles shrink. No mockup needed.</div>
+    <div class="note"><b>The fix</b>View All's section card loses its 12pt padding around the strip (the strip carries its own 8), search + capsule keep theirs — the day tiles land at exactly Welcome's width. One geometry, no new prop.</div>
+    <div class="note"><b>Also in-pass</b>The Android duplicate <em>ContentDetailModal.android.tsx</em> differs from the iOS file by four comment lines only — the rebuild ships ONE file. The unused <em>redeemAction</em> prop (zero callers) is dropped.</div>
+  </div>
+</div>
+</div>
+
+<div class="notes">
+  <div class="note"><b>What every concept carries</b>Title · category or priority pill · start + end date-time · rich description (bold runs preserved) · link · one-time PDF/image attachment with View + Download · <em>swipeable photos</em> with dots and a counter · pull-down-to-dismiss · safe-area Close.</div>
+  <div class="note"><b>Shared build</b>C1 and C3 sit on <em>GlassHeroSheet</em> (hero height becomes a prop; the carousel drops in as the hero). C2 and C4 are plain GlassSheet bodies. All four share one new <em>AttachmentRows</em> piece (link row + file row) so Announcements, Specials, Events and Guides render attachments identically.</div>
+  <div class="note"><b>Decision (s81)</b><em>C3 Poster</em> — Steve: keeps the edge-to-edge continuity and gives the image the most room; the link and file rows move up above the description so nobody misses them. Built as <em>components/ContentDetailModal.tsx</em> (one file, the Android duplicate retired) on GlassHeroSheet with a new <em>heroHeight</em> prop; ImageCarousel retired with it. Banner cards: <em>B</em>.</div>
+</div>
+
+<script>
+(function(){
+  var phones=[].slice.call(document.querySelectorAll('.phone'));
+  document.querySelectorAll('[data-theme]').forEach(function(b){
+    b.addEventListener('click',function(){
+      document.querySelectorAll('[data-theme]').forEach(function(x){x.classList.remove('on')});
+      b.classList.add('on');
+      phones.forEach(function(p){
+        p.classList.remove('t-mono-l','t-ocean-d','t-ocean-l');
+        if(b.dataset.theme)p.classList.add(b.dataset.theme);
+      });
+    });
+  });
+  document.querySelectorAll('[data-photo]').forEach(function(b){
+    b.addEventListener('click',function(){
+      document.querySelectorAll('[data-photo]').forEach(function(x){x.classList.remove('on')});
+      b.classList.add('on');
+      phones.forEach(function(p){p.classList.toggle('nophoto',b.dataset.photo==='off')});
+    });
+  });
+  // carousel dots + counter follow the snap position
+  document.querySelectorAll('.car').forEach(function(c){
+    var t=c.querySelector('.track'),d=c.querySelectorAll('.dots i'),n=c.querySelector('.cnt');
+    if(!t)return;
+    t.addEventListener('scroll',function(){
+      var i=Math.round(t.scrollLeft/t.clientWidth);
+      d.forEach(function(x,k){x.classList.toggle('on',k===i)});
+      if(n)n.textContent=(i+1)+' / '+d.length;
+    },{passive:true});
+  });
+})();
+</script>
+</body>
+</html>

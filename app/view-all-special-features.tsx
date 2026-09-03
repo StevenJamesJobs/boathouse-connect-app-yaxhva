@@ -29,6 +29,7 @@ import { getImageUrl } from '@/utils/imageUrl';
 import FormattedText, { stripFormattingTags } from '@/components/FormattedText';
 import { useAuth } from '@/contexts/AuthContext';
 import { fonts } from '@/constants/fonts';
+import ContentBannerCard, { formatBannerWhen } from '@/components/content/ContentBannerCard';
 
 interface GuideFile {
   id: string;
@@ -95,6 +96,7 @@ export default function ViewAllSpecialFeaturesScreen() {
     link?: string | null;
     guideFile?: GuideFile | null;
     imageUrls?: string[];
+    kind?: 'special_feature';
   } | null>(null);
 
   useEffect(() => {
@@ -162,6 +164,7 @@ export default function ViewAllSpecialFeaturesScreen() {
       link: feature.link,
       guideFile: feature.guide_file || guideFileFromAttachment(attachmentsMap.get(feature.id)),
       imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
+      kind: 'special_feature',
     });
     setDetailModalVisible(true);
   };
@@ -266,22 +269,31 @@ export default function ViewAllSpecialFeaturesScreen() {
               )}
             </View>
           ) : (
-            visibleFeatures.map((feature) => (
+            visibleFeatures.map((feature) => {
+              // Banner posts wear ContentBannerCard (s81 — the Welcome tab's
+              // card, same component). Square posts keep the row card below.
+              if (feature.thumbnail_shape === 'banner' && feature.thumbnail_url) {
+                const body = getLocalizedField(feature, 'content', language) || feature.content || feature.message;
+                return (
+                  <ContentBannerCard
+                    key={feature.id}
+                    imageUrl={getImageUrl(feature.thumbnail_url, feature.updated_at)!}
+                    title={getLocalizedField(feature, 'title', language)}
+                    description={body ? stripFormattingTags(body) : null}
+                    eyebrow={formatBannerWhen(feature.start_date_time, language)}
+                    onPress={() => openDetailModal(feature)}
+                  />
+                );
+              }
+              return (
               <TouchableOpacity
                 key={feature.id}
                 style={styles.featureCard}
                 onPress={() => openDetailModal(feature)}
                 activeOpacity={0.7}
               >
-                {feature.thumbnail_shape === 'banner' && feature.thumbnail_url && (
-                  <StorageExpoImage
-                    source={getImageUrl(feature.thumbnail_url, feature.updated_at)!}
-                    style={styles.bannerImage}
-                    contentFit="cover"
-                  />
-                )}
                 <View style={styles.squareLayout}>
-                  {feature.thumbnail_shape !== 'banner' && feature.thumbnail_url && (
+                  {feature.thumbnail_url && (
                     <StorageExpoImage
                       source={getImageUrl(feature.thumbnail_url, feature.updated_at)!}
                       style={styles.squareImage}
@@ -331,7 +343,8 @@ export default function ViewAllSpecialFeaturesScreen() {
                   </View>
                 </View>
               </TouchableOpacity>
-            ))
+              );
+            })
           )}
         </ScrollView>
       )}
@@ -349,6 +362,7 @@ export default function ViewAllSpecialFeaturesScreen() {
           link={selectedFeature.link}
           guideFile={selectedFeature.guideFile}
           imageUrls={selectedFeature.imageUrls}
+          kind={selectedFeature.kind}
           colors={{
             text: colors.text,
             textSecondary: colors.textSecondary,
@@ -452,13 +466,6 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       width: 80,
       height: 80,
       borderRadius: 10,
-      backgroundColor: colors.thumbPlaceholder,
-    },
-    bannerImage: {
-      width: '100%',
-      aspectRatio: 16 / 9,
-      borderRadius: 10,
-      marginBottom: 10,
       backgroundColor: colors.thumbPlaceholder,
     },
     squareContent: {

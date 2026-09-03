@@ -40,6 +40,9 @@ import { stripFormattingTags } from '@/components/FormattedText';
 import { useUnreadContent } from '@/hooks/useUnreadContent';
 import { useAuth } from '@/contexts/AuthContext';
 import { fonts } from '@/constants/fonts';
+import ContentBannerCard, { formatBannerWhen } from '@/components/content/ContentBannerCard';
+import { categoryHue } from '@/components/content/contentVisuals';
+import { useIsDarkTheme } from '@/components/content/useIsDarkTheme';
 
 // Status red for the NEW pill + unread dots. A status flag is the one place the
 // glass language keeps saturation (no palette carries a danger/alert token).
@@ -115,6 +118,8 @@ export default function ViewAllUpcomingEventsScreen() {
     link?: string | null;
     guideFile?: GuideFile | null;
     imageUrls?: string[];
+    category?: string | null;
+    kind?: 'upcoming_event';
   } | null>(null);
 
   const colors = useThemeColors();
@@ -174,6 +179,8 @@ export default function ViewAllUpcomingEventsScreen() {
     }
   };
 
+  const isDark = useIsDarkTheme();
+
   const openDetailModal = (event: UpcomingEvent) => {
     markEventViewed(event.id);
     const additionalImages = contentImagesMap.get(event.id) || [];
@@ -191,6 +198,8 @@ export default function ViewAllUpcomingEventsScreen() {
       link: event.link,
       guideFile: event.guide_file || guideFileFromAttachment(attachmentsMap.get(event.id)),
       imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
+      category: event.category,
+      kind: 'upcoming_event',
     });
     setDetailModalVisible(true);
   };
@@ -283,18 +292,39 @@ export default function ViewAllUpcomingEventsScreen() {
     markEventsTabVisited(tab);
   };
 
-  const renderEventCard = (event: UpcomingEvent, index: number) => (
+  const renderEventCard = (event: UpcomingEvent, index: number) => {
+    const eventIsNew =
+      !viewedEventIds.has(event.id) &&
+      (!lastViewedEvents || new Date(event.created_at) > new Date(lastViewedEvents));
+    const categoryLabel = event.category === 'Event' ? t('upcoming_events:events') : t('upcoming_events:entertainment');
+
+    // Banner posts wear ContentBannerCard (s81 — the Welcome tab's card, same
+    // component). The category badge shows only on the date-filtered list,
+    // mirroring the row card below.
+    if (event.thumbnail_shape === 'banner' && event.thumbnail_url) {
+      return (
+        <ContentBannerCard
+          key={event.id || index}
+          imageUrl={getImageUrl(event.thumbnail_url, event.updated_at)!}
+          title={getLocalizedField(event, 'title', language)}
+          description={truncate(getLocalizedField(event, 'content', language) || event.content || event.message)}
+          eyebrow={formatBannerWhen(event.start_date_time, language)}
+          badge={selectedDate !== null ? { label: categoryLabel, color: categoryHue(event.category, isDark) } : null}
+          newLabel={eventIsNew ? t('content_editor.new_badge') : null}
+          onPress={() => openDetailModal(event)}
+        />
+      );
+    }
+
+    return (
     <TouchableOpacity
       key={event.id || index}
       style={styles.eventCard}
       onPress={() => openDetailModal(event)}
       activeOpacity={0.7}
     >
-      {event.thumbnail_shape === 'banner' && event.thumbnail_url && (
-        <StorageExpoImage source={getImageUrl(event.thumbnail_url, event.updated_at)!} style={styles.bannerCardImage} contentFit="cover" />
-      )}
       <View style={styles.cardRow}>
-        {event.thumbnail_shape !== 'banner' && event.thumbnail_url && (
+        {event.thumbnail_url && (
           <StorageExpoImage source={getImageUrl(event.thumbnail_url, event.updated_at)!} style={styles.cardImage} contentFit="cover" />
         )}
         <View style={styles.cardContent}>
@@ -302,12 +332,11 @@ export default function ViewAllUpcomingEventsScreen() {
             <Text style={styles.eventTitle} numberOfLines={1}>
               {getLocalizedField(event, 'title', language)}
             </Text>
-            {!viewedEventIds.has(event.id) &&
-              (!lastViewedEvents || new Date(event.created_at) > new Date(lastViewedEvents)) && (
-                <View style={styles.newPill}>
-                  <Text style={styles.newPillText}>{t('content_editor.new_badge')}</Text>
-                </View>
-              )}
+            {eventIsNew && (
+              <View style={styles.newPill}>
+                <Text style={styles.newPillText}>{t('content_editor.new_badge')}</Text>
+              </View>
+            )}
             {selectedDate !== null && (
               <View style={styles.categoryBadge}>
                 <Text style={styles.categoryBadgeText}>
@@ -332,7 +361,8 @@ export default function ViewAllUpcomingEventsScreen() {
         </View>
       </View>
     </TouchableOpacity>
-  );
+    );
+  };
 
   const renderEmptyState = (forTab: EventsTab | 'date') => (
     <View style={styles.emptyContainer}>
@@ -419,6 +449,7 @@ export default function ViewAllUpcomingEventsScreen() {
           onWeekChange={handleWeekChange}
           edgeToEdge
         >
+          <View style={styles.stripChildren}>
           <View style={styles.searchField}>
             <View style={styles.searchIconSlot}>
               <IconSymbol
@@ -455,6 +486,7 @@ export default function ViewAllUpcomingEventsScreen() {
               {renderSegment('Entertainment', t('upcoming_events:entertainment'), eventsEntertainmentHasNew)}
             </View>
           )}
+          </View>
         </WeeklyCalendarStrip>
       </GlassCard>
 
@@ -556,6 +588,8 @@ export default function ViewAllUpcomingEventsScreen() {
           link={selectedEvent.link}
           guideFile={selectedEvent.guideFile}
           imageUrls={selectedEvent.imageUrls}
+          category={selectedEvent.category}
+          kind={selectedEvent.kind}
           colors={{
             text: colors.text,
             textSecondary: colors.textSecondary,
@@ -574,10 +608,18 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
     container: {
       flex: 1,
     },
+    // No horizontal padding around the strip: WeeklyCalendarStrip carries its
+    // own 8pt, so the seven day tiles land at exactly the Welcome tab's width
+    // (16 margin + 8 inner on both screens — s81 "one geometry" carry). The
+    // search field + capsule restore the 12pt inset via `stripChildren`.
     sectionCard: {
       marginHorizontal: 16,
       marginBottom: 4,
-      padding: 12,
+      paddingVertical: 12,
+      paddingHorizontal: 0,
+    },
+    stripChildren: {
+      paddingHorizontal: 12,
     },
     // MenuSearchRow geometry: 46pt, r13, glass fill + glassBorder hairline+0.5.
     searchField: {
@@ -713,13 +755,6 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       width: 80,
       height: 80,
       borderRadius: 10,
-      backgroundColor: colors.thumbPlaceholder,
-    },
-    bannerCardImage: {
-      width: '100%',
-      aspectRatio: 16 / 9,
-      borderRadius: 10,
-      marginBottom: 10,
       backgroundColor: colors.thumbPlaceholder,
     },
     cardContent: {

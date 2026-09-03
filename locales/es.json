@@ -3379,10 +3379,10 @@
     "download_msg": "Tu navegador descargará el archivo. Lo encontrarás en tu carpeta de descargas.",
     "ok": "OK",
     "download_failed": "No se pudo descargar el archivo",
-    "view_more": "Ver más información",
     "view": "Ver",
     "download": "Descargar",
-    "starts": "Inicio:",
-    "ends": "Fin:"
+    "starts": "Empieza",
+    "ends": "Termina",
+    "open": "Abrir"
   }
 }
