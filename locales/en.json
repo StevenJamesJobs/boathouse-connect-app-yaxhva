@@ -3379,10 +3379,10 @@
     "download_msg": "The file will be downloaded by your browser. You can find it in your downloads folder.",
     "ok": "OK",
     "download_failed": "Could not download the file",
-    "view_more": "View More Information",
     "view": "View",
     "download": "Download",
-    "starts": "Start:",
-    "ends": "End:"
+    "starts": "Starts",
+    "ends": "Ends",
+    "open": "Open"
   }
 }

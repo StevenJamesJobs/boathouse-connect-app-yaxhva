@@ -4,7 +4,6 @@ import {
   Text,
   Modal,
   Pressable,
-  ScrollView,
   StyleSheet,
   Animated,
   PanResponder,
@@ -44,15 +43,34 @@ interface GlassHeroSheetProps {
   onClose: () => void;
   /** Full-bleed hero content (image + overlays). Box + top radii come from the sheet. */
   hero?: React.ReactNode;
+  /** Hero box height — 196 (the recipe sheets); ContentDetailModal's poster passes ~46% of the window. */
+  heroHeight?: number;
+  /**
+   * The Poster collapse (s81): pass an Animated.Value and the sheet drives it
+   * from the body scroll (native driver). With `pinHero` the hero is
+   * translated by that same value so it STAYS PUT while the children slide up
+   * over it — the caller uses the value to blur / darken its hero as the
+   * panel rises. Without `pinHero` the hero scrolls away like any content.
+   */
+  scrollY?: Animated.Value;
+  pinHero?: boolean;
+  /** Fired when the body is pulled past its top by PULL_DISMISS (iOS bounce) — the poster's "pull down to leave". */
+  onPullDown?: () => void;
   children: React.ReactNode;
   /** Replaces the default pinned Close button row. */
   footer?: React.ReactNode;
 }
 
+const PULL_DISMISS = 72;
+
 export default function GlassHeroSheet({
   visible,
   onClose,
   hero,
+  heroHeight = 196,
+  scrollY,
+  pinHero = false,
+  onPullDown,
   children,
   footer,
 }: GlassHeroSheetProps) {
@@ -66,6 +84,8 @@ export default function GlassHeroSheet({
   // ─── Pull-down-to-dismiss (the ContentDetailModal recipe, unchanged) ──────
   const translateY = useRef(new Animated.Value(0)).current;
   const dragDismissing = useRef(false);
+  // Where the last body drag began — the two-stage pull-down guard.
+  const dragStartY = useRef(0);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -132,7 +152,7 @@ export default function GlassHeroSheet({
               </View>
             )}
 
-            <ScrollView
+            <Animated.ScrollView
               // The body escapes the shell's padding (10 top / 18 horizontal —
               // GlassSheet's exact values) so the hero can sit flush to the
               // sheet's top edge, then the content container pads the normal
@@ -141,14 +161,59 @@ export default function GlassHeroSheet({
               style={[styles.scroll, !!hero && styles.scrollWithHero]}
               contentContainerStyle={styles.scrollContent}
               showsVerticalScrollIndicator={false}
+              onScroll={
+                scrollY
+                  ? Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })
+                  : undefined
+              }
+              scrollEventThrottle={16}
+              // Two-stage pull (Steve): a drag that starts while the panel is
+              // UP only restores the photo, however far it overshoots; only a
+              // drag that begins AT REST and pulls past the top dismisses.
+              onScrollBeginDrag={
+                onPullDown
+                  ? (e) => {
+                      dragStartY.current = e.nativeEvent.contentOffset.y;
+                    }
+                  : undefined
+              }
+              onScrollEndDrag={
+                onPullDown
+                  ? (e) => {
+                      if (dragStartY.current <= 2 && e.nativeEvent.contentOffset.y < -PULL_DISMISS) onPullDown();
+                    }
+                  : undefined
+              }
             >
               {!!hero && (
-                <View style={[styles.hero, { backgroundColor: colors.thumbPlaceholder }]}>
+                <Animated.View
+                  style={[
+                    styles.hero,
+                    { height: heroHeight, backgroundColor: colors.thumbPlaceholder },
+                    // Pinned: translate by the scroll offset so the hero holds
+                    // the sheet's top while the children ride up over it. The
+                    // overscroll bounce is clamped so a pull-down drags the
+                    // photo with the content instead of opening a gap.
+                    pinHero && scrollY
+                      ? {
+                          transform: [
+                            {
+                              translateY: scrollY.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [0, 1],
+                                extrapolateLeft: 'clamp',
+                              }),
+                            },
+                          ],
+                        }
+                      : null,
+                  ]}
+                >
                   {hero}
-                </View>
+                </Animated.View>
               )}
-              {children}
-            </ScrollView>
+              {pinHero ? <View style={styles.overHero}>{children}</View> : children}
+            </Animated.ScrollView>
 
             {!!hero && (
               // The grab handle floats OVER the photo — pinned at the sheet
@@ -228,6 +293,8 @@ const styles = StyleSheet.create({
   // to the top edge.
   scrollWithHero: { marginTop: -10 },
   scrollContent: { paddingHorizontal: 18, paddingBottom: 4 },
+  // Pinned-hero mode: the children draw ABOVE the translated hero.
+  overHero: { zIndex: 1 },
   hero: {
     marginHorizontal: -18,
     height: 196,

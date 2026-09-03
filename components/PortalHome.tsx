@@ -40,7 +40,9 @@ import FormattedText from '@/components/FormattedText';
 import { stripFormattingTags } from '@/components/FormattedText';
 import { fetchContentImagesBatch, ContentType } from '@/utils/contentImages';
 import { fetchContentAttachmentsBatch, sweepExpiredContent, type ContentAttachment } from '@/utils/contentAttachments';
-import type { ContentKind } from '@/components/content/contentVisuals';
+import { priorityHue, type ContentKind } from '@/components/content/contentVisuals';
+import ContentBannerCard, { formatBannerWhen } from '@/components/content/ContentBannerCard';
+import { useIsDarkTheme } from '@/components/content/useIsDarkTheme';
 import { getImageUrl } from '@/utils/imageUrl';
 import WelcomeHeader from '@/components/WelcomeHeader';
 import NotificationDropdown from '@/components/NotificationDropdown';
@@ -270,6 +272,7 @@ export default function PortalHome({ role }: PortalHomeProps) {
   const [contentAttachmentsMap, setContentAttachmentsMap] = useState<Map<string, ContentAttachment>>(new Map());
   // Owner/manager gate for the quick-add rows — NOT the `role` prop (it misses owners).
   const canEditContent = isManagerOrOwner(user);
+  const isDark = useIsDarkTheme();
 
   // Detail modal state
   const [detailModalVisible, setDetailModalVisible] = useState(false);
@@ -284,6 +287,8 @@ export default function PortalHome({ role }: PortalHomeProps) {
     priority?: string;
     link?: string | null;
     guideFile?: GuideFile | null;
+    category?: string | null;
+    kind?: ContentKind;
   } | null>(null);
 
   const SECTIONS: ConnectBarTab[] = ['schedule', 'today', 'events', 'specials'];
@@ -513,6 +518,8 @@ export default function PortalHome({ role }: PortalHomeProps) {
     priority?: string;
     link?: string | null;
     guideFile?: GuideFile | null;
+    category?: string | null;
+    kind?: ContentKind;
   }) => {
     setSelectedItem(item);
     setDetailModalVisible(true);
@@ -612,35 +619,51 @@ export default function PortalHome({ role }: PortalHomeProps) {
       imageUrls.push(...additionalImages.map(url => getImageUrl(url, event.updated_at)!));
     }
 
+    const openEvent = () => {
+      markEventViewed(event.id);
+      openDetailModal({
+        title: getLocalizedField(event, 'title', language),
+        content: getLocalizedField(event, 'content', language) || event.content || event.message || '',
+        thumbnailUrl: event.thumbnail_url,
+        thumbnailShape: event.thumbnail_shape,
+        imageUrls,
+        startDateTime: event.start_date_time,
+        endDateTime: event.end_date_time,
+        link: event.link,
+        guideFile: resolveGuideFile(event.guide_file, contentAttachmentsMap.get(attachmentKey('upcoming_event', event.id))),
+        category: event.category,
+        kind: 'upcoming_event',
+      });
+    };
+    const eventIsNew =
+      !viewedEventIds.has(event.id) &&
+      (!lastViewedEvents || new Date(event.created_at) > new Date(lastViewedEvents));
+
+    // Banner posts wear ContentBannerCard (s81 — the menu banner grammar: the
+    // photo IS the card). Square posts keep the row card below.
+    if (event.thumbnail_shape === 'banner' && event.thumbnail_url) {
+      return (
+        <ContentBannerCard
+          key={event.id}
+          imageUrl={getImageUrl(event.thumbnail_url, event.updated_at)!}
+          title={getLocalizedField(event, 'title', language)}
+          description={truncateText(getLocalizedField(event, 'content', language) || event.content || event.message)}
+          eyebrow={formatBannerWhen(event.start_date_time, language)}
+          newLabel={eventIsNew ? t('content_editor.new_badge') : null}
+          onPress={openEvent}
+        />
+      );
+    }
+
     return (
       <TouchableOpacity
         key={event.id}
         style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}
-        onPress={() => {
-          markEventViewed(event.id);
-          openDetailModal({
-            title: getLocalizedField(event, 'title', language),
-            content: getLocalizedField(event, 'content', language) || event.content || event.message || '',
-            thumbnailUrl: event.thumbnail_url,
-            thumbnailShape: event.thumbnail_shape,
-            imageUrls,
-            startDateTime: event.start_date_time,
-            endDateTime: event.end_date_time,
-            link: event.link,
-            guideFile: resolveGuideFile(event.guide_file, contentAttachmentsMap.get(attachmentKey('upcoming_event', event.id))),
-          });
-        }}
+        onPress={openEvent}
         activeOpacity={0.7}
       >
-        {event.thumbnail_shape === 'banner' && event.thumbnail_url && (
-          <StorageExpoImage
-            source={getImageUrl(event.thumbnail_url, event.updated_at)!}
-            style={styles.bannerCardImage}
-            contentFit="cover"
-          />
-        )}
         <View style={styles.cardRow}>
-          {event.thumbnail_shape !== 'banner' && event.thumbnail_url && (
+          {event.thumbnail_url && (
             <StorageExpoImage
               source={getImageUrl(event.thumbnail_url, event.updated_at)!}
               style={styles.cardImage}
@@ -652,12 +675,11 @@ export default function PortalHome({ role }: PortalHomeProps) {
               <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
                 {getLocalizedField(event, 'title', language)}
               </Text>
-              {!viewedEventIds.has(event.id) &&
-                (!lastViewedEvents || new Date(event.created_at) > new Date(lastViewedEvents)) && (
-                  <View style={styles.newPill}>
-                    <Text style={styles.newPillText}>NEW</Text>
-                  </View>
-                )}
+              {eventIsNew && (
+                <View style={styles.newPill}>
+                  <Text style={styles.newPillText}>NEW</Text>
+                </View>
+              )}
             </View>
             <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]} numberOfLines={2}>
               {truncateText(getLocalizedField(event, 'content', language) || event.content || event.message)}
@@ -749,34 +771,51 @@ export default function PortalHome({ role }: PortalHomeProps) {
 
   // ===== RENDER CARD COMPONENTS =====
 
-  const renderAnnouncementCard = (announcement: Announcement, index: number) => (
+  const renderAnnouncementCard = (announcement: Announcement, index: number) => {
+    const openAnnouncement = () => {
+      markAnnouncementViewed(announcement.id);
+      openDetailModal({
+        title: getLocalizedField(announcement, 'title', language),
+        content: getLocalizedField(announcement, 'content', language) || announcement.content || announcement.message || '',
+        thumbnailUrl: announcement.thumbnail_url,
+        thumbnailShape: announcement.thumbnail_shape,
+        imageUrls: buildImageUrls(announcement.id, announcement.thumbnail_url, announcement.updated_at),
+        priority: announcement.priority,
+        link: announcement.link,
+        guideFile: resolveGuideFile(announcement.guide_file, contentAttachmentsMap.get(attachmentKey('announcement', announcement.id))),
+        kind: 'announcement',
+      });
+    };
+    const announcementIsNew =
+      !viewedAnnouncementIds.has(announcement.id) &&
+      (!lastViewedAnnouncements || new Date(announcement.created_at) > new Date(lastViewedAnnouncements));
+    const hasPriority = !!announcement.priority && announcement.priority !== 'none';
+
+    // Banner posts wear ContentBannerCard (s81). Announcements carry no dates,
+    // so the priority pill is the only top-left chip.
+    if (announcement.thumbnail_shape === 'banner' && announcement.thumbnail_url) {
+      return (
+        <ContentBannerCard
+          key={announcement.id}
+          imageUrl={getImageUrl(announcement.thumbnail_url, announcement.updated_at)!}
+          title={getLocalizedField(announcement, 'title', language)}
+          description={truncateText(getLocalizedField(announcement, 'content', language) || announcement.content || announcement.message)}
+          badge={hasPriority ? { label: getPriorityLabel(announcement.priority), color: priorityHue(announcement.priority, colors, isDark) } : null}
+          newLabel={announcementIsNew ? t('content_editor.new_badge') : null}
+          onPress={openAnnouncement}
+        />
+      );
+    }
+
+    return (
     <TouchableOpacity
       key={announcement.id}
       style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}
-      onPress={() => {
-        markAnnouncementViewed(announcement.id);
-        openDetailModal({
-          title: getLocalizedField(announcement, 'title', language),
-          content: getLocalizedField(announcement, 'content', language) || announcement.content || announcement.message || '',
-          thumbnailUrl: announcement.thumbnail_url,
-          thumbnailShape: announcement.thumbnail_shape,
-          imageUrls: buildImageUrls(announcement.id, announcement.thumbnail_url, announcement.updated_at),
-          priority: announcement.priority,
-          link: announcement.link,
-          guideFile: resolveGuideFile(announcement.guide_file, contentAttachmentsMap.get(attachmentKey('announcement', announcement.id))),
-        });
-      }}
+      onPress={openAnnouncement}
       activeOpacity={0.7}
     >
-      {announcement.thumbnail_shape === 'banner' && announcement.thumbnail_url && (
-        <StorageExpoImage
-          source={getImageUrl(announcement.thumbnail_url, announcement.updated_at)!}
-          style={styles.bannerCardImage}
-          contentFit="cover"
-        />
-      )}
       <View style={styles.cardRow}>
-        {announcement.thumbnail_shape !== 'banner' && announcement.thumbnail_url && (
+        {announcement.thumbnail_url && (
           <StorageExpoImage
             source={getImageUrl(announcement.thumbnail_url, announcement.updated_at)!}
             style={styles.cardImage}
@@ -788,12 +827,11 @@ export default function PortalHome({ role }: PortalHomeProps) {
             <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
               {getLocalizedField(announcement, 'title', language)}
             </Text>
-            {!viewedAnnouncementIds.has(announcement.id) &&
-              (!lastViewedAnnouncements || new Date(announcement.created_at) > new Date(lastViewedAnnouncements)) && (
-                <View style={styles.newPill}>
-                  <Text style={styles.newPillText}>NEW</Text>
-                </View>
-              )}
+            {announcementIsNew && (
+              <View style={styles.newPill}>
+                <Text style={styles.newPillText}>NEW</Text>
+              </View>
+            )}
             {announcement.priority && announcement.priority !== 'none' && (
               <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(announcement.priority) }]}>
                 <Text style={styles.priorityText}>{getPriorityLabel(announcement.priority).toUpperCase()}</Text>
@@ -806,37 +844,53 @@ export default function PortalHome({ role }: PortalHomeProps) {
         </View>
       </View>
     </TouchableOpacity>
-  );
+    );
+  };
 
-  const renderFeatureCard = (feature: SpecialFeature, index: number) => (
+  const renderFeatureCard = (feature: SpecialFeature, index: number) => {
+    const openFeature = () => {
+      markSpecialFeatureViewed(feature.id);
+      openDetailModal({
+        title: getLocalizedField(feature, 'title', language),
+        content: getLocalizedField(feature, 'content', language) || feature.content || feature.message || '',
+        thumbnailUrl: feature.thumbnail_url,
+        thumbnailShape: feature.thumbnail_shape,
+        imageUrls: buildImageUrls(feature.id, feature.thumbnail_url, feature.updated_at),
+        startDateTime: feature.start_date_time,
+        endDateTime: feature.end_date_time,
+        link: feature.link,
+        guideFile: resolveGuideFile(feature.guide_file, contentAttachmentsMap.get(attachmentKey('special_feature', feature.id))),
+        kind: 'special_feature',
+      });
+    };
+    const featureIsNew =
+      !viewedSpecialFeatureIds.has(feature.id) &&
+      (!lastViewedSpecialFeatures || new Date(feature.created_at) > new Date(lastViewedSpecialFeatures));
+
+    // Banner posts wear ContentBannerCard (s81).
+    if (feature.thumbnail_shape === 'banner' && feature.thumbnail_url) {
+      return (
+        <ContentBannerCard
+          key={feature.id}
+          imageUrl={getImageUrl(feature.thumbnail_url, feature.updated_at)!}
+          title={getLocalizedField(feature, 'title', language)}
+          description={truncateText(getLocalizedField(feature, 'content', language) || feature.content || feature.message)}
+          eyebrow={formatBannerWhen(feature.start_date_time, language)}
+          newLabel={featureIsNew ? t('content_editor.new_badge') : null}
+          onPress={openFeature}
+        />
+      );
+    }
+
+    return (
     <TouchableOpacity
       key={feature.id}
       style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}
-      onPress={() => {
-        markSpecialFeatureViewed(feature.id);
-        openDetailModal({
-          title: getLocalizedField(feature, 'title', language),
-          content: getLocalizedField(feature, 'content', language) || feature.content || feature.message || '',
-          thumbnailUrl: feature.thumbnail_url,
-          thumbnailShape: feature.thumbnail_shape,
-          imageUrls: buildImageUrls(feature.id, feature.thumbnail_url, feature.updated_at),
-          startDateTime: feature.start_date_time,
-          endDateTime: feature.end_date_time,
-          link: feature.link,
-          guideFile: resolveGuideFile(feature.guide_file, contentAttachmentsMap.get(attachmentKey('special_feature', feature.id))),
-        });
-      }}
+      onPress={openFeature}
       activeOpacity={0.7}
     >
-      {feature.thumbnail_shape === 'banner' && feature.thumbnail_url && (
-        <StorageExpoImage
-          source={getImageUrl(feature.thumbnail_url, feature.updated_at)!}
-          style={styles.bannerCardImage}
-          contentFit="cover"
-        />
-      )}
       <View style={styles.cardRow}>
-        {feature.thumbnail_shape !== 'banner' && feature.thumbnail_url && (
+        {feature.thumbnail_url && (
           <StorageExpoImage
             source={getImageUrl(feature.thumbnail_url, feature.updated_at)!}
             style={styles.cardImage}
@@ -848,12 +902,11 @@ export default function PortalHome({ role }: PortalHomeProps) {
             <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
               {getLocalizedField(feature, 'title', language)}
             </Text>
-            {!viewedSpecialFeatureIds.has(feature.id) &&
-              (!lastViewedSpecialFeatures || new Date(feature.created_at) > new Date(lastViewedSpecialFeatures)) && (
-                <View style={styles.newPill}>
-                  <Text style={styles.newPillText}>NEW</Text>
-                </View>
-              )}
+            {featureIsNew && (
+              <View style={styles.newPill}>
+                <Text style={styles.newPillText}>NEW</Text>
+              </View>
+            )}
           </View>
           <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]} numberOfLines={2}>
             {truncateText(getLocalizedField(feature, 'content', language) || feature.content || feature.message)}
@@ -866,7 +919,8 @@ export default function PortalHome({ role }: PortalHomeProps) {
         </View>
       </View>
     </TouchableOpacity>
-  );
+    );
+  };
 
   // All nine dietary abbreviations for a specials row, localized. Literal t()
   // calls so the i18n harvester sees every key (same rule as MenuDisplay).
@@ -1562,6 +1616,8 @@ export default function PortalHome({ role }: PortalHomeProps) {
           startDateTime={selectedItem.startDateTime}
           endDateTime={selectedItem.endDateTime}
           priority={selectedItem.priority}
+          category={selectedItem.category}
+          kind={selectedItem.kind}
           link={selectedItem.link}
           guideFile={selectedItem.guideFile}
           colors={{
@@ -1696,12 +1752,6 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 10,
-  },
-  bannerCardImage: {
-    width: '100%',
-    aspectRatio: 16 / 9,
-    borderRadius: 10,
-    marginBottom: 10,
   },
   cardContent: {
     flex: 1,

@@ -8,6 +8,7 @@ import { useIsDarkTheme } from '@/components/content/useIsDarkTheme';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { StepTitle, SwitchRow } from '@/components/content/FormKit';
 import { categoryHue, priorityHue, EMBER, type ContentKind } from '@/components/content/contentVisuals';
+import ContentBannerCard from '@/components/content/ContentBannerCard';
 import { fonts } from '@/constants/fonts';
 
 export interface ReviewLine {
@@ -141,13 +142,26 @@ export function ContentPreviewCard({ data }: { data: PreviewCardData }) {
         ? priorityLabel(data.priority, t)
         : null;
 
+  // Banner covers preview as the real ContentBannerCard (s81) — the eyebrow is
+  // the first "when" part (date or Today), the badge the category / priority.
+  if (data.shape === 'banner' && !!cover) {
+    return (
+      <ContentBannerCard
+        imageUrl={cover}
+        title={data.title || t('content_editor.preview_untitled')}
+        description={plainBody || null}
+        eyebrow={whenParts[0] ?? null}
+        badge={badgeColor && badgeText ? { label: badgeText, color: badgeColor } : null}
+        newLabel={t('content_editor.new_badge')}
+        style={styles.bannerPreview}
+      />
+    );
+  }
+
   return (
     <View style={styles.card}>
-      {data.shape === 'banner' && !!cover && (
-        <StorageImage source={{ uri: cover }} style={styles.bannerImage} resizeMode="cover" />
-      )}
       <View style={styles.cardRow}>
-        {data.shape !== 'banner' && !!cover && (
+        {!!cover && (
           <StorageImage source={{ uri: cover }} style={styles.squareImage} resizeMode="cover" />
         )}
         <View style={styles.cardBody}>
@@ -225,7 +239,9 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       borderColor: colors.surfaceBorder,
       marginBottom: 4,
     },
-    bannerImage: { width: '100%', aspectRatio: 16 / 9, borderRadius: 10, marginBottom: 10 },
+    // ContentBannerCard carries its own 11pt marginBottom; the preview frame
+    // wants the row card's 4.
+    bannerPreview: { marginBottom: 4 },
     cardRow: { flexDirection: 'row', gap: 12 },
     squareImage: { width: 64, height: 64, borderRadius: 10 },
     cardBody: { flex: 1, minWidth: 0, justifyContent: 'center' },

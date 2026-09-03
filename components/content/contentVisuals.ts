@@ -79,6 +79,23 @@ export function priorityHue(priority: string | null | undefined, colors: ThemeCo
   }
 }
 
+/**
+ * Kind badge hues for the detail modal's title pill (s81 round 3) — FIXED
+ * pairs, not the theme tint: the pill sits on a photo (white ink) and Mono's
+ * tint is near-white. Announcement ember-orange · Special Feature emerald ·
+ * Upcoming Event = its category hue.
+ */
+export function kindHue(kind: ContentKind, category: string | null | undefined, isDark: boolean): string {
+  switch (kind) {
+    case 'announcement':
+      return isDark ? '#F97316' : '#C2410C';
+    case 'special_feature':
+      return isDark ? '#10A56F' : '#087A52';
+    default:
+      return categoryHue(category, isDark);
+  }
+}
+
 /** The steps rail's "done" green (the tips emerald pair). */
 export function doneHue(isDark: boolean): string {
   return isDark ? '#10A56F' : '#087A52';
