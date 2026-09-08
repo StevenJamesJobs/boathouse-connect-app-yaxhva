@@ -3876,6 +3876,10 @@ export type Database = {
         Args: { p_actor_id: string; p_upload_id: string }
         Returns: boolean
       }
+      delete_menu_upload: {
+        Args: { p_actor_id: string; p_upload_id: string }
+        Returns: string
+      }
       get_org_guest_reviews: {
         Args: { p_actor_id: string }
         Returns: {

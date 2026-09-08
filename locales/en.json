@@ -412,8 +412,8 @@
     "edit_menu_sub": "Add, edit, reorder and delete items",
     "edit_categories": "Edit Categories",
     "edit_categories_sub": "Rename, hide, reorder, set colours",
-    "upload_menu": "Upload Menu",
-    "upload_menu_sub": "Read a PDF or photo into items",
+    "upload_menu": "Upload Menu & History",
+    "upload_menu_sub": "Upload a PDF or image to your menu & view upload history.",
     "menu_configuration": "Menu Configuration",
     "menu_configuration_sub": "Menu names, icons, one menu or two",
     "ask_owner": "Ask your owner to enable this",
@@ -2541,7 +2541,9 @@
     "return_to_onboarding": "Return to Onboarding",
     "permission_needed_title": "Permission Needed",
     "permission_needed_msg": "Menu uploads need the owner's permission. Ask your owner to enable AI Menu Uploads for managers.",
-    "poll_failed": "Could not check the upload status. Open Upload History to see the result."
+    "poll_failed": "Could not check the upload status. Open Upload History to see the result.",
+    "delete_upload_title": "Delete Upload",
+    "delete_upload_message": "This removes the scan and its photo. The scan credit is not refunded."
   },
   "redeem_settings": {
     "add": "Add Option",

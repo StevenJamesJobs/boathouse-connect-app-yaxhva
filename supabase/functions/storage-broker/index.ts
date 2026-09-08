@@ -33,6 +33,8 @@
 //
 // v13 (session 80): three *_attachment purposes — one-time post attachments
 // (PDF/image, 20MB) in the post's own bucket under attachments/.
+//
+// v14 (session 82b): 'menu-uploads' joins DELETE_BUCKETS (Recent Uploads delete).
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -195,8 +197,11 @@ const GATES: Record<string, Gate> = {
 };
 
 // Only buckets with real client delete flows accept broker deletes.
+// v14 (s82b): + 'menu-uploads' — Recent Uploads can delete a saved/failed scan
+// (delete_menu_upload returns the file_url; the client broker-deletes it after).
 const DELETE_BUCKETS = new Set([
   'guides-and-training', 'announcements', 'special-features', 'upcoming-events', 'menu-items',
+  'menu-uploads',
 ]);
 
 // The 15 real buckets sign-read will mint READ URLs for (excludes the inert,
