@@ -251,7 +251,7 @@ export default function HostSectionEditorScreen() {
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: shape === 'square' ? [1, 1] : [16, 9],
       quality: 0.8,

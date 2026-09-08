@@ -341,7 +341,7 @@ export function MiniProfileProvider({ children }: { children: React.ReactNode })
 const makeStyles = (colors: ThemeColorSet) =>
   StyleSheet.create({
     scrim: {
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
       backgroundColor: 'rgba(10, 9, 8, 0.55)',
     },
     sheetWrap: {

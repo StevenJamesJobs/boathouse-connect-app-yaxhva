@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, Platform } from 'react-native';
-import DateTimePicker, { DateTimePickerAndroid, type DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { useTranslation } from 'react-i18next';
 import GlassSheet from '@/components/GlassSheet';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -34,6 +34,10 @@ interface DateTimeFieldProps {
  * (the invisible-compact-picker overlay only sized to its own pill and missed
  * taps on the row text, s80 smoke). Android: the standard DateTimePickerAndroid
  * dialogs — same library, no Modal.
+ *
+ * datetimepicker 9.x (SDK 57, s82): `onValueChange(event, date)` fires ONLY on a
+ * selection (a dismissed dialog never calls it), so the old `event.type === 'set'`
+ * guard is gone; `onChange` is deprecated.
  */
 export default function DateTimeField({
   label,
@@ -77,8 +81,7 @@ export default function DateTimeField({
       value: value ?? seedDate,
       mode,
       minimumDate: mode === 'date' ? minimumDate : undefined,
-      onChange: (e: DateTimePickerEvent, picked?: Date) => {
-        if (e.type !== 'set' || !picked) return;
+      onValueChange: (_e, picked) => {
         if (mode === 'date') setDatePart(picked);
         else setTimePart(picked);
       },
@@ -148,7 +151,7 @@ export default function DateTimeField({
               minimumDate={minimumDate}
               themeVariant={isDark ? 'dark' : 'light'}
               locale={locale}
-              onChange={(_e, picked) => picked && setDraft(picked)}
+              onValueChange={(_e, picked) => setDraft(picked)}
               style={styles.spinner}
             />
           </View>

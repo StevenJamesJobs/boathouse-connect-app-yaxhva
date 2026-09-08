@@ -546,7 +546,7 @@ export default function AnimatedSplash(props: AnimatedSplashProps) {
 
 const styles = StyleSheet.create({
   container: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     zIndex: 999,
     elevation: 999,
     justifyContent: "center",
@@ -678,7 +678,7 @@ const styles = StyleSheet.create({
   },
   logoWrap: {},
   whiteOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "#FFFFFF",
   },
 });

@@ -781,7 +781,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   imgLoading: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     justifyContent: 'center',
     alignItems: 'center',
   },

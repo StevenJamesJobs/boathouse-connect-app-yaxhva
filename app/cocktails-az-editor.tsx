@@ -217,7 +217,7 @@ export default function CocktailsAZEditorScreen() {
   const pickImage = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [16, 9],
         quality: 0.8,
@@ -1012,7 +1012,7 @@ const styles = StyleSheet.create({
   thumbImage: { width: '100%', height: '100%' },
   thumbPlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   thumbUploading: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.35)',

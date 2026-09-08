@@ -234,7 +234,7 @@ const createStyles = (colors: any) =>
       paddingBottom: 8,
     },
     backdrop: {
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
       overflow: 'hidden',
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: colors.hairline,

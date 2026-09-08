@@ -264,7 +264,7 @@ const styles = StyleSheet.create({
     color: '#1A2030',
   },
   matchFlash: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderRadius: 11,
     borderWidth: 2.5,
     borderColor: '#10B981',

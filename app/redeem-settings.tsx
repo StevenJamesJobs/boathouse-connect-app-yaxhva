@@ -407,7 +407,7 @@ const makeStyles = (colors: ReturnType<typeof useThemeColors>) =>
     tsw: { width: 46, height: 27, borderRadius: 14, padding: 3, justifyContent: 'center' },
     tswKnob: { width: 21, height: 21, borderRadius: 11, backgroundColor: '#fff' },
     sheetWrap: { flex: 1, justifyContent: 'flex-end' },
-    scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(6,10,18,0.5)' },
+    scrim: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(6,10,18,0.5)' },
     sheet: { paddingHorizontal: 18, paddingBottom: 28, paddingTop: 8 },
     grab: { width: 40, height: 5, borderRadius: 3, backgroundColor: colors.glassBorder, alignSelf: 'center', marginTop: 6, marginBottom: 14 },
     mtitle: { fontFamily: fonts.display.bold, fontSize: 18, color: colors.text },

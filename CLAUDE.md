@@ -7,8 +7,8 @@ Claude Code auto-loads this file. **These rules are load-bearing — follow them
 
 - **Edit the WORKTREE, not the main checkout.** Do development in a git worktree
   (`git worktree add ../boathouse-connect-app-yaxhva-<name> <branch>`), not in the primary checkout.
-- **A fresh worktree has no `node_modules` — SYMLINK it, do NOT `npm install`.** The SDK-54 install /
-  lockfile is delicate and must not be disturbed: `ln -s <main-checkout>/node_modules <worktree>/node_modules`.
+- **A fresh worktree has no `node_modules` — SYMLINK it, do NOT `npm install`.** The SDK-57 install /
+  lockfile (SDK 57 since s82, 2026-09-08) is delicate and must not be disturbed: `ln -s <main-checkout>/node_modules <worktree>/node_modules`.
   (The symlink is ignored via `.git/info/exclude`, not `.gitignore` — re-add it if the repo is recloned.)
   Also copy `.expo/types/router.d.ts` from the main checkout into the worktree's `.expo/types/` —
   a stale or missing copy shows phantom expo-router `Href` tsc errors until a dev server regenerates it.

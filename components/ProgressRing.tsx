@@ -36,7 +36,7 @@ function HalfRing({
   // borderLeft+borderBottom coloured + 45° = the LEFT semicircle; the outer
   // wrapper then swings that half by the progress angle.
   return (
-    <View style={[StyleSheet.absoluteFillObject, { transform: [{ rotate: `${rotate}deg` }] }]}>
+    <View style={[StyleSheet.absoluteFill, { transform: [{ rotate: `${rotate}deg` }] }]}>
       <View
         style={{
           width: size,
@@ -75,7 +75,7 @@ export default function ProgressRing({
       {/* track */}
       <View
         style={{
-          ...StyleSheet.absoluteFillObject,
+          ...StyleSheet.absoluteFill,
           borderRadius: half,
           borderWidth: stroke,
           borderColor: trackColor,
@@ -108,7 +108,7 @@ export default function ProgressRing({
 
 const styles = StyleSheet.create({
   center: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
   },

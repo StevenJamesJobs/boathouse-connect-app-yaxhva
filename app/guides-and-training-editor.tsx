@@ -30,7 +30,7 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { brokerUploadImage, brokerUploadFile, brokerDelete } from '@/utils/storageBroker';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from "expo-router/react-navigation";
 import { useTranslation } from 'react-i18next';
 import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-native-draggable-flatlist';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -416,7 +416,7 @@ export default function GuidesAndTrainingEditorScreen() {
   const pickThumbnail = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,

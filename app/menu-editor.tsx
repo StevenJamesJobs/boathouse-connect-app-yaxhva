@@ -1361,7 +1361,7 @@ const createStyles = (colors: ThemeColorSet) =>
     // Jolt paints above EVERYTHING (30 > header 20 > chrome overlay 10) —
     // mirrors the portal layout rendering it above the whole tab scene.
     joltLayer: {
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
       zIndex: 30,
     },
     pagerArea: {

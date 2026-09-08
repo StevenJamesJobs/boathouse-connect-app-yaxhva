@@ -811,7 +811,7 @@ export default function ExamEditorScreen() {
         return null;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [16, 10],
         quality: 0.8,
