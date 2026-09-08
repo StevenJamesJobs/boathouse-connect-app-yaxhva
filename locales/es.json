@@ -412,8 +412,8 @@
     "edit_menu_sub": "Agrega, edita, reordena y elimina platillos",
     "edit_categories": "Editar Categorías",
     "edit_categories_sub": "Renombra, oculta, reordena y elige colores",
-    "upload_menu": "Subir Menú",
-    "upload_menu_sub": "Convierte un PDF o foto en platillos",
+    "upload_menu": "Subir menú e historial",
+    "upload_menu_sub": "Sube un PDF o imagen a tu menú y consulta el historial de subidas.",
     "menu_configuration": "Configuración del Menú",
     "menu_configuration_sub": "Nombres, íconos, uno o dos menús",
     "ask_owner": "Pídele al dueño que lo habilite",
@@ -2541,7 +2541,9 @@
     "return_to_onboarding": "Volver a la Configuración Inicial",
     "permission_needed_title": "Se Necesita Permiso",
     "permission_needed_msg": "Subir menús requiere permiso del dueño. Pídele que habilite las Subidas de Menú con IA para gerentes.",
-    "poll_failed": "No se pudo verificar el estado. Abre el Historial de Subidas para ver el resultado."
+    "poll_failed": "No se pudo verificar el estado. Abre el Historial de Subidas para ver el resultado.",
+    "delete_upload_title": "Eliminar subida",
+    "delete_upload_message": "Esto elimina el escaneo y su foto. El crédito del escaneo no se reembolsa."
   },
   "redeem_settings": {
     "title": "Configuración de Canje",

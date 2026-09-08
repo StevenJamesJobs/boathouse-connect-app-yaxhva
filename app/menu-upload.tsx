@@ -16,7 +16,7 @@ import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 import { useManagerPermissions } from '@/hooks/useManagerPermissions';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
-import { brokerUploadBase64 } from '@/utils/storageBroker';
+import { brokerUploadBase64, brokerDelete } from '@/utils/storageBroker';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
@@ -137,6 +137,39 @@ export default function MenuUploadScreen() {
       setLoading(false);
     }
   }, [user?.id, organizationId]);
+
+
+  // s82b (Steve, 2026-09-08): delete a saved-for-later or failed scan from Recent
+  // Uploads. The scan credit is NOT refunded (a scan costs its credit whether or
+  // not it is applied); applied uploads stay — they are the audit trail behind
+  // their items. Row first (gated RPC), then a best-effort object delete.
+  const confirmDeleteUpload = (u: MenuUpload) => {
+    Alert.alert(
+      t('menu_upload.delete_upload_title', 'Delete Upload'),
+      t('menu_upload.delete_upload_message', 'This removes the scan and its photo. The scan credit is not refunded.'),
+      [
+        { text: t('common.cancel', 'Cancel'), style: 'cancel' },
+        {
+          text: t('common.delete', 'Delete'),
+          style: 'destructive',
+          onPress: async () => {
+            if (!user?.id) return;
+            try {
+              const { data: fileUrl, error } = await supabase.rpc('delete_menu_upload', {
+                p_actor_id: user.id, p_upload_id: u.id,
+              });
+              if (error) throw error;
+              if (fileUrl) await brokerDelete('menu-uploads', [fileUrl], user.id);
+              setUploads((prev) => prev.filter((x) => x.id !== u.id));
+            } catch (e: any) {
+              console.error('Error deleting menu upload:', e);
+              Alert.alert(t('menu_upload.delete_failed', 'Could Not Delete'), translateServerError(e, t('common.error', 'Error')));
+            }
+          },
+        },
+      ]
+    );
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -604,6 +637,16 @@ export default function MenuUploadScreen() {
                       {creditLabel(u) ? ` · ${creditLabel(u)}` : ''}
                     </Text>
                   </View>
+                  {(u.status === 'ready_for_review' || u.status === 'failed') && (
+                    <TouchableOpacity
+                      onPress={() => confirmDeleteUpload(u)}
+                      hitSlop={10}
+                      accessibilityLabel={t('common.delete', 'Delete')}
+                      style={styles.historyTrash}
+                    >
+                      <IconSymbol ios_icon_name="trash" android_material_icon_name="delete" size={17} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  )}
                   {u.status === 'ready_for_review' ? (
                     <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={16} color={colors.primary} />
                   ) : u.status === 'applied' ? (
@@ -803,6 +846,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   historyName: { fontSize: 14, fontFamily: fonts.body.semibold },
   historyMeta: { fontSize: 11.5, fontFamily: fonts.mono.medium, marginTop: 2 },
+  historyTrash: { padding: 4 },
   dangerWrap: { marginTop: 20, alignItems: 'center', gap: 9 },
   dangerIntro: { fontSize: 12.5, fontFamily: fonts.body.regular, color: colors.textSecondary, textAlign: 'center', lineHeight: 17, paddingHorizontal: 12 },
   dangerBtn: {
