@@ -95,7 +95,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth + 0.5,
   },
   glyphBox: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
     // Keep the glyph above the name strip's visual weight.

@@ -21,10 +21,22 @@ EAS account: **stevenjamesjobs**. Apple Team: **86JRKCMC65** (Steven Eccles — 
 
 ## Prerequisites
 
+- **Expo SDK 57** (React Native 0.86.3 · React 19.2.3 · Hermes V1 · expo-router 57 · Reanimated 4.5) — upgraded from
+  SDK 54 in s82 (2026-09-08). Expo Go must match the project SDK exactly and the App Store ships only the
+  latest Expo Go, so a device on a newer Expo Go cannot open an older-SDK project (that was the s81→s82 trigger).
+  SDK 56+ needs **Xcode 26.4+** on the build machine — EAS picks its image from the SDK (add `"image": "latest"`
+  to the profile only if a build ever fails on image selection); the local Xcode only matters for `expo run:ios`.
 - `eas-cli` installed and logged in: `eas whoami` → `stevenjamesjobs`. (A "version outdated" warning is harmless.)
 - Local Node version doesn't matter — EAS builds on its own Node (pinned to `22.15.0` in the `production` profile).
 - **Gates before building** (same as the dev workflow): `npx tsc --noEmit` with 0 net-new errors, and en/es i18n key parity. Build from a **committed** commit on `main` (EAS archives git state).
 - **Lockfile gate (learned build #11, 2026-08-04):** EAS runs `npm ci --include=dev` on **npm 10** (bundled with the pinned Node 22.15.0). A lockfile written by a newer local npm (11+) can be npm-10-invalid (e.g. a missing optional-peer entry → `EUSAGE … Missing: <pkg> from lock file`) while installing fine locally. Before building — and after ANY dependency change — validate in a scratch copy (never in the checkout): copy `package.json` + `package-lock.json` to a temp dir and run `npx -y npm@10.9.2 ci --include=dev --ignore-scripts`. If it fails, repair with `npx -y npm@10.9.2 install --package-lock-only` in the temp dir, diff, and commit the repaired lock.
+  **s82 addendum (SDK 57):** write the lock WITH npm 10 from the start (`npx -y npm@10.9.2 install …` — an npm-10
+  binary staged in a scratch prefix and put first on `PATH` also makes `npx expo install --fix` use it). Under strict
+  npm 10 the SDK 57 tree hits ERESOLVE through `@react-native-community/datetimepicker`'s *optional* peer
+  `react-native-windows` (its latest pins `react-native@0.84.1` exactly); the fix is `npm install --force` — **never**
+  `--legacy-peer-deps`, which writes a lock that omits real peers (webpack, react-refresh, tailwindcss,
+  `@react-native/metro-config`) and then fails the `npm ci` gate with `Missing: … from lock file`. The `--force` lock
+  passed the gate clean (1517 packages) with no `.npmrc` needed.
 
 ## Versioning
 

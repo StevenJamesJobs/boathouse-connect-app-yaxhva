@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth + 0.5,
   },
   glyphBox: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
     // Keep the glyph above the foot strip's visual weight.
@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.25)',
   },
   doneScrim: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(8,10,14,0.35)',
   },
   doneBadge: {
@@ -231,7 +231,7 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
   },
   ghostCenter: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,

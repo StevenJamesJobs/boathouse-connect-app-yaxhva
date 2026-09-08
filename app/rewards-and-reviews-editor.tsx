@@ -1846,7 +1846,7 @@ const makeStyles = (colors: ReturnType<typeof useThemeColors>) =>
 
     // modals
     sheetWrap: { flex: 1, justifyContent: 'flex-end' },
-    scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(6,10,18,0.5)' },
+    scrim: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(6,10,18,0.5)' },
     sheet: { paddingHorizontal: 18, paddingBottom: 28, paddingTop: 8, maxHeight: '88%' },
     grab: { width: 40, height: 5, borderRadius: 3, backgroundColor: colors.glassBorder, alignSelf: 'center', marginTop: 6, marginBottom: 14 },
     mtitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
@@ -1878,5 +1878,5 @@ const makeStyles = (colors: ReturnType<typeof useThemeColors>) =>
     resetAllWarn: { fontFamily: fonts.body.regular, fontSize: 12, color: colors.textSecondary, fontStyle: 'italic', lineHeight: 17 },
     divider: { height: 1, backgroundColor: colors.hairline, marginVertical: 22 },
 
-    loadingOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.25)', zIndex: 20 },
+    loadingOverlay: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.25)', zIndex: 20 },
   });

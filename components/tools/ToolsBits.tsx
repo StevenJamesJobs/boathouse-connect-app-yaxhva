@@ -65,7 +65,7 @@ const styles = StyleSheet.create({
     height: StyleSheet.hairlineWidth,
   },
   pulse: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderWidth: 1.5,
     shadowOpacity: 0.55,
     shadowRadius: 8,

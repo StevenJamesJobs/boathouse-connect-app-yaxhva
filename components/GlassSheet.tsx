@@ -199,7 +199,7 @@ export default function GlassSheet({
 
 const styles = StyleSheet.create({
   wrap: { flex: 1, justifyContent: 'flex-end' },
-  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(6,10,18,0.55)' },
+  scrim: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(6,10,18,0.55)' },
   sheet: {
     // Top corners only — the sheet is flush to the bottom edge.
     borderBottomLeftRadius: 0,

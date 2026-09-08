@@ -23,7 +23,7 @@ import { useSubscription } from '@/contexts/SubscriptionContext';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from "expo-router/react-navigation";
 import { useTranslation } from 'react-i18next';
 import { translateServerError } from '@/utils/serverErrors';
 import AmbientGlow from '@/components/AmbientGlow';
@@ -832,5 +832,5 @@ const createStyles = (colors: any) => StyleSheet.create({
   sheetCancelText: { fontSize: 13.5, fontFamily: fonts.body.semibold },
   sheetDelete: { flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center', backgroundColor: '#F44336' },
   sheetDeleteText: { color: '#FFFFFF', fontSize: 13.5, fontFamily: fonts.body.semibold },
-  joltLayer: { ...StyleSheet.absoluteFillObject, zIndex: 30 },
+  joltLayer: { ...StyleSheet.absoluteFill, zIndex: 30 },
 });

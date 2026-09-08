@@ -475,7 +475,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   fabCircle: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderRadius: FAB_SIZE / 2,
     borderWidth: 1,
     shadowOffset: { width: 0, height: 0 },
@@ -484,7 +484,7 @@ const styles = StyleSheet.create({
     elevation: 9,
   },
   scrim: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(10, 9, 8, 0.55)',
   },
   palbox: {

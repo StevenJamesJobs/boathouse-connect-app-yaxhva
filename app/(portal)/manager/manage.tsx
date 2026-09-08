@@ -19,7 +19,7 @@ import {
 } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useRouter } from 'expo-router';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from "expo-router/react-navigation";
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useManagerPermissions } from '@/hooks/useManagerPermissions';
 import { useAuth } from '@/contexts/AuthContext';

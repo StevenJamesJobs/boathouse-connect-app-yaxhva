@@ -502,7 +502,7 @@ export default function MenuItemDetailSheet({
 
 const styles = StyleSheet.create({
   wrap: { flex: 1, justifyContent: 'flex-end' },
-  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(6,10,18,0.55)' },
+  scrim: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(6,10,18,0.55)' },
   // Layout box + the animated transform only; all fill/blur/border/radius live
   // on the GlassCard inside. maxHeight here (against the full-height wrap) so
   // the card's flexShrink has a real bound to shrink against.
@@ -559,7 +559,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     flexShrink: 0,
   },
-  heroImage: { ...StyleSheet.absoluteFillObject },
+  heroImage: { ...StyleSheet.absoluteFill },
   heroEyebrow: {
     position: 'absolute',
     left: 14,

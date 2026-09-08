@@ -65,8 +65,10 @@ const getLogServerUrl = (): string | null => {
           .replace('exp://', 'https://')
           .split('/')[0] + '//' + experienceUrl.replace('exp://', '').split('/')[0];
 
-        // If it looks like a local IP, use http
-        if (baseUrl.includes('192.168.') || baseUrl.includes('10.') || baseUrl.includes('localhost')) {
+        // If it looks like a local IP, use http (127.0.0.1 = the simulator's
+        // exp://127.0.0.1:8081 — it was missing here, so the sim built an https URL
+        // that Metro can never serve; s82).
+        if (baseUrl.includes('192.168.') || baseUrl.includes('10.') || baseUrl.includes('localhost') || baseUrl.includes('127.')) {
           baseUrl = baseUrl.replace('https://', 'http://');
         }
 
@@ -90,6 +92,13 @@ const getLogServerUrl = (): string | null => {
 
 // Track if we've logged fetch errors to avoid spam
 let fetchErrorLogged = false;
+
+// The un-intercepted console.log, captured at module load (before
+// setupErrorLogging overrides it). Hermes V1 (SDK 56+) gives `console` no
+// prototype methods, so the old `console.__proto__.log.call(...)` fallback
+// threw inside the .catch and surfaced as an unhandled rejection on every
+// launch (Sentry REACT-NATIVE-5, s82).
+const rawConsoleLog: (...args: any[]) => void = console.log.bind(console);
 
 // Flush the log queue to server
 const flushLogs = async () => {
@@ -115,10 +124,8 @@ const flushLogs = async () => {
         // Log fetch errors only once to avoid spam
         if (!fetchErrorLogged) {
           fetchErrorLogged = true;
-          // Use a different method to avoid recursion - write directly without going through our intercept
-          if (typeof window !== 'undefined' && window.console) {
-            (window.console as any).__proto__.log.call(console, '[Natively] Fetch error (will not repeat):', e.message || e);
-          }
+          // Use the pre-intercept console.log to avoid recursion through our override
+          rawConsoleLog('[Natively] Fetch error (will not repeat):', e?.message || e);
         }
       });
     } catch (e) {

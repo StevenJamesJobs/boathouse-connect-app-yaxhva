@@ -31,7 +31,7 @@ import { menuBadgeForSeason, compareBySectionThenOrder } from '@/utils/menuBadge
 import { labelForCategoryName } from '@/utils/menuCategoryLabels';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from "expo-router/react-navigation";
 import WeatherDetailModal from '@/components/WeatherDetailModal';
 
 import { getLocalizedField } from '@/utils/translateContent';

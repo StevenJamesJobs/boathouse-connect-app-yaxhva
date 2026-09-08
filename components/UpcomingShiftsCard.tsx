@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from "expo-router/react-navigation";
 import { supabase } from '@/app/integrations/supabase/client';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import GlassCard from '@/components/GlassCard';

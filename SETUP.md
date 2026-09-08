@@ -32,7 +32,7 @@ before installing deps fails with `Cannot find package 'expo'`. **`npm ci`** —
 not `npm install`, and not `nvm install` — is what fixes it:
 - installs the **exact** versions from `package-lock.json` (identical to the
   other machine), and
-- **never rewrites the lockfile**, so it can't drift the SDK-54 setup.
+- **never rewrites the lockfile**, so it can't drift the SDK-57 setup.
 
 Use `npm ci`, never `npm install`, on this project.
 

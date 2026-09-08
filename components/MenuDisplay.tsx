@@ -23,7 +23,7 @@ import { getImageUrl } from '@/utils/imageUrl';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useRouter } from 'expo-router';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from "expo-router/react-navigation";
 import { fonts } from '@/constants/fonts';
 import type { ThemeColorSet } from '@/styles/commonStyles';
 import { isManagerOrOwner } from '@/utils/roles';

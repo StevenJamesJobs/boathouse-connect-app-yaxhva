@@ -469,7 +469,7 @@ export default function MenuItemEditSheet({
   const openPhotoLibrary = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: formData.thumbnail_shape === 'square' ? [1, 1] : [16, 9],
         quality: 0.8,

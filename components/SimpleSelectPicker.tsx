@@ -193,7 +193,7 @@ const fieldStyles = (colors: ReturnType<typeof useThemeColors>) =>
 const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
   StyleSheet.create({
     container: { flex: 1, justifyContent: 'flex-end' },
-    backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(6,10,18,0.55)' },
+    backdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(6,10,18,0.55)' },
     sheet: {
       borderBottomLeftRadius: 0,
       borderBottomRightRadius: 0,

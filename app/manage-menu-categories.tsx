@@ -1555,7 +1555,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
     modalCancelText: { fontSize: 15, fontFamily: fonts.body.semibold, color: colors.textSecondary },
     modalSave: { paddingHorizontal: 22, paddingVertical: 10, borderRadius: 10, backgroundColor: colors.primary },
     modalSaveText: { fontSize: 15, fontFamily: fonts.body.semibold, color: colors.fireText },
-    joltLayer: { ...StyleSheet.absoluteFillObject, zIndex: 30 },
+    joltLayer: { ...StyleSheet.absoluteFill, zIndex: 30 },
   });
 
 // Sheet-local styles (CategoryEditorSheet + LegendSheet).

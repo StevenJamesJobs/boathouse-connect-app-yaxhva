@@ -21,7 +21,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { brokerUploadBase64 } from '@/utils/storageBroker';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from "expo-router/react-navigation";
 import { useTranslation } from 'react-i18next';
 import { translateServerError } from '@/utils/serverErrors';
 import AmbientGlow from '@/components/AmbientGlow';
