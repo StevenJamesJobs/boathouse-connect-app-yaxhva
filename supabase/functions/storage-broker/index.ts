@@ -35,6 +35,10 @@
 // (PDF/image, 20MB) in the post's own bucket under attachments/.
 //
 // v14 (session 82b): 'menu-uploads' joins DELETE_BUCKETS (Recent Uploads delete).
+//
+// v15 (session 83): schedule_upload_file gains grantKey 'premium.ai_schedule_upload'
+// (the AI Schedule Uploads manager permission goes live) and 'schedules' joins
+// DELETE_BUCKETS (the schedule Recent Uploads delete).
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -191,8 +195,11 @@ const GATES: Record<string, Gate> = {
     grantKey: 'premium.ai_menu_upload',
   },
   schedule_upload_file: {
-    bucket: 'schedules', roles: 'manager', maxBytes: 25 * MB, mimes: UPLOAD_DOC_TYPES,
+    // v15 (s83): the AI Schedule Uploads grant goes live — owner, or a manager holding
+    // premium.ai_schedule_upload (_may_upload_schedule server-side; parse-schedule mirrors it).
+    bucket: 'schedules', roles: 'owner', maxBytes: 25 * MB, mimes: UPLOAD_DOC_TYPES,
     path: (c) => `${c.orgId}/${c.ts}-${c.safeName}`,
+    grantKey: 'premium.ai_schedule_upload',
   },
 };
 
@@ -201,7 +208,7 @@ const GATES: Record<string, Gate> = {
 // (delete_menu_upload returns the file_url; the client broker-deletes it after).
 const DELETE_BUCKETS = new Set([
   'guides-and-training', 'announcements', 'special-features', 'upcoming-events', 'menu-items',
-  'menu-uploads',
+  'menu-uploads', 'schedules',
 ]);
 
 // The 15 real buckets sign-read will mint READ URLs for (excludes the inert,

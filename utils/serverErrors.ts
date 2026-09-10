@@ -22,6 +22,30 @@
 import i18n from '@/i18n';
 
 const EXACT_MAP: Record<string, string> = {
+  // s83 schedule wave (request_time_off / decide_* / release_shift / claim_shift /
+  // get_schedule_approvals / create_schedule_upload / parse-schedule credits)
+  'Time off requests are turned off for your organization': 'server_errors.s83_time_off_disabled',
+  'Shift releases are turned off for your organization': 'server_errors.s83_shift_release_disabled',
+  'Time off must start today or later': 'server_errors.s83_time_off_past',
+  'End date must be on or after the start date': 'server_errors.s83_time_off_end_before_start',
+  'You already have a request covering those dates': 'server_errors.s83_time_off_overlap',
+  'Request not found': 'server_errors.s83_request_not_found',
+  'Request is no longer pending': 'server_errors.s83_request_not_pending',
+  "You can't decide your own request": 'server_errors.s83_own_request',
+  'Only managers or owners can decide requests': 'server_errors.s83_decide_managers_only',
+  'You can only release your own shifts': 'server_errors.s83_release_own_only',
+  "Past shifts can't be released": 'server_errors.s83_release_past',
+  'This shift is already released': 'server_errors.s83_release_exists',
+  'Release not found': 'server_errors.s83_release_not_found',
+  'This shift is no longer available': 'server_errors.s83_shift_unavailable',
+  "You can't pick up your own shift": 'server_errors.s83_pickup_own',
+  "This shift needs a job title you don't have": 'server_errors.s83_pickup_title_mismatch',
+  "You can't decide a pick-up you're part of": 'server_errors.s83_pickup_decide_party',
+  'This pick-up is no longer pending': 'server_errors.s83_pickup_not_pending',
+  'Only managers or owners can view schedule approvals': 'server_errors.s83_schedule_approvals_managers_only',
+  'You do not have permission to upload schedules': 'server_errors.s83_schedule_upload_forbidden',
+  'Only managers or owners can review schedule uploads': 'server_errors.s83_schedule_review_managers_only',
+  'You’re out of schedule-scan credits this month. They reset next month, or upgrade for more.': 'server_errors.s83_schedule_credits_exhausted',
   // s80 content attachments / storage retire (set_content_attachment,
   // retire_content_storage, ack_pending_deletes, replace_content_images)
   'Only managers or owners can manage content attachments': 'server_errors.content_attachments_managers_only',

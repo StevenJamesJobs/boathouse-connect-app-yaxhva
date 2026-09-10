@@ -1601,6 +1601,7 @@ export type Database = {
           special_features_enabled: boolean | null
           updated_at: string | null
           user_id: string
+          shift_releases_enabled: boolean
         }
         Insert: {
           announcements_enabled?: boolean | null
@@ -2312,6 +2313,12 @@ export type Database = {
           uploaded_by: string
           week_end: string
           week_start: string
+          title: string | null
+          reviewed_at: string | null
+          source_type: string | null
+          page_count: number
+          credits_charged: number
+          was_free: boolean
         }
         Insert: {
           created_at?: string | null
@@ -3621,6 +3628,9 @@ export type Database = {
           reward_currency_name: string
           slug: string
           staff_can_view_roster: boolean
+          time_off_requests_enabled: boolean
+          shift_release_enabled: boolean
+          roster_pm_cutoff: string
           state: string
           weather_location: string
           zip: string
@@ -3813,11 +3823,209 @@ export type Database = {
           uploaded_by: string
           week_end: string
           week_start: string
+          title: string | null
+          reviewed_at: string | null
+          source_type: string | null
+          page_count: number
+          credits_charged: number
+          was_free: boolean
         }[]
       }
       get_latest_schedule_upload_at: {
         Args: { p_actor_id: string }
         Returns: string
+      }
+      // ─── s83 Schedule wave (hand-spliced; nullability by hand) ───
+      get_schedule_settings: {
+        Args: { p_actor_id: string }
+        Returns: {
+          staff_can_view_roster: boolean
+          time_off_requests_enabled: boolean
+          shift_release_enabled: boolean
+          roster_pm_cutoff: string
+        }[]
+      }
+      get_schedule_upload_quota: {
+        Args: { p_actor_id: string }
+        Returns: Json
+      }
+      consume_schedule_upload_credits: {
+        Args: { p_actor_id: string; p_source_type: string; p_page_count?: number }
+        Returns: Json
+      }
+      mark_schedule_upload_reviewed: {
+        Args: { p_actor_id: string; p_upload_id: string }
+        Returns: boolean
+      }
+      request_time_off: {
+        Args: { p_actor_id: string; p_start_date: string; p_end_date?: string | null; p_reason?: string | null }
+        Returns: string
+      }
+      cancel_time_off_request: {
+        Args: { p_actor_id: string; p_request_id: string }
+        Returns: boolean
+      }
+      get_my_time_off_requests: {
+        Args: { p_actor_id: string; p_limit?: number }
+        Returns: {
+          id: string
+          start_date: string
+          end_date: string
+          reason: string | null
+          status: string
+          decided_at: string | null
+          decision_reason: string | null
+          created_at: string
+        }[]
+      }
+      decide_time_off_request: {
+        Args: { p_actor_id: string; p_request_id: string; p_approve: boolean; p_reason?: string | null }
+        Returns: { user_id: string; user_name: string | null; start_date: string; end_date: string }[]
+      }
+      release_shift: {
+        Args: { p_actor_id: string; p_shift_id: string }
+        Returns: string
+      }
+      cancel_shift_release: {
+        Args: { p_actor_id: string; p_release_id: string }
+        Returns: boolean
+      }
+      get_my_shift_releases: {
+        Args: { p_actor_id: string }
+        Returns: {
+          release_id: string
+          shift_id: string
+          status: string
+          claimed_by: string | null
+          claimed_by_name: string | null
+          decided_at: string | null
+          decision_reason: string | null
+        }[]
+      }
+      get_available_shifts: {
+        Args: { p_actor_id: string }
+        Returns: {
+          release_id: string
+          shift_id: string
+          status: string
+          shift_date: string
+          start_time: string
+          end_time: string
+          roles: string[]
+          is_opener: boolean
+          is_closer: boolean
+          is_training: boolean
+          room_assignment: string | null
+          released_by: string
+          releaser_name: string | null
+          releaser_avatar: string | null
+          claimed_by_me: boolean
+        }[]
+      }
+      get_shift_release_recipients: {
+        Args: { p_actor_id: string; p_release_id: string }
+        Returns: { user_id: string }[]
+      }
+      claim_shift: {
+        Args: { p_actor_id: string; p_release_id: string }
+        Returns: {
+          released_by: string
+          releaser_name: string | null
+          claimer_name: string | null
+          shift_date: string
+          start_time: string
+          end_time: string
+          roles: string[]
+        }[]
+      }
+      decide_shift_pickup: {
+        Args: { p_actor_id: string; p_release_id: string; p_approve: boolean; p_reason?: string | null }
+        Returns: {
+          released_by: string
+          claimed_by: string
+          releaser_name: string | null
+          claimer_name: string | null
+          shift_date: string
+          start_time: string
+          end_time: string
+          roles: string[]
+        }[]
+      }
+      get_schedule_approvals: {
+        Args: { p_actor_id: string }
+        Returns: {
+          kind: string
+          id: string
+          created_at: string
+          requester_id: string
+          requester_name: string | null
+          requester_avatar: string | null
+          requester_titles: string[] | null
+          start_date: string | null
+          end_date: string | null
+          reason: string | null
+          shift_id: string | null
+          shift_date: string | null
+          start_time: string | null
+          end_time: string | null
+          roles: string[] | null
+          releaser_id: string | null
+          releaser_name: string | null
+          claimer_id: string | null
+          claimer_name: string | null
+          claimer_avatar: string | null
+          conflicts: Json
+          is_own: boolean
+        }[]
+      }
+      get_schedule_approval_history: {
+        Args: { p_actor_id: string; p_limit?: number; p_offset?: number }
+        Returns: {
+          kind: string
+          id: string
+          status: string
+          decided_at: string | null
+          decided_by_name: string | null
+          decision_reason: string | null
+          requester_id: string | null
+          requester_name: string | null
+          requester_avatar: string | null
+          start_date: string | null
+          end_date: string | null
+          reason: string | null
+          shift_date: string | null
+          start_time: string | null
+          end_time: string | null
+          roles: string[] | null
+          releaser_name: string | null
+          claimer_name: string | null
+        }[]
+      }
+      get_pending_schedule_approval_count: {
+        Args: { p_actor_id: string }
+        Returns: number
+      }
+      get_my_schedule_decisions: {
+        Args: { p_actor_id: string }
+        Returns: {
+          kind: string
+          id: string
+          status: string
+          my_role: string
+          decided_at: string | null
+          decision_reason: string | null
+          start_date: string | null
+          end_date: string | null
+          shift_date: string | null
+          start_time: string | null
+          end_time: string | null
+          roles: string[] | null
+          other_name: string | null
+        }[]
+      }
+      ack_schedule_decisions: {
+        Args: { p_actor_id: string }
+        Returns: number
       }
       add_shift: {
         Args: {
@@ -3869,6 +4077,9 @@ export type Database = {
           p_status?: string
           p_week_end: string
           p_week_start: string
+          p_title?: string | null
+          p_source_type?: string | null
+          p_page_count?: number
         }
         Returns: string
       }
@@ -5291,6 +5502,7 @@ export type Database = {
           special_features_enabled: boolean
           updated_at: string
           user_id: string
+          shift_releases_enabled: boolean
         }[]
       }
       create_notification: {
@@ -5954,6 +6166,9 @@ export type Database = {
           p_organization_id: string
           p_reward_currency_name?: string
           p_staff_can_view_roster?: boolean
+          p_time_off_requests_enabled?: boolean
+          p_shift_release_enabled?: boolean
+          p_roster_pm_cutoff?: string
           p_state?: string
           p_user_id: string
           p_weather_location?: string
@@ -6150,6 +6365,7 @@ export type Database = {
           p_rewards_enabled?: boolean
           p_special_features_enabled?: boolean
           p_user_id: string
+          p_shift_releases_enabled?: boolean
         }
         Returns: undefined
       }

@@ -24,15 +24,19 @@ export interface ManagerPermissions {
   jobsTools: boolean;
   access: boolean;
   reviewRefresh: boolean;
+  /** 'premium.ai_schedule_upload' — LIVE since s83 (schedule scans + their credits) */
+  aiScheduleUpload: boolean;
 }
 
 const NONE: ManagerPermissions = {
   menuConfig: false, editCategories: false, aiUpload: false,
   branding: false, jobsTools: false, access: false, reviewRefresh: false,
+  aiScheduleUpload: false,
 };
 const ALL: ManagerPermissions = {
   menuConfig: true, editCategories: true, aiUpload: true,
   branding: true, jobsTools: true, access: true, reviewRefresh: true,
+  aiScheduleUpload: true,
 };
 
 interface UseManagerPermissionsResult {
@@ -79,6 +83,7 @@ export function useManagerPermissions(): UseManagerPermissionsResult {
         jobsTools: byKey.get('org_settings.jobs_tools') ?? false,
         access: byKey.get('org_settings.access') ?? false,
         reviewRefresh: byKey.get('premium.review_refresh') ?? false,
+        aiScheduleUpload: byKey.get('premium.ai_schedule_upload') ?? false,
       });
     } catch (e) {
       // Fail CLOSED — an unreadable grant must never unlock anything.

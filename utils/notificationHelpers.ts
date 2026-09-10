@@ -12,7 +12,7 @@ import i18n from '@/i18n';
 interface SendNotificationParams {
   userIds?: string[];
   organizationId?: string;
-  notificationType: 'message' | 'reward' | 'announcement' | 'event' | 'special_feature' | 'custom';
+  notificationType: 'message' | 'reward' | 'announcement' | 'event' | 'special_feature' | 'custom' | 'schedule' | 'shift_release';
   title: string;
   body: string;
   // s62: optional Spanish copy — the edge function picks per recipient from
@@ -43,7 +43,7 @@ export function bothLanguages(key: string, vars?: Record<string, any>): { en: st
  * Returns whether the push HTTP call succeeded so interactive senders (the
  * composer) can tell the manager when the phone alert may not have gone out.
  */
-async function sendNotification(params: SendNotificationParams): Promise<boolean> {
+export async function sendNotification(params: SendNotificationParams): Promise<boolean> {
   try {
     // Server verifies actor_id (active user) and derives the org from it — the
     // recipient org is never trusted from the client. Null actor => 401 (no push).

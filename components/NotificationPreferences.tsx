@@ -26,6 +26,8 @@ interface NotificationPreferencesData {
   special_features_enabled: boolean;
   custom_notifications_enabled: boolean;
   game_hub_enabled: boolean;
+  /** s83: a coworker released a shift you're qualified for */
+  shift_releases_enabled: boolean;
 }
 
 export default function NotificationPreferences({ variant = 'employee' }: NotificationPreferencesProps) {
@@ -44,6 +46,7 @@ export default function NotificationPreferences({ variant = 'employee' }: Notifi
     special_features_enabled: true,
     custom_notifications_enabled: true,
     game_hub_enabled: true,
+    shift_releases_enabled: true,
   });
 
   useEffect(() => {
@@ -74,6 +77,7 @@ export default function NotificationPreferences({ variant = 'employee' }: Notifi
           special_features_enabled: row.special_features_enabled,
           custom_notifications_enabled: row.custom_notifications_enabled,
           game_hub_enabled: row.game_hub_enabled ?? true,
+          shift_releases_enabled: row.shift_releases_enabled ?? true,
         });
       }
     } catch (error) {
@@ -144,6 +148,13 @@ export default function NotificationPreferences({ variant = 'employee' }: Notifi
       icon: 'star.fill',
       androidIcon: 'star',
       description: t('notifications.special_features_desc'),
+    },
+    {
+      key: 'shift_releases_enabled' as keyof NotificationPreferencesData,
+      label: t('notifications.shift_releases'),
+      icon: 'arrow.left.arrow.right',
+      androidIcon: 'swap-horiz',
+      description: t('notifications.shift_releases_desc'),
     },
     {
       key: 'custom_notifications_enabled' as keyof NotificationPreferencesData,

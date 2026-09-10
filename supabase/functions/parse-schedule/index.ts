@@ -7,59 +7,67 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-function buildSchedulePrompt(employeeNames: string[], restaurantName?: string): string {
+// The generic role list — only the FALLBACK when an org has no job titles of its own.
+// s83: the prompt is format-agnostic (R365, HotSchedules, 7shifts, Sling, Excel prints,
+// hand-made grids) and the allowed roles are the ORG's own job titles.
+const GENERIC_ROLES = [
+  'Manager', 'Bar Manager', 'Banquet Captain',
+  'Server', 'Lead Server', 'Training Server', 'Banquet Server',
+  'Bartender', 'Training Bartender', 'Banquet Bartender', 'Barback',
+  'Host', 'Busser', 'Runner', 'Expo',
+  'Chef', 'Cook', 'Kitchen', 'Dishwasher',
+];
+
+function buildSchedulePrompt(
+  employeeNames: string[],
+  roleTitles: string[],
+  restaurantName?: string,
+  weekHint?: { start: string; end: string } | null,
+): string {
   const nameList = employeeNames.map((n) => `  - ${n}`).join('\n');
-  const displayName = restaurantName || "McLoone's Boathouse";
-  return `You are parsing a Restaurant 365 (R365) Weekly Schedule PDF for ${displayName} restaurant.
+  const displayName = restaurantName || 'the restaurant';
+  const roles = roleTitles.length ? roleTitles : GENERIC_ROLES;
+  const roleList = roles.map((r) => `  - ${r}`).join('\n');
+  const hint = weekHint
+    ? `\nWEEK RANGE FROM THE MANAGER: this schedule covers ${weekHint.start} to ${weekHint.end}. Use that range whenever the document does not clearly print its own dates. If the document clearly shows different dates, trust the document.`
+    : '';
+  return `You are extracting a staff work schedule for ${displayName} from the attached document — a PDF, or one or more photos/images of a schedule. Schedules come from many systems (Restaurant365, HotSchedules, 7shifts, Sling, When I Work, Excel / Google Sheets prints, hand-made grids). Read the VISUAL rendering — what a person would see printed — not a hidden text layer.
 
-IMPORTANT: This PDF uses a calendar-grid visual layout. You MUST read employee names from the VISUAL rendering of the PDF (what a human would see), NOT from any hidden text layer. Look at the actual printed text in the leftmost column of each row.
+STEP 1 — IDENTIFY THE LAYOUT, then read it systematically:
+- GRID: one row per employee (the name in the leftmost column), one column per day; each cell holds that person's shift(s) for that day. The header row carries the dates or weekday names.
+- DAY SECTIONS: each day is a block or column listing the people working it, with their times and roles.
+- ROLE SECTIONS: blocks per job (Servers, Bartenders, Hosts, Kitchen…) listing people and their days.
+Multi-page documents continue the same table — carry the column dates across pages. Read EVERY page.
 
-R365 VISUAL FORMAT
-- Calendar-grid layout: leftmost column is the Employee name, then one column per day of the week (typically Thursday through Wednesday).
-- The report header shows the restaurant name and the date range for the week.
-- Each employee row has the full name (and may include a role label below the name).
-- Shift cells contain: a time range (e.g., "4:30 PM - 10:00 PM"), the job title, and sometimes extra annotations like "CL", "Rm 1", "Rm 2", or a moon icon 🌙.
-- Empty cells mean the employee is off that day.
-- Some employees have MULTIPLE shifts in one day (double shifts) — stacked entries in the same cell → emit them as separate shift objects.
+STEP 2 — WHAT A SHIFT CELL CONTAINS:
+- A time range in any format: "4:30 PM - 10:00 PM", "4:30p-10p", "16:30-22:00", "11-4", "5-CL", "5-close". Convert to 24-hour "HH:MM". A start with no end (e.g. "5 PM") → end_time "23:00" for evening starts and "16:00" for morning starts is NOT acceptable — instead use the document's usual close/lunch-end time if one is printed anywhere, otherwise "22:00" (evening) / "16:00" (morning) and keep the shift.
+- Usually a job/role label; sometimes only the section or colour identifies the role.
+- Markers: a moon icon 🌙, "CL", "Close", "C" → is_closer: true. "OP", "Open", "O" → is_opener: true. "Training", "TR", "Trainee" → is_training: true (keep the training label as the role when the org has one). "Rm 1", "Rm 2", "Sec 3", "Patio", "Bar 2" → room_assignment (keep "CL" in room_assignment too when it is the only text).
+- "OFF", "RDO", "X", "—", a blank cell, "Requested off", "Unavailable", "N/A" → NOT a shift. Vacation/PTO rows are not shifts.
+- Two entries stacked in one cell = two separate shift objects (a double).
 
-ROW/CELL COLOR CODING (most reliable signal for the primary role — use this to disambiguate job titles when text is unclear):
-- Purple  (#A143D1 approx) = Manager / Bar Manager / Banquet Captain
-- Red     (#E50001 approx) = Server / Lead Server / Training Server / Banquet Server
-- Orange  (#FF7701 approx) = Bartender / Training Bartender / Banquet Bartender / Barback
-- Yellow  (#F3B202 approx) = Host
-- Forest Green (#9BB700 approx) = Busser / Runner / Expo
-- Highlighter Green (#26BC41 approx) = Chef / Cook / Kitchen / Dishwasher
+COLOUR CODING (when present): if rows or cells are colour-coded by job, use the colour to disambiguate the role. Restaurant365 prints usually mean: purple = Manager / Bar Manager, red = Server, orange = Bartender / Barback, yellow = Host, green = Busser / Runner / Expo, bright green = Kitchen.
 
-CLOSER / OPENER / TRAINING DETECTION
-- A moon icon 🌙 next to a shift time means that shift is a CLOSER. Set is_closer: true. This is especially common on manager shifts.
-- Server/Bartender cells may also show "CL" (closer), "RM 1 CL", "RM 2 CL" etc. — "CL" → is_closer: true. Preserve "RM 1"/"RM 2" in room_assignment.
-- If a cell or role label says "Opener" or "OP", set is_opener: true.
-- If a cell or role says anything containing "Training" (e.g., "Training Server", "Training Bartender"), set is_training: true. Keep the training label as the primary role value.
+DATES: use the dates printed on the document. If only weekday names are printed, derive each date from the week range. Every shift needs a full YYYY-MM-DD date.${hint}
+If end_time is after midnight (e.g. a shift starting 22:00 ending 01:00), still write "01:00" on the same date.
 
-ALLOWED ROLE VALUES (use these exact strings in the "roles" array — map any variant to the closest match below):
-  Manager, Bar Manager, Banquet Captain,
-  Server, Lead Server, Training Server, Banquet Server,
-  Bartender, Training Bartender, Banquet Bartender, Barback,
-  Host, Busser, Runner, Expo,
-  Chef, Cook, Kitchen, Dishwasher
+ALLOWED ROLE VALUES — use these exact strings in the "roles" array (map each job label to the closest one; if a label truly matches none, use the label as written in Title Case; if a shift has no discernible role, use "Staff"):
+${roleList}
+Common abbreviations: "Bus" → Busser · "Bart"/"BT" → Bartender · "Svr" → Server · "Bqt Server" → Banquet Server · "Mgr" → Manager · "Exp" → Expo.
 
-If you see "Bus" → "Busser". "Bart" → "Bartender". "Bqt Server" → "Banquet Server". Always normalize to one of the strings above.
-
-KNOWN EMPLOYEE NAMES — These are the actual staff members. When you read a name from the PDF, match it to the closest name from this list. The PDF names may have slight visual artifacts or formatting differences, but they should correspond to someone on this list. If a PDF name is clearly a variant/misspelling of a known employee, use the KNOWN employee name instead.
+KNOWN EMPLOYEE NAMES — the actual staff. Match each printed name to the closest known name (printed names may be abbreviated, reordered "Last, First", or have small artifacts). When it is clearly the same person, use the KNOWN spelling. If a printed name matches nobody (a new hire), keep it exactly as printed.
 
 Known employees:
 ${nameList}
 
-If a name in the PDF does NOT reasonably match anyone on the known list (e.g., a brand new hire), use the name exactly as shown in the PDF.
-
-Extract ALL shifts from ALL pages. Return ONLY valid JSON (no markdown, no explanation) with this exact structure:
+Return ONLY valid JSON (no markdown, no explanation) with this exact structure:
 
 {
   "week_start": "YYYY-MM-DD",
   "week_end": "YYYY-MM-DD",
   "shifts": [
     {
-      "employee_name": "Full Name (use known employee name if matched)",
+      "employee_name": "Full Name (the known employee name when matched)",
       "date": "YYYY-MM-DD",
       "start_time": "HH:MM",
       "end_time": "HH:MM",
@@ -73,15 +81,9 @@ Extract ALL shifts from ALL pages. Return ONLY valid JSON (no markdown, no expla
 }
 
 Rules:
-- Use 24-hour time format (e.g., "16:30" not "4:30 PM").
-- If end_time is after midnight (e.g., "1:00 AM" after a shift starting "10:00 PM"), still use "01:00".
-- "CL" alone → room_assignment: "CL" AND is_closer: true.
-- "Rm 1", "Rm 2", etc. → room_assignment with that value. If combined with "CL", also set is_closer: true.
-- Moon icon 🌙 on a shift → is_closer: true (even if no "CL" text is present).
-- Double shifts in one cell = two separate shift entries for that employee on that date.
-- Return ALL employees from ALL pages — do not skip anyone.
-- The "roles" array should contain ONE value: the primary job title for that shift, normalized to the allowed list above.
-- CRITICAL: Match PDF names to the known employee list above whenever possible. Use the known spelling, not the PDF's potentially garbled version.
+- week_start / week_end = the first and last dates the schedule covers.
+- The "roles" array holds ONE value: the primary job for that shift.
+- Return ALL shifts for ALL employees from ALL pages — never skip anyone, never summarise.
 - Return ONLY the JSON object, nothing else.`;
 }
 
@@ -92,6 +94,12 @@ interface ParseRequest {
   additional_image_urls?: string[];
   organization_id?: string;
   user_id?: string; // B4 batch 8: caller id — verified mgr/owner when present
+  // s83: the manager's optional week range (used when the document prints no dates),
+  // and what the scan costs (consume_schedule_upload_credits after a successful parse).
+  week_start_hint?: string | null; // YYYY-MM-DD
+  week_end_hint?: string | null;
+  source_type?: 'pdf' | 'image';
+  page_count?: number;
 }
 
 // Normalize unicode quotes/apostrophes and special chars for comparison
@@ -165,7 +173,11 @@ async function processScheduleInBackground(
   upload_id: string,
   media_type: string,
   additional_image_urls: string[],
-  organizationId?: string
+  organizationId?: string,
+  userId?: string,
+  weekHint?: { start: string; end: string } | null,
+  sourceType: 'pdf' | 'image' = 'pdf',
+  pageCount = 1
 ): Promise<void> {
   try {
     console.log(`[bg] Starting schedule parse for upload ${upload_id}`);
@@ -236,11 +248,24 @@ async function processScheduleInBackground(
       if (orgData?.name) restaurantName = orgData.name;
     }
 
+    // s83: the org's OWN job titles are the allowed role values (generic list = fallback)
+    let roleTitles: string[] = [];
+    if (organizationId) {
+      const { data: titleRows } = await supabase
+        .from('organization_job_titles')
+        .select('title, is_active, display_order')
+        .eq('organization_id', organizationId)
+        .order('display_order', { ascending: true });
+      roleTitles = (titleRows || [])
+        .filter((t: { title: string; is_active: boolean | null }) => t.title && t.title.trim() && t.is_active !== false)
+        .map((t: { title: string }) => t.title.trim());
+    }
+
     // Build prompt with known employee names for better matching
     const employeeNames = (users || [])
       .filter((u: { name: string }) => u.name && u.name.trim())
       .map((u: { name: string }) => u.name.trim());
-    const prompt = buildSchedulePrompt(employeeNames, restaurantName);
+    const prompt = buildSchedulePrompt(employeeNames, roleTitles, restaurantName, weekHint);
 
     console.log(`Sending to Claude with ${employeeNames.length} known employee names, format: ${media_type}`);
 
@@ -390,6 +415,32 @@ async function processScheduleInBackground(
       });
     }
 
+    // s83: charge the scan now that the AI work succeeded (free-first bypasses the
+    // charge). A failed scan never charges; a deleted upload never refunds. The client
+    // pre-checks the quota, so insufficient here is only a race — and it fails the
+    // upload BEFORE any shift is written.
+    let creditsCharged = 0;
+    let wasFree = false;
+    if (userId) {
+      const { data: charge, error: chargeErr } = await supabase.rpc('consume_schedule_upload_credits', {
+        p_actor_id: userId,
+        p_source_type: sourceType,
+        p_page_count: pageCount,
+      });
+      if (chargeErr) {
+        console.error('consume_schedule_upload_credits error:', chargeErr);
+      } else if (charge?.ok) {
+        creditsCharged = charge.charged || 0;
+        wasFree = !!charge.free_used;
+      } else if (charge?.reason === 'insufficient_credits') {
+        throw new Error('You’re out of schedule-scan credits this month. They reset next month, or upgrade for more.');
+      } else if (charge?.reason === 'owner_only') {
+        throw new Error('You do not have permission to upload schedules');
+      } else {
+        console.warn('consume_schedule_upload_credits not ok:', JSON.stringify(charge));
+      }
+    }
+
     // Check for existing uploads for the same week and mark as replaced
     let existingQuery = supabase
       .from('schedule_uploads')
@@ -441,6 +492,8 @@ async function processScheduleInBackground(
         week_end,
         parsed_shifts_count: matchedShifts.length,
         unmatched_employees: unmatchedArray,
+        credits_charged: creditsCharged,
+        was_free: wasFree,
         updated_at: new Date().toISOString(),
       })
       .eq('id', upload_id);
@@ -503,6 +556,14 @@ serve(async (req) => {
     const media_type = body.media_type || 'application/pdf';
     const additional_image_urls = body.additional_image_urls || [];
     const organizationId = body.organization_id;
+    // s83: optional week hint + scan cost inputs
+    const isoDate = /^\d{4}-\d{2}-\d{2}$/;
+    const weekHint =
+      body.week_start_hint && body.week_end_hint && isoDate.test(body.week_start_hint) && isoDate.test(body.week_end_hint)
+        ? { start: body.week_start_hint, end: body.week_end_hint }
+        : null;
+    const sourceType: 'pdf' | 'image' = body.source_type === 'image' || media_type.startsWith('image/') ? 'image' : 'pdf';
+    const pageCount = Math.max(1, Number(body.page_count) || (1 + additional_image_urls.length));
 
     if (!anthropicApiKey) {
       throw new Error('ANTHROPIC_API_KEY not configured');
@@ -530,7 +591,19 @@ serve(async (req) => {
       // Org match is now UNCONDITIONAL (organization_id is required above) — a
       // manager/owner may only parse a schedule for their OWN org.
       const orgOk = caller && !!organizationId && caller.organization_id === organizationId;
-      if (callerErr || !isManager || !orgOk) {
+      // s83: the AI Schedule Uploads grant is live — a MANAGER also needs
+      // premium.ai_schedule_upload (mirrors _may_upload_schedule / parse-menu).
+      let grantOk = true;
+      if (caller && caller.role === 'manager' && orgOk) {
+        const { data: perm } = await supabase
+          .from('manager_permissions')
+          .select('granted')
+          .eq('organization_id', organizationId)
+          .eq('permission_key', 'premium.ai_schedule_upload')
+          .maybeSingle();
+        grantOk = perm?.granted === true;
+      }
+      if (callerErr || !isManager || !orgOk || !grantOk) {
         try {
           await supabase
             .from('schedule_uploads')
@@ -553,7 +626,11 @@ serve(async (req) => {
       upload_id,
       media_type,
       additional_image_urls,
-      organizationId
+      organizationId,
+      body.user_id,
+      weekHint,
+      sourceType,
+      pageCount
     );
 
     // @ts-ignore EdgeRuntime is a Supabase Edge Runtime global

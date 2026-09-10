@@ -12,6 +12,7 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { useTranslation } from 'react-i18next';
 import GlassCard from '@/components/GlassCard';
 import { fonts } from '@/constants/fonts';
+import { AttentionRing } from '@/components/tools/ToolsBits';
 
 export type ConnectBarTab = 'schedule' | 'today' | 'events' | 'specials';
 
@@ -151,6 +152,9 @@ export default function ConnectBar({ activeTab, onTabChange, badges }: ConnectBa
               </Text>
             )}
             {hasBadge && <View style={[styles.badgeDot, { backgroundColor: colors.blue }]} />}
+            {/* s83: the icon-only Schedule tab rings (not just dots) while approvals,
+                decisions or newly available shifts wait — Steve's attention glow. */}
+            {tab.key === 'schedule' && <AttentionRing active={!!hasBadge} color={colors.primary} radius={10} />}
           </TouchableOpacity>
         );
       })}
@@ -187,6 +191,7 @@ const styles = StyleSheet.create({
     flex: 0,
     flexBasis: 38,
     minWidth: 38,
+    position: 'relative',
   },
   tabText: {
     fontFamily: fonts.display.semibold,
