@@ -98,7 +98,8 @@ const PERM_SECTIONS: PermSectionDef[] = [
     headerFallback: 'Premium features',
     rows: [
       { key: 'premium.review_refresh', live: true, premium: true, labelKey: 'org_settings.perm_review_refresh', labelFallback: 'Manual Review Refreshes' },
-      { key: 'premium.ai_schedule_upload', live: false, premium: true, labelKey: 'org_settings.perm_schedule_uploads', labelFallback: 'AI Schedule Uploads' },
+      // LIVE since s83: gates schedule scans (and their own credit pool) for managers.
+      { key: 'premium.ai_schedule_upload', live: true, premium: true, labelKey: 'org_settings.perm_schedule_uploads', labelFallback: 'AI Schedule Uploads', subKey: 'org_settings.perm_schedule_uploads_sub', subFallback: 'Scan schedules and spend schedule credits' },
     ],
   },
 ];
@@ -218,7 +219,6 @@ export default function OrganizationSettingsScreen() {
   const [googleMapsQuery, setGoogleMapsQuery] = useState('');
   const [rewardCurrencyName, setRewardCurrencyName] = useState('');
   const [allowSelfSignup, setAllowSelfSignup] = useState(true);
-  const [staffCanViewRoster, setStaffCanViewRoster] = useState(true);
   const [menuCount, setMenuCount] = useState<1 | 2>(2);
   const [menu1Name, setMenu1Name] = useState('');
   const [menu2Name, setMenu2Name] = useState('');
@@ -238,7 +238,6 @@ export default function OrganizationSettingsScreen() {
     setGoogleMapsQuery(organization.google_maps_query || '');
     setRewardCurrencyName(organization.reward_currency_name);
     setAllowSelfSignup(organization.allow_self_signup);
-    setStaffCanViewRoster(organization.staff_can_view_roster);
     setMenuCount(organization.menu_count);
     setMenuScope(organization.menu_category_scope);
     setMenu1Name(organization.menu_1_name);
@@ -574,7 +573,6 @@ export default function OrganizationSettingsScreen() {
             ...(perms.access
               ? {
                   p_allow_self_signup: allowSelfSignup,
-                  p_staff_can_view_roster: staffCanViewRoster,
                   p_default_password: defaultPassword.trim() || 'welcome123',
                 }
               : {}),
@@ -591,7 +589,6 @@ export default function OrganizationSettingsScreen() {
             p_google_maps_query: googleMapsQuery.trim() || undefined,
             p_reward_currency_name: rewardCurrencyName.trim() || 'Bucks',
             p_allow_self_signup: allowSelfSignup,
-            p_staff_can_view_roster: staffCanViewRoster,
             p_menu_count: menuCount,
             p_menu_1_name: menu1Name.trim() || 'Menu 1',
             p_menu_2_name: menu2Name.trim() || 'Menu 2',
@@ -1331,19 +1328,7 @@ export default function OrganizationSettingsScreen() {
                 />
               </View>
 
-              {/* Staff Roster Visibility Toggle */}
-              <View style={styles.featureRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.featureLabel}>{t('org_settings.staff_can_view_roster', 'Staff Can View Roster')}</Text>
-                  <Text style={styles.featureHint}>{t('org_settings.staff_can_view_roster_hint', "Employees can browse the day roster to see coworkers' shifts. Managers always can.")}</Text>
-                </View>
-                <Switch
-                  value={staffCanViewRoster}
-                  onValueChange={setStaffCanViewRoster}
-                  trackColor={{ false: colors.surfaceBorder, true: colors.primary }}
-                  thumbColor={colors.card}
-                />
-              </View>
+              {/* s83: the roster toggle moved to the ⚙ Schedule sheet's Schedule Settings. */}
 
               {/* Default Password */}
               <View style={[styles.fieldContainer, { marginBottom: 0 }]}>

@@ -26,6 +26,7 @@ import { isManagerOrOwner } from '@/utils/roles';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { weeklySpecialsNames } from '@/utils/categoryNames';
 import { menuBadgeForSeason, compareBySectionThenOrder } from '@/utils/menuBadges';
 import { labelForCategoryName } from '@/utils/menuCategoryLabels';
@@ -51,6 +52,14 @@ import { useUnreadContent } from '@/hooks/useUnreadContent';
 import { useUnreadNotifications } from '@/hooks/useUnreadNotifications';
 import WeeklyCalendarStrip from '@/components/WeeklyCalendarStrip';
 import UpcomingShiftsCard from '@/components/UpcomingShiftsCard';
+import ShiftsFlipCard from '@/components/schedule/ShiftsFlipCard';
+import ShiftToolTile from '@/components/schedule/ShiftToolTile';
+import DecisionBlurb, { type ScheduleDecision } from '@/components/schedule/DecisionBlurb';
+import TimeOffSheet from '@/components/schedule/TimeOffSheet';
+import ReleaseShiftSheet from '@/components/schedule/ReleaseShiftSheet';
+import { SectionRule } from '@/components/tools/ToolsBits';
+import { useScheduleSettings } from '@/hooks/useScheduleSettings';
+import { useScheduleAttention, ackScheduleDecisions, refreshAllScheduleAttention } from '@/hooks/useScheduleAttention';
 import { eventFallsOnDate } from '@/utils/dateUtils';
 import { fonts } from '@/constants/fonts';
 
@@ -190,7 +199,7 @@ export default function PortalHome({ role }: PortalHomeProps) {
   const { organizationId, organization } = useOrganization();
   const { t } = useTranslation();
   const router = useRouter();
-  const params = useLocalSearchParams<{ openAnnouncementId?: string; openEventId?: string; openFeatureId?: string }>();
+  const params = useLocalSearchParams<{ openAnnouncementId?: string; openEventId?: string; openFeatureId?: string; tab?: string }>();
   const { unreadCount } = useUnreadMessages();
   const { language } = useLanguage();
   const [weeklySpecials, setWeeklySpecials] = useState<MenuItem[]>([]);
@@ -265,6 +274,21 @@ export default function PortalHome({ role }: PortalHomeProps) {
 
   // Notification dropdown state
   const [notificationVisible, setNotificationVisible] = useState(false);
+
+  // s83 Schedule tab: org toggles, the attention counts (approvals / decisions /
+  // available shifts), the decision blurbs, and the two shift-tool sheets.
+  const { settings: scheduleSettings } = useScheduleSettings();
+  const { attention: scheduleAttention } = useScheduleAttention();
+  const [scheduleDecisions, setScheduleDecisions] = useState<ScheduleDecision[]>([]);
+  const [timeOffOpen, setTimeOffOpen] = useState(false);
+  const [releaseOpen, setReleaseOpen] = useState(false);
+  // Available-shift ring: rings until the tab is looked at (device-side seen count).
+  const [availSeen, setAvailSeen] = useState<number | null>(null);
+  const availSeenKey = user?.id ? `@schedule_avail_seen:${user.id}` : null;
+  useEffect(() => {
+    if (!availSeenKey) return;
+    AsyncStorage.getItem(availSeenKey).then((v) => setAvailSeen(v ? Number(v) || 0 : 0)).catch(() => setAvailSeen(0));
+  }, [availSeenKey]);
 
   // Content images maps (content_id -> additional image URLs)
   const [contentImagesMap, setContentImagesMap] = useState<Map<string, string[]>>(new Map());
@@ -761,6 +785,50 @@ export default function PortalHome({ role }: PortalHomeProps) {
     if (tab === 'events') markEventsTabVisited('Event');
     sectionListRef.current?.scrollToIndex({ index: SECTION_FIRST_LEAF[tab], animated: true });
   }, [markTabViewed, markEventsTabVisited]);
+
+  // s83: `?tab=schedule` (a schedule push / shade row) lands on the Schedule tab.
+  const tabParamHandled = useRef<string | null>(null);
+  useEffect(() => {
+    if (params.tab === 'schedule' && tabParamHandled.current !== 'schedule') {
+      tabParamHandled.current = 'schedule';
+      handleTabChange('schedule');
+    }
+    if (params.tab !== 'schedule') tabParamHandled.current = null;
+  }, [params.tab, handleTabChange]);
+
+  // Looking at the Schedule tab = seeing the decisions: load the blurbs, then ack
+  // (clears the shade rows, the tab ring and the home-icon badge in one RPC); the
+  // blurbs stay on screen until dismissed or the tab is left. The available-shift
+  // ring is device-side: remember how many were open when the tab was viewed.
+  useEffect(() => {
+    if (activeSection !== 'schedule' || !user?.id) {
+      if (activeSection !== 'schedule') setScheduleDecisions([]);
+      return;
+    }
+    let alive = true;
+    (async () => {
+      const { data } = await supabase.rpc('get_my_schedule_decisions', { p_actor_id: user.id });
+      if (!alive) return;
+      const rows = (data || []) as ScheduleDecision[];
+      if (rows.length) {
+        setScheduleDecisions(rows);
+        await ackScheduleDecisions(user.id);
+      }
+      if (availSeenKey) {
+        setAvailSeen(scheduleAttention.availableShifts);
+        AsyncStorage.setItem(availSeenKey, String(scheduleAttention.availableShifts)).catch(() => {});
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSection, user?.id, scheduleAttention.unseenDecisions, scheduleAttention.availableShifts]);
+
+  const scheduleHasNew =
+    scheduleAttention.pendingApprovals > 0 ||
+    scheduleAttention.unseenDecisions > 0 ||
+    (availSeen !== null && scheduleAttention.availableShifts > availSeen);
 
   // Sub-tab tap handlers — scroll the pager to the matching leaf.
   const goToLeaf = useCallback((index: number) => {
@@ -1408,7 +1476,10 @@ export default function PortalHome({ role }: PortalHomeProps) {
     </View>
   );
 
-  // FlatList leaf for the Schedule tab — upcoming shifts + actions + reserved tools.
+  // FlatList leaf for the Schedule tab (s83): decision blurbs → the Shifts flip
+  // card (upcoming ⇄ available) → My Full Schedule / View Roster → Shift Tools.
+  const scheduleToolsVisible =
+    scheduleSettings.timeOffEnabled || scheduleSettings.shiftReleaseEnabled || isManagerOrOwner(user);
   const renderScheduleSection = () => (
     <View style={[styles.sectionPage, { width: SCREEN_WIDTH }]}>
       <ScrollView
@@ -1417,7 +1488,11 @@ export default function PortalHome({ role }: PortalHomeProps) {
         showsVerticalScrollIndicator={false}
         nestedScrollEnabled
       >
-        <UpcomingShiftsCard userId={user?.id} />
+        {scheduleDecisions.length > 0 && (
+          <DecisionBlurb decisions={scheduleDecisions} onDismiss={() => setScheduleDecisions([])} />
+        )}
+
+        <ShiftsFlipCard releaseEnabled={scheduleSettings.shiftReleaseEnabled} />
 
         <View style={styles.scheduleBtns}>
           <TouchableOpacity
@@ -1427,10 +1502,10 @@ export default function PortalHome({ role }: PortalHomeProps) {
           >
             <IconSymbol ios_icon_name="calendar" android_material_icon_name="calendar-month" size={16} color={colors.fireText} />
             <Text style={[styles.schedBtnText, { color: colors.fireText }]}>
-              {t('upcoming_shifts.full_schedule', 'Full Schedule')}
+              {t('upcoming_shifts.my_full_schedule')}
             </Text>
           </TouchableOpacity>
-          {(isManagerOrOwner(user) || organization.staff_can_view_roster) && (
+          {(isManagerOrOwner(user) || scheduleSettings.staffCanViewRoster) && (
             <TouchableOpacity
               style={[styles.schedBtn, styles.schedBtnOutline, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}
               onPress={() => router.push('/todays-roster')}
@@ -1444,38 +1519,49 @@ export default function PortalHome({ role }: PortalHomeProps) {
           )}
         </View>
 
-        {/* Reserved (design-only) — swap / time-off / approvals land here later. */}
-        <View style={[styles.reserve, { borderColor: colors.glassBorder, backgroundColor: colors.blue + '0D' }]}>
-          <View style={styles.reserveHead}>
-            <Text style={[styles.reserveHeadText, { color: colors.textSecondary }]}>
-              {t('upcoming_shifts.shift_tools', 'Shift Tools')}
-            </Text>
-            <View style={[styles.reserveTag, { backgroundColor: colors.surface }]}>
-              <Text style={[styles.reserveTagText, { color: colors.textSecondary }]}>
-                {t('upcoming_shifts.coming_soon', 'Coming soon')}
-              </Text>
+        {scheduleToolsVisible && (
+          <>
+            <SectionRule label={t('upcoming_shifts.shift_tools', 'Shift Tools')} />
+            <View style={styles.toolGrid}>
+              {(scheduleSettings.timeOffEnabled || scheduleSettings.shiftReleaseEnabled) && (
+                <View style={styles.toolRow}>
+                  {scheduleSettings.timeOffEnabled && (
+                    <ShiftToolTile
+                      iosIcon="calendar.badge.minus"
+                      androidIcon="event-busy"
+                      title={t('upcoming_shifts.request_time_off', 'Request time off')}
+                      sub={t('shift_tools.time_off_sub')}
+                      onPress={() => setTimeOffOpen(true)}
+                    />
+                  )}
+                  {scheduleSettings.shiftReleaseEnabled && (
+                    <ShiftToolTile
+                      iosIcon="arrow.left.arrow.right"
+                      androidIcon="swap-horiz"
+                      title={t('shift_tools.release_title')}
+                      sub={t('shift_tools.release_sub')}
+                      onPress={() => setReleaseOpen(true)}
+                    />
+                  )}
+                </View>
+              )}
+              {isManagerOrOwner(user) && (
+                <ShiftToolTile
+                  wide
+                  iosIcon="checkmark.circle.fill"
+                  androidIcon="task-alt"
+                  title={t('upcoming_shifts.approvals', 'Approvals')}
+                  sub={scheduleAttention.pendingApprovals > 0
+                    ? t('shift_tools.approvals_waiting', { n: scheduleAttention.pendingApprovals })
+                    : t('shift_tools.approvals_clear')}
+                  big={scheduleAttention.pendingApprovals}
+                  pulse={scheduleAttention.pendingApprovals > 0}
+                  onPress={() => router.push('/schedule-approvals' as any)}
+                />
+              )}
             </View>
-          </View>
-          <View style={styles.reserveMini}>
-            <View style={[styles.reserveMiniItem, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
-              <Text style={[styles.reserveMiniText, { color: colors.text }]}>
-                {t('upcoming_shifts.request_time_off', 'Request time off')}
-              </Text>
-            </View>
-            <View style={[styles.reserveMiniItem, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
-              <Text style={[styles.reserveMiniText, { color: colors.text }]}>
-                {t('upcoming_shifts.release_shift', 'Release shift')}
-              </Text>
-            </View>
-            {isManager && (
-              <View style={[styles.reserveMiniItem, { backgroundColor: colors.blue + '24', borderColor: colors.blue + '4D' }]}>
-                <Text style={[styles.reserveMiniText, { color: colors.blueText }]}>
-                  {t('upcoming_shifts.approvals', 'Approvals')}
-                </Text>
-              </View>
-            )}
-          </View>
-        </View>
+          </>
+        )}
       </ScrollView>
     </View>
   );
@@ -1564,7 +1650,7 @@ export default function PortalHome({ role }: PortalHomeProps) {
           <ConnectBar
             activeTab={activeSection}
             onTabChange={handleTabChange}
-            badges={{ today: todayHasNew, events: eventsHasNew, specials: specialsHasNew }}
+            badges={{ schedule: scheduleHasNew, today: todayHasNew, events: eventsHasNew, specials: specialsHasNew }}
           />
         </View>
       </View>
@@ -1594,6 +1680,14 @@ export default function PortalHome({ role }: PortalHomeProps) {
 
       {/* Fixed collapsing section header — locked across intra-section swipes. */}
       {renderSectionHeaderOverlay()}
+
+      {/* s83 shift-tool sheets (root-level so they present above the pager) */}
+      <TimeOffSheet
+        visible={timeOffOpen}
+        onClose={() => setTimeOffOpen(false)}
+        onSubmitted={() => refreshAllScheduleAttention()}
+      />
+      <ReleaseShiftSheet visible={releaseOpen} onClose={() => setReleaseOpen(false)} />
 
       {/* Notification Dropdown */}
       <NotificationDropdown
@@ -2008,8 +2102,11 @@ const styles = StyleSheet.create({
   scheduleBtns: {
     flexDirection: 'row',
     gap: 9,
+    marginTop: 14, // breathing room under the flip card (Steve's device round, s83)
     marginBottom: 11,
   },
+  toolGrid: { gap: 10, marginTop: 2 },
+  toolRow: { flexDirection: 'row', gap: 10 },
   schedBtn: {
     flex: 1,
     flexDirection: 'row',

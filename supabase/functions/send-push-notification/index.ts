@@ -12,7 +12,7 @@ interface NotificationRequest {
   userIds?: string[]; // Specific users (must resolve to the actor's org; cross-org ids are dropped)
   organizationId?: string; // Ignored for scoping — kept only for back-compat logging (camel/snake both accepted)
   organization_id?: string;
-  notificationType: 'message' | 'reward' | 'announcement' | 'event' | 'special_feature' | 'custom';
+  notificationType: 'message' | 'reward' | 'announcement' | 'event' | 'special_feature' | 'custom' | 'schedule' | 'shift_release';
   title: string; // English base copy — always required, the fallback for every recipient
   body: string;
   title_es?: string; // Optional Spanish copy (s62): recipients whose users.preferred_language = 'es'
@@ -142,7 +142,7 @@ serve(async (req) => {
     // Get notification preferences for recipients
     const { data: preferences, error: prefsError } = await supabaseClient
       .from('notification_preferences')
-      .select('user_id, messages_enabled, rewards_enabled, announcements_enabled, events_enabled, special_features_enabled, custom_notifications_enabled')
+      .select('user_id, messages_enabled, rewards_enabled, announcements_enabled, events_enabled, special_features_enabled, custom_notifications_enabled, shift_releases_enabled')
       .in('user_id', recipientIds);
 
     if (prefsError) {
@@ -166,6 +166,10 @@ serve(async (req) => {
       'event': 'events_enabled',
       'special_feature': 'special_features_enabled',
       'custom': 'custom_notifications_enabled',
+      // s83: a coworker released a shift you're qualified for — the Profile
+      // "Shift releases" toggle. Schedule requests/decisions ('schedule') are
+      // transactional and carry NO preference field: always delivered.
+      'shift_release': 'shift_releases_enabled',
     };
 
     const preferenceField = preferencesFieldMap[notificationType];

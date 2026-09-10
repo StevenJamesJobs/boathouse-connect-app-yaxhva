@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Schedule Wave — Shift Tools Concepts</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{min-height:100vh;display:flex;flex-direction:column;align-items:center;gap:14px;padding:24px 12px 60px;background:#0C0D11;color:#D6D9DE;
+  font-family:'Inter','SF Pro Text',system-ui,sans-serif}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+
+/* ---------- toolbar (s81 kit) ---------- */
+h1{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:22px;letter-spacing:-0.3px;color:#F4F6F8}
+h1 span{color:#FF8A4A}
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center;max-width:1000px}
+.grp{display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);padding:6px;border-radius:16px}
+.gl2{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:#6E7681;margin:0 4px 0 6px}
+.tb{background:rgba(255,255,255,0.06);color:#D6D9DE;border:1px solid rgba(255,255,255,0.10);border-radius:11px;padding:7px 11px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:.18s}
+.tb:hover{background:rgba(255,255,255,0.12)}
+.tb.on{background:#F4F6F8;color:#15171C;border-color:#F4F6F8}
+.hint{color:#6E7681;font-size:11.5px;font-family:'JetBrains Mono',ui-monospace,monospace;text-align:center;max-width:960px;line-height:1.7}
+.hint b{color:#AEB4BD;font-weight:600}
+.hint em{font-style:normal;color:#2FBF8F}
+.section{width:100%;max-width:1700px;display:flex;flex-direction:column;align-items:center;gap:12px;margin-top:18px}
+.sh{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#FF8A4A;display:flex;align-items:center;gap:12px;width:100%;max-width:1240px}
+.sh .ln{flex:1;height:1px;background:rgba(255,255,255,0.10)}
+.sh small{color:#6E7681;letter-spacing:1px}
+.row{display:flex;flex-wrap:wrap;gap:18px;justify-content:center;align-items:flex-start;max-width:1700px}
+.col{display:flex;flex-direction:column;gap:10px;align-items:center}
+.concept{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:#6E7681;display:flex;align-items:center;gap:8px;width:392px}
+.concept b{color:#FF8A4A}
+.concept .ln{flex:1;height:1px;background:rgba(255,255,255,0.08)}
+.bcap{width:392px;font-size:11px;color:#8A9098;line-height:1.55;font-style:italic}
+.bcap b{font-style:normal;color:#D6D9DE;font-weight:600}
+.bcap em{font-style:normal;color:#2FBF8F;font-weight:600}
+.notes{max-width:1240px;width:100%;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;margin-top:6px}
+.note{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:12px 14px;font-size:11.5px;line-height:1.55;color:#AEB4BD}
+.note b{display:block;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:#FF8A4A;margin-bottom:5px}
+.note em{font-style:normal;color:#F4F6F8;font-weight:600}
+
+/* ---------- phone shell + theme palettes (the s76–s81 kit) ---------- */
+.phone{
+  --bg:#181B21; --text:#F4F6F8; --muted:#9AA1A8; --fireText:#1A1E24; --tint:#FF7A2F;
+  --glass:rgba(255,255,255,0.07); --glassbd:rgba(255,255,255,0.12); --surf:rgba(255,255,255,0.045); --surfbd:rgba(255,255,255,0.09); --hair:rgba(255,255,255,0.07);
+  --glowA:rgba(230,234,238,0.12); --glowB:rgba(59,130,246,0.10); --scrim:rgba(6,10,18,0.55); --thumb:#2C313A; --sheetbg:#20242B;
+  --azure:#3B82F6; --violet:#7C5CE0; --gold:#F59E0B; --bad:#EF4444; --blue:#3B82F6; --bluetext:#93B4FF; --ember:#FFB07A; --ok:#10A56F; --am:#FF9800; --pm:#7C4DFF;
+  position:relative;width:392px;height:840px;background:var(--bg);border-radius:46px;border:1px solid #2A2E36;overflow:hidden;
+  box-shadow:0 40px 90px -30px rgba(0,0,0,0.8);transition:background .3s;display:flex;flex-direction:column;color:var(--text)}
+.phone.t-mono-l{--bg:#ECECEE;--text:#22262C;--muted:#6E747C;--fireText:#FFFFFF;--tint:#EC6A1E;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.66);--surfbd:rgba(0,0,0,0.07);--hair:rgba(0,0,0,0.07);--glowA:rgba(58,66,80,0.10);--glowB:rgba(37,99,235,0.10);--scrim:rgba(20,24,32,0.35);--thumb:#D9DBDF;--sheetbg:#F6F6F8;--azure:#2563EB;--violet:#6D28D9;--gold:#B45309;--ok:#087A52;--bluetext:#2456C9}
+.phone.t-ocean-d{--bg:#1A2332;--text:#FFFFFF;--muted:#A8B8D8;--fireText:#0A1422;--tint:#5DA0E5;--glass:rgba(255,255,255,0.07);--glassbd:rgba(255,255,255,0.13);--surf:rgba(255,255,255,0.05);--surfbd:rgba(255,255,255,0.10);--hair:rgba(255,255,255,0.08);--glowA:rgba(74,144,226,0.32);--glowB:rgba(16,185,129,0.13);--thumb:#2A3A50;--sheetbg:#222E40}
+.phone.t-ocean-l{--bg:#E8F4F8;--text:#1A3A52;--muted:#4A6B7C;--fireText:#FFFFFF;--tint:#1976D2;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.7);--surfbd:rgba(13,71,161,0.10);--hair:rgba(13,71,161,0.08);--glowA:rgba(25,118,210,0.18);--glowB:rgba(5,150,105,0.13);--scrim:rgba(10,30,50,0.35);--thumb:#CFE0EA;--sheetbg:#F3F9FC;--azure:#2563EB;--violet:#6D28D9;--gold:#B45309;--ok:#087A52;--bluetext:#2456C9}
+
+.glow{position:absolute;top:-120px;right:-80px;width:360px;height:320px;border-radius:50%;background:radial-gradient(circle,var(--glowA),transparent 66%);z-index:0;pointer-events:none}
+.glow2{position:absolute;top:-70px;left:-90px;width:300px;height:280px;border-radius:50%;background:radial-gradient(circle,var(--glowB),transparent 68%);z-index:0;pointer-events:none}
+.sb{position:relative;z-index:3;display:flex;justify-content:space-between;align-items:center;padding:16px 30px 4px;font-size:13px;font-weight:600;font-family:'JetBrains Mono',ui-monospace,monospace;color:var(--text)}
+
+/* ---------- shared kit ---------- */
+.ic{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.disp{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif}
+.eyeb{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);font-weight:600}
+.eyeb.tint{color:var(--tint)}
+
+/* ScreenHeader */
+.hdr{position:relative;z-index:3;display:flex;align-items:center;gap:12px;padding:12px 16px 12px}
+.c38{width:38px;height:38px;border-radius:12px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;justify-content:center;flex:0 0 auto;color:var(--text)}
+.c38 .ic{width:20px;height:20px}
+.hdr .ttl{flex:1;text-align:center;font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:20px;letter-spacing:-0.2px;min-width:0}
+.hdr .ttl small{display:block;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--tint);font-weight:600;margin-bottom:2px}
+.gchip{height:38px;padding:0 11px 0 9px;border-radius:12px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:var(--text);flex:0 0 auto;position:relative}
+.gchip .ic{width:15px;height:15px}
+.savechip{height:38px;padding:0 14px;border-radius:12px;background:var(--tint);color:var(--fireText);font-weight:600;font-size:13.5px;display:flex;align-items:center;flex:0 0 auto}
+.rslot{display:flex;gap:8px;flex:0 0 auto}
+
+/* Welcome header + ConnectBar stand-ins */
+.whead{position:relative;z-index:3;padding:6px 16px 0;display:flex;flex-direction:column;gap:8px}
+.whead .greet{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:22px;letter-spacing:-0.3px}
+.whead .greet span{color:var(--tint)}
+.hrow{display:flex;align-items:center;gap:10px}
+.av{width:40px;height:40px;border-radius:20px;background:linear-gradient(140deg,#5A6C86,#2C3646);display:flex;align-items:center;justify-content:center;font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:13px;color:#fff;flex:0 0 auto}
+.av.s{width:34px;height:34px;border-radius:17px;font-size:12px}
+.av.p2{background:linear-gradient(140deg,#B26A3C,#5A3016)}
+.av.p3{background:linear-gradient(140deg,#3C8A6E,#164034)}
+.av.p4{background:linear-gradient(140deg,#7C5CE0,#3D2A7A)}
+.hrow .nm{flex:1;min-width:0}
+.hrow .nm b{display:block;font-size:14px;font-weight:600}
+.hrow .nm span{font-size:11.5px;color:var(--muted)}
+.wx{height:30px;padding:0 10px;border-radius:10px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;gap:5px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11.5px;font-weight:600}
+.wx .ic{width:14px;height:14px;color:var(--gold)}
+.ib{width:34px;height:34px;border-radius:11px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;justify-content:center;position:relative}
+.ib .ic{width:16px;height:16px}
+.dot{position:absolute;top:-2px;right:-2px;width:8px;height:8px;border-radius:4px;background:var(--blue);border:1.5px solid var(--bg)}
+.cbar{position:relative;z-index:3;margin:10px 16px 0;display:flex;gap:4px;padding:4px;border-radius:15px;background:var(--glass);border:1px solid var(--glassbd)}
+.cbar .tab{flex:1;height:36px;border-radius:11px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:12.5px;font-weight:600;color:var(--muted);position:relative}
+.cbar .tab .ic{width:16px;height:16px}
+.cbar .tab.io{flex:0 0 38px}
+.cbar .tab.on{background:color-mix(in srgb,var(--tint) 18%,transparent);color:var(--tint)}
+.cbar .tab .d{position:absolute;top:4px;right:10px;width:6px;height:6px;border-radius:3px;background:var(--blue)}
+.cbar .tab .d.ring{top:auto;right:auto;position:absolute;inset:-2px;width:auto;height:auto;border-radius:12px;background:transparent;border:1.5px solid var(--tint);box-shadow:0 0 10px color-mix(in srgb,var(--tint) 65%,transparent);animation:ring 1.9s ease-in-out infinite}
+@keyframes ring{0%,100%{opacity:.45}50%{opacity:1}}
+
+/* content column */
+.cnt{position:relative;z-index:2;flex:1;overflow-y:auto;padding:12px 16px 34px;display:flex;flex-direction:column;gap:12px;scrollbar-width:none}
+.cnt::-webkit-scrollbar{display:none}
+.card{border-radius:16px;background:var(--surf);border:1px solid var(--surfbd);padding:12px}
+.card.g{background:var(--glass);border-color:var(--glassbd)}
+.ct{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:600;font-size:15px}
+.srule{display:flex;align-items:center;gap:10px;margin-top:2px}
+.srule .ln{flex:1;height:1px;background:var(--hair)}
+.srule .bub{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;font-weight:600;background:color-mix(in srgb,var(--blue) 22%,transparent);color:var(--bluetext);border-radius:8px;padding:1px 6px}
+.shift{display:flex;align-items:center;gap:9px;padding:9px 0;border-top:1px solid var(--hair)}
+.shift:first-child{border-top:0;padding-top:2px}
+.shift .day{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;font-weight:600;color:var(--muted);width:46px}
+.shift .tm{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12.5px;font-weight:600;flex:1}
+.rp{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;padding:3px 7px;border-radius:7px;background:color-mix(in srgb,var(--tint) 14%,transparent);color:var(--tint);border:1px solid color-mix(in srgb,var(--tint) 26%,transparent)}
+.rp.ok{background:color-mix(in srgb,var(--ok) 14%,transparent);color:var(--ok);border-color:color-mix(in srgb,var(--ok) 30%,transparent)}
+.rp.gold{background:color-mix(in srgb,var(--gold) 16%,transparent);color:var(--gold);border-color:color-mix(in srgb,var(--gold) 34%,transparent)}
+.rp.bad{background:color-mix(in srgb,var(--bad) 14%,transparent);color:var(--bad);border-color:color-mix(in srgb,var(--bad) 30%,transparent)}
+.rp.mut{background:var(--glass);color:var(--muted);border-color:var(--glassbd)}
+.rp.am{background:color-mix(in srgb,var(--am) 16%,transparent);color:var(--am);border-color:color-mix(in srgb,var(--am) 34%,transparent)}
+.rp.pm{background:color-mix(in srgb,var(--pm) 16%,transparent);color:var(--pm);border-color:color-mix(in srgb,var(--pm) 34%,transparent)}
+.fl{display:inline-flex;width:18px;height:18px;border-radius:5px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;font-weight:700;align-items:center;justify-content:center;background:var(--glass);border:1px solid var(--glassbd);color:var(--muted)}
+.btnrow{display:flex;gap:10px}
+.btn{flex:1;height:44px;border-radius:13px;display:flex;align-items:center;justify-content:center;gap:7px;font-size:14px;font-weight:600;background:var(--glass);border:1px solid var(--glassbd);color:var(--text)}
+.btn .ic{width:16px;height:16px}
+.btn.fill{background:var(--tint);border-color:var(--tint);color:var(--fireText)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tile{position:relative;border-radius:16px;padding:12px;min-height:88px;display:flex;flex-direction:column;justify-content:space-between;background:color-mix(in srgb,var(--tint) 11%,transparent);border:1px solid color-mix(in srgb,var(--tint) 28%,transparent)}
+.tile .ic{width:20px;height:20px;color:var(--tint)}
+.tile .tt{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:600;font-size:15px;margin-top:8px}
+.tile .ts{font-size:11.5px;color:var(--muted);line-height:15px;margin-top:2px}
+.tile .chev{position:absolute;top:12px;right:12px;color:var(--muted)}
+.tile .chev .ic{width:16px;height:16px;color:var(--muted)}
+.tile.wide{grid-column:1/-1;flex-direction:row;align-items:center;gap:12px;min-height:0}
+.tile.wide .tt{margin-top:0}
+.tile.wide .bd{flex:1}
+.tile.wide .ic{width:22px;height:22px}
+.tile .big{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:26px;line-height:1;color:var(--tint)}
+.tile.pulse::after{content:"";position:absolute;inset:-2px;border-radius:18px;border:1.5px solid var(--tint);box-shadow:0 0 12px color-mix(in srgb,var(--tint) 60%,transparent);animation:ring 1.9s ease-in-out infinite;pointer-events:none}
+.tile.off{background:var(--glass);border-color:var(--glassbd)}
+.tile.off .ic,.tile.off .big{color:var(--muted)}
+.avail{display:flex;align-items:center;gap:10px}
+.avail .bd{flex:1;min-width:0}
+.avail .who{font-size:11.5px;color:var(--muted)}
+.avail .who b{color:var(--text);font-weight:600}
+.avail .when{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12.5px;font-weight:600;margin-top:2px;display:flex;align-items:center;gap:7px}
+.pu{height:34px;padding:0 14px;border-radius:11px;background:var(--tint);color:var(--fireText);font-weight:600;font-size:13px;display:flex;align-items:center;gap:5px;flex:0 0 auto}
+.pu .ic{width:14px;height:14px}
+.pu.ghost{background:var(--glass);border:1px solid var(--glassbd);color:var(--muted)}
+.blurb{position:relative;border-radius:14px;padding:11px 36px 11px 12px;background:color-mix(in srgb,var(--ok) 12%,transparent);border:1px solid color-mix(in srgb,var(--ok) 32%,transparent);display:flex;gap:10px;align-items:flex-start}
+.blurb .ic{width:18px;height:18px;color:var(--ok);margin-top:1px}
+.blurb .t{font-size:13px;line-height:17px}
+.blurb .t b{font-weight:600}
+.blurb .q{margin-top:5px;padding-left:9px;border-left:2px solid color-mix(in srgb,var(--ok) 45%,transparent);font-size:12px;color:var(--muted);font-style:italic;line-height:16px}
+.blurb .x{position:absolute;top:8px;right:8px;width:24px;height:24px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--muted)}
+.blurb .x .ic{width:14px;height:14px;color:var(--muted);margin:0}
+.blurb.deny{background:color-mix(in srgb,var(--bad) 10%,transparent);border-color:color-mix(in srgb,var(--bad) 30%,transparent)}
+.blurb.deny .ic{color:var(--bad)}
+.blurb.deny .q{border-color:color-mix(in srgb,var(--bad) 45%,transparent)}
+.rail{display:flex;gap:10px;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:2px 16px}
+.rail::-webkit-scrollbar{display:none}
+.rail .card{flex:0 0 232px}
+.console{display:flex;gap:8px}
+.console .cb{flex:1;height:60px;border-radius:13px;background:var(--glass);border:1px solid var(--glassbd);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:11.5px;font-weight:600;position:relative}
+.console .cb .ic{width:18px;height:18px;color:var(--tint)}
+.console .cb .bub{position:absolute;top:6px;right:8px;min-width:17px;height:16px;border-radius:8px;background:var(--tint);color:var(--fireText);font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px}
+.console .cb.pulse::after{content:"";position:absolute;inset:-2px;border-radius:15px;border:1.5px solid var(--tint);box-shadow:0 0 10px color-mix(in srgb,var(--tint) 60%,transparent);animation:ring 1.9s ease-in-out infinite;pointer-events:none}
+.lrow{display:flex;align-items:center;gap:12px;padding:11px 0;border-top:1px solid var(--hair)}
+.lrow:first-of-type{border-top:0;padding-top:2px}
+.lrow .lic{width:36px;height:36px;border-radius:11px;background:color-mix(in srgb,var(--tint) 14%,transparent);display:flex;align-items:center;justify-content:center;color:var(--tint);position:relative}
+.lrow .lic .ic{width:17px;height:17px}
+.lrow .lic.pulse::after{content:"";position:absolute;inset:-2px;border-radius:13px;border:1.5px solid var(--tint);box-shadow:0 0 10px color-mix(in srgb,var(--tint) 60%,transparent);animation:ring 1.9s ease-in-out infinite}
+.lrow .bd{flex:1;min-width:0}
+.lrow .l1{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:600;font-size:14.5px}
+.lrow .l2{font-size:11.5px;color:var(--muted);margin-top:1px}
+.lrow .bub{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;font-weight:700;min-width:22px;height:20px;border-radius:10px;background:var(--tint);color:var(--fireText);display:flex;align-items:center;justify-content:center;padding:0 6px}
+.lrow .chev{color:var(--muted)}
+.lrow .chev .ic{width:16px;height:16px}
+.lrow.here{opacity:.55}
+.lrow.locked .lic{background:var(--glass);color:var(--muted)}
+.fold{display:flex;align-items:center;gap:10px}
+.fold .ct{flex:1}
+.fold .chev .ic{width:16px;height:16px;color:var(--muted)}
+
+/* seg (menu-upload grammar) */
+.seg{display:flex;border-radius:13px;padding:3px;gap:3px;background:var(--glass);border:1px solid var(--glassbd)}
+.seg span{flex:1;text-align:center;padding:8px 6px;border-radius:10px;font-size:12.5px;color:var(--muted);display:flex;align-items:center;justify-content:center;gap:6px;font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:600}
+.seg .on{background:color-mix(in srgb,var(--tint) 18%,transparent);color:var(--tint)}
+.seg .bub{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;background:color-mix(in srgb,var(--blue) 22%,transparent);color:var(--bluetext);border-radius:8px;padding:1px 6px}
+
+/* approvals */
+.apc .top{display:flex;align-items:center;gap:10px}
+.apc .top .bd{flex:1;min-width:0}
+.apc .top b{display:block;font-size:14px;font-weight:600}
+.apc .top span{font-size:11.5px;color:var(--muted)}
+.apc .what{margin-top:10px;display:flex;align-items:center;gap:10px}
+.apc .what .cal{width:46px;height:46px;border-radius:12px;background:var(--glass);border:1px solid var(--glassbd);display:flex;flex-direction:column;align-items:center;justify-content:center}
+.apc .what .cal .m{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;letter-spacing:1px;text-transform:uppercase;color:var(--tint);font-weight:700}
+.apc .what .cal .d{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:18px;line-height:1}
+.apc .what .wb{flex:1}
+.apc .what .wb .l1{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:600;font-size:15px}
+.apc .what .wb .l2{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11.5px;color:var(--muted);margin-top:2px;display:flex;align-items:center;gap:6px}
+.q{margin-top:9px;padding:8px 10px;border-radius:10px;background:var(--glass);border-left:2px solid color-mix(in srgb,var(--tint) 50%,transparent);font-size:12.5px;line-height:16px;color:var(--muted);font-style:italic}
+.conf{margin-top:8px;display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--gold)}
+.conf .ic{width:14px;height:14px}
+.dec{display:flex;gap:8px;margin-top:11px}
+.dec .b{flex:1;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;gap:6px;font-weight:600;font-size:13.5px;background:var(--glass);border:1px solid var(--glassbd)}
+.dec .b .ic{width:15px;height:15px}
+.dec .b.ok{background:var(--ok);border-color:var(--ok);color:#fff}
+.dec .b.no{color:var(--bad)}
+.dec .b.dim{opacity:.4}
+.own{margin-top:9px;font-size:11.5px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.own .ic{width:14px;height:14px}
+.swap{display:flex;align-items:center;gap:8px;margin-top:10px}
+.swap .who{flex:1;display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;min-width:0}
+.swap .who span{font-size:10.5px;color:var(--muted);font-weight:500;display:block}
+.swap .arr{color:var(--tint)}
+.hist{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--hair)}
+.hist:first-child{border-top:0;padding-top:0}
+.hist .bd{flex:1;min-width:0}
+.hist .l1{font-size:13px;font-weight:600}
+.hist .l2{font-size:11px;color:var(--muted);margin-top:1px}
+.hist .st{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;color:var(--muted)}
+.led{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:14px;background:var(--surf);border:1px solid var(--surfbd)}
+.led .bd{flex:1;min-width:0}
+.led .l1{font-size:14px;font-weight:600}
+.led .l2{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.led .chev .ic{width:16px;height:16px;color:var(--muted)}
+.daysep{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1.6px;text-transform:uppercase;color:var(--tint);font-weight:700;display:flex;align-items:center;gap:10px;margin-top:4px}
+.daysep .ln{flex:1;height:1px;background:var(--hair)}
+.inl{display:flex;gap:6px;margin-top:10px;padding:3px;border-radius:12px;background:var(--glass);border:1px solid var(--glassbd)}
+.inl span{flex:1;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:13px;font-weight:600;color:var(--muted)}
+.inl span .ic{width:14px;height:14px}
+.inl span.ok{background:var(--ok);color:#fff}
+.inl span.no.on{background:color-mix(in srgb,var(--bad) 18%,transparent);color:var(--bad)}
+
+/* sheets (content-posts grammar) */
+.ovl{position:absolute;inset:0;z-index:50;display:flex;flex-direction:column;justify-content:flex-end}
+.ovl .scr{position:absolute;inset:0;background:var(--scrim)}
+.sheet{position:relative;z-index:2;border-radius:26px 26px 0 0;padding:10px 18px 24px;max-height:88%;display:flex;flex-direction:column;
+  background:var(--sheetbg);border:1px solid var(--glassbd);border-bottom:0;box-shadow:0 -18px 44px rgba(0,0,0,0.35)}
+.grabpill{width:40px;height:4px;border-radius:2px;background:var(--glassbd);margin:2px auto 10px;flex:0 0 auto}
+.shead{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex:0 0 auto}
+.shead .t{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:700;font-size:19px;letter-spacing:-0.2px;flex:1;min-width:0}
+.shead .sub{font-size:12.5px;color:var(--muted);margin-top:1px;font-family:'Inter',system-ui,sans-serif;font-weight:400;letter-spacing:0}
+.xbtn{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--text);flex:0 0 auto;background:var(--glass);border:1px solid var(--glassbd)}
+.xbtn .ic{width:16px;height:16px}
+.sbody{flex:0 1 auto;min-height:0;overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column;gap:9px;padding-bottom:4px}
+.sbody::-webkit-scrollbar{display:none}
+.sfoot{flex:0 0 auto;display:flex;gap:11px;padding-top:12px}
+.fbtn{flex:1;height:47px;border-radius:13px;display:flex;align-items:center;justify-content:center;gap:7px;font-size:15px;font-weight:600;border:1px solid var(--glassbd);background:var(--glass);color:var(--text)}
+.fbtn.save{background:var(--tint);border-color:var(--tint);color:var(--fireText);flex:1.35;position:relative;overflow:hidden}
+.fbtn.save::after{content:"";position:absolute;left:0;top:0;bottom:0;width:38%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.28),transparent);transform:skewX(-18deg) translateX(-160%);animation:shine 4.5s ease-in-out infinite}
+@keyframes shine{0%,70%{transform:skewX(-18deg) translateX(-160%)}100%{transform:skewX(-18deg) translateX(420%)}}
+.fbtn.dim{opacity:.5}
+.fbtn .ic{width:16px;height:16px}
+.flab{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;letter-spacing:1.1px;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.flab .opt{margin-left:auto;text-transform:none;letter-spacing:.3px;font-weight:500;opacity:.8}
+.inp{min-height:43px;border-radius:13px;padding:11px 13px;font-size:14px;color:var(--text);background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;gap:8px}
+.inp.ph{color:var(--muted)}
+.inp.ta{min-height:76px;align-items:flex-start;line-height:1.45}
+.inp .ic{width:17px;height:17px;color:var(--muted)}
+.inp .chev{margin-left:auto}
+.hintt{font-size:11.5px;line-height:16px;color:var(--muted);margin-top:6px}
+.two{display:flex;gap:10px}
+.two>*{flex:1;min-width:0}
+.frow{display:flex;align-items:center;gap:12px;padding:11px 13px;border-radius:13px;background:var(--glass);border:1px solid var(--glassbd)}
+.frow .bd{flex:1;min-width:0}
+.frow .l1{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:600;font-size:14px}
+.frow .l2{font-size:11.5px;line-height:15px;color:var(--muted);margin-top:2px}
+.frow .ic{width:18px;height:18px;color:var(--tint)}
+.frow.locked .ic{color:var(--muted)}
+.frow .val{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12.5px;font-weight:600;color:var(--tint)}
+.sw{width:44px;height:26px;border-radius:13px;background:var(--tint);position:relative;flex:0 0 auto}
+.sw::after{content:"";position:absolute;top:3px;right:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.3)}
+.sw.off{background:var(--thumb)}
+.sw.off::after{right:auto;left:3px}
+.lk{width:26px;height:26px;border-radius:8px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;justify-content:center;color:var(--muted)}
+.lk .ic{width:13px;height:13px;color:var(--muted)}
+.arow{display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:13px;background:var(--surf);border:1px solid var(--surfbd)}
+.arow .lic{width:34px;height:34px;border-radius:10px;background:color-mix(in srgb,var(--tint) 14%,transparent);display:flex;align-items:center;justify-content:center;color:var(--tint)}
+.arow .lic .ic{width:16px;height:16px}
+.arow .bd{flex:1;min-width:0}
+.arow .l1{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:600;font-size:14.5px}
+.arow .l2{font-size:11.5px;color:var(--muted);margin-top:1px}
+.arow .chev .ic{width:16px;height:16px;color:var(--muted)}
+.arow.here{opacity:.55}
+.arow.here .l2{color:var(--tint)}
+.arow.locked .lic{background:var(--glass);color:var(--muted)}
+.arow .bub{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;font-weight:700;min-width:22px;height:20px;border-radius:10px;background:var(--tint);color:var(--fireText);display:flex;align-items:center;justify-content:center;padding:0 6px}
+.arow.hist{border:1px dashed color-mix(in srgb,var(--tint) 45%,transparent);background:transparent}
+
+/* mini month calendar */
+.cal7{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.cal7 .dh{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);text-align:center;padding:2px 0 4px;font-weight:600}
+.cal7 .d{height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12.5px;font-weight:600}
+.cal7 .d.o{color:var(--muted);opacity:.35}
+.cal7 .d.td{border:1px solid color-mix(in srgb,var(--tint) 50%,transparent)}
+.cal7 .d.sel{background:var(--tint);color:var(--fireText)}
+.cal7 .d.rng{background:color-mix(in srgb,var(--tint) 18%,transparent);color:var(--tint);border-radius:0}
+.cal7 .d.sh{position:relative}
+.cal7 .d.sh::after{content:"";position:absolute;bottom:4px;width:4px;height:4px;border-radius:2px;background:var(--muted)}
+.calnav{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.calnav .m{flex:1;text-align:center;font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:600;font-size:14px}
+.calnav .c{width:30px;height:30px;border-radius:9px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;justify-content:center}
+.calnav .c .ic{width:14px;height:14px}
+.rev{border-radius:16px;padding:14px;background:var(--glass);border:1px solid var(--glassbd);text-align:center}
+.rev .e{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:var(--tint);font-weight:700}
+.rev .big{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:24px;letter-spacing:-0.3px;margin-top:6px}
+.rev .sm{font-size:12px;color:var(--muted);margin-top:2px}
+.rev .q{text-align:left}
+
+/* roster + strip stand-in */
+.strip{display:flex;gap:6px;padding:8px}
+.strip .dd{flex:1;height:54px;border-radius:12px;background:var(--glass);border:1px solid var(--glassbd);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.strip .dd .w{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-weight:600}
+.strip .dd .n{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:15px}
+.strip .dd.on{background:var(--tint);border-color:var(--tint)}
+.strip .dd.on .w,.strip .dd.on .n{color:var(--fireText)}
+.ampm{display:flex;gap:8px}
+.ampm span{flex:1;height:38px;border-radius:12px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;justify-content:center;gap:7px;font-size:13px;font-weight:600;color:var(--muted)}
+.ampm span .ic{width:15px;height:15px}
+.ampm span.on.am{background:color-mix(in srgb,var(--am) 18%,transparent);border-color:color-mix(in srgb,var(--am) 40%,transparent);color:var(--am)}
+.ampm span.on.pm{background:color-mix(in srgb,var(--pm) 18%,transparent);border-color:color-mix(in srgb,var(--pm) 40%,transparent);color:var(--pm)}
+.ampm .bub{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;padding:1px 6px;border-radius:8px;background:var(--glass);border:1px solid var(--glassbd)}
+
+/* upload page bits */
+.utile{border-radius:16px;padding:12px;min-height:92px;display:flex;flex-direction:column;justify-content:space-between;background:color-mix(in srgb,var(--tint) 11%,transparent);border:1px solid color-mix(in srgb,var(--tint) 28%,transparent);position:relative}
+.utile .ic{width:20px;height:20px;color:var(--tint)}
+.utile .tt{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:600;font-size:14px;margin-top:6px}
+.utile .ts{font-size:11px;color:var(--muted)}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px}
+.stage .th{width:56px;height:56px;border-radius:12px;background:var(--thumb);display:flex;align-items:center;justify-content:center;color:var(--muted);flex:0 0 auto;position:relative}
+.stage .th .ic{width:22px;height:22px}
+.stage .th .pg{position:absolute;bottom:-5px;right:-5px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;font-weight:700;background:var(--tint);color:var(--fireText);border-radius:7px;padding:1px 5px}
+.stage .hd{display:flex;align-items:center;gap:11px}
+.stage .hd .bd{flex:1;min-width:0}
+.stage .hd b{display:block;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stage .hd span{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;color:var(--muted)}
+.proc{display:flex;align-items:center;gap:12px}
+.spin{width:28px;height:28px;border-radius:50%;border:3px solid var(--glassbd);border-top-color:var(--tint);animation:spin 1s linear infinite;flex:0 0 auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+.quip{flex:1;font-size:13px;font-weight:600;min-height:18px;transition:opacity .3s}
+.quip.fade{opacity:0}
+.quip small{display:block;font-size:11px;color:var(--muted);font-weight:500;margin-top:2px}
+.stats{display:flex;gap:8px;margin-top:10px}
+.stats .s{flex:1;border-radius:12px;padding:8px 6px;text-align:center;background:var(--glass);border:1px solid var(--glassbd)}
+.stats .s .n{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:20px;line-height:1}
+.stats .s .l{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-top:4px;font-weight:600}
+.stats .s.ok .n{color:var(--ok)}
+.stats .s.warn{border-color:color-mix(in srgb,var(--gold) 40%,transparent)}
+.stats .s.warn .n{color:var(--gold)}
+.stats .s.warn .l{color:var(--gold)}
+.unm{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px}
+.unm span{font-size:11.5px;padding:4px 9px;border-radius:9px;background:color-mix(in srgb,var(--gold) 14%,transparent);border:1px solid color-mix(in srgb,var(--gold) 32%,transparent);color:var(--gold)}
+.revbar{margin-top:10px;height:44px;border-radius:12px;background:var(--tint);color:var(--fireText);display:flex;align-items:center;justify-content:center;gap:8px;font-weight:600;font-size:14px}
+.revbar .ic{width:16px;height:16px}
+.hcard{display:flex;align-items:center;gap:11px;padding:11px 12px;border-radius:13px;background:var(--surf);border:1px solid var(--surfbd)}
+.hcard .bd{flex:1;min-width:0}
+.hcard .l1{font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hcard .l2{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10.5px;margin-top:2px;color:var(--muted)}
+.hcard .l2 b{color:var(--ok);font-weight:600}
+.hcard .l2 i{font-style:normal;color:var(--gold)}
+.hcard .tr{color:var(--muted)}
+.hcard .tr .ic{width:16px;height:16px}
+.mini{display:flex;flex-direction:column;gap:6px}
+.mini .r{display:flex;align-items:center;gap:8px;font-size:12px;line-height:16px;color:var(--muted)}
+.mini .r::before{content:"";width:5px;height:5px;border-radius:3px;background:var(--tint);flex:0 0 auto;margin-top:1px}
+.fab{position:absolute;right:18px;bottom:96px;width:52px;height:52px;border-radius:26px;background:var(--tint);color:var(--fireText);display:flex;align-items:center;justify-content:center;z-index:4;box-shadow:0 10px 24px rgba(0,0,0,.35)}
+.fab .ic{width:22px;height:22px}
+.tabbar{position:absolute;left:14px;right:14px;bottom:18px;height:62px;border-radius:22px;background:color-mix(in srgb,var(--sheetbg) 80%,transparent);border:1px solid var(--glassbd);backdrop-filter:blur(14px);display:flex;align-items:center;justify-content:space-around;z-index:4;padding:0 6px}
+.tabbar .t{width:50px;height:42px;border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--muted);font-size:9px;font-weight:600}
+.tabbar .t .ic{width:18px;height:18px}
+.tabbar .t.on{background:color-mix(in srgb,var(--tint) 16%,transparent);color:var(--tint)}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-cal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></symbol>
+  <symbol id="i-chr" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></symbol>
+  <symbol id="i-chl" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
+  <symbol id="i-chd" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></symbol>
+  <symbol id="i-cam" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></symbol>
+  <symbol id="i-img" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><path d="M22 6l-10 7L2 6"/></symbol>
+  <symbol id="i-mega" viewBox="0 0 24 24"><path d="M3 11l18-5v12L3 13v-2z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></symbol>
+  <symbol id="i-fork" viewBox="0 0 24 24"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2M7 2v20M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3zm0 0v7"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></symbol>
+  <symbol id="i-swap" viewBox="0 0 24 24"><path d="M17 1l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3"/></symbol>
+  <symbol id="i-hist" viewBox="0 0 24 24"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></symbol>
+  <symbol id="i-hand" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M16 12l-4-4-4 4M12 16V8"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></symbol>
+  <symbol id="i-wrench" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></symbol>
+  <symbol id="i-slider" viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></symbol>
+  <symbol id="i-off" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M9 15l6 6M15 15l-6 6"/></symbol>
+</svg>
+
+<h1>Schedule Wave — <span>Shift Tools</span> concepts</h1>
+<div class="toolbar">
+  <div class="grp"><span class="gl2">Theme</span>
+    <button class="tb on" data-theme="">Moonstone dark</button>
+    <button class="tb" data-theme="t-mono-l">Moonstone light</button>
+    <button class="tb" data-theme="t-ocean-d">Ocean dark</button>
+    <button class="tb" data-theme="t-ocean-l">Ocean light</button>
+  </div>
+</div>
+<p class="hint">Pick <b>one</b> per row. Row 1 = the Welcome <b>Schedule tab</b> (3 layouts). Row 2 = the employee <b>sheets</b> (one design each). Row 3 = the <b>Approvals</b> page (3 layouts). Row 4 = the <b>⚙ Schedule chip</b> family + the reworked Upload page. <em>Everything rides the existing kit</em> — tinted-glass tiles, GlassSheet, the menu-upload seg, ScanQuip.</p>
+
+<!-- ============================================================ ROW 1 · WELCOME SCHEDULE TAB -->
+<div class="section">
+  <div class="sh">Row 1 · Welcome · Schedule tab <span class="ln"></span><small>employee view · manager sees + Approvals</small></div>
+  <div class="row">
+
+    <!-- A · TILES -->
+    <div class="col">
+      <div class="concept"><b>A</b> Tiles <span class="ln"></span> Tools-kit grammar</div>
+      <div class="phone">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>9:41</span><span>●●● ▲ ▮</span></div>
+        <div class="whead">
+          <div class="greet">Good evening, <span>Daisy</span></div>
+          <div class="hrow"><div class="av p2">DD</div><div class="nm"><b>Daisy Dukes</b><span>Server · Bartender</span></div><div class="wx"><svg class="ic"><use href="#i-sun"/></svg>74°</div><div class="ib"><svg class="ic"><use href="#i-mail"/></svg></div><div class="ib"><svg class="ic"><use href="#i-bell"/></svg><i class="dot"></i></div></div>
+        </div>
+        <div class="cbar">
+          <div class="tab io on"><svg class="ic"><use href="#i-clock"/></svg></div>
+          <div class="tab"><svg class="ic"><use href="#i-mega"/></svg>Today</div>
+          <div class="tab"><svg class="ic"><use href="#i-cal"/></svg>Events</div>
+          <div class="tab"><svg class="ic"><use href="#i-fork"/></svg>Specials</div>
+        </div>
+        <div class="cnt">
+          <div class="blurb"><svg class="ic"><use href="#i-check"/></svg><div class="t"><b>Time off approved</b> — Sat, Sep 20. <span style="color:var(--muted);font-style:italic">"Enjoy the wedding."</span></div><div class="x"><svg class="ic"><use href="#i-x"/></svg></div></div>
+          <div class="card">
+            <div class="ct">Upcoming shifts</div>
+            <div style="margin-top:6px">
+              <div class="shift"><span class="day">Tue 16</span><span class="tm">4:30 – 10:00 PM</span><span class="fl">C</span><span class="rp">Server</span></div>
+              <div class="shift"><span class="day">Thu 18</span><span class="tm">11:00 – 4:00 PM</span><span class="rp">Server</span></div>
+            </div>
+          </div>
+          <div class="srule"><span class="eyeb tint">Available shifts</span><span class="bub">2</span><span class="ln"></span></div>
+          <div class="card" style="padding:4px 12px">
+            <div class="avail" style="padding:9px 0"><div class="av s p3">MR</div><div class="bd"><div class="who">Released by <b>Marcus R.</b></div><div class="when">Sat 20 · 5:00 – 11:00 PM <span class="rp">Bartender</span></div></div><div class="pu"><svg class="ic"><use href="#i-hand"/></svg>Pick Up</div></div>
+            <div class="avail" style="padding:9px 0;border-top:1px solid var(--hair)"><div class="av s p4">PJ</div><div class="bd"><div class="who">Released by <b>Pilar J.</b></div><div class="when">Sun 21 · 10:30 – 4:00 PM <span class="rp">Server</span></div></div><div class="pu ghost">Awaiting</div></div>
+          </div>
+          <div class="srule"><span class="eyeb tint">Shift tools</span><span class="ln"></span></div>
+          <div class="grid2">
+            <div class="tile" style="min-height:80px"><svg class="ic"><use href="#i-off"/></svg><div class="chev"><svg class="ic"><use href="#i-chr"/></svg></div><div><div class="tt">Request time off</div><div class="ts">Pick a day, add a reason</div></div></div>
+            <div class="tile" style="min-height:80px"><svg class="ic"><use href="#i-swap"/></svg><div class="chev"><svg class="ic"><use href="#i-chr"/></svg></div><div><div class="tt">Release a shift</div><div class="ts">Offer it to coworkers</div></div></div>
+            <div class="tile wide pulse"><svg class="ic"><use href="#i-check"/></svg><div class="bd"><div class="tt">Approvals</div><div class="ts">2 time off · 1 pick-up waiting</div></div><div class="big">3</div></div>
+          </div>
+          <div class="btnrow"><div class="btn fill"><svg class="ic"><use href="#i-cal"/></svg>Full Schedule</div><div class="btn"><svg class="ic"><use href="#i-users"/></svg>View Roster</div></div>
+        </div>
+      </div>
+      <p class="bcap"><b>A · Tiles.</b> Tinted-glass CommandTiles (the Tools page grammar): two half tiles + the manager-only wide Approvals tile with the count and the AttentionRing pulse. Available shifts stack as cards above the tools; a claimed one shows <em>Awaiting approval</em>. The decision blurb sits first.</p>
+    </div>
+
+    <!-- B · RAIL -->
+    <div class="col">
+      <div class="concept"><b>B</b> Rail + console <span class="ln"></span> shortest page</div>
+      <div class="phone">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>9:41</span><span>●●● ▲ ▮</span></div>
+        <div class="whead">
+          <div class="greet">Good evening, <span>Daisy</span></div>
+          <div class="hrow"><div class="av p2">DD</div><div class="nm"><b>Daisy Dukes</b><span>Server · Bartender</span></div><div class="wx"><svg class="ic"><use href="#i-sun"/></svg>74°</div><div class="ib"><svg class="ic"><use href="#i-mail"/></svg></div><div class="ib"><svg class="ic"><use href="#i-bell"/></svg><i class="dot"></i></div></div>
+        </div>
+        <div class="cbar">
+          <div class="tab io on"><svg class="ic"><use href="#i-clock"/></svg></div>
+          <div class="tab"><svg class="ic"><use href="#i-mega"/></svg>Today</div>
+          <div class="tab"><svg class="ic"><use href="#i-cal"/></svg>Events</div>
+          <div class="tab"><svg class="ic"><use href="#i-fork"/></svg>Specials</div>
+        </div>
+        <div class="cnt">
+          <div class="blurb deny"><svg class="ic"><use href="#i-x"/></svg><div class="t"><b>Shift pick-up not approved</b> — Sun, Sep 21.<div class="q">"You'd be on a double that weekend — let's keep it fair."</div></div><div class="x"><svg class="ic"><use href="#i-x"/></svg></div></div>
+          <div class="card">
+            <div class="ct">Upcoming shifts</div>
+            <div style="margin-top:6px">
+              <div class="shift"><span class="day">Tue 16</span><span class="tm">4:30 – 10:00 PM</span><span class="fl">C</span><span class="rp">Server</span></div>
+              <div class="shift"><span class="day">Thu 18</span><span class="tm">11:00 – 4:00 PM</span><span class="rp">Server</span></div>
+            </div>
+          </div>
+          <div class="btnrow"><div class="btn fill"><svg class="ic"><use href="#i-cal"/></svg>Full Schedule</div><div class="btn"><svg class="ic"><use href="#i-users"/></svg>View Roster</div></div>
+          <div class="srule"><span class="eyeb tint">Shift tools</span><span class="ln"></span></div>
+          <div class="console">
+            <div class="cb"><svg class="ic"><use href="#i-off"/></svg>Time off</div>
+            <div class="cb"><svg class="ic"><use href="#i-swap"/></svg>Release</div>
+            <div class="cb pulse"><svg class="ic"><use href="#i-check"/></svg>Approvals<span class="bub">3</span></div>
+          </div>
+          <div class="srule"><span class="eyeb tint">Available shifts</span><span class="bub">2</span><span class="ln"></span></div>
+          <div class="rail">
+            <div class="card"><div class="avail" style="align-items:flex-start"><div class="av s p3">MR</div><div class="bd"><div class="who">From <b>Marcus R.</b></div><div class="when" style="flex-wrap:wrap">Sat, Sep 20<br>5:00 – 11:00 PM</div><div style="margin-top:6px"><span class="rp">Bartender</span></div></div></div><div class="pu" style="margin-top:10px;justify-content:center"><svg class="ic"><use href="#i-hand"/></svg>Pick Up</div></div>
+            <div class="card"><div class="avail" style="align-items:flex-start"><div class="av s p4">PJ</div><div class="bd"><div class="who">From <b>Pilar J.</b></div><div class="when" style="flex-wrap:wrap">Sun, Sep 21<br>10:30 – 4:00 PM</div><div style="margin-top:6px"><span class="rp">Server</span></div></div></div><div class="pu ghost" style="margin-top:10px;justify-content:center">Awaiting approval</div></div>
+            <div class="card" style="opacity:.6"><div class="avail" style="align-items:flex-start"><div class="av s">TK</div><div class="bd"><div class="who">From <b>Tom K.</b></div><div class="when" style="flex-wrap:wrap">Mon, Sep 22<br>4:00 – 10:00 PM</div></div></div></div>
+          </div>
+        </div>
+      </div>
+      <p class="bcap"><b>B · Rail + console.</b> Tools become one three-button glass console (the Tips ConsoleStrip feel) with the count bubble + pulse on Approvals; available shifts ride a horizontal rail so the tab stays short. Buttons row moves up under the upcoming card. Rails live in the fixed chrome per the drag-list rule — fine here, this page has no drag list.</p>
+    </div>
+
+    <!-- C · LIST CARD -->
+    <div class="col">
+      <div class="concept"><b>C</b> Tool list + fold <span class="ln"></span> one card, rows</div>
+      <div class="phone">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>9:41</span><span>●●● ▲ ▮</span></div>
+        <div class="whead">
+          <div class="greet">Good evening, <span>Daisy</span></div>
+          <div class="hrow"><div class="av p2">DD</div><div class="nm"><b>Daisy Dukes</b><span>Server · Bartender</span></div><div class="wx"><svg class="ic"><use href="#i-sun"/></svg>74°</div><div class="ib"><svg class="ic"><use href="#i-mail"/></svg></div><div class="ib"><svg class="ic"><use href="#i-bell"/></svg><i class="dot"></i></div></div>
+        </div>
+        <div class="cbar">
+          <div class="tab io on"><svg class="ic"><use href="#i-clock"/></svg></div>
+          <div class="tab"><svg class="ic"><use href="#i-mega"/></svg>Today</div>
+          <div class="tab"><svg class="ic"><use href="#i-cal"/></svg>Events</div>
+          <div class="tab"><svg class="ic"><use href="#i-fork"/></svg>Specials</div>
+        </div>
+        <div class="cnt">
+          <div class="blurb"><svg class="ic"><use href="#i-check"/></svg><div class="t"><b>Time off approved</b> — Sat, Sep 20.</div><div class="x"><svg class="ic"><use href="#i-x"/></svg></div></div>
+          <div class="card">
+            <div class="ct">Upcoming shifts</div>
+            <div style="margin-top:6px">
+              <div class="shift"><span class="day">Tue 16</span><span class="tm">4:30 – 10:00 PM</span><span class="fl">C</span><span class="rp">Server</span></div>
+              <div class="shift"><span class="day">Thu 18</span><span class="tm">11:00 – 4:00 PM</span><span class="rp">Server</span></div>
+            </div>
+          </div>
+          <div class="btnrow"><div class="btn fill"><svg class="ic"><use href="#i-cal"/></svg>Full Schedule</div><div class="btn"><svg class="ic"><use href="#i-users"/></svg>View Roster</div></div>
+          <div class="card g">
+            <div class="ct" style="margin-bottom:4px">Shift tools</div>
+            <div class="lrow"><div class="lic"><svg class="ic"><use href="#i-off"/></svg></div><div class="bd"><div class="l1">Request time off</div><div class="l2">Pick a day, add a reason, send to a manager</div></div><div class="chev"><svg class="ic"><use href="#i-chr"/></svg></div></div>
+            <div class="lrow"><div class="lic"><svg class="ic"><use href="#i-swap"/></svg></div><div class="bd"><div class="l1">Release a shift</div><div class="l2">Offer one of your shifts to coworkers</div></div><div class="chev"><svg class="ic"><use href="#i-chr"/></svg></div></div>
+            <div class="lrow"><div class="lic pulse"><svg class="ic"><use href="#i-check"/></svg></div><div class="bd"><div class="l1">Approvals</div><div class="l2">2 time off · 1 pick-up waiting</div></div><span class="bub">3</span><div class="chev"><svg class="ic"><use href="#i-chr"/></svg></div></div>
+          </div>
+          <div class="card">
+            <div class="fold"><div class="ct">Available shifts</div><span class="rp">2</span><div class="chev"><svg class="ic"><use href="#i-chd"/></svg></div></div>
+            <div style="margin-top:8px">
+              <div class="avail" style="padding:9px 0;border-top:1px solid var(--hair)"><div class="av s p3">MR</div><div class="bd"><div class="who">Released by <b>Marcus R.</b></div><div class="when">Sat 20 · 5:00 – 11:00 PM <span class="rp">Bartender</span></div></div><div class="pu"><svg class="ic"><use href="#i-hand"/></svg>Pick Up</div></div>
+              <div class="avail" style="padding:9px 0;border-top:1px solid var(--hair)"><div class="av s p4">PJ</div><div class="bd"><div class="who">Released by <b>Pilar J.</b></div><div class="when">Sun 21 · 10:30 – 4:00 PM <span class="rp">Server</span></div></div><div class="pu ghost">Awaiting</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="bcap"><b>C · Tool list + fold.</b> One glass card lists the three tools as rows (MenuSheet row grammar, pulse on the Approvals icon disc); Available shifts collapse behind a FoldGroup with a count pill. Calmest page; the blurb can sit top or bottom.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ ROW 2 · EMPLOYEE SHEETS -->
+<div class="section">
+  <div class="sh">Row 2 · Employee sheets <span class="ln"></span><small>one design each · GlassSheet</small></div>
+  <div class="row">
+
+    <!-- Request time off · form -->
+    <div class="col">
+      <div class="concept"><b>S1</b> Request time off <span class="ln"></span> calendar + reason</div>
+      <div class="phone">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>9:41</span><span>●●● ▲ ▮</span></div>
+        <div class="whead"><div class="greet">Good evening, <span>Daisy</span></div><div class="hrow"><div class="av p2">DD</div><div class="nm"><b>Daisy Dukes</b><span>Server · Bartender</span></div></div></div>
+        <div class="ovl"><div class="scr"></div>
+          <div class="sheet">
+            <div class="grabpill"></div>
+            <div class="shead"><div><div class="t">Request time off</div><div class="sub">Tap a day · tap a later day for a range</div></div><div class="xbtn"><svg class="ic"><use href="#i-x"/></svg></div></div>
+            <div class="sbody">
+              <div class="card g">
+                <div class="calnav"><div class="c"><svg class="ic"><use href="#i-chl"/></svg></div><div class="m">September 2026</div><div class="c"><svg class="ic"><use href="#i-chr"/></svg></div></div>
+                <div class="cal7">
+                  <div class="dh">S</div><div class="dh">M</div><div class="dh">T</div><div class="dh">W</div><div class="dh">T</div><div class="dh">F</div><div class="dh">S</div>
+                  <div class="d o">30</div><div class="d o">31</div><div class="d o">1</div><div class="d o">2</div><div class="d o">3</div><div class="d o">4</div><div class="d o">5</div>
+                  <div class="d o">6</div><div class="d o">7</div><div class="d o">8</div><div class="d td">9</div><div class="d">10</div><div class="d">11</div><div class="d">12</div>
+                  <div class="d">13</div><div class="d">14</div><div class="d">15</div><div class="d sh">16</div><div class="d">17</div><div class="d sh">18</div><div class="d sh">19</div>
+                  <div class="d sel">20</div><div class="d rng">21</div><div class="d rng">22</div><div class="d sel">23</div><div class="d">24</div><div class="d">25</div><div class="d">26</div>
+                  <div class="d">27</div><div class="d">28</div><div class="d">29</div><div class="d">30</div><div class="d o">1</div><div class="d o">2</div><div class="d o">3</div>
+                </div>
+                <div class="hintt" style="margin-top:8px">Dots mark days you're already scheduled.</div>
+              </div>
+              <div><div class="flab">Reason <span class="opt">optional</span></div><div class="inp ta">My cousin's wedding is that weekend — flying out Saturday morning, back Wednesday.</div></div>
+            </div>
+            <div class="sfoot"><div class="fbtn">Cancel</div><div class="fbtn save">Review request<svg class="ic"><use href="#i-arrow"/></svg></div></div>
+          </div>
+        </div>
+      </div>
+      <p class="bcap"><b>S1.</b> The mini month calendar (the Poster's date grammar, tint-filled ends + soft range). Second tap on a later day extends to a range; dots mark days you already have shifts. Reason is optional. <em>Review</em> flips the same sheet to S2 — no second modal.</p>
+    </div>
+
+    <!-- Request time off · review -->
+    <div class="col">
+      <div class="concept"><b>S2</b> Review &amp; submit <span class="ln"></span> same sheet, second pane</div>
+      <div class="phone">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>9:41</span><span>●●● ▲ ▮</span></div>
+        <div class="whead"><div class="greet">Good evening, <span>Daisy</span></div><div class="hrow"><div class="av p2">DD</div><div class="nm"><b>Daisy Dukes</b><span>Server · Bartender</span></div></div></div>
+        <div class="ovl"><div class="scr"></div>
+          <div class="sheet">
+            <div class="grabpill"></div>
+            <div class="shead"><div><div class="t">Review request</div><div class="sub">A manager will approve or deny it</div></div><div class="xbtn"><svg class="ic"><use href="#i-x"/></svg></div></div>
+            <div class="sbody">
+              <div class="rev">
+                <div class="e">You're requesting off</div>
+                <div class="big">Sat, Sep 20 – Wed, Sep 23</div>
+                <div class="sm">4 days · you're scheduled Sat &amp; Sun</div>
+                <div class="q">"My cousin's wedding is that weekend — flying out Saturday morning, back Wednesday."</div>
+              </div>
+              <div class="frow"><svg class="ic"><use href="#i-info"/></svg><div class="bd"><div class="l1">Your Sat &amp; Sun shifts stay on the schedule</div><div class="l2">A manager reassigns them if this is approved — or release them now so coworkers can pick them up.</div></div></div>
+            </div>
+            <div class="sfoot"><div class="fbtn"><svg class="ic"><use href="#i-chl"/></svg>Back</div><div class="fbtn save"><svg class="ic"><use href="#i-send"/></svg>Submit to Manager</div></div>
+          </div>
+        </div>
+      </div>
+      <p class="bcap"><b>S2.</b> The confirmation Steve asked for: the range in display type, the reason in a quote box, and an honest note about what happens to shifts inside the range. <em>Submit to Manager</em> writes the request, the managers' shade row, and the push.</p>
+    </div>
+
+    <!-- Release shift -->
+    <div class="col">
+      <div class="concept"><b>S3</b> Release a shift <span class="ln"></span> my shifts, mini rows</div>
+      <div class="phone">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>9:41</span><span>●●● ▲ ▮</span></div>
+        <div class="whead"><div class="greet">Good evening, <span>Daisy</span></div><div class="hrow"><div class="av p2">DD</div><div class="nm"><b>Daisy Dukes</b><span>Server · Bartender</span></div></div></div>
+        <div class="ovl"><div class="scr"></div>
+          <div class="sheet">
+            <div class="grabpill"></div>
+            <div class="shead"><div><div class="t">Release a shift</div><div class="sub">Coworkers with the same job title can pick it up</div></div><div class="xbtn"><svg class="ic"><use href="#i-x"/></svg></div></div>
+            <div class="sbody">
+              <div class="card g">
+                <div class="shift"><span class="day">Tue 16</span><span class="tm">4:30 – 10:00 PM</span><span class="rp">Server</span><div class="pu ghost" style="height:30px;padding:0 11px;font-size:12px;color:var(--tint);border-color:color-mix(in srgb,var(--tint) 40%,transparent)">Release</div></div>
+                <div class="shift"><span class="day">Thu 18</span><span class="tm">11:00 – 4:00 PM</span><span class="rp">Server</span><div class="pu ghost" style="height:30px;padding:0 11px;font-size:12px;color:var(--tint);border-color:color-mix(in srgb,var(--tint) 40%,transparent)">Release</div></div>
+                <div class="shift"><span class="day">Fri 19</span><span class="tm">5:00 – 1:00 AM</span><span class="rp">Bartender</span><span class="rp gold">Released · open</span></div>
+                <div class="shift"><span class="day">Sun 21</span><span class="tm">10:30 – 4:00 PM</span><span class="rp">Server</span><span class="rp gold">Awaiting approval</span></div>
+                <div class="shift"><span class="day">Tue 23</span><span class="tm">4:30 – 10:00 PM</span><span class="rp">Server</span><div class="pu ghost" style="height:30px;padding:0 11px;font-size:12px;color:var(--tint);border-color:color-mix(in srgb,var(--tint) 40%,transparent)">Release</div></div>
+              </div>
+              <div class="hintt">Releasing doesn't need approval. The pick-up does — you'll hear back when a manager decides. Tap a released row to cancel while it's still open.</div>
+            </div>
+            <div class="sfoot"><div class="fbtn">Done</div></div>
+          </div>
+        </div>
+      </div>
+      <p class="bcap"><b>S3.</b> The Upcoming-shifts row grammar with a <em>Release</em> chip per future shift; state pills take over once released (open → awaiting approval). Same rows appear on My Schedule day cards, so the sheet and the page never disagree.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ ROW 3 · APPROVALS PAGE -->
+<div class="section">
+  <div class="sh">Row 3 · Approvals page <span class="ln"></span><small>owner / manager · Time Off | Shift Pick Up | History</small></div>
+  <div class="row">
+
+    <!-- A · CARDS -->
+    <div class="col">
+      <div class="concept"><b>A</b> Cards, inline decide <span class="ln"></span> fewest taps</div>
+      <div class="phone">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>9:41</span><span>●●● ▲ ▮</span></div>
+        <div class="hdr"><div class="c38"><svg class="ic"><use href="#i-chl"/></svg></div><div class="ttl">Approvals</div><div class="gchip"><svg class="ic"><use href="#i-gear"/></svg>Schedule</div></div>
+        <div class="cnt">
+          <div class="seg"><span class="on">Time off <span class="bub">2</span></span><span>Pick up <span class="bub">1</span></span><span>History</span></div>
+          <div class="card apc">
+            <div class="top"><div class="av s p2">DD</div><div class="bd"><b>Daisy Dukes</b><span>Server · Bartender · requested 2h ago</span></div><span class="rp gold">Time off</span></div>
+            <div class="what"><div class="cal"><div class="m">Sep</div><div class="d">20</div></div><div class="wb"><div class="l1">Sat, Sep 20 – Wed, Sep 23</div><div class="l2">4 days</div></div></div>
+            <div class="q">"My cousin's wedding is that weekend — flying out Saturday morning, back Wednesday."</div>
+            <div class="conf"><svg class="ic"><use href="#i-alert"/></svg>Scheduled Sat 5:00 – 1:00 AM · Sun 10:30 – 4:00 PM</div>
+            <div class="dec"><div class="b no"><svg class="ic"><use href="#i-x"/></svg>Deny</div><div class="b ok"><svg class="ic"><use href="#i-check"/></svg>Approve</div></div>
+          </div>
+          <div class="card apc">
+            <div class="top"><div class="av s p3">NZ</div><div class="bd"><b>Nina Zebra</b><span>Manager · requested yesterday</span></div><span class="rp gold">Time off</span></div>
+            <div class="what"><div class="cal"><div class="m">Oct</div><div class="d">3</div></div><div class="wb"><div class="l1">Fri, Oct 3</div><div class="l2">1 day · no shifts that day</div></div></div>
+            <div class="q">"Doctor's appointment in the morning."</div>
+            <div class="own"><svg class="ic"><use href="#i-info"/></svg>This is your own request — another manager or the owner decides it.</div>
+            <div class="dec"><div class="b no dim"><svg class="ic"><use href="#i-x"/></svg>Deny</div><div class="b ok dim"><svg class="ic"><use href="#i-check"/></svg>Approve</div></div>
+          </div>
+        </div>
+      </div>
+      <p class="bcap"><b>A · Cards.</b> The three-tab seg (menu-upload grammar) and one card per request: who · what · quoted reason · a gold <em>conflict line</em> listing the shifts they hold inside the range · Approve / Deny inline. Tapping either opens the small DecisionSheet for the optional reason. A manager's own request renders with disabled buttons.</p>
+    </div>
+
+    <!-- B · LEDGER + DECISION SHEET -->
+    <div class="col">
+      <div class="concept"><b>B</b> Ledger + decision sheet <span class="ln"></span> compact rows</div>
+      <div class="phone">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>9:41</span><span>●●● ▲ ▮</span></div>
+        <div class="hdr"><div class="c38"><svg class="ic"><use href="#i-chl"/></svg></div><div class="ttl">Approvals</div><div class="gchip"><svg class="ic"><use href="#i-gear"/></svg>Schedule</div></div>
+        <div class="cnt">
+          <div class="seg"><span>Time off <span class="bub">2</span></span><span class="on">Pick up <span class="bub">1</span></span><span>History</span></div>
+          <div class="led"><div class="av s p3">MR</div><div class="bd"><div class="l1">Marcus R. → Daisy D.</div><div class="l2">Sat, Sep 20 · 5:00 – 11:00 PM · Bartender</div></div><div class="chev"><svg class="ic"><use href="#i-chr"/></svg></div></div>
+          <div class="led" style="opacity:.5"><div class="av s p4">PJ</div><div class="bd"><div class="l1">Pilar J. → Tom K.</div><div class="l2">Sun, Sep 21 · 10:30 – 4:00 PM · Server</div></div><div class="chev"><svg class="ic"><use href="#i-chr"/></svg></div></div>
+        </div>
+        <div class="ovl"><div class="scr"></div>
+          <div class="sheet">
+            <div class="grabpill"></div>
+            <div class="shead"><div><div class="t">Shift pick-up</div><div class="sub">Sat, Sep 20 · 5:00 – 11:00 PM · Bartender</div></div><div class="xbtn"><svg class="ic"><use href="#i-x"/></svg></div></div>
+            <div class="sbody">
+              <div class="card g">
+                <div class="swap"><div class="who"><div class="av s p3">MR</div><div>Marcus R.<span>releasing · Bartender</span></div></div><div class="arr"><svg class="ic"><use href="#i-arrow"/></svg></div><div class="who"><div class="av s p2">DD</div><div>Daisy D.<span>picking up · Server, Bartender</span></div></div></div>
+                <div class="conf" style="margin-top:12px"><svg class="ic"><use href="#i-alert"/></svg>Daisy also works Fri 5:00 – 1:00 AM — back-to-back closes.</div>
+              </div>
+              <div><div class="flab">Reason <span class="opt">optional · shown to both</span></div><div class="inp ph">Add a note for Marcus and Daisy…</div></div>
+            </div>
+            <div class="sfoot"><div class="fbtn" style="color:var(--bad)"><svg class="ic"><use href="#i-x"/></svg>Deny</div><div class="fbtn save" style="background:var(--ok);border-color:var(--ok);color:#fff"><svg class="ic"><use href="#i-check"/></svg>Approve</div></div>
+          </div>
+        </div>
+      </div>
+      <p class="bcap"><b>B · Ledger.</b> Dense rows (avatar · who → who · when) keep a busy week scannable; the decision happens in a GlassSheet with the releaser → claimer strip, a conflict line, the optional reason and the two footer buttons. Time-off rows use the same row + sheet.</p>
+    </div>
+
+    <!-- C · DAY GROUPS + INLINE -->
+    <div class="col">
+      <div class="concept"><b>C</b> Day groups, inline segment <span class="ln"></span> no sheet</div>
+      <div class="phone">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>9:41</span><span>●●● ▲ ▮</span></div>
+        <div class="hdr"><div class="c38"><svg class="ic"><use href="#i-chl"/></svg></div><div class="ttl">Approvals</div><div class="gchip"><svg class="ic"><use href="#i-gear"/></svg>Schedule</div></div>
+        <div class="cnt">
+          <div class="seg"><span class="on">Time off <span class="bub">2</span></span><span>Pick up <span class="bub">1</span></span><span>History</span></div>
+          <div class="daysep">Sat · Sep 20 <span class="ln"></span></div>
+          <div class="card apc">
+            <div class="top"><div class="av s p2">DD</div><div class="bd"><b>Daisy Dukes</b><span>Sat 20 – Wed 23 · 4 days</span></div><span class="rp gold">Time off</span></div>
+            <div class="q">"My cousin's wedding is that weekend — flying out Saturday morning, back Wednesday."</div>
+            <div class="conf"><svg class="ic"><use href="#i-alert"/></svg>Holds 2 shifts in this range</div>
+            <div class="inl"><span class="no on"><svg class="ic"><use href="#i-x"/></svg>Deny</span><span class="ok"><svg class="ic"><use href="#i-check"/></svg>Approve</span></div>
+            <div style="margin-top:8px"><div class="inp ph" style="min-height:40px">Reason (optional) — sent with the decision</div></div>
+            <div class="dec" style="margin-top:8px"><div class="b ok"><svg class="ic"><use href="#i-send"/></svg>Send decision</div></div>
+          </div>
+          <div class="daysep">Fri · Oct 3 <span class="ln"></span></div>
+          <div class="card apc">
+            <div class="top"><div class="av s p3">NZ</div><div class="bd"><b>Nina Zebra</b><span>Fri 3 · 1 day · no shifts</span></div><span class="rp gold">Time off</span></div>
+            <div class="q">"Doctor's appointment in the morning."</div>
+            <div class="own"><svg class="ic"><use href="#i-info"/></svg>Your own request — another manager decides.</div>
+          </div>
+        </div>
+      </div>
+      <p class="bcap"><b>C · Day groups.</b> Requests group under mono date rules (the Poster's when-row DNA); the decision is an inline Approve | Deny segment that reveals the reason field and a <em>Send decision</em> button — everything on the page, no sheet. History tab (all three): decided rows with a status pill, 10 at a time, 30-day sweep.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ ROW 4 · CHROME + UPLOAD -->
+<div class="section">
+  <div class="sh">Row 4 · The ⚙ Schedule chip family + Upload page <span class="ln"></span><small>one design each</small></div>
+  <div class="row">
+
+    <!-- NAV SHEET on Roster -->
+    <div class="col">
+      <div class="concept"><b>N1</b> Schedule nav sheet <span class="ln"></span> ⚙ chip on Roster</div>
+      <div class="phone">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>9:41</span><span>●●● ▲ ▮</span></div>
+        <div class="hdr"><div class="c38"><svg class="ic"><use href="#i-chl"/></svg></div><div class="ttl">Roster</div><div class="gchip"><svg class="ic"><use href="#i-gear"/></svg>Schedule</div></div>
+        <div class="cnt" style="padding-top:0">
+          <div class="strip" style="margin:0 -8px"><div class="dd"><div class="w">Sun</div><div class="n">7</div></div><div class="dd"><div class="w">Mon</div><div class="n">8</div></div><div class="dd on"><div class="w">Tue</div><div class="n">9</div></div><div class="dd"><div class="w">Wed</div><div class="n">10</div></div><div class="dd"><div class="w">Thu</div><div class="n">11</div></div><div class="dd"><div class="w">Fri</div><div class="n">12</div></div><div class="dd"><div class="w">Sat</div><div class="n">13</div></div></div>
+          <div class="ampm"><span class="on am"><svg class="ic"><use href="#i-sun"/></svg>AM <span class="bub">6</span></span><span class="pm"><svg class="ic"><use href="#i-moon"/></svg>PM <span class="bub">11</span></span></div>
+          <div class="srule"><span class="eyeb tint">Server</span><span class="ln"></span></div>
+          <div class="card"><div class="shift"><div class="av s p2">DD</div><span class="tm">11:00 – 4:00 PM</span><span class="fl">O</span><span class="rp am">AM</span></div><div class="shift"><div class="av s">TK</div><span class="tm">11:30 – 4:00 PM</span><span class="rp am">AM</span></div></div>
+        </div>
+        <div class="fab"><svg class="ic"><use href="#i-plus"/></svg></div>
+        <div class="ovl"><div class="scr"></div>
+          <div class="sheet">
+            <div class="grabpill"></div>
+            <div class="shead"><div><div class="t">Schedule</div><div class="sub">Jump between the schedule pages</div></div><div class="xbtn"><svg class="ic"><use href="#i-x"/></svg></div></div>
+            <div class="sbody">
+              <div class="arow here"><div class="lic"><svg class="ic"><use href="#i-users"/></svg></div><div class="bd"><div class="l1">Roster</div><div class="l2">You're here</div></div></div>
+              <div class="arow"><div class="lic"><svg class="ic"><use href="#i-cal"/></svg></div><div class="bd"><div class="l1">Schedules</div><div class="l2">Edit shifts by employee, week by week</div></div><div class="chev"><svg class="ic"><use href="#i-chr"/></svg></div></div>
+              <div class="arow"><div class="lic"><svg class="ic"><use href="#i-up"/></svg></div><div class="bd"><div class="l1">Upload Schedules &amp; View History</div><div class="l2">File, image or photo — AI assigns the shifts</div></div><div class="chev"><svg class="ic"><use href="#i-chr"/></svg></div></div>
+              <div class="arow"><div class="lic"><svg class="ic"><use href="#i-check"/></svg></div><div class="bd"><div class="l1">Approvals</div><div class="l2">Time off &amp; shift pick-ups</div></div><span class="bub">3</span><div class="chev"><svg class="ic"><use href="#i-chr"/></svg></div></div>
+              <div class="arow"><div class="lic"><svg class="ic"><use href="#i-slider"/></svg></div><div class="bd"><div class="l1">Schedule Settings</div><div class="l2">Roster view · time off · shift releases</div></div><div class="chev"><svg class="ic"><use href="#i-chr"/></svg></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="bcap"><b>N1.</b> The Menu ⚙ chip's twin (38pt glass, gear + "Schedule") on every schedule page; the sheet is MenuSheet's row grammar — current page dimmed with <em>You're here</em>, Approvals carries the count, Upload opens the upload sheet NESTED (closeBothThen), Settings opens the settings sheet nested. Employees get My Schedule · Roster only.</p>
+    </div>
+
+    <!-- SETTINGS SHEET -->
+    <div class="col">
+      <div class="concept"><b>N2</b> Schedule Settings <span class="ln"></span> nested over N1</div>
+      <div class="phone">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>9:41</span><span>●●● ▲ ▮</span></div>
+        <div class="hdr"><div class="c38"><svg class="ic"><use href="#i-chl"/></svg></div><div class="ttl">Schedules</div><div class="gchip"><svg class="ic"><use href="#i-gear"/></svg>Schedule</div></div>
+        <div class="cnt"><div class="btnrow"><div class="btn"><svg class="ic"><use href="#i-up"/></svg>Uploads</div><div class="btn"><svg class="ic"><use href="#i-check"/></svg>Approvals <span class="rp" style="margin-left:2px">3</span></div></div><div class="card" style="height:120px"></div><div class="card" style="height:120px"></div></div>
+        <div class="ovl"><div class="scr"></div>
+          <div class="sheet">
+            <div class="grabpill"></div>
+            <div class="shead"><div><div class="t">Schedule Settings</div><div class="sub">What staff can see and do</div></div><div class="xbtn"><svg class="ic"><use href="#i-x"/></svg></div></div>
+            <div class="sbody">
+              <div class="frow"><svg class="ic"><use href="#i-users"/></svg><div class="bd"><div class="l1">Staff can view the roster</div><div class="l2">Employees can browse the day roster to see coworkers' shifts. Managers always can.</div></div><div class="sw"></div></div>
+              <div class="frow"><svg class="ic"><use href="#i-off"/></svg><div class="bd"><div class="l1">Request time off</div><div class="l2">Staff can send time-off requests to managers from the Schedule tab.</div></div><div class="sw"></div></div>
+              <div class="frow"><svg class="ic"><use href="#i-swap"/></svg><div class="bd"><div class="l1">Release shifts</div><div class="l2">Staff can offer a shift to coworkers with the same job title; pick-ups need a manager's approval.</div></div><div class="sw off"></div></div>
+              <div class="frow"><svg class="ic"><use href="#i-clock"/></svg><div class="bd"><div class="l1">AM / PM cutoff</div><div class="l2">Shifts starting before this time count as AM on the roster.</div></div><span class="val">3:00 PM</span><svg class="ic" style="color:var(--muted);width:15px;height:15px"><use href="#i-chr"/></svg></div>
+              <div class="hintt">Owners and managers with the <b>Access</b> permission can change these. Turning a tool off hides it for everyone; nothing already requested is lost.</div>
+            </div>
+            <div class="sfoot"><div class="fbtn">Close</div></div>
+          </div>
+        </div>
+      </div>
+      <p class="bcap"><b>N2.</b> The elevated toggles — Roster view (moved out of Org Settings → Access), Request time off, Release shifts, plus the proposed <em>AM / PM cutoff</em> (wheel in a nested sheet). Managers without the Access grant see the rows LOCKED with "Ask the owner" (the manager-permissions grammar).</p>
+    </div>
+
+    <!-- UPLOAD · staging -->
+    <div class="col">
+      <div class="concept"><b>U1</b> Upload page · staged <span class="ln"></span> pick → title/dates → Scan</div>
+      <div class="phone">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>9:41</span><span>●●● ▲ ▮</span></div>
+        <div class="hdr"><div class="c38"><svg class="ic"><use href="#i-chl"/></svg></div><div class="ttl">Upload Schedule</div><div class="gchip"><svg class="ic"><use href="#i-gear"/></svg>Schedule</div></div>
+        <div class="cnt">
+          <div class="seg"><span class="on">Upload</span><span>Recent uploads <span class="bub">6</span></span></div>
+          <div class="grid3">
+            <div class="utile"><svg class="ic"><use href="#i-file"/></svg><div><div class="tt">Upload File</div><div class="ts">PDF</div></div></div>
+            <div class="utile"><svg class="ic"><use href="#i-img"/></svg><div><div class="tt">Upload Image</div><div class="ts">Photos · pages</div></div></div>
+            <div class="utile"><svg class="ic"><use href="#i-cam"/></svg><div><div class="tt">Take Photo</div><div class="ts">Camera</div></div></div>
+          </div>
+          <div class="card g"><div class="fold"><svg class="ic" style="color:var(--tint)"><use href="#i-info"/></svg><div class="ct" style="font-size:14px">For best results</div><div class="chev"><svg class="ic"><use href="#i-chd"/></svg></div></div>
+            <div class="mini" style="margin-top:8px">
+              <div class="r">Show the week's start &amp; end dates, employee names and shift times clearly.</div>
+              <div class="r">PDF, PNG or JPG — up to 25 MB.</div>
+              <div class="r">Sharp, in-focus photos; crop out anything that isn't the schedule.</div>
+              <div class="r">No dates printed? Set the week below so the scan knows where the shifts belong.</div>
+            </div>
+          </div>
+          <div class="card stage">
+            <div class="hd"><div class="th"><svg class="ic"><use href="#i-img"/></svg><span class="pg">3 pg</span></div><div class="bd"><b>Schedule images (3 pages)</b><span>Ready to scan · 4.2 MB</span></div><div class="c38" style="width:32px;height:32px;border-radius:10px"><svg class="ic" style="width:15px;height:15px"><use href="#i-trash"/></svg></div></div>
+            <div style="margin-top:12px"><div class="flab">Title <span class="opt">optional</span></div><div class="inp">Week of Sep 14 — FOH</div></div>
+            <div style="margin-top:10px"><div class="flab">Week range <span class="opt">optional</span></div><div class="two"><div class="inp"><svg class="ic"><use href="#i-cal"/></svg><span class="mono" style="font-size:12.5px">Sun, Sep 14</span></div><div class="inp"><svg class="ic"><use href="#i-cal"/></svg><span class="mono" style="font-size:12.5px">Sat, Sep 20</span></div></div><div class="hintt">Used when the schedule doesn't print its own dates.</div></div>
+            <div class="sfoot" style="padding-top:12px"><div class="fbtn">Discard</div><div class="fbtn save"><svg class="ic"><use href="#i-search"/></svg>Scan schedule</div></div>
+          </div>
+        </div>
+      </div>
+      <p class="bcap"><b>U1.</b> Two-tab page (Upload | Recent uploads). Three tinted tiles, the collapsible <em>For best results</em> fold (open here), and the <em>staging card</em> after a pick — title (prefilled), optional week range, <em>Scan schedule</em>. Nothing uploads until Scan.</p>
+    </div>
+
+    <!-- UPLOAD · scanning + ready -->
+    <div class="col">
+      <div class="concept"><b>U2</b> Upload page · scanning &amp; ready <span class="ln"></span> quips → review card</div>
+      <div class="phone">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>9:41</span><span>●●● ▲ ▮</span></div>
+        <div class="hdr"><div class="c38"><svg class="ic"><use href="#i-chl"/></svg></div><div class="ttl">Upload Schedule</div><div class="gchip"><svg class="ic"><use href="#i-gear"/></svg>Schedule</div></div>
+        <div class="cnt">
+          <div class="seg"><span class="on">Upload</span><span>Recent uploads <span class="bub">6</span></span></div>
+          <div class="grid3">
+            <div class="utile" style="opacity:.5"><svg class="ic"><use href="#i-file"/></svg><div><div class="tt">Upload File</div><div class="ts">PDF</div></div></div>
+            <div class="utile" style="opacity:.5"><svg class="ic"><use href="#i-img"/></svg><div><div class="tt">Upload Image</div><div class="ts">Photos · pages</div></div></div>
+            <div class="utile" style="opacity:.5"><svg class="ic"><use href="#i-cam"/></svg><div><div class="tt">Take Photo</div><div class="ts">Camera</div></div></div>
+          </div>
+          <div class="card g proc"><div class="spin"></div><div class="quip" id="quip">Consulting the digital oracle.<small>Scanning "Week of Sep 14 — FOH" · usually under a minute</small></div></div>
+          <div class="srule"><span class="eyeb tint">Ready to review</span><span class="ln"></span></div>
+          <div class="card">
+            <div class="hd" style="display:flex;align-items:center;gap:10px"><div class="bd" style="flex:1"><div class="ct">Week of Sep 7 — BOH</div><div class="mono" style="font-size:11px;color:var(--muted);margin-top:2px">Sep 7 – Sep 13 · scanned today 2:14 PM · PDF</div></div><span class="rp ok">Completed</span></div>
+            <div class="stats"><div class="s"><div class="n">48</div><div class="l">Shifts</div></div><div class="s ok"><div class="n">44</div><div class="l">Matched</div></div><div class="s warn"><div class="n">4 ▾</div><div class="l">Unmatched</div></div><div class="s"><div class="n">17</div><div class="l">People</div></div></div>
+            <div class="unm"><span>J. Alvarez</span><span>Tommy K</span><span>M. Ruiz</span><span>New Hire</span></div>
+            <div class="revbar">Review &amp; Edit Shifts<svg class="ic"><use href="#i-chr"/></svg></div>
+          </div>
+        </div>
+      </div>
+      <p class="bcap"><b>U2.</b> While scanning, the tiles dim and the <em>ScanQuip</em> rotor runs on the schedule phrase list (23 quips, EN + ES). Completed-but-unreviewed uploads sit under <em>Ready to review</em>: stats row where the gold Unmatched number expands the names; the Review bar navigates. After Save on the review page the card moves to Recent uploads (trash + chevron rows, menu-upload grammar).</p>
+    </div>
+  </div>
+</div>
+
+<div class="notes">
+  <div class="note"><b>Shared build</b>Every sheet here is <em>GlassSheet</em>; tiles are the Tools-kit tinted glass; the seg is menu-upload's; rows are MenuSheet's. New shared pieces: ScheduleGearChip · ScheduleNavSheet · ScheduleUploadSheet · ScheduleSettingsSheet · ShiftEditSheet · ShiftRow · AvailableShiftCard · DecisionBlurb · ApprovalCard.</div>
+  <div class="note"><b>Attention story</b>Manager: push → shade row → Schedule-tab dot + <em>AttentionRing</em> on the clock tab → Approvals tile pulse + count. Employee: push → shade row (only them) → tab dot + ring → <em>DecisionBlurb</em>. Seeing any one clears all (one RPC: ack_schedule_decisions).</div>
+  <div class="note"><b>Rules baked in</b>A manager never decides their own request (server + disabled buttons). Pick-ups are title-matched server-side. Deny on a pick-up re-opens the shift. Releases need no approval. Toggles hide surfaces; the server enforces regardless.</div>
+  <div class="note"><b>Open questions</b>1 credits for schedule scans (none today) · 2 time off as a range (built) · 3 AM/PM cutoff setting · 4 get_org_uploads DROP+CREATE for title/reviewed_at · 5 push coworkers when a shift is released (default no).</div>
+</div>
+
+<script>
+(function(){
+  var phones=[].slice.call(document.querySelectorAll('.phone'));
+  document.querySelectorAll('[data-theme]').forEach(function(b){
+    b.addEventListener('click',function(){
+      document.querySelectorAll('[data-theme]').forEach(function(x){x.classList.remove('on')});
+      b.classList.add('on');
+      phones.forEach(function(p){
+        p.classList.remove('t-mono-l','t-ocean-d','t-ocean-l');
+        if(b.dataset.theme)p.classList.add(b.dataset.theme);
+      });
+    });
+  });
+  // the ScanQuip rotor (5.5s, 250ms fade)
+  var quips=["Consulting the digital oracle.","Questioning if Sunday is real.","Looking for hidden lunch breaks.","Applying digital coffee to calendar.","Re-routing around Mercury retrograde.","Predicting three \"car troubles\" and one \"sudden 24-hour flu\" for Saturday morning.","Plotting a permanent weekend.","Oh boy… that guy again!"];
+  var q=document.getElementById('quip'),i=0;
+  if(q){var sub=q.querySelector('small');setInterval(function(){q.classList.add('fade');setTimeout(function(){i=(i+1)%quips.length;q.firstChild.textContent=quips[i];q.classList.remove('fade')},250)},5500)}
+})();
+</script>
+</body>
+</html>

@@ -4,21 +4,44 @@ import {
   Text,
   ScrollView,
   StyleSheet,
-  TouchableOpacity,
+  Pressable,
   ActivityIndicator,
-  Platform,
   FlatList,
   Dimensions,
+  Alert,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router/react-navigation';
+import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { useOrganization } from '@/contexts/OrganizationContext';
-import { useFocusEffect } from "expo-router/react-navigation";
-import { useTranslation } from 'react-i18next';
-import { getWeekStartDate, getWeekDays, addWeeks, isSameDay } from '@/utils/dateUtils';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { getWeekStartDate, getWeekDays, addWeeks } from '@/utils/dateUtils';
+import { fonts } from '@/constants/fonts';
+import { IS_MCLOONES } from '@/constants/buildVariant';
+import { isManagerOrOwner } from '@/utils/roles';
+import { translateServerError } from '@/utils/serverErrors';
+import {
+  toISODate,
+  todayISO,
+  addDays,
+  isSameDay,
+  localeFor,
+  formatWeekRange,
+  shiftHours,
+  type AppLocale,
+} from '@/utils/schedule/format';
+import { notifyShiftReleased } from '@/utils/schedule/notify';
+import { useScheduleSettings } from '@/hooks/useScheduleSettings';
+import { useIsDarkTheme } from '@/components/content/useIsDarkTheme';
+import AmbientGlow from '@/components/AmbientGlow';
+import ScreenHeader from '@/components/ScreenHeader';
+import GlassCard from '@/components/GlassCard';
+import ShiftRow from '@/components/schedule/ShiftRow';
+import ScheduleGearChip from '@/components/schedule/ScheduleGearChip';
+import ScheduleNavSheet from '@/components/schedule/ScheduleNavSheet';
+import { scheduleHue } from '@/components/schedule/scheduleVisuals';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -40,26 +63,50 @@ interface Shift {
   room_assignment: string | null;
 }
 
-function toISODate(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+/** One row of get_my_shift_releases (live + recently decided). */
+interface ShiftRelease {
+  release_id: string;
+  shift_id: string;
+  status: string;
+  claimed_by: string | null;
+  claimed_by_name: string | null;
+  decided_at: string | null;
+  decision_reason: string | null;
+}
+
+/**
+ * Only LIVE rows drive the pills. A denied pick-up re-opens server-side (a
+ * fresh `open` row is inserted), so the denied row itself never wins; a shift
+ * with nothing live simply shows the Release chip again.
+ */
+function liveReleasesByShift(rows: ShiftRelease[]): Record<string, ShiftRelease> {
+  const map: Record<string, ShiftRelease> = {};
+  for (const r of rows) {
+    if (r.status !== 'open' && r.status !== 'claimed') continue;
+    const prev = map[r.shift_id];
+    if (!prev || (r.status === 'claimed' && prev.status !== 'claimed')) map[r.shift_id] = r;
+  }
+  return map;
 }
 
 export default function MyScheduleScreen() {
-  const router = useRouter();
   const colors = useThemeColors();
+  const isDark = useIsDarkTheme();
   const { user } = useAuth();
-  const { organizationId } = useOrganization();
-  const { t, i18n } = useTranslation();
-  const dateLocale = i18n.language === 'es' ? 'es-ES' : 'en-US';
+  const { language } = useLanguage();
+  const locale = localeFor(language);
+  const { t } = useTranslation();
+  const { settings } = useScheduleSettings();
+  const showGear = isManagerOrOwner(user);
 
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPageIndex, setCurrentPageIndex] = useState(INITIAL_INDEX);
   const [lastUploadAt, setLastUploadAt] = useState<string | null>(null);
-  const pagerRef = useRef<FlatList>(null);
+  const [releases, setReleases] = useState<Record<string, ShiftRelease>>({});
+  const [busyShiftId, setBusyShiftId] = useState<string | null>(null);
+  const [navOpen, setNavOpen] = useState(false);
+  const pagerRef = useRef<FlatList<Date>>(null);
 
   // The anchor week is the week containing today (Sunday). Pages are offsets from it.
   const anchorWeekStart = useMemo(() => getWeekStartDate(new Date()), []);
@@ -71,24 +118,26 @@ export default function MyScheduleScreen() {
     );
   }, [anchorWeekStart]);
 
-  useFocusEffect(
-    useCallback(() => {
-      if (user?.id) loadSchedule();
-    }, [user?.id])
-  );
+  const loadReleases = useCallback(async () => {
+    if (!user?.id) return;
+    const { data, error } = await supabase.rpc('get_my_shift_releases', { p_actor_id: user.id });
+    if (error) {
+      console.error('Error loading shift releases:', error);
+      return;
+    }
+    setReleases(liveReleasesByShift((data || []) as ShiftRelease[]));
+  }, [user?.id]);
 
-  const loadSchedule = async () => {
+  const loadSchedule = useCallback(async () => {
+    if (!user?.id) return;
     try {
-      setLoading(true);
-
       // Fetch shifts for the full pager range (one query instead of per-page).
       const rangeStart = weekStarts[0];
-      const rangeEnd = new Date(weekStarts[weekStarts.length - 1]);
-      rangeEnd.setDate(rangeEnd.getDate() + 6);
+      const rangeEnd = addDays(weekStarts[weekStarts.length - 1], 6);
 
       // Self-only RPC: the server returns the acting user's shifts, nobody else's.
       const { data, error } = await supabase.rpc('get_my_shifts', {
-        p_actor_id: user?.id as string,
+        p_actor_id: user.id,
         p_start_date: toISODate(rangeStart),
         p_end_date: toISODate(rangeEnd),
       });
@@ -97,32 +146,104 @@ export default function MyScheduleScreen() {
       setShifts(data || []);
 
       const { data: uploadAt } = await supabase.rpc('get_latest_schedule_upload_at', {
-        p_actor_id: user?.id as string,
+        p_actor_id: user.id,
       });
       setLastUploadAt((uploadAt as string | null) ?? null);
     } catch (error) {
       console.error('Error loading schedule:', error);
     } finally {
+      // The spinner only guards the FIRST load; later focuses refresh in place so
+      // the pager keeps its page (a remount would snap back to today's week).
       setLoading(false);
     }
-  };
+  }, [user?.id, weekStarts]);
 
-  const formatTime = (timeStr: string) => {
-    const [hours, minutes] = timeStr.split(':').map(Number);
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    const displayHour = hours % 12 || 12;
-    return `${displayHour}:${minutes.toString().padStart(2, '0')} ${ampm}`;
-  };
+  useFocusEffect(
+    useCallback(() => {
+      if (user?.id) {
+        loadSchedule();
+        loadReleases();
+      }
+    }, [user?.id, loadSchedule, loadReleases])
+  );
 
-  const getShiftDuration = (start: string, end: string) => {
-    const [startH, startM] = start.split(':').map(Number);
-    const [endH, endM] = end.split(':').map(Number);
-    let totalMinutes = (endH * 60 + endM) - (startH * 60 + startM);
-    if (totalMinutes < 0) totalMinutes += 24 * 60;
-    const hours = Math.floor(totalMinutes / 60);
-    const mins = totalMinutes % 60;
-    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
-  };
+  // ─── Release actions ───
+
+  const doRelease = useCallback(
+    async (shift: Shift) => {
+      if (!user?.id) return;
+      setBusyShiftId(shift.id);
+      try {
+        const { data: releaseId, error } = await supabase.rpc('release_shift', {
+          p_actor_id: user.id,
+          p_shift_id: shift.id,
+        });
+        if (error) throw error;
+        if (releaseId) {
+          // fire-and-forget: the release already succeeded
+          void notifyShiftReleased({ id: user.id, name: user.name }, releaseId, shift);
+        }
+        await loadReleases();
+      } catch (e) {
+        Alert.alert(
+          t('common.error'),
+          translateServerError(e as { message?: string | null }, t('my_schedule.release_failed'))
+        );
+      } finally {
+        setBusyShiftId(null);
+      }
+    },
+    [user?.id, user?.name, loadReleases, t]
+  );
+
+  const confirmRelease = useCallback(
+    (shift: Shift) => {
+      Alert.alert(t('my_schedule.release_confirm_title'), t('my_schedule.release_confirm_msg'), [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('my_schedule.release'), onPress: () => doRelease(shift) },
+      ]);
+    },
+    [t, doRelease]
+  );
+
+  const doCancelRelease = useCallback(
+    async (shift: Shift, release: ShiftRelease) => {
+      if (!user?.id) return;
+      setBusyShiftId(shift.id);
+      try {
+        const { error } = await supabase.rpc('cancel_shift_release', {
+          p_actor_id: user.id,
+          p_release_id: release.release_id,
+        });
+        if (error) throw error;
+        await loadReleases();
+      } catch (e) {
+        Alert.alert(
+          t('common.error'),
+          translateServerError(e as { message?: string | null }, t('my_schedule.cancel_release_failed'))
+        );
+      } finally {
+        setBusyShiftId(null);
+      }
+    },
+    [user?.id, loadReleases, t]
+  );
+
+  const confirmCancelRelease = useCallback(
+    (shift: Shift, release: ShiftRelease) => {
+      Alert.alert(t('my_schedule.cancel_release_title'), t('my_schedule.cancel_release_msg'), [
+        { text: t('common.not_now'), style: 'cancel' },
+        {
+          text: t('my_schedule.cancel_release'),
+          style: 'destructive',
+          onPress: () => doCancelRelease(shift, release),
+        },
+      ]);
+    },
+    [t, doCancelRelease]
+  );
+
+  // ─── Pager mechanics (unchanged) ───
 
   const onMomentumScrollEnd = (event: any) => {
     const offsetX = event.nativeEvent.contentOffset.x;
@@ -144,29 +265,31 @@ export default function MyScheduleScreen() {
     }
   };
 
-  const formatWeekHeader = (weekStart: Date) => {
-    const end = new Date(weekStart);
-    end.setDate(end.getDate() + 6);
-    const sameMonth = weekStart.getMonth() === end.getMonth();
-    if (dateLocale === 'es-ES') {
-      // Spanish reads month-last: "19 – 25 jul" / "26 jul – 1 ago"
-      const startFmt = sameMonth
-        ? String(weekStart.getDate())
-        : weekStart.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' });
-      const endFmt = end.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' });
-      return `${startFmt} – ${endFmt}`;
-    }
-    const startFmt = weekStart.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' });
-    const endFmt = sameMonth
-      ? end.toLocaleDateString(dateLocale, { day: 'numeric' })
-      : end.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' });
-    return `${startFmt} – ${endFmt}`;
-  };
-
   const currentWeekStart = weekStarts[currentPageIndex];
+  const weekLabel = formatWeekRange(toISODate(currentWeekStart), toISODate(addDays(currentWeekStart, 6)), locale);
+
+  const today = todayISO();
+  const releaseEnabled = settings.shiftReleaseEnabled;
+
+  // Everything a page reads besides its own week — handed to the FlatList as
+  // extraData so the cells re-render when a release lands or shifts reload.
+  const pageData = useMemo(
+    () => ({ shifts, releases, releaseEnabled, busyShiftId }),
+    [shifts, releases, releaseEnabled, busyShiftId]
+  );
+
+  const stampText = useMemo(() => {
+    if (!lastUploadAt) return null;
+    const d = new Date(lastUploadAt);
+    return t('my_schedule.last_updated_at', {
+      date: d.toLocaleDateString(locale, { month: 'long', day: 'numeric', year: 'numeric' }),
+      time: d.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' }),
+    });
+  }, [lastUploadAt, locale, t]);
 
   const renderWeekPage = ({ item: weekStart }: { item: Date }) => {
     const days = getWeekDays(weekStart);
+    const now = new Date();
 
     return (
       <View style={{ width: SCREEN_WIDTH }}>
@@ -177,20 +300,22 @@ export default function MyScheduleScreen() {
         >
           {days.map((day) => {
             const dayIso = toISODate(day);
-            const dayShifts = shifts.filter((s) => s.shift_date === dayIso);
-            const isTodayDay = isSameDay(day, new Date());
-
+            const dayShifts = pageData.shifts.filter((s) => s.shift_date === dayIso);
             return (
-              <DayRow
+              <DayCard
                 key={dayIso}
                 day={day}
+                dayIso={dayIso}
                 shifts={dayShifts}
-                isToday={isTodayDay}
-                colors={colors}
-                t={t}
-                dateLocale={dateLocale}
-                formatTime={formatTime}
-                getShiftDuration={getShiftDuration}
+                isToday={isSameDay(day, now)}
+                isFuture={dayIso >= today}
+                releases={pageData.releases}
+                releaseEnabled={pageData.releaseEnabled}
+                busyShiftId={pageData.busyShiftId}
+                locale={locale}
+                isDark={isDark}
+                onRelease={confirmRelease}
+                onCancelRelease={confirmCancelRelease}
               />
             );
           })}
@@ -199,69 +324,68 @@ export default function MyScheduleScreen() {
     );
   };
 
+  const prevDisabled = currentPageIndex <= 0;
+  const nextDisabled = currentPageIndex >= TOTAL_WEEKS - 1;
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <IconSymbol
-            ios_icon_name="chevron.left"
-            android_material_icon_name="arrow-back"
-            size={24}
-            color={colors.primary}
-          />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
-          {t('my_schedule.title', 'My Schedule')}
-        </Text>
-        <View style={styles.headerRight} />
-      </View>
+      <AmbientGlow />
+      <ScreenHeader
+        title={t('my_schedule.title')}
+        right={showGear ? <ScheduleGearChip onPress={() => setNavOpen(true)} /> : undefined}
+        rightWide={showGear}
+      />
 
-      {/* Week navigation header */}
-      <View style={[styles.weekNavBar, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={goToPrevWeek} style={styles.weekNavArrow} activeOpacity={0.6}>
-          <IconSymbol
-            ios_icon_name="chevron.left"
-            android_material_icon_name="chevron-left"
-            size={20}
-            color={colors.primary}
-          />
-        </TouchableOpacity>
+      {/* Week navigation */}
+      <View style={styles.weekNavBar}>
+        <Pressable
+          onPress={goToPrevWeek}
+          disabled={prevDisabled}
+          hitSlop={6}
+          accessibilityRole="button"
+          style={[
+            styles.weekNavChip,
+            { backgroundColor: colors.glass, borderColor: colors.glassBorder },
+            prevDisabled && styles.weekNavChipDisabled,
+          ]}
+        >
+          <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="chevron-left" size={20} color={colors.text} />
+        </Pressable>
         <View style={styles.weekNavCenter}>
-          <IconSymbol
-            ios_icon_name="calendar"
-            android_material_icon_name="event"
-            size={16}
-            color={colors.primary}
-          />
-          <Text style={[styles.weekNavLabel, { color: colors.text }]}>
-            {formatWeekHeader(currentWeekStart)}
+          <IconSymbol ios_icon_name="calendar" android_material_icon_name="event" size={15} color={colors.tint} />
+          <Text style={[styles.weekNavLabel, { color: colors.text }]} numberOfLines={1}>
+            {weekLabel}
           </Text>
         </View>
-        <TouchableOpacity onPress={goToNextWeek} style={styles.weekNavArrow} activeOpacity={0.6}>
-          <IconSymbol
-            ios_icon_name="chevron.right"
-            android_material_icon_name="chevron-right"
-            size={20}
-            color={colors.primary}
-          />
-        </TouchableOpacity>
+        <Pressable
+          onPress={goToNextWeek}
+          disabled={nextDisabled}
+          hitSlop={6}
+          accessibilityRole="button"
+          style={[
+            styles.weekNavChip,
+            { backgroundColor: colors.glass, borderColor: colors.glassBorder },
+            nextDisabled && styles.weekNavChipDisabled,
+          ]}
+        >
+          <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={20} color={colors.text} />
+        </Pressable>
       </View>
 
-      {/* Last updated + R365 note */}
-      <View style={[styles.disclaimerBanner, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <IconSymbol ios_icon_name="clock.fill" android_material_icon_name="schedule" size={14} color={colors.primary} />
-        <View style={{ flex: 1 }}>
-          {lastUploadAt && (
-            <Text style={[styles.lastUpdatedText, { color: colors.text }]}>
-              {t('my_schedule.last_updated', 'Last Updated')} {new Date(lastUploadAt).toLocaleDateString(dateLocale, { month: 'long', day: 'numeric', year: 'numeric' })} {t('my_schedule.at', 'at')} {new Date(lastUploadAt).toLocaleTimeString(dateLocale, { hour: 'numeric', minute: '2-digit' })}
+      {/* Last updated stamp + variant note */}
+      <GlassCard variant="glass" radius={12} style={styles.stampCard}>
+        <View style={styles.stampRow}>
+          <IconSymbol ios_icon_name="clock.fill" android_material_icon_name="schedule" size={14} color={colors.tint} />
+          <View style={styles.stampBody}>
+            {!!stampText && (
+              <Text style={[styles.stampText, { color: colors.text }]}>{stampText}</Text>
+            )}
+            <Text style={[styles.stampNote, { color: colors.textSecondary }]}>
+              {IS_MCLOONES ? t('my_schedule.r365_note') : t('my_schedule.tools_note')}
             </Text>
-          )}
-          <Text style={[styles.disclaimerText, { color: colors.textSecondary, marginTop: lastUploadAt ? 2 : 0 }]}>
-            {t('my_schedule.r365_note', 'Please see R365 for any Shift Offers, Trades, Approvals and Changes to your schedule after the date above.')}
-          </Text>
+          </View>
         </View>
-      </View>
+      </GlassCard>
 
       {loading ? (
         <ActivityIndicator size="large" color={colors.primary} style={styles.loadingIndicator} />
@@ -270,6 +394,7 @@ export default function MyScheduleScreen() {
           ref={pagerRef}
           style={{ flex: 1 }}
           data={weekStarts}
+          extraData={pageData}
           keyExtractor={(item) => toISODate(item)}
           horizontal
           pagingEnabled
@@ -285,130 +410,162 @@ export default function MyScheduleScreen() {
           renderItem={renderWeekPage}
         />
       )}
+
+      <ScheduleNavSheet visible={navOpen} onClose={() => setNavOpen(false)} current="my-schedule" />
     </View>
   );
 }
 
-// -------- DayRow: one row per day (full cards or "Not scheduled") --------
+// -------- DayCard: one glass surface per day (date tile + shift rows / "Not scheduled") --------
 
-interface DayRowProps {
+interface DayCardProps {
   day: Date;
+  dayIso: string;
   shifts: Shift[];
   isToday: boolean;
-  colors: any;
-  t: any;
-  dateLocale: string;
-  formatTime: (s: string) => string;
-  getShiftDuration: (s: string, e: string) => string;
+  isFuture: boolean;
+  releases: Record<string, ShiftRelease>;
+  releaseEnabled: boolean;
+  busyShiftId: string | null;
+  locale: AppLocale;
+  isDark: boolean;
+  onRelease: (shift: Shift) => void;
+  onCancelRelease: (shift: Shift, release: ShiftRelease) => void;
 }
 
-function DayRow({ day, shifts, isToday, colors, t, dateLocale, formatTime, getShiftDuration }: DayRowProps) {
-  const dayName = day.toLocaleDateString(dateLocale, { weekday: 'short' });
+function DayCard({
+  day,
+  shifts,
+  isToday,
+  isFuture,
+  releases,
+  releaseEnabled,
+  busyShiftId,
+  locale,
+  isDark,
+  onRelease,
+  onCancelRelease,
+}: DayCardProps) {
+  const { t } = useTranslation();
+  const colors = useThemeColors();
+  const weekday = day.toLocaleDateString(locale, { weekday: 'short' });
   const dayNumber = day.getDate();
-  const hasShifts = shifts.length > 0;
+  const gold = scheduleHue('pending', isDark);
 
-  // Build the sub-tag for a shift: priority Opener/Closer/Training → room → nothing
-  const getShiftTag = (shift: Shift): string | null => {
-    if (shift.is_opener) return t('my_schedule.opener', 'Opener');
-    if (shift.is_closer) return t('my_schedule.closer', 'Closer');
-    if (shift.is_training) return t('my_schedule.training', 'Training');
-    if (shift.room_assignment) return shift.room_assignment;
-    return null;
-  };
+  // the row's right-edge control: Release chip · "Released · open" (tap = cancel) ·
+  // "Awaiting approval" with the claimer's name underneath
+  const renderReleaseControl = (shift: Shift): React.ReactNode => {
+    if (!releaseEnabled || !isFuture) return undefined;
+    const release = releases[shift.id];
+    const busy = busyShiftId === shift.id;
 
-  const dateBoxBg = isToday ? colors.primary : colors.card;
-  const dateBoxBorder = isToday
-    ? colors.primary
-    : colors.border || 'rgba(128,128,128,0.15)';
-  const dateBoxTextColor = isToday ? colors.fireText : colors.primary;
-  const accentColor = isToday ? colors.primary : 'transparent';
-
-  const renderDateBox = (dimmed: boolean) => (
-    <View
-      style={[
-        styles.dateBox,
-        {
-          backgroundColor: dateBoxBg,
-          borderColor: dateBoxBorder,
-          opacity: dimmed ? 0.35 : 1,
-        },
-      ]}
-    >
-      <Text style={[styles.dateBoxDay, { color: dateBoxTextColor }]}>
-        {dayName}
-      </Text>
-      <Text style={[styles.dateBoxNumber, { color: dateBoxTextColor }]}>
-        {dayNumber}
-      </Text>
-    </View>
-  );
-
-  if (!hasShifts) {
-    return (
-      <View style={styles.dayShiftStack}>
-        <View
-          style={[
-            styles.itemCard,
-            {
-              backgroundColor: colors.card,
-              borderLeftColor: accentColor,
-            },
-          ]}
-        >
-          {renderDateBox(false)}
-          <View style={styles.itemCardContent}>
-            <Text style={[styles.emptyDayText, { color: colors.textSecondary }]}>
-              {t('my_schedule.not_scheduled', 'Not scheduled')}
-            </Text>
-          </View>
-        </View>
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.dayShiftStack}>
-      {shifts.map((shift, idx) => {
-        const tag = getShiftTag(shift);
-        const primaryRole = shift.roles.length > 0 ? shift.roles[0] : null;
-        return (
-          <View
-            key={shift.id}
+    if (!release) {
+      return (
+        <View style={styles.releaseCol}>
+          <Pressable
+            onPress={() => onRelease(shift)}
+            disabled={busy}
+            hitSlop={4}
+            accessibilityRole="button"
             style={[
-              styles.itemCard,
-              {
-                backgroundColor: colors.card,
-                borderLeftColor: accentColor,
-              },
+              styles.releaseChip,
+              { backgroundColor: colors.glass, borderColor: colors.primary + '40' },
+              busy && styles.busy,
             ]}
           >
-            {renderDateBox(idx > 0)}
-            <View style={styles.itemCardContent}>
-              <View style={styles.shiftCardMain}>
-                <Text style={[styles.shiftTimeText, { color: colors.text }]}>
-                  {formatTime(shift.start_time)} - {formatTime(shift.end_time)}
-                </Text>
-                {primaryRole && (
-                  <Text style={[styles.shiftRoleText, { color: colors.textSecondary }]}>
-                    {primaryRole}
-                  </Text>
-                )}
-                {tag && (
-                  <Text style={[styles.shiftTagText, { color: colors.textSecondary }]}>
-                    {tag}
-                  </Text>
-                )}
-              </View>
-              <View style={styles.shiftDurationBadge}>
-                <Text style={[styles.shiftDurationText, { color: colors.textSecondary }]}>
-                  {getShiftDuration(shift.start_time, shift.end_time)}
-                </Text>
-              </View>
-            </View>
-          </View>
-        );
-      })}
-    </View>
+            <IconSymbol
+              ios_icon_name="arrow.left.arrow.right"
+              android_material_icon_name="swap-horiz"
+              size={13}
+              color={colors.primary}
+            />
+            <Text style={[styles.releaseChipText, { color: colors.primary }]}>{t('my_schedule.release')}</Text>
+          </Pressable>
+        </View>
+      );
+    }
+
+    const pill = (
+      <View style={[styles.statusPill, { backgroundColor: gold + '29', borderColor: gold + '57' }, busy && styles.busy]}>
+        <Text style={[styles.statusPillText, { color: gold }]} numberOfLines={1}>
+          {release.status === 'claimed' ? t('my_schedule.awaiting_approval') : t('my_schedule.released_open')}
+        </Text>
+      </View>
+    );
+
+    if (release.status === 'claimed') {
+      return (
+        <View style={styles.releaseCol}>
+          {pill}
+          {!!release.claimed_by_name && (
+            <Text style={[styles.releaseSub, { color: colors.textSecondary }]} numberOfLines={1}>
+              {t('my_schedule.claimed_by', { name: release.claimed_by_name })}
+            </Text>
+          )}
+        </View>
+      );
+    }
+
+    // open → tap to cancel while it's still open
+    return (
+      <View style={styles.releaseCol}>
+        <Pressable
+          onPress={() => onCancelRelease(shift, release)}
+          disabled={busy}
+          hitSlop={6}
+          accessibilityRole="button"
+          accessibilityLabel={t('my_schedule.cancel_release')}
+        >
+          {pill}
+        </Pressable>
+      </View>
+    );
+  };
+
+  return (
+    <GlassCard variant="surface" radius={16} style={styles.dayCard}>
+      <View style={styles.dayCardRow}>
+        <View
+          style={[
+            styles.dateTile,
+            isToday
+              ? { backgroundColor: colors.primary, borderColor: colors.primary }
+              : { backgroundColor: colors.glass, borderColor: colors.glassBorder },
+          ]}
+        >
+          <Text style={[styles.dateTileDay, { color: isToday ? colors.fireText : colors.textSecondary }]} numberOfLines={1}>
+            {weekday}
+          </Text>
+          <Text style={[styles.dateTileNumber, { color: isToday ? colors.fireText : colors.text }]}>{dayNumber}</Text>
+        </View>
+
+        <View style={styles.dayCardBody}>
+          {shifts.length === 0 ? (
+            <Text style={[styles.emptyDayText, { color: colors.textSecondary }]}>{t('my_schedule.not_scheduled')}</Text>
+          ) : (
+            shifts.map((shift, idx) => (
+              // stacked: time + hours on line one, role + O/C/T tags under them, the
+              // Release control alone on the right (Steve's device round, s83)
+              <ShiftRow
+                key={shift.id}
+                shift={shift}
+                showDay={false}
+                first={idx === 0}
+                stacked
+                timeTrailing={
+                  <View style={[styles.durationBadge, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
+                    <Text style={[styles.durationText, { color: colors.textSecondary }]}>
+                      {t('my_schedule.hours_short', { n: shiftHours(shift.start_time, shift.end_time) })}
+                    </Text>
+                  </View>
+                }
+                trailing={renderReleaseControl(shift)}
+              />
+            ))
+          )}
+        </View>
+      </View>
+    </GlassCard>
   );
 }
 
@@ -416,46 +573,63 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: Platform.OS === 'ios' ? 60 : 16,
-    paddingBottom: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  backButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  headerRight: {
-    width: 40,
-  },
   weekNavBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    marginTop: 2,
+    gap: 10,
   },
-  weekNavArrow: {
-    padding: 6,
-    width: 40,
+  weekNavChip: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+  weekNavChipDisabled: {
+    opacity: 0.4,
   },
   weekNavCenter: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
   },
   weekNavLabel: {
-    fontSize: 15,
-    fontWeight: '700',
+    fontFamily: fonts.display.semibold,
+    fontSize: 16,
+    letterSpacing: -0.2,
+  },
+  stampCard: {
+    marginHorizontal: 16,
+    marginTop: 12,
+  },
+  stampRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  stampBody: {
+    flex: 1,
+    gap: 2,
+  },
+  stampText: {
+    fontFamily: fonts.body.semibold,
+    fontSize: 12.5,
+    lineHeight: 17,
+  },
+  stampNote: {
+    fontFamily: fonts.body.regular,
+    fontSize: 11.5,
+    lineHeight: 16,
+  },
+  loadingIndicator: {
+    marginTop: 40,
   },
   scrollView: {
     flex: 1,
@@ -463,99 +637,94 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 16,
     paddingBottom: 40,
-  },
-  disclaimerBanner: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: StyleSheet.hairlineWidth,
-    marginHorizontal: 16,
-    marginTop: 10,
     gap: 8,
   },
-  lastUpdatedText: {
-    fontSize: 13,
-    fontWeight: '700',
-    lineHeight: 18,
+  dayCard: {
+    // GlassCard owns the fill/border; this is the inner spacing
   },
-  disclaimerText: {
-    fontSize: 11.5,
-    lineHeight: 16,
-    fontWeight: '400',
-  },
-  loadingIndicator: {
-    marginTop: 40,
-  },
-  dayShiftStack: {
-    gap: 6,
-    marginBottom: 10,
-  },
-  itemCard: {
+  dayCardRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
     gap: 12,
-    borderRadius: 12,
-    borderLeftWidth: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
-    elevation: 1,
+    padding: 10,
   },
-  dateBox: {
-    width: 80,
-    height: 80,
-    borderRadius: 10,
-    borderWidth: 1,
+  dateTile: {
+    width: 56,
+    height: 56,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  dateBoxDay: {
-    fontSize: 13,
-    fontWeight: '700',
+  dateTileDay: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 10,
+    letterSpacing: 1,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
-  dateBoxNumber: {
-    fontSize: 28,
-    fontWeight: '800',
-    marginTop: 2,
+  dateTileNumber: {
+    fontFamily: fonts.display.bold,
+    fontSize: 22,
+    letterSpacing: -0.3,
+    marginTop: 1,
   },
-  itemCardContent: {
+  dayCardBody: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  shiftCardMain: {
-    flex: 1,
-  },
-  shiftTimeText: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  shiftRoleText: {
-    fontSize: 13,
-    marginTop: 2,
-  },
-  shiftTagText: {
-    fontSize: 12,
-    marginTop: 2,
-    fontStyle: 'italic',
-  },
-  shiftDurationBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    backgroundColor: 'rgba(128,128,128,0.08)',
-  },
-  shiftDurationText: {
-    fontSize: 12,
-    fontWeight: '600',
+    minWidth: 0,
+    justifyContent: 'center',
   },
   emptyDayText: {
+    fontFamily: fonts.body.regular,
     fontSize: 13,
-    fontStyle: 'italic',
+  },
+  durationBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 7,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+  },
+  durationText: {
+    fontFamily: fonts.mono.medium,
+    fontSize: 10.5,
+    fontVariant: ['tabular-nums'],
+  },
+  releaseCol: {
+    alignItems: 'flex-end',
+    gap: 4,
+    maxWidth: 150,
+  },
+  releaseSub: {
+    maxWidth: 150,
+    fontFamily: fonts.body.regular,
+    fontSize: 11,
+    textAlign: 'right',
+  },
+  releaseChip: {
+    height: 30,
+    paddingHorizontal: 11,
+    borderRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  releaseChipText: {
+    fontFamily: fonts.body.semibold,
+    fontSize: 12,
+  },
+  statusPill: {
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 7,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+  },
+  statusPillText: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 9,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  busy: {
+    opacity: 0.5,
   },
 });

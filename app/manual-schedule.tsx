@@ -1,28 +1,44 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
   ScrollView,
   StyleSheet,
-  TouchableOpacity,
+  Pressable,
   Alert,
   ActivityIndicator,
   Platform,
   LayoutAnimation,
   UIManager,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { useTranslation } from 'react-i18next';
+import * as Haptics from 'expo-haptics';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
+import { useManagerPermissions } from '@/hooks/useManagerPermissions';
+import { useScheduleAttention } from '@/hooks/useScheduleAttention';
 import { IconSymbol } from '@/components/IconSymbol';
+import AmbientGlow from '@/components/AmbientGlow';
+import ScreenHeader from '@/components/ScreenHeader';
+import GlassCard from '@/components/GlassCard';
+import GlassSheet from '@/components/GlassSheet';
+import MenuSearchRow from '@/components/MenuSearchRow';
+import ScheduleGearChip from '@/components/schedule/ScheduleGearChip';
+import ScheduleNavSheet from '@/components/schedule/ScheduleNavSheet';
+import ShiftRow from '@/components/schedule/ShiftRow';
+import ShiftEditSheet, { type ShiftLike } from '@/components/schedule/ShiftEditSheet';
+import { scheduleHue } from '@/components/schedule/scheduleVisuals';
+import { useIsDarkTheme } from '@/components/content/useIsDarkTheme';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTranslation } from 'react-i18next';
-import { getOrgDirectory } from '@/utils/orgDirectory';
-import ShiftEditForm from '@/components/ShiftEditForm';
-import * as Haptics from 'expo-haptics';
 import { useSubscription } from '@/contexts/SubscriptionContext';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { getOrgDirectory } from '@/utils/orgDirectory';
+import { translateServerError } from '@/utils/serverErrors';
+import { localeFor, toISODate, initialsOf, formatDateShort } from '@/utils/schedule/format';
+import { fonts } from '@/constants/fonts';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -30,34 +46,29 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
-interface ShiftRecord {
-  id: string;
-  upload_id: string;
-  user_id: string | null;
-  employee_name: string;
-  shift_date: string;
-  start_time: string;
-  end_time: string;
-  roles: string[];
-  is_closer: boolean;
-  is_opener: boolean;
-  is_training: boolean;
-  room_assignment: string | null;
-}
+// A-Z rail initial, accent-folded (the schedule-review rule): ALPHABET holds no
+// accented letters, so an unfolded 'Á' ("Ángela") would match no rail button —
+// folding to the base letter files her under A. Used by BOTH the rail's
+// available-letters set and the scroll-to lookup so the two always agree.
+const initialLetter = (name: string) =>
+  name.charAt(0).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+type ShiftRecord = ShiftLike;
 
 interface UserRecord {
   id: string;
   name: string;
-  username: string;
   job_title: string | null;
   job_titles: string[] | null;
 }
 
-function toISODate(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+interface EmployeeRow {
+  /** stable card key — the user id, or the schedule name for an unmatched group */
+  key: string;
+  userId: string | null;
+  name: string;
+  jobTitles: string[];
+  shifts: ShiftRecord[];
 }
 
 function getWeekBounds(date: Date): { start: Date; end: Date; startStr: string; endStr: string } {
@@ -102,16 +113,126 @@ function formatWeekLabel(startStr: string, endStr: string, isES: boolean): strin
   return `${sMonth} ${sDay}${nth(sDay)} - ${eMonth} ${eDay}${nth(eDay)}`;
 }
 
-function formatDate(dateStr: string) {
-  const date = new Date(dateStr + 'T00:00:00');
-  return date.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' });
+/**
+ * JobTitleFilterSheet — the Filter slot of the search row. One glass chip per
+ * org job title (active titles, plus any role this week's shifts carry that the
+ * org list doesn't), multi-select. State-only: toggling never closes the sheet,
+ * so no useSheetHandoff is needed; the selection lives in the page and persists
+ * until Clear.
+ */
+function JobTitleFilterSheet({
+  visible,
+  onClose,
+  titles,
+  selected,
+  onToggle,
+  onClear,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  titles: string[];
+  selected: string[];
+  onToggle: (title: string) => void;
+  onClear: () => void;
+}) {
+  const { t } = useTranslation();
+  const colors = useThemeColors();
+  const selectedLower = useMemo(() => new Set(selected.map((s) => s.toLowerCase())), [selected]);
+
+  return (
+    <GlassSheet
+      visible={visible}
+      onClose={onClose}
+      title={t('manual_schedule.filter_title')}
+      subtitle={t('manual_schedule.filter_sub')}
+      footer={
+        <View style={styles.sheetFooter}>
+          <Pressable
+            style={[
+              styles.footerBtn,
+              { backgroundColor: colors.glass, borderColor: colors.glassBorder },
+              !selected.length && styles.footerBtnDisabled,
+            ]}
+            onPress={onClear}
+            disabled={!selected.length}
+          >
+            <Text style={[styles.footerLabel, { color: colors.textSecondary }]}>{t('common.clear')}</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.footerBtn, styles.footerPrimary, { backgroundColor: colors.primary, borderColor: colors.primary }]}
+            onPress={onClose}
+          >
+            <Text style={[styles.footerLabel, { color: colors.fireText }]}>{t('content_editor.done')}</Text>
+          </Pressable>
+        </View>
+      }
+    >
+      {titles.length === 0 ? (
+        <Text style={[styles.sheetHint, { color: colors.textSecondary }]}>{t('manual_schedule.filter_empty')}</Text>
+      ) : (
+        <View style={styles.chipsWrap}>
+          {titles.map((title) => {
+            const on = selectedLower.has(title.toLowerCase());
+            return (
+              <Pressable
+                key={title}
+                onPress={() => onToggle(title)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: on }}
+                style={[
+                  styles.filterChip,
+                  { backgroundColor: colors.glass, borderColor: colors.glassBorder },
+                  on && { backgroundColor: colors.primary + '24', borderColor: colors.primary + '80' },
+                ]}
+              >
+                {on && <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={12} color={colors.primary} />}
+                <Text style={[styles.filterChipText, { color: on ? colors.primary : colors.text }]} numberOfLines={1}>
+                  {title}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
+    </GlassSheet>
+  );
 }
 
-function formatTime(timeStr: string) {
-  const [hours, minutes] = timeStr.split(':').map(Number);
-  const ampm = hours >= 12 ? 'PM' : 'AM';
-  const displayHour = hours % 12 || 12;
-  return `${displayHour}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+/** Glass empty state — one icon disc, a title, a line of copy, optional action. */
+function EmptyCard({
+  iosIcon,
+  androidIcon,
+  title,
+  sub,
+  actionLabel,
+  onAction,
+}: {
+  iosIcon: string;
+  androidIcon: string;
+  title: string;
+  sub: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
+  const colors = useThemeColors();
+  return (
+    <GlassCard variant="surface" radius={16} style={styles.emptyCard}>
+      <View style={[styles.emptyIcon, { backgroundColor: colors.primary + '24' }]}>
+        <IconSymbol ios_icon_name={iosIcon} android_material_icon_name={androidIcon} size={20} color={colors.primary} />
+      </View>
+      <Text style={[styles.emptyTitle, { color: colors.text }]}>{title}</Text>
+      <Text style={[styles.emptySub, { color: colors.textSecondary }]}>{sub}</Text>
+      {!!onAction && !!actionLabel && (
+        <Pressable
+          onPress={onAction}
+          style={[styles.emptyAction, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
+          accessibilityRole="button"
+        >
+          <Text style={[styles.emptyActionLabel, { color: colors.text }]}>{actionLabel}</Text>
+        </Pressable>
+      )}
+    </GlassCard>
+  );
 }
 
 export default function ManualScheduleScreen() {
@@ -120,50 +241,82 @@ export default function ManualScheduleScreen() {
   const { t, i18n } = useTranslation();
   const isES = i18n.language === 'es';
   const colors = useThemeColors();
+  const isDark = useIsDarkTheme();
+  const { language } = useLanguage();
+  const locale = localeFor(language);
   const { organizationId } = useOrganization();
   const { user } = useAuth();
-  const { hasPremium } = useSubscription();
+  const { hasPremium, isLoading: subLoading } = useSubscription();
+  const { perms, loading: permsLoading } = useManagerPermissions();
+  const { attention } = useScheduleAttention();
 
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [shifts, setShifts] = useState<ShiftRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadedOnce, setLoadedOnce] = useState(false);
 
   // Week navigation
   const [currentWeek, setCurrentWeek] = useState(() => getWeekBounds(new Date()));
+  // Add Shift opens on today when the week on screen holds it, else on the week's Sunday
+  const weekHasToday = useMemo(() => {
+    const today = toISODate(new Date());
+    return today >= currentWeek.startStr && today <= currentWeek.endStr;
+  }, [currentWeek.startStr, currentWeek.endStr]);
 
-  const [selectedLetter, setSelectedLetter] = useState<string | null>(null);
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
+  const [navOpen, setNavOpen] = useState(false);
 
-  // Shift form state
-  const [shiftFormVisible, setShiftFormVisible] = useState(false);
-  const [shiftFormMode, setShiftFormMode] = useState<'add' | 'edit'>('add');
-  const [shiftFormTarget, setShiftFormTarget] = useState<{
+  // Search + job-title filter (they compose; the filter persists until Clear)
+  const [search, setSearch] = useState('');
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [selectedTitles, setSelectedTitles] = useState<string[]>([]);
+  const [orgTitles, setOrgTitles] = useState<string[]>([]);
+
+  // Shift editor (the shared ShiftEditSheet)
+  const [editor, setEditor] = useState<{
+    visible: boolean;
+    mode: 'add' | 'edit';
     shift?: ShiftRecord;
     employeeName?: string;
     userId?: string | null;
-  }>({});
+  }>({ visible: false, mode: 'add' });
 
-  useEffect(() => {
-    loadUsers();
-  }, [organizationId]);
+  // A-Z rail: each card reports its y inside the scroll content on layout.
+  const scrollRef = useRef<ScrollView>(null);
+  const cardY = useRef<Record<string, number>>({});
 
-  useEffect(() => {
-    loadShifts();
-  }, [currentWeek.startStr, currentWeek.endStr]);
-
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     try {
       const directory = await getOrgDirectory(user?.id);
       const data = directory
         .filter((r) => r.is_active)
+        .map((r) => ({ id: r.id, name: r.name, job_title: r.job_title, job_titles: r.job_titles }))
         .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-      setUsers(data || []);
-    } catch (error) {
-      console.error('Error loading users:', error);
+      setUsers(data);
+    } catch (error: any) {
+      console.error('[manual-schedule] load users error:', error);
     }
-  };
+  }, [user?.id]);
 
-  const loadShifts = async () => {
+  useEffect(() => {
+    loadUsers();
+  }, [loadUsers, organizationId]);
+
+  const loadTitles = useCallback(async () => {
+    if (!user?.id) return;
+    const { data, error } = await supabase.rpc('get_org_job_titles', { p_actor_id: user.id });
+    if (error) {
+      console.error('[manual-schedule] load job titles error:', error);
+      return;
+    }
+    setOrgTitles((data || []).filter((r) => r.is_active !== false).map((r) => r.title));
+  }, [user?.id]);
+
+  useEffect(() => {
+    loadTitles();
+  }, [loadTitles]);
+
+  const loadShifts = useCallback(async () => {
     if (!user?.id) return;
     try {
       setLoading(true);
@@ -173,16 +326,24 @@ export default function ManualScheduleScreen() {
         p_start_date: currentWeek.startStr,
         p_end_date: currentWeek.endStr,
       });
-
       if (error) throw error;
       setShifts(data || []);
-    } catch (error) {
-      console.error('Error loading shifts:', error);
-      Alert.alert('Error', 'Failed to load schedule data.');
+    } catch (error: any) {
+      console.error('[manual-schedule] load shifts error:', error);
+      Alert.alert(t('common.error'), translateServerError(error, t('manual_schedule.load_failed')));
     } finally {
       setLoading(false);
+      setLoadedOnce(true);
     }
-  };
+  }, [user?.id, currentWeek.startStr, currentWeek.endStr, t]);
+
+  // on focus, not just on mount — Review's Save pops back to THIS instance (dismissTo),
+  // and the shifts it edited must show without a manual refresh
+  useFocusEffect(
+    useCallback(() => {
+      loadShifts();
+    }, [loadShifts]),
+  );
 
   const goToPrevWeek = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -202,14 +363,30 @@ export default function ManualScheduleScreen() {
     });
   }, []);
 
-  const handlePremiumFeature = () => {
-    // Both tiers land on /schedule-upload: premium gets the working uploader,
-    // base gets its sales-copy lock screen (a better pitch than an alert).
-    // The buttons' lock badges below still telegraph the gate.
+  // Uploads chip lock — the manager-permissions grammar (locked, never hidden):
+  // base tier wears the Premium lock; a manager without the AI Schedule Uploads
+  // grant wears the "Ask the owner" lock. Owners hold every grant.
+  // (both wait for their loads — the chip flashed a lock for a beat on the sim smoke, s83)
+  const grantLocked = user?.role === 'manager' && !permsLoading && !perms.aiScheduleUpload;
+  const uploadLocked = (!hasPremium && !subLoading) || grantLocked;
+  const gold = scheduleHue('pending', isDark);
+
+  const onUploadsPress = () => {
+    if (!hasPremium) {
+      Alert.alert(t('schedule_upload.premium_title'), t('schedule_upload.premium_msg'), [
+        { text: t('common.not_now'), style: 'cancel' },
+        { text: t('common.upgrade'), onPress: () => router.push('/subscription-management' as any) },
+      ]);
+      return;
+    }
+    if (grantLocked) {
+      Alert.alert(t('manual_schedule.uploads_locked_title'), t('schedule_nav.ask_owner'));
+      return;
+    }
     router.push('/schedule-upload' as any);
   };
 
-  const employeeRows = useMemo(() => {
+  const employeeRows = useMemo<EmployeeRow[]>(() => {
     const shiftsByUserId: Record<string, ShiftRecord[]> = {};
     const unassignedShifts: ShiftRecord[] = [];
 
@@ -222,11 +399,15 @@ export default function ManualScheduleScreen() {
       }
     }
 
-    const rows = users.map((u) => ({
+    const byDateThenTime = (a: ShiftRecord, b: ShiftRecord) =>
+      a.shift_date.localeCompare(b.shift_date) || a.start_time.localeCompare(b.start_time);
+
+    const rows: EmployeeRow[] = users.map((u) => ({
+      key: u.id,
       userId: u.id,
       name: u.name,
       jobTitles: u.job_titles || (u.job_title ? [u.job_title] : []),
-      shifts: shiftsByUserId[u.id] || [],
+      shifts: (shiftsByUserId[u.id] || []).sort(byDateThenTime),
     }));
 
     const unassignedGroups: Record<string, ShiftRecord[]> = {};
@@ -238,10 +419,11 @@ export default function ManualScheduleScreen() {
     for (const [name, groupShifts] of Object.entries(unassignedGroups)) {
       if (!rows.some((r) => r.name === name)) {
         rows.push({
-          userId: null as any,
+          key: `name:${name}`,
+          userId: null,
           name,
           jobTitles: [],
-          shifts: groupShifts,
+          shifts: groupShifts.sort(byDateThenTime),
         });
       }
     }
@@ -249,10 +431,45 @@ export default function ManualScheduleScreen() {
     return rows.sort((a, b) => a.name.localeCompare(b.name));
   }, [users, shifts]);
 
-  const filteredEmployeeRows = useMemo(() => {
-    if (!selectedLetter) return employeeRows;
-    return employeeRows.filter((r) => r.name.charAt(0).toUpperCase() === selectedLetter);
-  }, [employeeRows, selectedLetter]);
+  const selectedLower = useMemo(() => new Set(selectedTitles.map((s) => s.toLowerCase())), [selectedTitles]);
+  const query = search.trim().toLowerCase();
+  const hasNarrowing = query.length > 0 || selectedTitles.length > 0;
+
+  // Search (name, case-insensitive) AND filter (holds ANY selected title —
+  // job_titles, falling back to job_title; a name-only group with no directory
+  // titles matches on the roles its shifts carry, so it stays reachable).
+  const visibleRows = useMemo(() => {
+    return employeeRows.filter((row) => {
+      if (query && !row.name.toLowerCase().includes(query)) return false;
+      if (selectedLower.size) {
+        const titles = row.jobTitles.length ? row.jobTitles : row.shifts.flatMap((s) => s.roles || []);
+        if (!titles.some((jt) => selectedLower.has(jt.toLowerCase()))) return false;
+      }
+      return true;
+    });
+  }, [employeeRows, query, selectedLower]);
+
+  // Filter chips: the org's active titles, plus any role on this week's shifts
+  // the list lacks, plus anything currently selected (so a stale pick can still
+  // be toggled off after the week moves on). De-duped case-insensitively.
+  const filterTitles = useMemo(() => {
+    const byLower = new Map<string, string>();
+    const add = (title: string | null | undefined) => {
+      const trimmed = (title || '').trim();
+      if (trimmed && !byLower.has(trimmed.toLowerCase())) byLower.set(trimmed.toLowerCase(), trimmed);
+    };
+    orgTitles.forEach(add);
+    shifts.forEach((s) => (s.roles || []).forEach(add));
+    selectedTitles.forEach(add);
+    return Array.from(byLower.values());
+  }, [orgTitles, shifts, selectedTitles]);
+
+  const toggleTitle = useCallback((title: string) => {
+    const lower = title.toLowerCase();
+    setSelectedTitles((prev) =>
+      prev.some((s) => s.toLowerCase() === lower) ? prev.filter((s) => s.toLowerCase() !== lower) : [...prev, title]
+    );
+  }, []);
 
   const totalShifts = shifts.length;
   const employeesWithShifts = useMemo(() => {
@@ -260,13 +477,23 @@ export default function ManualScheduleScreen() {
     return ids.size;
   }, [shifts]);
 
+  // Letters present under the CURRENT search + filter.
   const availableLetters = useMemo(() => {
     const letters = new Set<string>();
-    employeeRows.forEach((r) => {
-      if (r.name) letters.add(r.name.charAt(0).toUpperCase());
+    visibleRows.forEach((r) => {
+      if (r.name) letters.add(initialLetter(r.name));
     });
     return letters;
-  }, [employeeRows]);
+  }, [visibleRows]);
+
+  const scrollToLetter = (letter: string) => {
+    const target = visibleRows.find((r) => initialLetter(r.name) === letter);
+    if (!target) return;
+    const y = cardY.current[target.key];
+    if (y === undefined) return;
+    Haptics.selectionAsync();
+    scrollRef.current?.scrollTo({ y: Math.max(0, y - 4), animated: true });
+  };
 
   const toggleCardExpanded = (key: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -278,26 +505,24 @@ export default function ManualScheduleScreen() {
     });
   };
 
-  const openAddShift = (employeeName: string, userId: string | null) => {
-    setShiftFormMode('add');
-    setShiftFormTarget({ employeeName, userId });
-    setShiftFormVisible(true);
+  const openAddShift = (row: EmployeeRow) => {
+    setEditor({ visible: true, mode: 'add', employeeName: row.name, userId: row.userId });
   };
 
   const openEditShift = (shift: ShiftRecord) => {
-    setShiftFormMode('edit');
-    setShiftFormTarget({ shift });
-    setShiftFormVisible(true);
+    setEditor({ visible: true, mode: 'edit', shift });
   };
 
-  const handleDeleteShift = (shift: ShiftRecord) => {
+  const closeEditor = () => setEditor((prev) => ({ ...prev, visible: false }));
+
+  const confirmDeleteShift = (shift: ShiftRecord) => {
     Alert.alert(
-      'Delete Shift',
-      `Remove ${shift.employee_name}'s shift on ${formatDate(shift.shift_date)}?`,
+      t('manual_schedule.delete_title'),
+      t('manual_schedule.delete_msg', { name: shift.employee_name, date: formatDateShort(shift.shift_date, locale) }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             if (!user?.id) return;
@@ -308,8 +533,9 @@ export default function ManualScheduleScreen() {
               });
               if (error) throw error;
               loadShifts();
-            } catch (error) {
-              console.error('Delete shift error:', error);
+            } catch (error: any) {
+              console.error('[manual-schedule] delete shift error:', error);
+              Alert.alert(t('common.error'), translateServerError(error, t('manual_schedule.delete_failed')));
             }
           },
         },
@@ -317,257 +543,269 @@ export default function ManualScheduleScreen() {
     );
   };
 
+  const clearNarrowing = () => {
+    setSearch('');
+    setSelectedTitles([]);
+  };
+
+  const pendingApprovals = attention.pendingApprovals;
+  const statLine = [
+    t('manual_schedule.shifts_count', { count: totalShifts }),
+    t('manual_schedule.scheduled_count', { count: employeesWithShifts }),
+    t('manual_schedule.employees_count', { count: users.length }),
+  ].join(' · ');
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="arrow-back" size={24} color={colors.primary} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Schedules</Text>
-        <View style={styles.headerRight} />
-      </View>
+      <AmbientGlow />
+      <ScreenHeader
+        title={t('manual_schedule.title')}
+        rightWide
+        right={<ScheduleGearChip onPress={() => setNavOpen(true)} />}
+      />
 
-      {/* Premium Upload Section */}
-      <View style={[styles.premiumSection, { backgroundColor: colors.card }]}>
-        <View style={styles.premiumButtons}>
-          <TouchableOpacity
-            style={[styles.premiumButton, { backgroundColor: colors.primary + '12' }]}
-            onPress={handlePremiumFeature}
-            activeOpacity={0.7}
-          >
-            <IconSymbol ios_icon_name="doc.fill" android_material_icon_name="description" size={16} color={colors.primary} />
-            <Text style={[styles.premiumButtonText, { color: colors.primary }]}>{t('schedule_upload.upload_file')}</Text>
-            {!hasPremium && <IconSymbol ios_icon_name="lock.fill" android_material_icon_name="lock" size={11} color={colors.primary + '60'} />}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.premiumButton, { backgroundColor: colors.primary + '12' }]}
-            onPress={handlePremiumFeature}
-            activeOpacity={0.7}
-          >
-            <IconSymbol ios_icon_name="photo.fill" android_material_icon_name="photo-library" size={16} color={colors.primary} />
-            <Text style={[styles.premiumButtonText, { color: colors.primary }]}>{t('schedule_upload.upload_images')}</Text>
-            {!hasPremium && <IconSymbol ios_icon_name="lock.fill" android_material_icon_name="lock" size={11} color={colors.primary + '60'} />}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.premiumButton, { backgroundColor: colors.primary + '12' }]}
-            onPress={handlePremiumFeature}
-            activeOpacity={0.7}
-          >
-            <IconSymbol ios_icon_name="clock.arrow.circlepath" android_material_icon_name="history" size={16} color={colors.primary} />
-            <Text style={[styles.premiumButtonText, { color: colors.primary }]}>{t('schedule_upload.history_short')}</Text>
-            {!hasPremium && <IconSymbol ios_icon_name="lock.fill" android_material_icon_name="lock" size={11} color={colors.primary + '60'} />}
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Week Navigation Strip */}
-      <View style={[styles.weekNav, { backgroundColor: colors.card }]}>
-        <TouchableOpacity
-          onPress={goToPrevWeek}
-          style={styles.weekArrow}
-          activeOpacity={0.6}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      {/* Uploads · Approvals */}
+      <View style={styles.chipRow}>
+        <Pressable
+          onPress={onUploadsPress}
+          accessibilityRole="button"
+          style={[styles.chip, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
         >
-          <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="chevron-left" size={22} color={colors.primary} />
-        </TouchableOpacity>
+          {uploadLocked ? (
+            <IconSymbol ios_icon_name="lock.fill" android_material_icon_name="lock" size={15} color={gold} />
+          ) : (
+            <IconSymbol ios_icon_name="square.and.arrow.up" android_material_icon_name="file-upload" size={16} color={colors.text} />
+          )}
+          <Text style={[styles.chipLabel, { color: uploadLocked ? colors.textSecondary : colors.text }]} numberOfLines={1}>
+            {t('manual_schedule.uploads')}
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={() => router.push('/schedule-approvals' as any)}
+          accessibilityRole="button"
+          style={[styles.chip, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
+        >
+          <IconSymbol ios_icon_name="checkmark.circle.fill" android_material_icon_name="task-alt" size={16} color={colors.text} />
+          <Text style={[styles.chipLabel, { color: colors.text }]} numberOfLines={1}>
+            {t('manual_schedule.approvals')}
+          </Text>
+          {pendingApprovals > 0 && (
+            <View style={[styles.bubble, { backgroundColor: colors.primary }]}>
+              <Text style={[styles.bubbleText, { color: colors.fireText }]}>{pendingApprovals > 99 ? '99+' : pendingApprovals}</Text>
+            </View>
+          )}
+        </Pressable>
+      </View>
 
-        <View style={styles.weekLabelContainer}>
-          <Text style={[styles.weekLabel, { color: colors.text }]}>
+      {/* Week navigation */}
+      <View style={styles.weekNav}>
+        <Pressable
+          onPress={goToPrevWeek}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={t('manual_schedule.prev_week')}
+          style={[styles.weekArrow, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
+        >
+          <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="chevron-left" size={20} color={colors.text} />
+        </Pressable>
+
+        <View style={styles.weekLabelWrap}>
+          <Text style={[styles.weekLabel, { color: colors.text }]} numberOfLines={1}>
             {formatWeekLabel(currentWeek.startStr, currentWeek.endStr, isES)}
           </Text>
-          <View style={styles.weekStats}>
-            <Text style={[styles.weekStatText, { color: colors.primary }]}>{t('manual_schedule.shifts_count', { count: totalShifts })}</Text>
-            <Text style={[styles.weekStatDot, { color: colors.textSecondary }]}> · </Text>
-            <Text style={[styles.weekStatText, { color: '#4CAF50' }]}>{t('manual_schedule.scheduled_count', { count: employeesWithShifts })}</Text>
-            <Text style={[styles.weekStatDot, { color: colors.textSecondary }]}> · </Text>
-            <Text style={[styles.weekStatText, { color: colors.textSecondary }]}>{t('manual_schedule.employees_count', { count: users.length })}</Text>
+          <View style={styles.weekStatsRow}>
+            <Text style={[styles.weekStats, { color: colors.textSecondary }]} numberOfLines={1}>
+              {statLine}
+            </Text>
+            {loading && loadedOnce && <ActivityIndicator size="small" color={colors.textSecondary} style={styles.weekSpinner} />}
           </View>
         </View>
 
-        <TouchableOpacity
+        <Pressable
           onPress={goToNextWeek}
-          style={styles.weekArrow}
-          activeOpacity={0.6}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={t('manual_schedule.next_week')}
+          style={[styles.weekArrow, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
         >
-          <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={22} color={colors.primary} />
-        </TouchableOpacity>
+          <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={20} color={colors.text} />
+        </Pressable>
       </View>
 
-      {loading && !shifts.length ? (
-        <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 40 }} />
+      <MenuSearchRow
+        colors={colors}
+        mode="user"
+        value={search}
+        onChangeText={setSearch}
+        placeholder={t('manual_schedule.search_placeholder')}
+        onRightPress={() => setFilterOpen(true)}
+        filterCount={selectedTitles.length}
+      />
+
+      {!loadedOnce ? (
+        <ActivityIndicator size="large" color={colors.primary} style={styles.initialSpinner} />
       ) : (
         <View style={styles.contentRow}>
           <ScrollView
+            ref={scrollRef}
             style={styles.scrollView}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
           >
-            {filteredEmployeeRows.map((row) => {
-              const cardKey = row.userId || row.name;
-              const isExpanded = expandedCards.has(cardKey);
-              const shiftCount = row.shifts.length;
+            {totalShifts === 0 && !loading && (
+              <EmptyCard
+                iosIcon="calendar.badge.exclamationmark"
+                androidIcon="event-busy"
+                title={t('manual_schedule.empty_week_title')}
+                sub={t('manual_schedule.empty_week_sub')}
+              />
+            )}
+
+            {visibleRows.length === 0 && (
+              <EmptyCard
+                iosIcon="person.crop.circle.badge.questionmark"
+                androidIcon="person-search"
+                title={t('manual_schedule.empty_match_title')}
+                sub={t('manual_schedule.empty_match_sub')}
+                actionLabel={hasNarrowing ? t('common.clear') : undefined}
+                onAction={hasNarrowing ? clearNarrowing : undefined}
+              />
+            )}
+
+            {visibleRows.map((row) => {
+              const isExpanded = expandedCards.has(row.key);
+              const firstTitle = row.jobTitles[0];
 
               return (
-                <View key={cardKey} style={[styles.employeeCard, { backgroundColor: colors.card }]}>
-                  <TouchableOpacity
-                    style={styles.employeeHeader}
-                    onPress={() => toggleCardExpanded(cardKey)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.employeeHeaderLeft}>
+                <View
+                  key={row.key}
+                  style={styles.cardWrap}
+                  onLayout={(e) => {
+                    cardY.current[row.key] = e.nativeEvent.layout.y;
+                  }}
+                >
+                  <GlassCard variant="surface" radius={16}>
+                    <Pressable
+                      style={styles.cardHeader}
+                      onPress={() => toggleCardExpanded(row.key)}
+                      accessibilityRole="button"
+                      accessibilityState={{ expanded: isExpanded }}
+                    >
+                      <View style={[styles.avatar, { backgroundColor: colors.primary + '2E' }]}>
+                        <Text style={[styles.avatarText, { color: colors.primary }]}>{initialsOf(row.name)}</Text>
+                      </View>
+
+                      <View style={styles.cardBody}>
+                        <Text style={[styles.cardName, { color: colors.text }]} numberOfLines={1}>
+                          {row.name}
+                        </Text>
+                        <View style={styles.cardMeta}>
+                          {firstTitle ? (
+                            <View style={[styles.jobPill, { backgroundColor: colors.primary + '24', borderColor: colors.primary + '42' }]}>
+                              <Text style={[styles.jobPillText, { color: colors.primary }]} numberOfLines={1}>
+                                {firstTitle}
+                              </Text>
+                            </View>
+                          ) : !row.userId ? (
+                            <View style={[styles.jobPill, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
+                              <Text style={[styles.jobPillText, { color: colors.textSecondary }]} numberOfLines={1}>
+                                {t('manual_schedule.unmatched')}
+                              </Text>
+                            </View>
+                          ) : null}
+                          <Text style={[styles.shiftCount, { color: colors.textSecondary }]} numberOfLines={1}>
+                            {t('manual_schedule.shifts_count', { count: row.shifts.length })}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <Pressable
+                        onPress={() => openAddShift(row)}
+                        hitSlop={6}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('manual_schedule.add_shift')}
+                        style={[styles.addBtn, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
+                      >
+                        <IconSymbol ios_icon_name="plus" android_material_icon_name="add" size={16} color={colors.primary} />
+                      </Pressable>
+
                       <IconSymbol
                         ios_icon_name={isExpanded ? 'chevron.down' : 'chevron.right'}
                         android_material_icon_name={isExpanded ? 'expand-more' : 'chevron-right'}
                         size={16}
                         color={colors.textSecondary}
                       />
-                      <View style={styles.employeeInfo}>
-                        <Text style={[styles.employeeName, { color: colors.text }]}>{row.name}</Text>
-                        <View style={styles.employeeMeta}>
-                          {row.jobTitles.length > 0 && (
-                            <View style={[styles.jobBadge, { backgroundColor: colors.primary + '15' }]}>
-                              <Text style={[styles.jobBadgeText, { color: colors.primary }]}>
-                                {row.jobTitles[0]}
-                              </Text>
-                            </View>
-                          )}
-                          <Text style={[styles.shiftCountText, { color: colors.textSecondary }]}>
-                            {shiftCount} shift{shiftCount !== 1 ? 's' : ''}
+                    </Pressable>
+
+                    {isExpanded && (
+                      <View style={[styles.cardShifts, { borderTopColor: colors.hairline }]}>
+                        {row.shifts.length === 0 ? (
+                          <Text style={[styles.noShifts, { color: colors.textSecondary }]}>
+                            {t('manual_schedule.no_shifts_employee')}
                           </Text>
-                        </View>
+                        ) : (
+                          row.shifts.map((shift, idx) => (
+                            <ShiftRow
+                              key={shift.id}
+                              shift={shift}
+                              showDay
+                              stacked
+                              first={idx === 0}
+                              onPress={() => openEditShift(shift)}
+                              trailing={
+                                <View style={styles.rowActions}>
+                                  <Pressable
+                                    onPress={() => openEditShift(shift)}
+                                    hitSlop={6}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={t('manual_schedule.edit_shift')}
+                                    style={styles.rowAction}
+                                  >
+                                    <IconSymbol ios_icon_name="pencil" android_material_icon_name="edit" size={14} color={colors.textSecondary} />
+                                  </Pressable>
+                                  <Pressable
+                                    onPress={() => confirmDeleteShift(shift)}
+                                    hitSlop={6}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={t('manual_schedule.delete_title')}
+                                    style={styles.rowAction}
+                                  >
+                                    <IconSymbol ios_icon_name="xmark" android_material_icon_name="close" size={14} color={colors.textSecondary} />
+                                  </Pressable>
+                                </View>
+                              }
+                            />
+                          ))
+                        )}
                       </View>
-                    </View>
-
-                    <TouchableOpacity
-                      style={[styles.addButton, { backgroundColor: '#4CAF5015' }]}
-                      onPress={(e) => {
-                        e.stopPropagation?.();
-                        openAddShift(row.name, row.userId);
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <IconSymbol ios_icon_name="plus.circle.fill" android_material_icon_name="add-circle" size={13} color="#4CAF50" />
-                      <Text style={[styles.addButtonText, { color: '#4CAF50' }]}>Add</Text>
-                    </TouchableOpacity>
-                  </TouchableOpacity>
-
-                  {isExpanded && (
-                    <View style={styles.shiftsContainer}>
-                      {row.shifts.length === 0 ? (
-                        <Text style={[styles.noShiftsText, { color: colors.textSecondary }]}>
-                          No shifts this week
-                        </Text>
-                      ) : (
-                        row.shifts.map((shift, idx) => (
-                          <TouchableOpacity
-                            key={shift.id}
-                            style={[
-                              styles.shiftRow,
-                              idx < row.shifts.length - 1 && {
-                                borderBottomWidth: StyleSheet.hairlineWidth,
-                                borderBottomColor: 'rgba(128,128,128,0.12)',
-                              },
-                            ]}
-                            onPress={() => openEditShift(shift)}
-                            activeOpacity={0.6}
-                          >
-                            <Text style={[styles.shiftDate, { color: colors.text }]}>
-                              {formatDate(shift.shift_date)}
-                            </Text>
-                            <Text style={[styles.shiftTime, { color: colors.textSecondary }]}>
-                              {formatTime(shift.start_time)} – {formatTime(shift.end_time)}
-                            </Text>
-                            <View style={styles.shiftMeta}>
-                              {shift.is_opener && (
-                                <View style={[styles.flagBadge, { backgroundColor: '#4CAF5020' }]}>
-                                  <Text style={[styles.flagText, { color: '#4CAF50' }]}>O</Text>
-                                </View>
-                              )}
-                              {shift.is_closer && (
-                                <View style={[styles.flagBadge, { backgroundColor: '#FF980020' }]}>
-                                  <Text style={[styles.flagText, { color: '#FF9800' }]}>C</Text>
-                                </View>
-                              )}
-                              {shift.is_training && (
-                                <View style={[styles.flagBadge, { backgroundColor: '#2196F320' }]}>
-                                  <Text style={[styles.flagText, { color: '#2196F3' }]}>T</Text>
-                                </View>
-                              )}
-                              {shift.roles.length > 0 && (
-                                <View style={[styles.roleBadge, { backgroundColor: colors.primary + '15' }]}>
-                                  <Text style={[styles.roleText, { color: colors.primary }]}>{shift.roles[0]}</Text>
-                                </View>
-                              )}
-                            </View>
-                            <View style={styles.shiftActions}>
-                              <IconSymbol ios_icon_name="pencil" android_material_icon_name="edit" size={13} color={colors.primary + '80'} />
-                              <TouchableOpacity
-                                onPress={(e) => {
-                                  e.stopPropagation?.();
-                                  handleDeleteShift(shift);
-                                }}
-                                style={styles.deleteShiftButton}
-                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                              >
-                                <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={16} color="rgba(128,128,128,0.4)" />
-                              </TouchableOpacity>
-                            </View>
-                          </TouchableOpacity>
-                        ))
-                      )}
-                    </View>
-                  )}
+                    )}
+                  </GlassCard>
                 </View>
               );
             })}
-
-            {filteredEmployeeRows.length === 0 && selectedLetter && (
-              <View style={styles.emptyFilter}>
-                <Text style={[styles.emptyFilterText, { color: colors.textSecondary }]}>
-                  No employees starting with "{selectedLetter}"
-                </Text>
-              </View>
-            )}
           </ScrollView>
 
-          {/* A-Z Navigation */}
-          <View style={[styles.alphabetNav, { backgroundColor: colors.card }]}>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.alphabetNavContent}>
-              <TouchableOpacity
-                style={[styles.alphabetButton, selectedLetter === null && styles.alphabetButtonActive]}
-                onPress={() => setSelectedLetter(null)}
-              >
-                <Text
-                  style={[
-                    styles.alphabetButtonText,
-                    { color: colors.textSecondary },
-                    selectedLetter === null && [styles.alphabetButtonTextActive, { color: '#FFFFFF' }],
-                  ]}
-                >
-                  All
-                </Text>
-              </TouchableOpacity>
+          {/* A-Z rail — letters present under the current search + filter light up;
+              a tap scrolls to that letter's first card. */}
+          <View style={[styles.rail, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.railContent}>
               {ALPHABET.map((letter) => {
-                const hasEmployees = availableLetters.has(letter);
+                const on = availableLetters.has(letter);
                 return (
-                  <TouchableOpacity
+                  <Pressable
                     key={letter}
-                    style={[styles.alphabetButton, selectedLetter === letter && styles.alphabetButtonActive]}
-                    onPress={() => setSelectedLetter(selectedLetter === letter ? null : letter)}
-                    disabled={!hasEmployees}
+                    onPress={() => scrollToLetter(letter)}
+                    disabled={!on}
+                    accessibilityRole="button"
+                    accessibilityLabel={letter}
+                    style={styles.railBtn}
                   >
-                    <Text
-                      style={[
-                        styles.alphabetButtonText,
-                        { color: hasEmployees ? colors.textSecondary : 'rgba(128,128,128,0.2)' },
-                        selectedLetter === letter && [styles.alphabetButtonTextActive, { color: '#FFFFFF' }],
-                      ]}
-                    >
+                    <Text style={[styles.railText, { color: on ? colors.primary : colors.textSecondary, opacity: on ? 1 : 0.35 }]}>
                       {letter}
                     </Text>
-                  </TouchableOpacity>
+                  </Pressable>
                 );
               })}
             </ScrollView>
@@ -575,274 +813,156 @@ export default function ManualScheduleScreen() {
         </View>
       )}
 
-      {/* Add/Edit Shift Modal */}
-      <ShiftEditForm
-        visible={shiftFormVisible}
-        mode={shiftFormMode}
-        shift={shiftFormTarget.shift}
-        employeeName={shiftFormTarget.employeeName}
-        userId={shiftFormTarget.userId}
-        defaultDate={new Date(currentWeek.startStr + 'T12:00:00')}
-        currentUserId={user?.id}
-        colors={colors}
-        onClose={() => setShiftFormVisible(false)}
-        onSaved={() => {
-          setShiftFormVisible(false);
-          loadShifts();
-        }}
+      <ScheduleNavSheet visible={navOpen} onClose={() => setNavOpen(false)} current="schedules" />
+
+      <JobTitleFilterSheet
+        visible={filterOpen}
+        onClose={() => setFilterOpen(false)}
+        titles={filterTitles}
+        selected={selectedTitles}
+        onToggle={toggleTitle}
+        onClear={() => setSelectedTitles([])}
+      />
+
+      <ShiftEditSheet
+        visible={editor.visible}
+        mode={editor.mode}
+        shift={editor.shift}
+        employeeName={editor.employeeName}
+        userId={editor.userId}
+        lockEmployee={editor.mode === 'add'}
+        defaultDate={weekHasToday ? new Date() : currentWeek.start}
+        onClose={closeEditor}
+        onSaved={loadShifts}
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  container: { flex: 1 },
+
+  // Uploads · Approvals — the mockup's .btnrow / .btn (44pt glass, icon + label)
+  chipRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, marginBottom: 12 },
+  chip: {
     flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: Platform.OS === 'ios' ? 60 : 16,
-    paddingBottom: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  backButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  headerRight: {
-    width: 40,
-  },
-  premiumSection: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  premiumButtons: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  premiumButton: {
-    flex: 1,
+    height: 44,
+    borderRadius: 13,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 6,
-    borderRadius: 10,
-    gap: 4,
+    gap: 7,
+    paddingHorizontal: 10,
   },
-  premiumButtonText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  weekNav: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(128,128,128,0.15)',
-  },
+  chipLabel: { fontFamily: fonts.body.semibold, fontSize: 14, flexShrink: 1 },
+  bubble: { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 5, alignItems: 'center', justifyContent: 'center' },
+  bubbleText: { fontFamily: fonts.mono.semibold, fontSize: 10 },
+
+  // Week nav — ‹ › 38pt glass chips, display label, mono stat line
+  weekNav: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, marginBottom: 12 },
   weekArrow: {
-    padding: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  weekLabelContainer: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  weekLabel: {
-    fontSize: 17,
-    fontWeight: '700',
-    marginBottom: 3,
-  },
-  weekStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  weekStatText: {
-    fontSize: 11,
-    fontWeight: '500',
-  },
-  weekStatDot: {
-    fontSize: 11,
-  },
-  contentRow: {
-    flex: 1,
-    flexDirection: 'row',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 16,
-    paddingRight: 8,
-    paddingBottom: 40,
-  },
-  employeeCard: {
+    width: 38,
+    height: 38,
     borderRadius: 12,
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
-    elevation: 1,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  weekLabelWrap: { flex: 1, minWidth: 0, alignItems: 'center' },
+  weekLabel: { fontFamily: fonts.display.semibold, fontSize: 16, letterSpacing: -0.2, textAlign: 'center' },
+  weekStatsRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2, maxWidth: '100%' },
+  weekStats: { fontFamily: fonts.mono.medium, fontSize: 10.5, fontVariant: ['tabular-nums'], textAlign: 'center', flexShrink: 1 },
+  weekSpinner: { transform: [{ scale: 0.7 }] },
+
+  initialSpinner: { marginTop: 40 },
+  contentRow: { flex: 1, flexDirection: 'row' },
+  scrollView: { flex: 1 },
+  scrollContent: { paddingLeft: 16, paddingRight: 8, paddingBottom: 40 },
+
+  // Employee cards
+  cardWrap: { marginBottom: 8 },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12 },
+  avatar: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontFamily: fonts.display.semibold, fontSize: 12, letterSpacing: 0.2 },
+  cardBody: { flex: 1, minWidth: 0 },
+  cardName: { fontFamily: fonts.display.semibold, fontSize: 15 },
+  cardMeta: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3 },
+  jobPill: {
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 7,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    maxWidth: 130,
+  },
+  jobPillText: { fontFamily: fonts.mono.semibold, fontSize: 9, letterSpacing: 0.8, textTransform: 'uppercase' },
+  shiftCount: { fontFamily: fonts.mono.medium, fontSize: 10.5, fontVariant: ['tabular-nums'], flexShrink: 1 },
+  addBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardShifts: { paddingHorizontal: 12, paddingBottom: 6, borderTopWidth: StyleSheet.hairlineWidth },
+  noShifts: { fontFamily: fonts.mono.medium, fontSize: 11, paddingVertical: 12, textAlign: 'center' },
+  rowActions: { flexDirection: 'row', alignItems: 'center', gap: 2, marginLeft: 2 },
+  rowAction: { width: 26, height: 26, alignItems: 'center', justifyContent: 'center' },
+
+  // Empty states
+  emptyCard: { padding: 18, alignItems: 'center', gap: 6, marginBottom: 10 },
+  emptyIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
+  emptyTitle: { fontFamily: fonts.display.semibold, fontSize: 15, textAlign: 'center' },
+  emptySub: { fontFamily: fonts.body.regular, fontSize: 12.5, lineHeight: 17, textAlign: 'center' },
+  emptyAction: {
+    marginTop: 6,
+    height: 36,
+    paddingHorizontal: 14,
+    borderRadius: 11,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyActionLabel: { fontFamily: fonts.body.semibold, fontSize: 13 },
+
+  // A-Z rail (36pt, glass, r13)
+  rail: {
+    width: 36,
+    borderRadius: 13,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    marginRight: 8,
+    marginBottom: 12,
     overflow: 'hidden',
   },
-  employeeHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 12,
-  },
-  employeeHeaderLeft: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginRight: 8,
-  },
-  employeeInfo: {
-    flex: 1,
-  },
-  employeeName: {
-    fontSize: 14,
-    fontWeight: '700',
-    marginBottom: 3,
-  },
-  employeeMeta: {
+  railContent: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 6 },
+  railBtn: { width: 28, height: 21, alignItems: 'center', justifyContent: 'center' },
+  railText: { fontFamily: fonts.mono.semibold, fontSize: 10 },
+
+  // JobTitleFilterSheet
+  sheetHint: { fontFamily: fonts.body.regular, fontSize: 13, lineHeight: 18 },
+  chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  filterChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-  },
-  jobBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 5,
-  },
-  jobBadgeText: {
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  shiftCountText: {
-    fontSize: 11,
-  },
-  addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 7,
-    gap: 3,
-  },
-  addButtonText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  shiftsContainer: {
+    gap: 6,
     paddingHorizontal: 12,
-    paddingBottom: 8,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(128,128,128,0.12)',
+    paddingVertical: 9,
+    borderRadius: 11,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    maxWidth: '100%',
   },
-  noShiftsText: {
-    fontSize: 12,
-    fontStyle: 'italic',
-    paddingVertical: 8,
-    textAlign: 'center',
-  },
-  shiftRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 7,
-    gap: 6,
-  },
-  shiftDate: {
-    fontSize: 12,
-    fontWeight: '600',
-    width: 80,
-  },
-  shiftTime: {
-    fontSize: 11,
+  filterChipText: { fontFamily: fonts.body.semibold, fontSize: 12.5, flexShrink: 1 },
+  sheetFooter: { flexDirection: 'row', gap: 11, paddingTop: 12 },
+  footerBtn: {
     flex: 1,
-  },
-  shiftMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  roleBadge: {
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 4,
-  },
-  roleText: {
-    fontSize: 9,
-    fontWeight: '600',
-  },
-  flagBadge: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    height: 47,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
   },
-  flagText: {
-    fontSize: 9,
-    fontWeight: '700',
-  },
-  shiftActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginLeft: 4,
-  },
-  deleteShiftButton: {
-    padding: 2,
-  },
-  emptyFilter: {
-    alignItems: 'center',
-    padding: 32,
-  },
-  emptyFilterText: {
-    fontSize: 14,
-  },
-  alphabetNav: {
-    width: 36,
-    borderTopLeftRadius: 12,
-    borderBottomLeftRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: -1, height: 0 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  alphabetNavContent: {
-    paddingVertical: 6,
-    alignItems: 'center',
-  },
-  alphabetButton: {
-    width: 28,
-    height: 26,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginVertical: 1,
-    borderRadius: 14,
-  },
-  alphabetButtonActive: {
-    backgroundColor: '#D4A843',
-  },
-  alphabetButtonText: {
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  alphabetButtonTextActive: {
-    fontWeight: '700',
-  },
+  footerBtnDisabled: { opacity: 0.5 },
+  footerPrimary: { flex: 1.35 },
+  footerLabel: { fontFamily: fonts.body.semibold, fontSize: 15 },
 });

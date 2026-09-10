@@ -298,6 +298,13 @@ export default function NotificationDropdown({
           if (linkedType === 'leaderboard_pass') {
             if (cn.data?.targetUserId !== user?.id) continue;
           }
+          // s83 schedule rows: requests are manager-facing, decisions per-user.
+          if (linkedType === 'time_off_requested' || linkedType === 'shift_pickup_requested') {
+            if (user?.role !== 'manager' && user?.role !== 'owner') continue;
+          }
+          if (linkedType === 'time_off_decision' || linkedType === 'shift_pickup_decision') {
+            if (cn.data?.targetUserId !== user?.id) continue;
+          }
           // s62: composer/system senders store the Spanish copy in
           // data.title_es/body_es — pick the viewer's language, EN base as
           // fallback (rows sent before s62 simply have no _es keys).
@@ -372,6 +379,20 @@ export default function NotificationDropdown({
         setNotifications((prev) => prev.filter((n) => n.id !== item.id));
         onClose();
         router.push('/weekly-quizzes' as any);
+        return;
+      }
+      // s83: schedule requests → the schedule Approvals page; decisions → the
+      // Welcome Schedule tab (the tab ack clears the row server-side).
+      if (data.data?.notificationType === 'time_off_requested' || data.data?.notificationType === 'shift_pickup_requested') {
+        onClose();
+        router.push('/schedule-approvals' as any);
+        return;
+      }
+      if (data.data?.notificationType === 'time_off_decision' || data.data?.notificationType === 'shift_pickup_decision') {
+        setNotifications((prev) => prev.filter((n) => n.id !== item.id));
+        onClose();
+        const portalPrefix = (user?.role === 'manager' || user?.role === 'owner') ? '/(portal)/manager' : '/(portal)/employee';
+        router.push({ pathname: portalPrefix, params: { tab: 'schedule' } } as any);
         return;
       }
       // Manager: redemption request → Approvals

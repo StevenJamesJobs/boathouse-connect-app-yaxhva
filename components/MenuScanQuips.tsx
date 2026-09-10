@@ -14,9 +14,11 @@ import { useTranslation } from 'react-i18next';
 const ROTATE_MS = 5500;
 const FADE_MS = 250;
 
-export default function ScanQuip({ style }: { style?: StyleProp<TextStyle> }) {
+export default function ScanQuip({ style, quips: quipsProp }: { style?: StyleProp<TextStyle>; quips?: string[] }) {
   const { t } = useTranslation();
-  const quips = useMemo(
+  // s83: an optional list swaps the rotor's lines (the schedule scanner has its
+  // own set — components/schedule/scheduleQuips.ts); the menu list stays the default.
+  const menuQuips = useMemo(
     () => [
       t('menu_upload.quip_burrito', 'Teaching AI what a burrito looks like...'),
       t('menu_upload.quip_download', 'Downloading culinary intelligence...'),
@@ -43,8 +45,9 @@ export default function ScanQuip({ style }: { style?: StyleProp<TextStyle> }) {
     ],
     [t]
   );
+  const quips = quipsProp && quipsProp.length ? quipsProp : menuQuips;
 
-  const [idx, setIdx] = useState(() => Math.floor(Math.random() * 22));
+  const [idx, setIdx] = useState(() => Math.floor(Math.random() * quips.length));
   const opacity = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {

@@ -18,6 +18,7 @@ import { useUnreadQuizzes } from '@/hooks/useUnreadQuizzes';
 import { usePendingApprovals } from '@/hooks/usePendingApprovals';
 import { useUnreadAwards } from '@/hooks/useUnreadAwards';
 import { useUnreadLeaderboardPasses } from '@/hooks/useUnreadLeaderboardPasses';
+import { useScheduleAttention } from '@/hooks/useScheduleAttention';
 
 // Configure how notifications are handled when app is in foreground
 if (Platform.OS !== 'web') {
@@ -300,6 +301,13 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
               case 'approvals':
                 router.push('/manager-approvals' as any);
                 break;
+              // s83 schedule wave
+              case 'schedule-approvals':
+                router.push('/schedule-approvals' as any);
+                break;
+              case 'schedule':
+                router.push({ pathname: portalPrefix, params: { tab: 'schedule' } } as any);
+                break;
               case 'redeem':
                 router.push('/redeem' as any);
                 break;
@@ -380,6 +388,8 @@ function BadgeSyncer() {
   const { pendingCount: pendingApprovals } = usePendingApprovals();
   const { count: unreadAwards } = useUnreadAwards();
   const { unreadCount: unreadLeaderboardPasses } = useUnreadLeaderboardPasses();
+  // s83: pending schedule approvals (managers) + unseen decisions on my own requests
+  const { attention: scheduleAttention } = useScheduleAttention();
 
   useEffect(() => {
     const total =
@@ -387,9 +397,11 @@ function BadgeSyncer() {
       (unreadQuizzes || 0) +
       (pendingApprovals || 0) +
       (unreadAwards || 0) +
-      (unreadLeaderboardPasses || 0);
+      (unreadLeaderboardPasses || 0) +
+      (scheduleAttention.pendingApprovals || 0) +
+      (scheduleAttention.unseenDecisions || 0);
     Notifications.setBadgeCountAsync(total).catch(() => {});
-  }, [unreadMessages, unreadQuizzes, pendingApprovals, unreadAwards, unreadLeaderboardPasses]);
+  }, [unreadMessages, unreadQuizzes, pendingApprovals, unreadAwards, unreadLeaderboardPasses, scheduleAttention.pendingApprovals, scheduleAttention.unseenDecisions]);
 
   return null;
 }
