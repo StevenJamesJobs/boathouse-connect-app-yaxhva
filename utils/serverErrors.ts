@@ -22,6 +22,8 @@
 import i18n from '@/i18n';
 
 const EXACT_MAP: Record<string, string> = {
+  // s84 profile hub (update_profile_info)
+  'Tagline must be 60 characters or fewer': 'server_errors.s84_tagline_too_long',
   // s83 schedule wave (request_time_off / decide_* / release_shift / claim_shift /
   // get_schedule_approvals / create_schedule_upload / parse-schedule credits)
   'Time off requests are turned off for your organization': 'server_errors.s83_time_off_disabled',

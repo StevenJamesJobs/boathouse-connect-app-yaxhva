@@ -18,7 +18,7 @@ import {
   NativeScrollEvent,
 } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from "expo-router/react-navigation";
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useManagerPermissions } from '@/hooks/useManagerPermissions';
@@ -789,6 +789,18 @@ export default function ManagerManageScreen() {
     pagerRef.current?.scrollToIndex({ index, animated: true });
   }, []);
 
+  // s84: `?pane=employees` (the Profile hub's Team tile) lands on that pane. Tab screens
+  // stay mounted, so the param is read whenever it changes, not only on mount.
+  const { pane: paneParam } = useLocalSearchParams<{ pane?: string }>();
+  useEffect(() => {
+    if (!paneParam) return;
+    const idx = PANES.indexOf(paneParam as PaneKey);
+    if (idx >= 0) {
+      const id = setTimeout(() => goTab(idx), 60);
+      return () => clearTimeout(id);
+    }
+  }, [paneParam, goTab]);
+
   const onPagerMomentumEnd = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const index = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
     setActiveTab(index);
@@ -871,7 +883,7 @@ export default function ManagerManageScreen() {
         buttons={
           shiftsAttn
             ? [
-                { label: t('manager_manage.add_employees', 'Add Employees'), android: 'group-add', ios: 'person.badge.plus', primary: true, onPress: () => router.push('/employee-editor') },
+                { label: t('manager_manage.add_employees', 'Add Employees'), android: 'group-add', ios: 'person.badge.plus', primary: true, onPress: () => goTab(2) },
                 { label: t('manager_manage.add_schedules', 'Add Schedules'), android: 'upload-file', ios: 'calendar.badge.plus', onPress: () => router.push('/manual-schedule') },
               ]
             : [
@@ -1149,7 +1161,7 @@ export default function ManagerManageScreen() {
 
       <Text style={[styles.glabel, styles.glabelOwn, { color: colors.blueText }]}>{t('manager_manage.group_management', 'Management · Owner')}</Text>
       <View style={styles.dir}>
-        <DirectoryChip colors={colors} icon="people" ios="person.2.fill" title={t('manager_manage.dir_employees', 'Employees')} sub={`${tiles.staffCount} ${t('manager_manage.dir_sub_staff', 'STAFF')}`} onPress={() => router.push('/employee-editor')} />
+        <DirectoryChip colors={colors} icon="people" ios="person.2.fill" title={t('manager_manage.dir_employees', 'Employees')} sub={`${tiles.staffCount} ${t('manager_manage.dir_sub_staff', 'STAFF')}`} onPress={() => goTab(2)} />
         <DirectoryChip colors={colors} icon="event" ios="calendar.badge.clock" title={t('manager_manage.dir_schedules', 'Schedules')} sub={`${t('manager_manage.dir_sub_wk', 'WK')} ${weekLabel}`} onPress={() => router.push('/manual-schedule')} />
         {isOwner && (
           <DirectoryChip colors={colors} icon="settings" ios="gearshape.fill" title={t('manager_manage.dir_org_settings', 'Org Settings')} ownerTag={t('manager_manage.owner_tag', 'Owner')} sub={t('manager_manage.dir_sub_org', 'BRANDING · ACCESS')} onPress={() => router.push('/organization-settings')} />

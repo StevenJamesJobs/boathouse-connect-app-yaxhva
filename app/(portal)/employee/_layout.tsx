@@ -52,6 +52,7 @@ export default function EmployeeLayout() {
   const onMenus = lastSegment === 'menus';
   // Tools joined in s79 (the command-tile page renders transparent like Menus).
   const onTools = lastSegment === 'tools';
+  const onProfile = lastSegment === 'profile'; // s84: the Profile hub is a glass page too
   // B8 inverse of the manager-shell guard: when the (re)validated role is manager/owner,
   // hop up to the manager portal so a promotion is as visible as a demotion. Nothing
   // legitimately navigates a manager INTO the employee shell (verified in the B8 recon);
@@ -64,7 +65,7 @@ export default function EmployeeLayout() {
       {/* Ambient glow on the transparent, edge-to-edge tabs (Welcome + Rewards);
           absolute → no layout impact; the transparent spacer + transparent screen
           let it read edge-to-edge under the status bar. */}
-      {(onWelcome || onRewards || onMenus || onTools) && <AmbientGlow />}
+      {(onWelcome || onRewards || onMenus || onTools || onProfile) && <AmbientGlow />}
       <View style={{ height: insets.top }} />
       <Tabs
         tabBar={(props) => <EmployeeTabBar {...props} />}

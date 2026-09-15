@@ -1,1188 +1,646 @@
-
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
-  ScrollView,
   StyleSheet,
+  FlatList,
+  ScrollView,
+  Pressable,
   TouchableOpacity,
   ActivityIndicator,
   Alert,
   RefreshControl,
+  Share,
   Animated,
-  Dimensions,
 } from 'react-native';
-import { Swipeable } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { useAuth } from '@/contexts/AuthContext';
-import { getOrgDirectory } from '@/utils/orgDirectory';
-import { useOrganization } from '@/contexts/OrganizationContext';
-import { useThemeColors } from '@/hooks/useThemeColors';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as WebBrowser from 'expo-web-browser';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import AmbientGlow from '@/components/AmbientGlow';
+import ScreenHeader from '@/components/ScreenHeader';
+import GlassCard from '@/components/GlassCard';
+import GlassActionSheet, { GlassAction } from '@/components/GlassActionSheet';
 import { IconSymbol } from '@/components/IconSymbol';
-import { StorageImage } from '@/components/StorageImage';
-import { supabase } from '@/app/integrations/supabase/client';
-import { refreshAllUnreadCounts } from '@/hooks/useUnreadMessages';
+import { useAppTheme } from '@/contexts/ThemeContext';
+import { fonts } from '@/constants/fonts';
+import { resolveForOpen } from '@/utils/storageResolver';
+import FilterRail, { FilterChip } from '@/components/messages/FilterRail';
+import InboxMeter from '@/components/messages/InboxMeter';
+import DateSeparator from '@/components/messages/DateSeparator';
+import MessageRow, { namesLine } from '@/components/messages/MessageRow';
+import FilesGallery from '@/components/messages/FilesGallery';
+import { dateBucketOf, msgHue, type MessageFilter } from '@/components/messages/messageVisuals';
+import {
+  useMessageDirectory,
+  type MessageThread,
+  type MessageAttachment,
+} from '@/components/messages/useMessageDirectory';
 
-interface Message {
-  id: string;
-  sender_id: string;
-  subject: string | null;
-  body: string;
-  parent_message_id: string | null;
-  thread_id: string | null;
-  created_at: string;
-  sender_name: string;
-  sender_job_title: string;
-  sender_profile_picture: string | null;
-  is_read: boolean;
-  recipient_count: number;
-  recipient_id?: string;
-  recipient_names?: string[];
-  reply_count?: number;
-  image_url?: string | null;
-  file_url?: string | null;
-  file_name?: string | null;
-}
+type ListItem =
+  | { type: 'sep'; key: string; label: string; count: number; first: boolean }
+  | { type: 'row'; key: string; thread: MessageThread; hairline: boolean };
+
+const FAB_SIZE = 58;
+// Rail order = swipe order. Files sits last (Steve's round).
+const FILTERS: MessageFilter[] = ['all', 'unread', 'sent', 'groups', 'files'];
+// A horizontal drag on the list body flips the filter (the rows keep their own
+// left-swipe actions; a rightward drag on a row is released to this pager).
+const PAGE_SWIPE_DISTANCE = 64;
+const PAGE_SWIPE_VELOCITY = 650;
 
 export default function MessagesScreen() {
-  const { user } = useAuth();
-  const { organizationId } = useOrganization();
   const router = useRouter();
-  const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<'inbox' | 'sent'>('inbox');
-  const [inboxMessages, setInboxMessages] = useState<Message[]>([]);
-  const [sentMessages, setSentMessages] = useState<Message[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [inboxCount, setInboxCount] = useState(0);
+  const { t, i18n } = useTranslation();
+  const { colors, resolvedMode } = useAppTheme();
+  const isDark = resolvedMode === 'dark';
+  const insets = useSafeAreaInsets();
+  const dir = useMessageDirectory();
+  const { reload } = dir;
+
+  const [filter, setFilter] = useState<MessageFilter>('all');
   const [selectionMode, setSelectionMode] = useState(false);
-  const [selectedMessages, setSelectedMessages] = useState<Set<string>>(new Set());
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [sheetThread, setSheetThread] = useState<MessageThread | null>(null);
+  const [sheetFile, setSheetFile] = useState<MessageAttachment | null>(null);
+  const loadedOnce = useRef(false);
 
-  const colors = useThemeColors();
-  const isManager = user?.role === 'manager' || user?.role === 'owner';
-
-  const loadInboxMessages = useCallback(async () => {
-    if (!user?.id) return;
-
-    // Roster for sender/recipient name/title/avatar hydration (replaces the users(...) embeds).
-    const dir = await getOrgDirectory(user.id);
-    const dirById = new Map(dir.map((r) => [r.id, r]));
-
-    // All non-deleted recipient rows for this user, with the per-thread
-    // aggregates (recipients, reply count, unread flag) computed server-side.
-    const { data, error } = await supabase.rpc('get_inbox', { p_actor_id: user.id });
-
-    if (error) {
-      console.error('Error loading inbox:', error);
-      throw error;
-    }
-
-    // Banner counts raw (pre-filter) rows — the same set the old head-count query counted.
-    setInboxCount((data || []).length);
-
-    // Filter out feedback messages and group by thread
-    const threadMap = new Map<string, any>();
-    
-    for (const item of (data || [])) {
-      if (item.subject?.startsWith('[FEEDBACK]')) {
-        continue;
-      }
-
-      const threadId = item.thread_id || item.message_id;
-
-      if (!threadMap.has(threadId)) {
-        const recipientNames = (item.recipient_ids || []).map((id: string) => dirById.get(id)?.name).filter(Boolean);
-
-        threadMap.set(threadId, {
-          id: item.message_id,
-          sender_id: item.sender_id,
-          subject: item.subject,
-          body: item.body,
-          image_url: item.image_url || null,
-          file_url: item.file_url || null,
-          file_name: item.file_name || null,
-          parent_message_id: item.parent_message_id,
-          thread_id: item.thread_id,
-          created_at: item.message_created_at,
-          sender_name: dirById.get(item.sender_id)?.name || 'Unknown',
-          sender_job_title: dirById.get(item.sender_id)?.job_title || '',
-          sender_profile_picture: dirById.get(item.sender_id)?.profile_picture_url || null,
-          is_read: !item.thread_has_unread,
-          recipient_count: recipientNames.length,
-          recipient_id: item.recipient_id,
-          recipient_names: recipientNames,
-          reply_count: item.reply_count || 0,
-        });
-      } else {
-        // Update to latest message time
-        const existing = threadMap.get(threadId);
-        if (new Date(item.message_created_at) > new Date(existing.created_at)) {
-          existing.created_at = item.message_created_at;
-        }
-        // Check if this specific message is unread
-        if (!item.is_read) {
-          existing.is_read = false;
-        }
-      }
-    }
-
-    const messages = Array.from(threadMap.values()).sort((a, b) => 
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
-
-    console.log('Loaded inbox messages:', messages.length);
-    setInboxMessages(messages);
-  }, [user?.id]);
-
-  const loadSentMessages = useCallback(async () => {
-    if (!user?.id) return;
-
-    const dir = await getOrgDirectory(user.id);
-    const dirById = new Map(dir.map((r) => [r.id, r]));
-
-    const { data, error } = await supabase.rpc('get_sent_messages', { p_actor_id: user.id });
-
-    if (error) {
-      console.error('Error loading sent messages:', error);
-      throw error;
-    }
-
-    // Filter out feedback messages and group by thread
-    const threadMap = new Map<string, any>();
-    
-    for (const msg of (data || [])) {
-      if (msg.subject?.startsWith('[FEEDBACK]')) {
-        continue;
-      }
-
-      const threadId = msg.thread_id || msg.id;
-      const recipientNames = (msg.recipient_ids || []).map((id: string) => dirById.get(id)?.name).filter(Boolean);
-
-      if (!threadMap.has(threadId)) {
-        threadMap.set(threadId, {
-          id: msg.id,
-          sender_id: msg.sender_id,
-          subject: msg.subject,
-          body: msg.body,
-          image_url: msg.image_url || null,
-          file_url: msg.file_url || null,
-          file_name: msg.file_name || null,
-          parent_message_id: msg.parent_message_id,
-          thread_id: msg.thread_id,
-          created_at: msg.created_at,
-          sender_name: user.name,
-          sender_job_title: user.jobTitle,
-          sender_profile_picture: user.profilePictureUrl || null,
-          is_read: true,
-          recipient_count: recipientNames.length,
-          recipient_names: recipientNames,
-          reply_count: msg.reply_count || 0,
-        });
-      } else {
-        // Update to latest message time
-        const existing = threadMap.get(threadId);
-        if (new Date(msg.created_at) > new Date(existing.created_at)) {
-          existing.created_at = msg.created_at;
-        }
-      }
-    }
-
-    const messages = Array.from(threadMap.values()).sort((a, b) => 
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
-
-    setSentMessages(messages);
-  }, [user?.id, user?.name, user?.jobTitle, user?.profilePictureUrl]);
-
-  const loadUnreadCount = useCallback(async () => {
-    if (!user?.id) return;
-
-    const { data, error } = await supabase.rpc('get_unread_message_count', {
-      user_id: user.id,
-      p_organization_id: organizationId,
-    });
-
-    if (!error && data !== null) {
-      console.log('Unread count:', data);
-      setUnreadCount(data);
-    }
-  }, [user?.id]);
-
-  const loadMessages = useCallback(async () => {
-    if (!user?.id) return;
-
-    try {
-      setLoading(true);
-
-      if (activeTab === 'inbox') {
-        await loadInboxMessages();
-      } else if (activeTab === 'sent') {
-        await loadSentMessages();
-      }
-    } catch (error) {
-      console.error('Error loading messages:', error);
-      Alert.alert(t('common.error'), t('messages.error_load'));
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.id, activeTab, loadInboxMessages, loadSentMessages]);
-
-  // Refresh when screen comes into focus
+  // Reload whenever the screen gains focus (returning from a thread / compose).
   useFocusEffect(
     useCallback(() => {
-      console.log('Messages screen focused, refreshing data...');
-      loadMessages();
-      loadUnreadCount();
-    }, [loadMessages, loadUnreadCount])
+      reload().then((ok) => {
+        if (ok) loadedOnce.current = true;
+        else Alert.alert(t('common.error'), t('messages.error_load'));
+      });
+    }, [reload, t]),
   );
 
-  useEffect(() => {
-    loadMessages();
-    loadUnreadCount();
-  }, [loadMessages, loadUnreadCount]);
+  const onRefresh = useCallback(async () => {
+    const ok = await dir.refresh();
+    if (!ok) Alert.alert(t('common.error'), t('messages.error_load'));
+  }, [dir.refresh, t]);
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await loadMessages();
-    await loadUnreadCount();
-    setRefreshing(false);
-  };
+  // ── Filters ──────────────────────────────────────────────────────────────
+  const chips: FilterChip[] = useMemo(
+    () => [
+      { key: 'all', label: t('messages.filter_all') },
+      { key: 'unread', label: t('messages.filter_unread'), count: dir.unreadThreads.length },
+      { key: 'sent', label: t('messages.sent'), iosIcon: 'paperplane', androidIcon: 'send' },
+      { key: 'groups', label: t('messages.filter_groups'), iosIcon: 'person.2', androidIcon: 'group' },
+      { key: 'files', label: t('messages.filter_files'), count: dir.attachments.length, iosIcon: 'paperclip', androidIcon: 'attach-file' },
+    ],
+    [t, dir.unreadThreads.length, dir.attachments.length],
+  );
 
-  const handleMessagePress = (message: Message) => {
-    if (selectionMode) {
-      toggleMessageSelection(message.id);
-    } else {
-      router.push({
-        pathname: '/message-detail',
-        params: { messageId: message.id, threadId: message.thread_id || message.id },
-      });
-    }
-  };
+  // The body slides 22pt in from the side you swiped toward and fades up — the
+  // feedback that a page turned, without a full pager.
+  const slideX = useRef(new Animated.Value(0)).current;
+  const slideA = useRef(new Animated.Value(1)).current;
+  const filterRef = useRef<MessageFilter>('all');
+  filterRef.current = filter;
 
-  const toggleMessageSelection = (messageId: string) => {
-    const newSelected = new Set(selectedMessages);
-    if (newSelected.has(messageId)) {
-      newSelected.delete(messageId);
-    } else {
-      newSelected.add(messageId);
-    }
-    setSelectedMessages(newSelected);
-    
-    if (newSelected.size === 0) {
+  const changeFilter = useCallback(
+    (next: MessageFilter, direction: -1 | 0 | 1 = 0) => {
+      if (!FILTERS.includes(next) || next === filterRef.current) return;
+      setFilter(next);
       setSelectionMode(false);
-    }
-  };
-
-  const handleLongPress = (messageId: string) => {
-    setSelectionMode(true);
-    setSelectedMessages(new Set([messageId]));
-  };
-
-  const handleBatchMarkAsRead = async () => {
-    if (!user?.id || selectedMessages.size === 0) return;
-
-    try {
-      const messageIds = Array.from(selectedMessages);
-      
-      // For each selected message, mark the entire thread as read
-      for (const messageId of messageIds) {
-        const message = inboxMessages.find(m => m.id === messageId);
-        if (!message) continue;
-        
-        const threadId = message.thread_id || message.id;
-
-        // Mark all messages in thread as read (expanded server-side)
-        await supabase.rpc('mark_thread_read', {
-          p_actor_id: user.id,
-          p_message_id: messageId,
-          p_thread_id: threadId,
-        });
+      setSelected(new Set());
+      if (direction !== 0) {
+        slideX.setValue(22 * direction);
+        slideA.setValue(0.35);
+        Animated.parallel([
+          Animated.spring(slideX, { toValue: 0, useNativeDriver: true, speed: 22, bounciness: 4 }),
+          Animated.timing(slideA, { toValue: 1, duration: 180, useNativeDriver: true }),
+        ]).start();
       }
+    },
+    [slideX, slideA],
+  );
 
-      await loadMessages();
-      await loadUnreadCount();
-      // Immediately refresh badge counts on tab bar + WelcomeHeader
-      refreshAllUnreadCounts();
-      setSelectionMode(false);
-      setSelectedMessages(new Set());
-      Alert.alert(t('common.success'), t('messages.marked_as_read_success', { count: messageIds.length }));
-    } catch (error) {
-      console.error('Error marking messages as read:', error);
-      Alert.alert(t('common.error'), t('messages.error_mark_read'));
+  const stepFilter = useCallback(
+    (step: -1 | 1) => {
+      const idx = FILTERS.indexOf(filterRef.current);
+      const next = FILTERS[idx + step];
+      if (next) changeFilter(next, step);
+    },
+    [changeFilter],
+  );
+
+  // Horizontal pan on the body; vertical movement fails it so the lists still scroll,
+  // and a row's own Swipeable (activeOffsetX 10) wins a leftward drag that starts on it.
+  const pageGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .activeOffsetX([-28, 28])
+        .failOffsetY([-14, 14])
+        .runOnJS(true)
+        .onEnd((e) => {
+          if (e.translationX <= -PAGE_SWIPE_DISTANCE || e.velocityX <= -PAGE_SWIPE_VELOCITY) stepFilter(1);
+          else if (e.translationX >= PAGE_SWIPE_DISTANCE || e.velocityX >= PAGE_SWIPE_VELOCITY) stepFilter(-1);
+        }),
+    [stepFilter],
+  );
+
+  const threads = dir.threadsFor(filter);
+
+  const bucketLabel = useCallback(
+    (bucket: string): string => {
+      if (bucket === 'today') return t('messages.group_today');
+      if (bucket === 'yesterday') return t('messages.yesterday');
+      if (bucket === 'earlier_week') return t('messages.group_earlier_week');
+      const [y, m] = bucket.split('-').map(Number);
+      const month = new Date(y, (m || 1) - 1, 1).toLocaleDateString(i18n.language, { month: 'long' });
+      const label = month.charAt(0).toUpperCase() + month.slice(1);
+      return y !== new Date().getFullYear() ? `${label} ${y}` : label;
+    },
+    [t, i18n.language],
+  );
+
+  const items: ListItem[] = useMemo(() => {
+    const now = new Date();
+    const groups: { bucket: string; threads: MessageThread[] }[] = [];
+    for (const th of threads) {
+      const bucket = dateBucketOf(th.createdAt, now);
+      const last = groups[groups.length - 1];
+      if (last && last.bucket === bucket) last.threads.push(th);
+      else groups.push({ bucket, threads: [th] });
     }
+    const out: ListItem[] = [];
+    groups.forEach((g, gi) => {
+      out.push({ type: 'sep', key: `sep:${g.bucket}`, label: bucketLabel(g.bucket), count: g.threads.length, first: gi === 0 });
+      g.threads.forEach((th, i) => out.push({ type: 'row', key: th.key, thread: th, hairline: i > 0 }));
+    });
+    return out;
+  }, [threads, bucketLabel]);
+
+  // ── Selection ────────────────────────────────────────────────────────────
+  const toggleSelect = (key: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   };
 
-  const handleBatchDelete = async () => {
-    if (!user?.id || selectedMessages.size === 0) return;
-    const actorId = user.id;
-
-    const messageType = 'message';
-    const count = selectedMessages.size;
-    
-    Alert.alert(
-      t('messages.delete_confirm_title', { count, type: messageType }),
-      t('messages.delete_confirm_msg', { count, type: messageType }),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('common.delete'),
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const messageIds = Array.from(selectedMessages);
-
-              if (activeTab === 'inbox') {
-                // Delete the whole thread for each selected card (roots = thread_id||id)
-                const threadRoots = messageIds.map((id) => {
-                  const card = inboxMessages.find((m) => m.id === id);
-                  return card?.thread_id || id;
-                });
-                await supabase.rpc('delete_received_thread', {
-                  p_actor_id: actorId,
-                  p_thread_ids: threadRoots,
-                });
-              } else {
-                // Soft delete sent threads - mark as deleted by sender
-                for (const id of messageIds) {
-                  const card = sentMessages.find((m) => m.id === id);
-                  await supabase.rpc('delete_sent_thread', {
-                    p_actor_id: actorId,
-                    p_thread_id: card?.thread_id || id,
-                  });
-                }
-              }
-
-              await loadMessages();
-              await loadUnreadCount();
-              // Immediately refresh badge counts on tab bar + WelcomeHeader
-              refreshAllUnreadCounts();
-              setSelectionMode(false);
-              setSelectedMessages(new Set());
-              Alert.alert(t('common.success'), t('messages.deleted_success', { count, type: messageType }));
-            } catch (error) {
-              console.error('Error deleting messages:', error);
-              Alert.alert(t('common.error'), t('messages.error_delete'));
-            }
-          },
-        },
-      ]
-    );
+  const exitSelection = () => {
+    setSelectionMode(false);
+    setSelected(new Set());
   };
 
-  const handleMarkAsRead = async (message: Message) => {
-    if (!user?.id) return;
+  const selectedThreads = useMemo(
+    () => Array.from(selected).map((k) => dir.threadByKey(k)).filter((x): x is MessageThread => !!x),
+    [selected, dir.threadByKey],
+  );
+  const selectedInbox = selectedThreads.filter((th) => th.box === 'inbox');
 
+  // ── Actions ──────────────────────────────────────────────────────────────
+  const openThread = (th: MessageThread) => {
+    router.push({ pathname: '/message-detail', params: { messageId: th.id, threadId: th.threadId } });
+  };
+
+  const onRowPress = (th: MessageThread) => {
+    if (selectionMode) toggleSelect(th.key);
+    else openThread(th);
+  };
+
+  const markRead = async (list: MessageThread[], announce: boolean) => {
     try {
-      const threadId = message.thread_id || message.id;
-
-      // Mark all messages in thread as read (expanded server-side)
-      await supabase.rpc('mark_thread_read', {
-        p_actor_id: user.id,
-        p_message_id: message.id,
-        p_thread_id: threadId,
-      });
-
-      await loadMessages();
-      await loadUnreadCount();
-      // Immediately refresh badge counts on tab bar + WelcomeHeader
-      refreshAllUnreadCounts();
+      await dir.markThreadsRead(list);
+      if (announce) {
+        Alert.alert(t('common.success'), t('messages.marked_as_read_success', { count: list.length }));
+      }
     } catch (error) {
       console.error('Error marking as read:', error);
       Alert.alert(t('common.error'), t('messages.error_mark_read'));
     }
   };
 
-  const handleDeleteMessage = async (message: Message) => {
-    if (!user?.id) return;
-    const actorId = user.id;
-    const messageType = 'message';
-    const count = 1;
-
-    Alert.alert(
-      t('messages.delete_confirm_title', { count, type: messageType }),
-      activeTab === 'inbox'
-        ? t('messages.delete_inbox_confirm', { type: messageType })
-        : t('messages.delete_sent_confirm'),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('common.delete'),
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              if (activeTab === 'inbox') {
-                // Whole thread, recipient-scoped, expanded server-side
-                await supabase.rpc('delete_received_thread', {
-                  p_actor_id: actorId,
-                  p_thread_ids: [message.thread_id || message.id],
-                });
-              } else {
-                // Soft delete sent messages - mark as deleted by sender
-                // (whole thread, sender-scoped, expanded server-side)
-                await supabase.rpc('delete_sent_thread', {
-                  p_actor_id: actorId,
-                  p_thread_id: message.thread_id || message.id,
-                });
-              }
-
-              await loadMessages();
-              await loadUnreadCount();
-              // Immediately refresh badge counts on tab bar + WelcomeHeader
-              refreshAllUnreadCounts();
-              Alert.alert(t('common.success'), t('messages.deleted_success', { count, type: messageType }));
-            } catch (error) {
-              console.error('Error deleting message:', error);
-              Alert.alert(t('common.error'), t('messages.error_delete'));
-            }
-          },
+  const confirmDelete = (list: MessageThread[]) => {
+    if (list.length === 0) return;
+    const count = list.length;
+    const type = 'message';
+    const body =
+      count === 1
+        ? list[0].box === 'inbox'
+          ? t('messages.delete_inbox_confirm', { type })
+          : t('messages.delete_sent_confirm')
+        : t('messages.delete_confirm_msg', { count, type });
+    Alert.alert(t('messages.delete_confirm_title', { count, type }), body, [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('common.delete'),
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await dir.deleteThreads(list);
+            exitSelection();
+            Alert.alert(t('common.success'), t('messages.deleted_success', { count, type }));
+          } catch (error) {
+            console.error('Error deleting messages:', error);
+            Alert.alert(t('common.error'), t('messages.error_delete'));
+          }
         },
-      ]
+      },
+    ]);
+  };
+
+  const replyAll = (th: MessageThread) => {
+    router.push({
+      pathname: '/compose-message',
+      params: {
+        replyToMessageId: th.threadId,
+        replyToSenderId: th.senderId,
+        replyAllRecipientIds: th.participantIds.join(','),
+        replySubject: th.subject || '',
+        isReplyAll: 'true',
+      },
+    });
+  };
+
+  const onBatchMarkRead = async () => {
+    if (selectedInbox.length === 0) return;
+    await markRead(selectedInbox, true);
+    exitSelection();
+  };
+
+  // Thread long-press sheet
+  const threadActions: GlassAction[] = useMemo(() => {
+    const th = sheetThread;
+    if (!th) return [];
+    const list: GlassAction[] = [];
+    if (th.box === 'inbox' && !th.isRead) {
+      list.push({
+        key: 'read',
+        label: t('messages.mark_as_read'),
+        iosIcon: 'envelope.open',
+        androidIcon: 'mark-email-read',
+        onPress: () => markRead([th], false),
+      });
+    }
+    list.push({
+      key: 'reply',
+      label: t('messages.reply'),
+      iosIcon: 'arrowshape.turn.up.left',
+      androidIcon: 'reply',
+      onPress: () => replyAll(th),
+    });
+    list.push({
+      key: 'select',
+      label: t('messages.select_messages'),
+      iosIcon: 'checkmark.circle',
+      androidIcon: 'check-circle',
+      onPress: () => {
+        setSelectionMode(true);
+        setSelected(new Set([th.key]));
+      },
+    });
+    list.push({
+      key: 'delete',
+      label: t('common.delete'),
+      iosIcon: 'trash',
+      androidIcon: 'delete',
+      destructive: true,
+      onPress: () => confirmDelete([th]),
+    });
+    return list;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sheetThread, t]);
+
+  // ── Files ────────────────────────────────────────────────────────────────
+  const openAttachmentThread = (a: MessageAttachment) => {
+    const th = dir.threadByKey(`${a.box}:${a.threadId}`);
+    if (th) openThread(th);
+    else router.push({ pathname: '/message-detail', params: { messageId: a.messageId, threadId: a.threadId } });
+  };
+
+  const openFile = async (a: MessageAttachment) => {
+    try {
+      await WebBrowser.openBrowserAsync(await resolveForOpen(a.url, { tier: 'file' }));
+    } catch (err) {
+      console.error('Error opening file:', err);
+      Alert.alert(t('common.error'), t('messages.error_open_file'));
+    }
+  };
+
+  const shareAttachment = async (a: MessageAttachment) => {
+    try {
+      const url = await resolveForOpen(a.url, { tier: a.kind === 'photo' ? 'image' : 'file' });
+      const base = a.url.split('?')[0];
+      const name = a.fileName || base.substring(base.lastIndexOf('/') + 1) || `attachment_${Date.now()}`;
+      const downloadsDir = `${FileSystem.cacheDirectory}downloads/`;
+      const info = await FileSystem.getInfoAsync(downloadsDir);
+      if (!info.exists) await FileSystem.makeDirectoryAsync(downloadsDir, { intermediates: true });
+      const result = await FileSystem.downloadAsync(url, `${downloadsDir}${Date.now()}_${name}`);
+      if (result.status !== 200) throw new Error(`Download failed with status ${result.status}`);
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(result.uri, { dialogTitle: name });
+      } else {
+        await Share.share({ url, message: url });
+      }
+    } catch (err) {
+      console.error('Error sharing attachment:', err);
+      Alert.alert(t('common.error'), t('messages.error_share'));
+    }
+  };
+
+  const fileActions: GlassAction[] = useMemo(() => {
+    const a = sheetFile;
+    if (!a) return [];
+    return [
+      { key: 'open', label: t('messages.open_message'), iosIcon: 'envelope', androidIcon: 'mail', onPress: () => openAttachmentThread(a) },
+      { key: 'share', label: t('messages.share'), iosIcon: 'square.and.arrow.up', androidIcon: 'share', onPress: () => shareAttachment(a) },
+    ];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sheetFile, t]);
+
+  // ── Render ───────────────────────────────────────────────────────────────
+  const showSpinner = dir.loading && !loadedOnce.current;
+  const listBottomPad = insets.bottom + FAB_SIZE + 52;
+  const azure = msgHue('read', isDark);
+  const red = msgHue('delete', isDark);
+  const selectHidden = filter === 'files';
+
+  const selectChip = (
+    <Pressable
+      onPress={() => (selectionMode ? exitSelection() : setSelectionMode(true))}
+      disabled={selectHidden}
+      accessibilityRole="button"
+      accessibilityLabel={selectionMode ? t('messages.done') : t('messages.select')}
+      style={[
+        styles.selectChip,
+        { backgroundColor: colors.glass, borderColor: colors.glassBorder },
+        selectHidden && { opacity: 0 },
+      ]}
+    >
+      <IconSymbol
+        ios_icon_name={selectionMode ? 'checkmark' : 'checkmark.square'}
+        android_material_icon_name={selectionMode ? 'check' : 'check-box'}
+        size={15}
+        color={colors.text}
+      />
+      <Text style={[styles.selectLabel, { color: colors.text }]}>
+        {selectionMode ? t('messages.done') : t('messages.select')}
+      </Text>
+    </Pressable>
+  );
+
+  const emptyFor = (f: MessageFilter): { ios: string; android: string; text: string } => {
+    switch (f) {
+      case 'unread':
+        return { ios: 'checkmark.circle', android: 'done-all', text: t('messages.no_unread') };
+      case 'sent':
+        return { ios: 'paperplane', android: 'send', text: t('messages.no_sent_messages') };
+      case 'files':
+        return { ios: 'paperclip', android: 'attach-file', text: t('messages.no_files') };
+      case 'groups':
+        return { ios: 'person.2', android: 'group', text: t('messages.no_groups') };
+      default:
+        return { ios: 'tray', android: 'inbox', text: t('messages.no_inbox_messages') };
+    }
+  };
+
+  const renderEmpty = () => {
+    const e = emptyFor(filter);
+    return (
+      <View style={styles.empty}>
+        <IconSymbol ios_icon_name={e.ios} android_material_icon_name={e.android} size={44} color={colors.textSecondary} />
+        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{e.text}</Text>
+      </View>
     );
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffHours / 24);
+  const cardSide = { backgroundColor: colors.surface, borderColor: colors.surfaceBorder };
 
-    if (diffHours < 1) return t('messages.just_now');
-    if (diffHours < 24) return t('messages.hours_ago', { count: diffHours });
-    if (diffDays === 1) return t('messages.yesterday');
-    if (diffDays < 7) return t('messages.days_ago', { count: diffDays });
-
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  };
-
-  const getInboxWarning = () => {
-    if (inboxCount >= 38) {
+  const renderItem = ({ item }: { item: ListItem }) => {
+    if (item.type === 'sep') {
       return (
-        <View style={[styles.warningBanner, { backgroundColor: '#E74C3C' }]}>
-          <IconSymbol
-            ios_icon_name="exclamationmark.triangle.fill"
-            android_material_icon_name="warning"
-            size={20}
-            color="#FFFFFF"
-          />
-          <Text style={styles.warningText}>
-            {t('messages.inbox_almost_full', { count: inboxCount })}
-          </Text>
+        <View style={[styles.cell, styles.sepCell, cardSide]}>
+          <DateSeparator label={item.label} count={item.count} first={item.first} />
         </View>
       );
     }
-    if (inboxCount >= 35) {
-      return (
-        <View style={[styles.warningBanner, { backgroundColor: '#F39C12' }]}>
-          <IconSymbol
-            ios_icon_name="exclamationmark.triangle.fill"
-            android_material_icon_name="warning"
-            size={20}
-            color="#FFFFFF"
-          />
-          <Text style={styles.warningText}>
-            {t('messages.inbox_getting_full', { count: inboxCount })}
-          </Text>
-        </View>
-      );
-    }
-    return null;
+    return (
+      <View style={[styles.cell, cardSide]}>
+        <MessageRow
+          thread={item.thread}
+          hairline={item.hairline}
+          selectionMode={selectionMode}
+          selected={selected.has(item.thread.key)}
+          onPress={() => onRowPress(item.thread)}
+          onLongPress={() => setSheetThread(item.thread)}
+          onMarkRead={() => markRead([item.thread], false)}
+          onDelete={() => confirmDelete([item.thread])}
+        />
+      </View>
+    );
   };
 
-  const messages = activeTab === 'inbox' ? inboxMessages : sentMessages;
+  const refreshControl = <RefreshControl refreshing={dir.refreshing} onRefresh={onRefresh} tintColor={colors.tint} />;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.card }]}>
-        {selectionMode ? (
-          <>
-            <TouchableOpacity 
-              onPress={() => {
-                setSelectionMode(false);
-                setSelectedMessages(new Set());
-              }} 
-              style={styles.backButton}
-            >
-              <IconSymbol
-                ios_icon_name="xmark"
-                android_material_icon_name="close"
-                size={24}
-                color={colors.text}
-              />
-            </TouchableOpacity>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>
-              {t('messages.selected', { count: selectedMessages.size })}
-            </Text>
-            <View style={styles.headerRight} />
-          </>
-        ) : (
-          <>
-            <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-              <IconSymbol
-                ios_icon_name="chevron.left"
-                android_material_icon_name="chevron-left"
-                size={24}
-                color={colors.text}
-              />
-            </TouchableOpacity>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>{t('messages.title')}</Text>
-            <View style={styles.headerRight} />
-          </>
-        )}
-      </View>
+      <AmbientGlow />
+      <ScreenHeader title={t('messages.title')} right={selectChip} rightWide />
 
-      {/* Selection Mode Actions */}
-      {selectionMode && (
-        <View style={[styles.selectionActions, { backgroundColor: colors.card }]}>
-          {(activeTab === 'inbox') && (
-            <TouchableOpacity
-              style={[styles.selectionButton, { backgroundColor: '#3498DB' }]}
-              onPress={handleBatchMarkAsRead}
-            >
-              <IconSymbol
-                ios_icon_name="checkmark.circle"
-                android_material_icon_name="check-circle"
-                size={20}
-                color="#FFFFFF"
-              />
-              <Text style={styles.selectionButtonText}>{t('messages.mark_as_read')}</Text>
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity
-            style={[styles.selectionButton, { backgroundColor: '#E74C3C' }]}
-            onPress={handleBatchDelete}
-          >
-            <IconSymbol
-              ios_icon_name="trash"
-              android_material_icon_name="delete"
-              size={20}
-              color="#FFFFFF"
-            />
-            <Text style={styles.selectionButtonText}>{t('common.delete')}</Text>
-          </TouchableOpacity>
+      <FilterRail chips={chips} value={filter} onChange={(next) => changeFilter(next, 0)} />
+      {filter !== 'sent' && filter !== 'files' && <InboxMeter count={dir.inboxCount} />}
+
+      <GestureDetector gesture={pageGesture}>
+      <Animated.View style={[styles.body, { opacity: slideA, transform: [{ translateX: slideX }] }]}>
+      {showSpinner ? (
+        <View style={styles.loading}>
+          <ActivityIndicator size="large" color={colors.tint} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>{t('messages.loading_messages')}</Text>
         </View>
+      ) : filter === 'files' ? (
+        <ScrollView
+          style={styles.list}
+          contentContainerStyle={{ paddingBottom: listBottomPad }}
+          refreshControl={refreshControl}
+        >
+          {dir.attachments.length === 0 ? (
+            renderEmpty()
+          ) : (
+            <FilesGallery
+              attachments={dir.attachments}
+              onOpenPhoto={openAttachmentThread}
+              onOpenFile={openFile}
+              onLongPress={setSheetFile}
+            />
+          )}
+        </ScrollView>
+      ) : (
+        <FlatList
+          // Re-keyed per filter: rows remount, so an open swipe never rides across a page turn.
+          key={filter}
+          data={items}
+          keyExtractor={(item) => item.key}
+          renderItem={renderItem}
+          extraData={[selectionMode, selected]}
+          style={styles.list}
+          contentContainerStyle={[styles.listContent, { paddingBottom: listBottomPad }]}
+          refreshControl={refreshControl}
+          ListEmptyComponent={renderEmpty}
+          // The single surface card around the rows: a top cap, side-bordered cells, a bottom cap.
+          ListHeaderComponent={items.length > 0 ? <View style={[styles.cap, styles.capTop, cardSide]} /> : null}
+          ListFooterComponent={items.length > 0 ? <View style={[styles.cap, styles.capBottom, cardSide]} /> : null}
+          initialNumToRender={14}
+          windowSize={7}
+        />
+      )}
+      </Animated.View>
+      </GestureDetector>
+
+      {/* Selection bar — floats above the safe area while selecting */}
+      {selectionMode && (
+        <GlassCard variant="glass" radius={18} style={[styles.bar, { bottom: insets.bottom + 16 }]}>
+          <Text style={[styles.barCount, { color: colors.text }]} numberOfLines={1}>
+            {t('messages.selected', { count: selected.size })}
+          </Text>
+          {filter !== 'sent' && (
+            <Pressable
+              onPress={onBatchMarkRead}
+              disabled={selectedInbox.length === 0}
+              style={[
+                styles.barBtn,
+                { backgroundColor: azure + '29', borderColor: azure + '66' },
+                selectedInbox.length === 0 && styles.barBtnOff,
+              ]}
+            >
+              <IconSymbol ios_icon_name="checkmark.circle" android_material_icon_name="check-circle" size={15} color={azure} />
+              <Text style={[styles.barBtnLabel, { color: azure }]} numberOfLines={1}>
+                {t('messages.mark_as_read')}
+              </Text>
+            </Pressable>
+          )}
+          <Pressable
+            onPress={() => confirmDelete(selectedThreads)}
+            disabled={selectedThreads.length === 0}
+            style={[
+              styles.barBtn,
+              { backgroundColor: red + '29', borderColor: red + '66' },
+              selectedThreads.length === 0 && styles.barBtnOff,
+            ]}
+          >
+            <IconSymbol ios_icon_name="trash" android_material_icon_name="delete" size={15} color={red} />
+            <Text style={[styles.barBtnLabel, { color: red }]} numberOfLines={1}>
+              {t('common.delete')}
+            </Text>
+          </Pressable>
+        </GlassCard>
       )}
 
-      {/* Inbox Warning */}
-      {activeTab === 'inbox' && getInboxWarning()}
-
-      {/* Tabs */}
-      <View style={[styles.tabContainer, { backgroundColor: colors.card }]}>
-        <TouchableOpacity
-          style={[
-            styles.tab,
-            activeTab === 'inbox' && { borderBottomColor: colors.primary || colors.highlight },
-          ]}
-          onPress={() => setActiveTab('inbox')}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              { color: activeTab === 'inbox' ? colors.text : colors.textSecondary },
-            ]}
-          >
-            {t('messages.inbox')}
-          </Text>
-          {unreadCount > 0 && (
-            <View style={[styles.badge, { backgroundColor: '#E74C3C' }]}>
-              <Text style={styles.badgeText}>{unreadCount}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.tab,
-            activeTab === 'sent' && { borderBottomColor: colors.primary || colors.highlight },
-          ]}
-          onPress={() => setActiveTab('sent')}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              { color: activeTab === 'sent' ? colors.text : colors.textSecondary },
-            ]}
-          >
-            {t('messages.sent')}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Compose Button */}
+      {/* FAB → compose */}
       {!selectionMode && (
         <TouchableOpacity
-          style={[styles.composeButton, { backgroundColor: colors.primary || colors.highlight }]}
           onPress={() => router.push('/compose-message')}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel={t('messages.new_message')}
+          style={[styles.fab, { backgroundColor: colors.tint, bottom: insets.bottom + 20 }]}
         >
-          <IconSymbol
-            ios_icon_name="plus.circle.fill"
-            android_material_icon_name="add-circle"
-            size={24}
-            color={colors.fireText}
-          />
-          <Text style={[styles.composeButtonText, { color: colors.fireText }]}>
-            {t('messages.send_new_message')}
-          </Text>
+          <IconSymbol ios_icon_name="plus" android_material_icon_name="add" size={26} color={colors.fireText} />
         </TouchableOpacity>
       )}
 
-      {/* Messages List */}
-      <ScrollView
-        style={styles.messagesList}
-        contentContainerStyle={styles.messagesContent}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary || colors.highlight} />
+      <GlassActionSheet
+        visible={!!sheetThread}
+        onClose={() => setSheetThread(null)}
+        title={sheetThread?.subject || t('messages.no_subject')}
+        subtitle={
+          sheetThread
+            ? namesLine(
+                sheetThread,
+                sheetThread.box === 'sent'
+                  ? t('messages.recipients', { count: sheetThread.recipientIds.length })
+                  : t('messages.unknown_sender'),
+              )
+            : undefined
         }
-      >
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary || colors.highlight} />
-            <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-              {t('messages.loading_messages')}
-            </Text>
-          </View>
-        ) : messages.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <IconSymbol
-              ios_icon_name={activeTab === 'inbox' ? 'tray' : 'paperplane'}
-              android_material_icon_name={activeTab === 'inbox' ? 'inbox' : 'send'}
-              size={64}
-              color={colors.textSecondary}
-            />
-            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              {activeTab === 'inbox'
-                ? t('messages.no_inbox_messages')
-                : t('messages.no_sent_messages')}
-            </Text>
-          </View>
-        ) : (
-          <>
-            {messages.map((message, index) => (
-              <MessageCard
-                key={index}
-                message={message}
-                colors={colors}
-                isManager={isManager}
-                activeTab={activeTab}
-                selectionMode={selectionMode}
-                isSelected={selectedMessages.has(message.id)}
-                onPress={() => handleMessagePress(message)}
-                onLongPress={() => handleLongPress(message.id)}
-                onMarkAsRead={() => handleMarkAsRead(message)}
-                onDelete={() => handleDeleteMessage(message)}
-                formatDate={formatDate}
-              />
-            ))}
-          </>
-        )}
-      </ScrollView>
+        actions={threadActions}
+      />
+
+      <GlassActionSheet
+        visible={!!sheetFile}
+        onClose={() => setSheetFile(null)}
+        title={sheetFile ? sheetFile.fileName || t(sheetFile.kind === 'photo' ? 'messages.preview_photo' : 'messages.preview_file') : ''}
+        subtitle={sheetFile ? (sheetFile.isMine ? t('messages.you') : sheetFile.sender.name) : undefined}
+        actions={fileActions}
+      />
     </View>
   );
 }
 
-// Compact Message Card with Swipe-to-Delete
-function MessageCard({
-  message,
-  colors,
-  isManager,
-  activeTab,
-  selectionMode,
-  isSelected,
-  onPress,
-  onLongPress,
-  onMarkAsRead,
-  onDelete,
-  formatDate,
-}: {
-  message: Message;
-  colors: any;
-  isManager: boolean;
-  activeTab: string;
-  selectionMode: boolean;
-  isSelected: boolean;
-  onPress: () => void;
-  onLongPress: () => void;
-  onMarkAsRead: () => void;
-  onDelete: () => void;
-  formatDate: (date: string) => string;
-}) {
-  const { t } = useTranslation();
-  const swipeableRef = useRef<Swipeable>(null);
-
-  const renderRightActions = (progress: Animated.AnimatedInterpolation<number>) => {
-    const translateX = progress.interpolate({
-      inputRange: [0, 1],
-      outputRange: [120, 0],
-    });
-
-    return (
-      <Animated.View style={[styles.swipeActionsContainer, { transform: [{ translateX }] }]}>
-        {(activeTab === 'inbox') && !message.is_read && (
-          <TouchableOpacity
-            style={[styles.swipeAction, styles.swipeActionRead]}
-            onPress={() => {
-              swipeableRef.current?.close();
-              onMarkAsRead();
-            }}
-          >
-            <IconSymbol
-              ios_icon_name="checkmark.circle.fill"
-              android_material_icon_name="check-circle"
-              size={22}
-              color="#FFFFFF"
-            />
-            <Text style={styles.swipeActionText}>{t('messages.swipe_read')}</Text>
-          </TouchableOpacity>
-        )}
-        <TouchableOpacity
-          style={[styles.swipeAction, styles.swipeActionDelete]}
-          onPress={() => {
-            swipeableRef.current?.close();
-            onDelete();
-          }}
-        >
-          <IconSymbol
-            ios_icon_name="trash.fill"
-            android_material_icon_name="delete"
-            size={22}
-            color="#FFFFFF"
-          />
-          <Text style={styles.swipeActionText}>{t('common.delete')}</Text>
-        </TouchableOpacity>
-      </Animated.View>
-    );
-  };
-
-  const isUnread = !message.is_read && activeTab === 'inbox';
-  const accentColor = colors.primary || colors.highlight;
-
-  const cardContent = (
-    <TouchableOpacity
-      style={[
-        styles.messageItem,
-        { backgroundColor: colors.card },
-        isUnread && [styles.unreadMessage, { borderLeftColor: accentColor, backgroundColor: accentColor + '08' }],
-        selectionMode && isSelected && [styles.selectedMessage, { borderColor: accentColor }],
-      ]}
-      onPress={onPress}
-      onLongPress={onLongPress}
-      activeOpacity={0.7}
-    >
-      {/* Selection Checkbox */}
-      {selectionMode && (
-        <View style={styles.checkboxContainer}>
-          <View style={[
-            styles.checkbox,
-            { borderColor: colors.border },
-            isSelected && { backgroundColor: accentColor, borderColor: accentColor }
-          ]}>
-            {isSelected && (
-              <IconSymbol
-                ios_icon_name="checkmark"
-                android_material_icon_name="check"
-                size={14}
-                color={colors.fireText}
-              />
-            )}
-          </View>
-        </View>
-      )}
-
-      {/* Profile Picture */}
-      <View style={styles.profilePictureContainer}>
-        {message.sender_profile_picture ? (
-          <StorageImage
-            source={{ uri: message.sender_profile_picture }}
-            style={styles.profilePicture}
-          />
-        ) : (
-          <View style={[styles.profilePicturePlaceholder, { backgroundColor: colors.highlight }]}>
-            <Text style={[styles.profilePicturePlaceholderText, { color: colors.text }]}>
-              {message.sender_name.charAt(0).toUpperCase()}
-            </Text>
-          </View>
-        )}
-        {/* Unread dot on profile picture */}
-        {isUnread && (
-          <View style={[styles.unreadDot, { backgroundColor: accentColor, borderColor: colors.card }]} />
-        )}
-      </View>
-
-      {/* Message Content — compact two-column layout */}
-      <View style={styles.messageContent}>
-        {/* Top row: sender name + date */}
-        <View style={styles.messageHeader}>
-          <Text style={[styles.messageSender, { color: colors.text }, isUnread && styles.messageSenderUnread]} numberOfLines={1}>
-            {activeTab === 'sent'
-              ? (message.recipient_names && message.recipient_names.length > 0
-                  ? message.recipient_names.join(', ')
-                  : t('messages.recipients', { count: message.recipient_count }))
-              : message.sender_name}
-          </Text>
-          <Text style={[styles.messageDate, { color: colors.textSecondary }]}>
-            {formatDate(message.created_at)}
-          </Text>
-        </View>
-
-        {/* Subject line */}
-        {message.subject && (
-          <Text style={[styles.messageSubject, { color: colors.text }, isUnread && styles.messageSubjectUnread]} numberOfLines={1}>
-            {message.subject}
-          </Text>
-        )}
-
-        {/* Bottom row: body preview (left) + meta indicators (right) */}
-        <View style={styles.messageBottomRow}>
-          <Text style={[styles.messageBody, { color: colors.textSecondary }]} numberOfLines={1}>
-            {message.image_url && !message.body && !message.file_url ? '📷 Photo' :
-             message.file_url && !message.body && !message.image_url ? `📎 ${message.file_name || 'File'}` :
-             message.body}
-          </Text>
-          <View style={styles.messageMetaRight}>
-            {message.file_url ? (
-              <View style={styles.metaChip}>
-                <IconSymbol
-                  ios_icon_name="paperclip"
-                  android_material_icon_name="attach-file"
-                  size={11}
-                  color={colors.textSecondary}
-                />
-              </View>
-            ) : null}
-            {message.image_url && message.body ? (
-              <View style={styles.metaChip}>
-                <IconSymbol
-                  ios_icon_name="photo"
-                  android_material_icon_name="photo"
-                  size={11}
-                  color={colors.textSecondary}
-                />
-              </View>
-            ) : null}
-            {message.reply_count != null && message.reply_count > 0 ? (
-              <View style={styles.metaChip}>
-                <IconSymbol
-                  ios_icon_name="bubble.left.and.bubble.right"
-                  android_material_icon_name="forum"
-                  size={11}
-                  color={accentColor}
-                />
-                <Text style={[styles.metaChipText, { color: accentColor }]}>
-                  {message.reply_count}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-        </View>
-      </View>
-
-      {/* Unread accent bar on right edge */}
-      {isUnread && <View style={[styles.unreadBar, { backgroundColor: accentColor }]} />}
-    </TouchableOpacity>
-  );
-
-  // Wrap in Swipeable when not in selection mode
-  if (selectionMode) {
-    return cardContent;
-  }
-
-  return (
-    <Swipeable
-      ref={swipeableRef}
-      renderRightActions={renderRightActions}
-      overshootRight={false}
-      friction={2}
-    >
-      {cardContent}
-    </Swipeable>
-  );
-}
+const CARD_RADIUS = 16;
+const CARD_BORDER = StyleSheet.hairlineWidth + 0.5;
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
+  container: { flex: 1 },
+  selectChip: {
+    height: 38,
+    paddingLeft: 9,
+    paddingRight: 11,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 60,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
-  },
-  backButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  headerRight: {
-    width: 40,
-  },
-  selectionActions: {
-    flexDirection: 'row',
-    padding: 12,
-    gap: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
-  },
-  selectionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 12,
-    borderRadius: 8,
     gap: 6,
   },
-  selectionButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  warningBanner: {
+  selectLabel: { fontFamily: fonts.body.semibold, fontSize: 12.5 },
+  body: { flex: 1 },
+  list: { flex: 1 },
+  listContent: { paddingHorizontal: 16 },
+  // One surface card drawn across the virtualized cells: every cell carries the
+  // fill and the side borders; the caps carry the radius and the top / bottom edge.
+  cell: { borderLeftWidth: CARD_BORDER, borderRightWidth: CARD_BORDER, overflow: 'hidden' },
+  sepCell: { paddingHorizontal: 10 },
+  cap: { height: 4, borderLeftWidth: CARD_BORDER, borderRightWidth: CARD_BORDER },
+  capTop: { borderTopWidth: CARD_BORDER, borderTopLeftRadius: CARD_RADIUS, borderTopRightRadius: CARD_RADIUS },
+  capBottom: { borderBottomWidth: CARD_BORDER, borderBottomLeftRadius: CARD_RADIUS, borderBottomRightRadius: CARD_RADIUS },
+  loading: { paddingVertical: 40, alignItems: 'center', gap: 12 },
+  loadingText: { fontFamily: fonts.body.regular, fontSize: 14 },
+  empty: { paddingVertical: 60, alignItems: 'center', gap: 14, paddingHorizontal: 24 },
+  emptyText: { fontFamily: fonts.body.regular, fontSize: 14, textAlign: 'center' },
+  bar: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
     gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    zIndex: 20,
   },
-  warningText: {
-    flex: 1,
-    fontSize: 13,
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
-  },
-  tab: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    borderBottomWidth: 3,
-    borderBottomColor: 'transparent',
-    gap: 8,
-  },
-  tabText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  badge: {
-    minWidth: 20,
-    height: 20,
+  barCount: { flex: 1, fontFamily: fonts.body.semibold, fontSize: 14 },
+  barBtn: {
+    height: 34,
+    paddingHorizontal: 11,
     borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 6,
-  },
-  badgeText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
-  composeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    margin: 16,
-    padding: 16,
-    borderRadius: 12,
-    gap: 8,
-  },
-  composeButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  messagesList: {
-    flex: 1,
-  },
-  messagesContent: {
-    padding: 16,
-    paddingBottom: 100,
-  },
-  loadingContainer: {
-    paddingVertical: 40,
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-  },
-  emptyContainer: {
-    paddingVertical: 60,
-    alignItems: 'center',
-  },
-  emptyText: {
-    marginTop: 16,
-    fontSize: 16,
-    textAlign: 'center',
-  },
-  emptySubtext: {
-    marginTop: 8,
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  messageItem: {
-    flexDirection: 'row',
-    padding: 12,
-    borderRadius: 14,
-    boxShadow: '0px 1px 3px rgba(0, 0, 0, 0.08)',
-    elevation: 1,
-    gap: 10,
-    marginBottom: 8,
-    alignItems: 'center',
-    overflow: 'hidden',
-  },
-  unreadMessage: {
-    borderLeftWidth: 4,
-  },
-  selectedMessage: {
-    borderWidth: 2,
-  },
-  checkboxContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: 22,
-  },
-  checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  profilePictureContainer: {
-    width: 44,
-    height: 44,
-    position: 'relative',
-  },
-  profilePicture: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-  },
-  profilePicturePlaceholder: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  profilePicturePlaceholderText: {
-    fontSize: 17,
-    fontWeight: 'bold',
-  },
-  unreadDot: {
-    position: 'absolute',
-    top: -2,
-    right: -2,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    borderWidth: 2.5,
-  },
-  messageContent: {
-    flex: 1,
-  },
-  messageHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 1,
-  },
-  messageSender: {
-    fontSize: 15,
-    fontWeight: '500',
-    flex: 1,
-    marginRight: 8,
-  },
-  messageSenderUnread: {
-    fontWeight: '700',
-  },
-  messageDate: {
-    fontSize: 11,
-  },
-  messageSubject: {
-    fontSize: 13,
-    fontWeight: '500',
-    marginBottom: 1,
-  },
-  messageSubjectUnread: {
-    fontWeight: '700',
-  },
-  messageBottomRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 1,
-  },
-  messageBody: {
-    fontSize: 13,
-    lineHeight: 17,
-    flex: 1,
-    marginRight: 8,
-  },
-  messageMetaRight: {
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    flexShrink: 0,
   },
-  metaChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  metaChipText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  unreadBar: {
+  barBtnOff: { opacity: 0.4 },
+  barBtnLabel: { fontFamily: fonts.body.semibold, fontSize: 12.5 },
+  fab: {
     position: 'absolute',
-    right: 0,
-    top: 8,
-    bottom: 8,
-    width: 4,
-    borderRadius: 2,
-  },
-  // Swipe action styles
-  swipeActionsContainer: {
-    flexDirection: 'row',
-    marginBottom: 8,
-    borderRadius: 12,
-    overflow: 'hidden',
-    marginLeft: 4,
-  },
-  swipeAction: {
-    justifyContent: 'center',
+    right: 20,
+    width: FAB_SIZE,
+    height: FAB_SIZE,
+    borderRadius: FAB_SIZE / 2,
     alignItems: 'center',
-    width: 56,
-    paddingVertical: 8,
-  },
-  swipeActionRead: {
-    backgroundColor: '#3498DB',
-    borderTopLeftRadius: 12,
-    borderBottomLeftRadius: 12,
-  },
-  swipeActionDelete: {
-    backgroundColor: '#E74C3C',
-    borderTopRightRadius: 12,
-    borderBottomRightRadius: 12,
-  },
-  swipeActionText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    marginTop: 2,
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+    zIndex: 10,
   },
 });

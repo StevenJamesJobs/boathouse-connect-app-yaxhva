@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Profile Hub Round 1</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{min-height:100vh;display:flex;flex-direction:column;align-items:center;gap:14px;padding:24px 16px 60px;background:#0C0D11;color:#D6D9DE;font-family:'Inter','SF Pro Text',system-ui,sans-serif}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+h1{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:22px;letter-spacing:-0.3px;color:#F4F6F8;text-wrap:balance;text-align:center}
+h1 span{color:#FF8A4A}
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center;max-width:1000px}
+.grp{display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);padding:6px;border-radius:16px}
+.gl2{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:#6E7681;margin:0 4px 0 6px}
+.tb{background:rgba(255,255,255,0.06);color:#D6D9DE;border:1px solid rgba(255,255,255,0.10);border-radius:11px;padding:7px 11px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:.18s}
+.tb:hover{background:rgba(255,255,255,0.12)}
+.tb:focus-visible{outline:2px solid #FF8A4A;outline-offset:2px}
+.tb.on{background:#F4F6F8;color:#15171C;border-color:#F4F6F8}
+.hint{color:#8A9098;font-size:11.5px;font-family:'JetBrains Mono',ui-monospace,monospace;text-align:center;max-width:960px;line-height:1.7}
+.hint b{color:#D6D9DE;font-weight:600}
+.hint em{font-style:normal;color:#2FBF8F}
+.section{width:100%;max-width:1700px;display:flex;flex-direction:column;align-items:center;gap:12px;margin-top:18px}
+.sh{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#FF8A4A;display:flex;align-items:center;gap:12px;width:100%;max-width:1240px}
+.sh .ln{flex:1;height:1px;background:rgba(255,255,255,0.10)}
+.sh small{color:#8A9098;letter-spacing:1px}
+.row{display:flex;flex-wrap:wrap;gap:18px;justify-content:center;align-items:flex-start;max-width:1700px}
+.col{display:flex;flex-direction:column;gap:10px;align-items:center}
+.concept{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:#8A9098;display:flex;align-items:center;gap:8px;width:392px;max-width:100%}
+.concept b{color:#FF8A4A}
+.concept .ln{flex:1;height:1px;background:rgba(255,255,255,0.08)}
+.bcap{width:392px;max-width:100%;font-size:11.5px;color:#9AA1A8;line-height:1.55}
+.bcap b{color:#E6EAEE;font-weight:600}
+.bcap em{font-style:normal;color:#2FBF8F;font-weight:600}
+.notes{max-width:1240px;width:100%;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;margin-top:6px}
+.note{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:12px 14px;font-size:11.5px;line-height:1.55;color:#AEB4BD}
+.note b{display:block;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:#FF8A4A;margin-bottom:5px}
+.note em{font-style:normal;color:#F4F6F8;font-weight:600}
+
+/* ── the phone shell: the four real theme token sets ─────────────── */
+.phone{
+  --bg:#181B21; --text:#F4F6F8; --muted:#9AA1A8; --fireText:#1A1E24; --tint:#FF7A2F;
+  --glass:rgba(255,255,255,0.07); --glassbd:rgba(255,255,255,0.12); --surf:rgba(255,255,255,0.045); --surfbd:rgba(255,255,255,0.09); --hair:rgba(255,255,255,0.07);
+  --glowA:rgba(230,234,238,0.12); --glowB:rgba(59,130,246,0.10); --scrim:rgba(6,10,18,0.55); --thumb:#2C313A; --sheetbg:#20242B;
+  --azure:#3B82F6; --violet:#7C5CE0; --gold:#F59E0B; --bad:#EF4444; --blue:#8FA0AC; --bluetext:#CDD8DF; --ember:#FFB07A; --ok:#10A56F; --emerald:#10A56F;
+  position:relative;width:392px;max-width:100%;height:840px;background:var(--bg);border-radius:46px;border:1px solid #2A2E36;overflow:hidden;
+  box-shadow:0 40px 90px -30px rgba(0,0,0,0.8);transition:background .3s;display:flex;flex-direction:column;color:var(--text)}
+.phone.t-mono-l{--bg:#ECECEE;--text:#22262C;--muted:#6E747C;--fireText:#FFFFFF;--tint:#EC6A1E;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.66);--surfbd:rgba(0,0,0,0.07);--hair:rgba(0,0,0,0.07);--glowA:rgba(58,66,80,0.10);--glowB:rgba(37,99,235,0.10);--scrim:rgba(20,24,32,0.35);--thumb:#D9DBDF;--sheetbg:#F6F6F8;--azure:#2563EB;--violet:#6D28D9;--gold:#B45309;--ok:#087A52;--emerald:#087A52;--blue:#7E8A94;--bluetext:#2A313C}
+.phone.t-ocean-d{--bg:#1A2332;--text:#FFFFFF;--muted:#A8B8D8;--fireText:#0A1422;--tint:#5DA0E5;--glass:rgba(255,255,255,0.07);--glassbd:rgba(255,255,255,0.13);--surf:rgba(255,255,255,0.05);--surfbd:rgba(255,255,255,0.10);--hair:rgba(255,255,255,0.08);--glowA:rgba(74,144,226,0.32);--glowB:rgba(16,185,129,0.13);--thumb:#2A3A50;--sheetbg:#222E40;--blue:#5DADE2;--bluetext:#BFE3F7}
+.phone.t-ocean-l{--bg:#E8F4F8;--text:#1A3A52;--muted:#4A6B7C;--fireText:#FFFFFF;--tint:#1976D2;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.7);--surfbd:rgba(13,71,161,0.10);--hair:rgba(13,71,161,0.08);--glowA:rgba(25,118,210,0.18);--glowB:rgba(5,150,105,0.13);--scrim:rgba(10,30,50,0.35);--thumb:#CFE0EA;--sheetbg:#F3F9FC;--azure:#2563EB;--violet:#6D28D9;--gold:#B45309;--ok:#087A52;--emerald:#087A52;--blue:#42A5F5;--bluetext:#0D47A1}
+.glow{position:absolute;top:-120px;right:-80px;width:360px;height:320px;border-radius:50%;background:radial-gradient(circle,var(--glowA),transparent 66%);z-index:0;pointer-events:none}
+.glow2{position:absolute;top:-70px;left:-90px;width:300px;height:280px;border-radius:50%;background:radial-gradient(circle,var(--glowB),transparent 68%);z-index:0;pointer-events:none}
+.sb{position:relative;z-index:3;display:flex;justify-content:space-between;align-items:center;padding:16px 30px 4px;font-size:13px;font-weight:600;font-family:'JetBrains Mono',ui-monospace,monospace;color:var(--text)}
+.ic{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.eyeb{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);font-weight:600}
+.eyeb.tint{color:var(--tint)}
+@keyframes ring{0%,100%{opacity:.45}50%{opacity:1}}
+@keyframes shine{0%,70%{transform:skewX(-18deg) translateX(-160%)}100%{transform:skewX(-18deg) translateX(420%)}}
+
+/* pushed-screen header */
+.hdr{position:relative;z-index:3;display:flex;align-items:center;gap:12px;padding:12px 16px 12px}
+.c38{width:38px;height:38px;border-radius:12px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;justify-content:center;flex:0 0 auto;color:var(--text)}
+.c38 .ic{width:20px;height:20px}
+.c38.red{color:var(--bad)}
+.hdr .ttl{flex:1;text-align:center;font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:20px;letter-spacing:-0.2px;min-width:0}
+.hdr .ttl small{display:block;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);font-weight:600;margin-top:1px}
+.gchip{height:38px;padding:0 11px 0 9px;border-radius:12px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:var(--text);flex:0 0 auto}
+.gchip .ic{width:15px;height:15px}
+.gchip.sm{height:30px;padding:0 9px;font-size:11.5px;border-radius:10px}
+.gchip.sm .ic{width:13px;height:13px}
+.gchip.fill{background:var(--tint);border-color:var(--tint);color:var(--fireText)}
+
+/* the Welcome hero (tab pages) */
+.whead{position:relative;z-index:3;margin:6px 16px 0;padding:12px 14px;border-radius:20px;background:var(--glass);border:1px solid var(--glassbd);display:flex;flex-direction:column;gap:10px}
+.whead .greet{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:19px;letter-spacing:-0.4px;padding-left:2px}
+.whead .greet span{color:var(--tint)}
+.hrow{display:flex;align-items:center;gap:9px}
+.av{width:42px;height:42px;border-radius:21px;background:linear-gradient(140deg,#5A6C86,#2C3646);display:flex;align-items:center;justify-content:center;font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:13px;color:#fff;flex:0 0 auto;position:relative;border:1px solid var(--glassbd)}
+.av.s{width:34px;height:34px;border-radius:17px;font-size:12px}
+.av.xs{width:26px;height:26px;border-radius:13px;font-size:10px}
+.av.big{width:56px;height:56px;border-radius:28px;font-size:17px}
+.av.xl{width:64px;height:64px;border-radius:32px;font-size:20px}
+.av.p2{background:linear-gradient(140deg,#B26A3C,#5A3016)}
+.av.p3{background:linear-gradient(140deg,#3C8A6E,#164034)}
+.av.p4{background:linear-gradient(140deg,#7C5CE0,#3D2A7A)}
+.cam{position:absolute;right:-3px;bottom:-3px;width:18px;height:18px;border-radius:9px;background:var(--tint);border:2px solid var(--bg);display:flex;align-items:center;justify-content:center;color:var(--fireText)}
+.cam .ic{width:9px;height:9px;stroke-width:2.4}
+.av.big .cam{width:20px;height:20px;border-radius:10px}
+.av.big .cam .ic{width:10px;height:10px}
+.av.xl .cam{width:22px;height:22px;border-radius:11px;right:-2px;bottom:-2px}
+.av.xl .cam .ic{width:11px;height:11px}
+.hrow .nm{flex:1;min-width:0}
+.hrow .nm b{display:block;font-family:'Bricolage Grotesque',system-ui,sans-serif;font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hrow .nm span{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)}
+.wx{height:36px;padding:0 10px;border-radius:12px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;gap:5px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12.5px;font-weight:600;flex:0 0 auto}
+.wx .ic{width:16px;height:16px;color:var(--gold)}
+.ib{min-width:40px;height:36px;border-radius:12px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;justify-content:center;position:relative;flex:0 0 auto}
+.ib .ic{width:18px;height:18px}
+.dot{position:absolute;top:-5px;right:-5px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--blue);border:2px solid var(--bg);font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;font-weight:700;color:#06222B;display:flex;align-items:center;justify-content:center}
+.rstack{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex:0 0 auto}
+.chips{display:flex;gap:8px;align-items:center}
+.pills{display:flex;gap:6px;align-items:center}
+.pill{height:24px;padding:0 9px;border-radius:8px;display:flex;align-items:center;gap:4px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;font-weight:700;background:var(--tint);color:var(--fireText)}
+.pill .ic{width:12px;height:12px;stroke-width:2.4}
+.pill.gold{background:color-mix(in srgb,var(--gold) 20%,transparent);color:var(--gold);border:1px solid color-mix(in srgb,var(--gold) 40%,transparent)}
+.pill.ghost{background:var(--glass);color:var(--text);border:1px solid var(--glassbd)}
+
+/* content column */
+.cnt{position:relative;z-index:2;flex:1;overflow-y:auto;padding:12px 16px 110px;display:flex;flex-direction:column;gap:12px;scrollbar-width:none}
+.cnt::-webkit-scrollbar{display:none}
+.card{border-radius:16px;background:var(--surf);border:1px solid var(--surfbd);padding:12px;position:relative}
+.card.g{background:var(--glass);border-color:var(--glassbd)}
+.ct{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:600;font-size:15px}
+.chead{display:flex;align-items:center;gap:8px}
+.chead .ct{flex:1}
+.srule{display:flex;align-items:center;gap:10px;margin:2px 0 -2px}
+.srule .ln{flex:1;height:1px;background:var(--hair)}
+.chev .ic{width:16px;height:16px;color:var(--muted)}
+
+/* quick bar 4-up (the reskin) */
+.qa4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.qab{position:relative;height:66px;border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;background:color-mix(in srgb,var(--tint) 11%,transparent);border:1px solid color-mix(in srgb,var(--tint) 28%,transparent);font-size:10.5px;font-weight:600}
+.qab .ic{width:20px;height:20px;color:var(--tint)}
+.qab .bub{position:absolute;top:6px;right:8px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--bad);color:#fff;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center}
+
+/* shift line (Schedule Kit ShiftRow) */
+.shift{display:flex;align-items:center;gap:9px}
+.shift .day{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10.5px;font-weight:600;color:var(--muted);width:60px;line-height:1.25}
+.shift .tm{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:13px;font-weight:600;flex:1}
+.rp{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;padding:3px 7px;border-radius:7px;background:color-mix(in srgb,var(--tint) 14%,transparent);color:var(--tint);border:1px solid color-mix(in srgb,var(--tint) 26%,transparent);white-space:nowrap}
+.rp.gold{background:color-mix(in srgb,var(--gold) 16%,transparent);color:var(--gold);border-color:color-mix(in srgb,var(--gold) 34%,transparent)}
+.rp.mut{background:var(--glass);color:var(--muted);border-color:var(--glassbd)}
+.rp.ok{background:color-mix(in srgb,var(--ok) 14%,transparent);color:var(--ok);border-color:color-mix(in srgb,var(--ok) 30%,transparent)}
+.upnext{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:var(--glass);border:1px solid var(--glassbd)}
+.upnext .lic{width:32px;height:32px;border-radius:10px;background:color-mix(in srgb,var(--tint) 14%,transparent);display:flex;align-items:center;justify-content:center;color:var(--tint);flex:0 0 auto}
+.upnext .lic .ic{width:16px;height:16px}
+.upnext .bd{flex:1;min-width:0}
+.upnext .l1{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.upnext .l2{font-size:11px;color:var(--muted);margin-top:1px}
+.upnext .go{font-size:11.5px;font-weight:600;color:var(--tint);display:flex;align-items:center;gap:2px;flex:0 0 auto}
+.upnext .go .ic{width:13px;height:13px}
+
+/* fold rows + list rows */
+.fold{display:flex;align-items:center;gap:10px}
+.fold .ct{flex:1;font-size:14.5px}
+.fold .sub{font-size:11.5px;color:var(--muted);margin-top:1px}
+.arow{display:flex;align-items:center;gap:12px;padding:12px 13px;border-radius:14px;background:var(--surf);border:1px solid var(--surfbd)}
+.arow .lic{width:36px;height:36px;border-radius:11px;background:color-mix(in srgb,var(--tint) 14%,transparent);display:flex;align-items:center;justify-content:center;color:var(--tint);flex:0 0 auto}
+.arow .lic .ic{width:17px;height:17px}
+.arow .lic.vio{background:color-mix(in srgb,var(--violet) 16%,transparent);color:var(--violet)}
+.arow .lic.az{background:color-mix(in srgb,var(--azure) 16%,transparent);color:var(--azure)}
+.arow .lic.gold{background:color-mix(in srgb,var(--gold) 18%,transparent);color:var(--gold)}
+.arow .lic.em{background:color-mix(in srgb,var(--emerald) 16%,transparent);color:var(--emerald)}
+.arow .lic.bad{background:color-mix(in srgb,var(--bad) 14%,transparent);color:var(--bad)}
+.arow .bd{flex:1;min-width:0}
+.arow .l1{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:600;font-size:14.5px}
+.arow .l2{font-size:11.5px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.arow .l2 b{color:var(--text);font-weight:600}
+.arow .bub{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;font-weight:700;min-width:22px;height:20px;border-radius:10px;background:var(--tint);color:var(--fireText);display:flex;align-items:center;justify-content:center;padding:0 6px}
+.arow.own{border-color:color-mix(in srgb,var(--blue) 30%,transparent)}
+.arow .own{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;letter-spacing:1.2px;text-transform:uppercase;padding:2px 6px;border-radius:6px;background:color-mix(in srgb,var(--blue) 18%,transparent);color:var(--bluetext);font-weight:700}
+.swat{display:flex;gap:3px}
+.swat i{width:10px;height:10px;border-radius:5px;display:block;border:1px solid rgba(0,0,0,.15)}
+.frow{display:flex;align-items:center;gap:12px;padding:11px 13px;border-radius:13px;background:var(--glass);border:1px solid var(--glassbd)}
+.frow .bd{flex:1;min-width:0}
+.frow .l1{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:600;font-size:14px}
+.frow .l2{font-size:11.5px;line-height:15px;color:var(--muted);margin-top:2px}
+.frow .ic{width:18px;height:18px;color:var(--tint)}
+.frow.thin{padding:9px 12px}
+.sw{width:44px;height:26px;border-radius:13px;background:var(--tint);position:relative;flex:0 0 auto}
+.sw::after{content:"";position:absolute;top:3px;right:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.3)}
+.sw.off{background:var(--thumb)}
+.sw.off::after{right:auto;left:3px}
+.info{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--hair)}
+.info:first-of-type{border-top:0}
+.info .k{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);width:82px;flex:0 0 auto}
+.info .v{flex:1;font-size:13.5px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.info .v.mut{color:var(--muted)}
+.info .lk .ic{width:13px;height:13px;color:var(--muted)}
+
+/* identity card (B) */
+.idcard{display:flex;gap:12px;align-items:flex-start}
+.idcard .bd{flex:1;min-width:0}
+.idcard .name{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:18px;letter-spacing:-0.3px;line-height:1.1}
+.idcard .handle{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;color:var(--tint);margin-top:2px}
+.jts{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
+.tagline{font-size:12.5px;line-height:17px;color:var(--muted);margin-top:8px;font-style:italic}
+.tagline.add{color:var(--tint);font-style:normal;display:flex;align-items:center;gap:5px;font-weight:600}
+.tagline.add .ic{width:13px;height:13px}
+.pen{width:30px;height:30px;border-radius:10px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.pen .ic{width:14px;height:14px;color:var(--text)}
+
+/* stat strip */
+.stats3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.stat{border-radius:14px;padding:10px 10px 9px;background:var(--glass);border:1px solid var(--glassbd);display:flex;flex-direction:column;gap:3px;position:relative;min-width:0}
+.stat .big{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:19px;letter-spacing:-0.4px;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stat .big.gold{color:var(--gold)}
+.stat .big.tint{color:var(--tint)}
+.stat .big small{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;font-weight:600;color:var(--muted);letter-spacing:0}
+.stat .eyeb{font-size:8.5px}
+.stat .chev{position:absolute;top:8px;right:8px}
+.stat .chev .ic{width:12px;height:12px}
+
+/* command tiles (Tools kit) */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tile{position:relative;border-radius:16px;padding:12px;min-height:84px;display:flex;flex-direction:column;justify-content:space-between;--acc:var(--tint);background:color-mix(in srgb,var(--acc) 11%,transparent);border:1px solid color-mix(in srgb,var(--acc) 28%,transparent)}
+.tile .ic{width:20px;height:20px;color:var(--acc)}
+.tile .tt{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:600;font-size:15px;margin-top:8px;line-height:1.1}
+.tile .ts{font-size:11px;color:var(--muted);line-height:14px;margin-top:2px}
+.tile .chev{position:absolute;top:12px;right:12px}
+.tile .chev .ic{width:16px;height:16px;color:var(--muted)}
+.tile.wide{grid-column:1/-1;flex-direction:row;align-items:center;gap:12px;min-height:0}
+.tile.wide .tt{margin-top:0}
+.tile.wide .bd{flex:1;min-width:0}
+.tile.wide .ic{width:22px;height:22px}
+.tile.wide .chev{position:static}
+.tile.az{--acc:var(--azure)}.tile.vio{--acc:var(--violet)}.tile.em{--acc:var(--emerald)}.tile.gold{--acc:var(--gold)}
+.tile .bub{position:absolute;top:10px;right:10px;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--acc);color:#fff;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.tile.pulse::after{content:"";position:absolute;inset:-2px;border-radius:18px;border:1.5px solid var(--acc);box-shadow:0 0 12px color-mix(in srgb,var(--acc) 60%,transparent);animation:ring 1.9s ease-in-out infinite;pointer-events:none}
+.mini2{display:flex;gap:8px;margin-top:8px}
+.mini2 span{height:28px;padding:0 10px;border-radius:9px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600}
+.mini2 span .ic{width:13px;height:13px;color:var(--acc)}
+
+/* quick tools old grid + favorites rail */
+.qt4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.qt{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:11px;font-weight:500;text-align:center;line-height:1.15}
+.qt .cir{width:50px;height:50px;border-radius:25px;background:color-mix(in srgb,var(--tint) 14%,transparent);display:flex;align-items:center;justify-content:center;color:var(--tint)}
+.qt .cir .ic{width:22px;height:22px}
+.rail{display:flex;gap:12px;overflow:hidden;padding:2px 2px 0;margin-right:-16px}
+.rit{display:flex;flex-direction:column;align-items:center;gap:6px;width:62px;flex:0 0 auto;font-size:10.5px;font-weight:600;text-align:center;line-height:1.15}
+.rit .cir{width:54px;height:54px;border-radius:18px;display:flex;align-items:center;justify-content:center;--acc:var(--tint);background:color-mix(in srgb,var(--acc) 12%,transparent);border:1px solid color-mix(in srgb,var(--acc) 30%,transparent);color:var(--acc);position:relative}
+.rit .cir .ic{width:23px;height:23px}
+.rit.az .cir{--acc:var(--azure)}.rit.vio .cir{--acc:var(--violet)}.rit.em .cir{--acc:var(--emerald)}.rit.gold .cir{--acc:var(--gold)}
+.rit.add .cir{background:var(--glass);border:1px dashed var(--glassbd);color:var(--muted)}
+.rit .cir .bub{position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--bad);color:#fff;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid var(--bg)}
+
+/* seg capsules */
+.cseg{display:flex;padding:3px;gap:3px;border-radius:12px;background:var(--glass);border:1px solid var(--glassbd)}
+.cseg span{flex:1;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;gap:6px;font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:600;font-size:12.5px;color:var(--muted);position:relative}
+.cseg span .ic{width:14px;height:14px}
+.cseg span.on{background:color-mix(in srgb,var(--tint) 18%,transparent);color:var(--tint)}
+
+/* buttons */
+.btnrow{display:flex;gap:10px}
+.btn{flex:1;height:44px;border-radius:13px;display:flex;align-items:center;justify-content:center;gap:7px;font-size:14px;font-weight:600;background:var(--glass);border:1px solid var(--glassbd);color:var(--text)}
+.btn .ic{width:16px;height:16px}
+.btn.fill{background:var(--tint);border-color:var(--tint);color:var(--fireText);position:relative;overflow:hidden}
+.btn.fill::after{content:"";position:absolute;left:0;top:0;bottom:0;width:38%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.28),transparent);transform:skewX(-18deg) translateX(-160%);animation:shine 4.5s ease-in-out infinite}
+.btn.red{color:var(--bad)}
+.logout{display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px;color:var(--muted);padding:6px 0 2px}
+.logout b{color:var(--bad);font-weight:600;display:flex;align-items:center;gap:4px}
+.logout .ic{width:13px;height:13px}
+.logout .mono{color:var(--text)}
+.ftr{font-size:11px;color:var(--muted);line-height:15px;text-align:center}
+
+/* inputs */
+.flab{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;letter-spacing:1.1px;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.flab .opt{margin-left:auto;text-transform:none;letter-spacing:.3px;font-weight:500;opacity:.8}
+.inp{min-height:43px;border-radius:13px;padding:11px 13px;font-size:14px;color:var(--text);background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;gap:8px}
+.inp .ic{width:17px;height:17px;color:var(--muted)}
+.inp .ph{color:var(--muted)}
+.inp .fill{flex:1;min-width:0}
+.inp.lock{color:var(--muted)}
+.inp.lock .fill{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:13px}
+.inp .eye .ic{width:16px;height:16px}
+.inp.multi{min-height:64px;align-items:flex-start}
+.hintt{font-size:11.5px;line-height:16px;color:var(--muted);margin-top:6px}
+.hintt b{color:var(--tint);font-weight:600}
+.two{display:flex;gap:10px}
+.two>*{flex:1;min-width:0}
+.fld{display:flex;flex-direction:column}
+.sfoot{flex:0 0 auto;display:flex;gap:11px;padding-top:12px}
+.fbtn{flex:1;height:47px;border-radius:13px;display:flex;align-items:center;justify-content:center;gap:7px;font-size:15px;font-weight:600;border:1px solid var(--glassbd);background:var(--glass);color:var(--text)}
+.fbtn.save{background:var(--tint);border-color:var(--tint);color:var(--fireText);flex:1.35;position:relative;overflow:hidden}
+.fbtn.save::after{content:"";position:absolute;left:0;top:0;bottom:0;width:38%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.28),transparent);transform:skewX(-18deg) translateX(-160%);animation:shine 4.5s ease-in-out infinite}
+.fbtn .ic{width:16px;height:16px}
+
+/* sheets */
+.ovl{position:absolute;inset:0;z-index:50;display:flex;flex-direction:column;justify-content:flex-end}
+.ovl .scr{position:absolute;inset:0;background:var(--scrim)}
+.sheet{position:relative;z-index:2;border-radius:26px 26px 0 0;padding:10px 18px 24px;max-height:88%;display:flex;flex-direction:column;background:var(--sheetbg);border:1px solid var(--glassbd);border-bottom:0;box-shadow:0 -18px 44px rgba(0,0,0,0.35)}
+.grabpill{width:40px;height:4px;border-radius:2px;background:var(--glassbd);margin:2px auto 10px;flex:0 0 auto}
+.shead{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex:0 0 auto}
+.shead .t{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:19px;letter-spacing:-0.2px;flex:1;min-width:0}
+.shead .sub{display:block;font-size:12.5px;color:var(--muted);margin-top:1px;font-family:'Inter',system-ui,sans-serif;font-weight:400;letter-spacing:0}
+.xbtn{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--text);flex:0 0 auto;background:var(--glass);border:1px solid var(--glassbd)}
+.xbtn .ic{width:16px;height:16px}
+.sbody{flex:0 1 auto;min-height:0;overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column;gap:9px;padding-bottom:4px}
+.chipwrap{display:flex;flex-wrap:wrap;gap:7px}
+.chip{height:32px;padding:0 11px;border-radius:10px;display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;background:var(--glass);border:1px solid var(--glassbd);color:var(--text)}
+.chip .ic{width:13px;height:13px;color:var(--muted)}
+.chip.on{background:color-mix(in srgb,var(--tint) 16%,transparent);border-color:color-mix(in srgb,var(--tint) 40%,transparent);color:var(--tint)}
+.chip.on .ic{color:var(--tint)}
+.chip.dim{opacity:.45}
+.psub{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1.3px;text-transform:uppercase;color:var(--tint);font-weight:700;padding:6px 0 0}
+.lrow{display:flex;align-items:center;gap:12px;padding:12px 13px;border-radius:13px;background:var(--glass);border:1px solid var(--glassbd);font-size:14.5px;font-weight:600}
+.lrow .sub{font-size:11.5px;color:var(--muted);font-weight:400;display:block;margin-top:1px}
+.lrow .bd{flex:1}
+.lrow.on{border-color:color-mix(in srgb,var(--tint) 45%,transparent)}
+.lrow .ck{width:22px;height:22px;border-radius:11px;background:var(--tint);color:var(--fireText);display:flex;align-items:center;justify-content:center}
+.lrow .ck .ic{width:12px;height:12px;stroke-width:2.6}
+.lrow .ck.off{background:transparent;border:1.5px solid var(--glassbd)}
+
+/* tab bar */
+.tabbar{position:absolute;left:14px;right:14px;bottom:18px;height:62px;border-radius:22px;background:color-mix(in srgb,var(--sheetbg) 80%,transparent);border:1px solid var(--glassbd);backdrop-filter:blur(14px);display:flex;align-items:center;justify-content:space-around;z-index:4;padding:0 6px}
+.tabbar .t{width:50px;height:42px;border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--muted);font-size:9px;font-weight:600}
+.tabbar .t .ic{width:18px;height:18px}
+.tabbar .t.on{background:color-mix(in srgb,var(--tint) 16%,transparent);color:var(--tint)}
+.jolt{position:absolute;right:16px;bottom:92px;width:48px;height:48px;border-radius:24px;background:var(--tint);color:var(--fireText);display:flex;align-items:center;justify-content:center;z-index:4;box-shadow:0 8px 20px rgba(0,0,0,.35)}
+.jolt .ic{width:22px;height:22px;stroke-width:2.4}
+
+/* settings shelf + appearance */
+.shelf{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.stile{position:relative;height:78px;border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:var(--glass);border:1px solid var(--glassbd);font-size:10.5px;font-weight:600;color:var(--muted)}
+.stile .ic{width:20px;height:20px;color:var(--text)}
+.stile.on{background:color-mix(in srgb,var(--tint) 14%,transparent);border-color:color-mix(in srgb,var(--tint) 40%,transparent);color:var(--tint)}
+.stile.on .ic{color:var(--tint)}
+.stile.on::after{content:"";position:absolute;left:50%;bottom:-9px;width:8px;height:8px;background:var(--bg);border:1px solid color-mix(in srgb,var(--tint) 40%,transparent);border-top:0;border-left:0;transform:translateX(-50%) rotate(45deg)}
+.stile .go{position:absolute;top:6px;right:6px}
+.stile .go .ic{width:11px;height:11px;color:var(--muted)}
+.bigtile{border-radius:16px;padding:12px;min-height:110px;display:flex;flex-direction:column;justify-content:space-between;background:color-mix(in srgb,var(--tint) 10%,transparent);border:1px solid color-mix(in srgb,var(--tint) 28%,transparent);position:relative}
+.bigtile .ic{width:20px;height:20px;color:var(--tint)}
+.bigtile .tt{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:600;font-size:15px}
+.bigtile .ts{font-size:11px;color:var(--muted);margin-top:2px}
+.bigtile .chev{position:absolute;top:12px;right:12px}
+.bigtile .chev .ic{width:15px;height:15px;color:var(--muted)}
+.strip{display:flex;gap:3px;margin-top:8px}
+.strip i{height:14px;flex:1;border-radius:4px;display:block}
+.lang2{display:flex;gap:6px;margin-top:8px}
+.lang2 span{flex:1;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;background:var(--glass);border:1px solid var(--glassbd);color:var(--muted)}
+.lang2 span.on{background:color-mix(in srgb,var(--tint) 18%,transparent);color:var(--tint);border-color:color-mix(in srgb,var(--tint) 36%,transparent)}
+.seg3{display:flex;padding:3px;gap:3px;border-radius:13px;background:var(--glass);border:1px solid var(--glassbd)}
+.seg3 span{flex:1;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;gap:6px;font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:600;font-size:13px;color:var(--muted)}
+.seg3 span .ic{width:15px;height:15px}
+.seg3 span.on{background:var(--tint);color:var(--fireText)}
+.tgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tcard{border-radius:14px;overflow:hidden;background:var(--surf);border:1px solid var(--surfbd);position:relative}
+.tcard.on{border-color:var(--tint);box-shadow:0 0 0 1px var(--tint)}
+.tcard .pvb{height:64px;background:var(--tb);padding:7px;display:flex;flex-direction:column;gap:5px;position:relative;overflow:hidden}
+.tcard .pvb::before{content:"";position:absolute;top:-30px;right:-20px;width:90px;height:80px;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--tp) 35%,transparent),transparent 68%)}
+.tcard .pvb .h{display:flex;align-items:center;gap:4px;position:relative}
+.tcard .pvb .h i{width:12px;height:12px;border-radius:6px;background:var(--tp);display:block}
+.tcard .pvb .h b{height:5px;width:52px;border-radius:3px;background:var(--tt);display:block;opacity:.85}
+.tcard .pvb .c{height:22px;border-radius:6px;background:var(--tg);border:1px solid var(--tgb);position:relative;padding:5px 6px;display:flex;flex-direction:column;gap:4px}
+.tcard .pvb .c i{height:4px;border-radius:2px;background:var(--tt);display:block;opacity:.7;width:60%}
+.tcard .pvb .c i+i{width:80%;opacity:.35}
+.tcard .pvb .b{height:10px;width:34px;border-radius:4px;background:var(--tp);display:block;position:absolute;right:7px;bottom:7px}
+.tcard .lab{display:flex;align-items:center;gap:6px;padding:8px 10px;font-size:12.5px;font-weight:600}
+.tcard .lab .sw2{display:flex;gap:3px;margin-left:auto}
+.tcard .lab .sw2 i{width:9px;height:9px;border-radius:5px;display:block;border:1px solid rgba(0,0,0,.2)}
+.tcard .lab .ck{width:16px;height:16px;border-radius:8px;background:var(--tint);color:var(--fireText);display:flex;align-items:center;justify-content:center;margin-left:auto}
+.tcard .lab .ck .ic{width:9px;height:9px;stroke-width:2.8}
+.tcard .lab small{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;letter-spacing:1px;text-transform:uppercase;color:var(--gold);font-weight:700}
+.tcard.new .lab small{color:var(--emerald)}
+/* the faithful preview */
+.pv{border-radius:16px;overflow:hidden;background:var(--pbg,var(--bg));border:1px solid var(--surfbd);padding:10px;display:flex;flex-direction:column;gap:7px;position:relative;--pt:var(--ptint,var(--tint))}
+.pv::before{content:"";position:absolute;top:-60px;right:-40px;width:180px;height:160px;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--pt) 22%,transparent),transparent 68%);pointer-events:none}
+.pv>*{position:relative}
+.pv .ph{border-radius:12px;padding:8px 9px;background:var(--glass);border:1px solid var(--glassbd)}
+.pv .ph .g{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:12.5px;letter-spacing:-0.2px}
+.pv .ph .g span{color:var(--pt)}
+.pv .ph .r{display:flex;align-items:center;gap:6px;margin-top:6px}
+.pv .ph .r .av{width:22px;height:22px;border-radius:11px;font-size:8px}
+.pv .ph .r .nm{flex:1;font-size:9.5px;font-weight:600}
+.pv .ph .r .cb{width:22px;height:20px;border-radius:7px;background:var(--glass);border:1px solid var(--glassbd);position:relative}
+.pv .ph .r .cb i{position:absolute;top:-3px;right:-3px;width:8px;height:8px;border-radius:4px;background:var(--blue);display:block;border:1.5px solid var(--pbg,var(--bg))}
+.pv .sg{display:flex;padding:2px;gap:2px;border-radius:8px;background:var(--glass);border:1px solid var(--glassbd)}
+.pv .sg span{flex:1;height:20px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:var(--muted)}
+.pv .sg span.on{background:color-mix(in srgb,var(--pt) 18%,transparent);color:var(--pt)}
+.pv .cd{border-radius:11px;padding:9px;background:var(--surf);border:1px solid var(--surfbd)}
+.pv .cd .t{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:600;font-size:11.5px;display:flex;align-items:center;gap:6px}
+.pv .cd .t em{font-style:normal;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:7.5px;letter-spacing:1px;text-transform:uppercase;padding:1px 5px;border-radius:5px;background:color-mix(in srgb,var(--blue) 22%,transparent);color:var(--bluetext);font-weight:700}
+.pv .cd .p{font-size:9.5px;line-height:13px;color:var(--muted);margin-top:3px}
+.pv .cd .k{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;color:var(--pt);margin-top:5px;font-weight:600}
+.pv .bt{display:flex;gap:6px}
+.pv .bt span{flex:1;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;background:var(--glass);border:1px solid var(--glassbd)}
+.pv .bt span.f{background:var(--pt);border-color:var(--pt);color:var(--fireText)}
+.pv .tbm{display:flex;justify-content:space-around;padding:4px 6px;border-radius:10px;background:var(--glass);border:1px solid var(--glassbd)}
+.pv .tbm i{width:20px;height:16px;border-radius:5px;display:block;background:transparent}
+.pv .tbm i.on{background:color-mix(in srgb,var(--pt) 18%,transparent)}
+.pv .tbm i::after{content:"";display:block;width:8px;height:8px;border-radius:2px;margin:4px auto 0;background:var(--muted);opacity:.6}
+.pv .tbm i.on::after{background:var(--pt);opacity:1}
+/* custom accent */
+.hue{height:14px;border-radius:7px;background:linear-gradient(90deg,#FF5A3C,#FFB020,#7BE04A,#2DD4BF,#3B82F6,#8B5CF6,#EC4899,#FF5A3C);position:relative;margin:10px 0 6px}
+.hue i{position:absolute;top:-5px;width:24px;height:24px;border-radius:12px;background:#2DD4BF;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4);display:block;left:41%}
+.nb{display:flex;gap:6px;margin-top:4px}
+.nb span{flex:1;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:11.5px;font-weight:600;background:var(--glass);border:1px solid var(--glassbd);color:var(--muted)}
+.nb span i{width:12px;height:12px;border-radius:6px;display:block;border:1px solid rgba(255,255,255,.25)}
+.nb span.on{border-color:color-mix(in srgb,var(--tint) 45%,transparent);color:var(--text)}
+.prail{display:flex;gap:8px;overflow:hidden;margin-right:-16px;padding-right:16px}
+.pchip{flex:0 0 auto;height:36px;padding:0 11px 0 7px;border-radius:12px;display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;background:var(--glass);border:1px solid var(--glassbd);color:var(--muted)}
+.pchip i{width:18px;height:18px;border-radius:9px;display:block;border:1px solid rgba(0,0,0,.25)}
+.pchip.on{color:var(--text);border-color:color-mix(in srgb,var(--tint) 45%,transparent)}
+.pchip .ic{width:13px;height:13px}
+/* the forced change-password screen */
+.lockhero{display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;padding:26px 8px 6px}
+.lockhero .disc{width:64px;height:64px;border-radius:22px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;justify-content:center;color:var(--tint)}
+.lockhero .disc .ic{width:28px;height:28px}
+.lockhero h2{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:24px;letter-spacing:-0.4px;text-wrap:balance}
+.lockhero p{font-size:13px;line-height:18px;color:var(--muted);max-width:280px}
+.orgline{display:flex;align-items:center;justify-content:center;gap:8px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+.orgline i{width:18px;height:18px;border-radius:5px;background:linear-gradient(140deg,#B26A3C,#5A3016);display:block}
+/* portal toggle — hide the OTHER portal's pieces; shown pieces keep their own display */
+.phone:not(.mgr) .mgr-only{display:none!important}
+.phone.mgr .emp-only{display:none!important}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-cal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></symbol>
+  <symbol id="i-chr" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></symbol>
+  <symbol id="i-chl" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
+  <symbol id="i-chd" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-chu" viewBox="0 0 24 24"><path d="M18 15l-6-6-6 6"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+  <symbol id="i-key" viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.78 7.78 5.5 5.5 0 0 1 7.78-7.78zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></symbol>
+  <symbol id="i-cam" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></symbol>
+  <symbol id="i-half" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 0 20z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><path d="M22 6l-10 7L2 6"/></symbol>
+  <symbol id="i-mega" viewBox="0 0 24 24"><path d="M3 11l18-5v12L3 13v-2z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></symbol>
+  <symbol id="i-fork" viewBox="0 0 24 24"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2M7 2v20M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3zm0 0v7"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></symbol>
+  <symbol id="i-wrench" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></symbol>
+  <symbol id="i-slider" viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-pen" viewBox="0 0 24 24"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></symbol>
+  <symbol id="i-out" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></symbol>
+  <symbol id="i-wine" viewBox="0 0 24 24"><path d="M8 22h8M12 15v7M5 3h14l-1 7a6 6 0 0 1-12 0z"/></symbol>
+  <symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 22c4-2 7-5.5 7-10 0-3-2-5-3-6 0 2-1 3-2 3 0-3-2-6-5-7 1 3-1 5-3 7-2 2-2 4-2 5 0 4 3 6 8 8z"/></symbol>
+  <symbol id="i-quiz" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01"/></symbol>
+  <symbol id="i-dollar" viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></symbol>
+  <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></symbol>
+  <symbol id="i-game" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="11" rx="4"/><path d="M6 12h4M8 10v4M15 11h.01M18 13h.01"/></symbol>
+  <symbol id="i-brush" viewBox="0 0 24 24"><path d="M9.06 11.9l8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-eyeoff" viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24M1 1l22 22"/></symbol>
+  <symbol id="i-card" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></symbol>
+  <symbol id="i-tips" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M6 12h.01M18 12h.01"/></symbol>
+  <symbol id="i-clip" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></symbol>
+  <symbol id="i-at" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"/></symbol>
+  <symbol id="i-swap" viewBox="0 0 24 24"><path d="M17 1l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></symbol>
+</svg>
+
+<h1>Profile Hub — <span>Round 1</span></h1>
+<div class="toolbar">
+  <div class="grp"><span class="gl2">Theme</span>
+    <button class="tb on" data-theme="">Moonstone dark</button>
+    <button class="tb" data-theme="t-mono-l">Moonstone light</button>
+    <button class="tb" data-theme="t-ocean-d">Ocean dark</button>
+    <button class="tb" data-theme="t-ocean-l">Ocean light</button>
+  </div>
+  <div class="grp"><span class="gl2">Portal · row 1</span>
+    <button class="tb on" data-portal="emp">Employee</button>
+    <button class="tb" data-portal="mgr">Manager</button>
+  </div>
+</div>
+<p class="hint">Row 1 = the Profile tab, four directions: <b>A</b> is the true reskin baseline, <b>B</b>/<b>C</b>/<b>D</b> re-think the page below the hero (flip the portal toggle to see the O/M version of each). Row 2 = the manager tile that retires the Employee Hub, plus the two sheets every direction shares. Row 3 = Settings, three layouts. Row 4 = Appearance, three layouts, and the forced-change password screen. <em>Mix and match freely — every piece is a component, not a layout commitment.</em></p>
+
+<!-- ============================================================ ROW 1 · PROFILE -->
+<div class="section">
+  <div class="sh">Row 1 · Profile tab <span class="ln"></span><small>pick a direction, or mix</small></div>
+  <div class="row">
+
+    <!-- A · RESKIN -->
+    <div class="col">
+      <div class="concept"><b>A</b> Reskin <span class="ln"></span> the baseline</div>
+      <div class="phone prof">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>4:07</span><span>●●● ᯤ ▮</span></div>
+        <div class="whead">
+          <div class="greet">Good afternoon, <span class="emp-only">Daisy</span><span class="mgr-only">Nick</span></div>
+          <div class="hrow">
+            <div class="av"><span class="emp-only">DD</span><span class="mgr-only">NZ</span><div class="cam"><svg class="ic"><use href="#i-cam"/></svg></div></div>
+            <div class="nm"><b class="emp-only">Daisy Dukes</b><b class="mgr-only">Nick Zebra</b><span class="emp-only">Server · Bartender</span><span class="mgr-only">Manager</span></div>
+            <div class="rstack">
+              <div class="pills"><div class="pill"><svg class="ic"><use href="#i-dollar"/></svg>42</div><div class="pill gold"><svg class="ic"><use href="#i-trophy"/></svg>1,280</div></div>
+              <div class="chips"><div class="wx"><svg class="ic"><use href="#i-sun"/></svg>72°</div><div class="ib"><svg class="ic"><use href="#i-mail"/></svg><div class="dot">3</div></div><div class="ib"><svg class="ic"><use href="#i-bell"/></svg><div class="dot">2</div></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="cnt">
+          <div class="qa4">
+            <div class="qab"><svg class="ic"><use href="#i-mail"/></svg>Messages<div class="bub">3</div></div>
+            <div class="qab"><svg class="ic"><use href="#i-cal"/></svg>Schedule</div>
+            <div class="qab emp-only"><svg class="ic"><use href="#i-star"/></svg>Rewards</div>
+            <div class="qab mgr-only"><svg class="ic"><use href="#i-users"/></svg>Employees</div>
+            <div class="qab"><svg class="ic"><use href="#i-gear"/></svg>Settings</div>
+          </div>
+          <div class="card g">
+            <div class="chead"><div class="ct">Your next shift</div><span class="chev"><svg class="ic"><use href="#i-chr"/></svg></span></div>
+            <div class="shift" style="margin-top:8px"><div class="day">THU<br>SEP 17</div><div class="tm">4:00 PM – 11:00 PM</div><span class="rp emp-only">Server</span><span class="rp mgr-only">Manager</span></div>
+          </div>
+          <div class="card">
+            <div class="fold"><div><div class="ct">Profile information</div><div class="sub">Username · name · email · phone</div></div><span class="chev"><svg class="ic"><use href="#i-chd"/></svg></span></div>
+          </div>
+          <div class="card">
+            <div class="chead"><div class="ct">My Quick Tools</div><div class="pen"><svg class="ic"><use href="#i-pen"/></svg></div></div>
+            <div class="qt4" style="margin-top:12px">
+              <div class="qt emp-only"><div class="cir"><svg class="ic"><use href="#i-wine"/></svg></div>Bar Assistant</div>
+              <div class="qt mgr-only"><div class="cir"><svg class="ic"><use href="#i-users"/></svg></div>Employee Hub</div>
+              <div class="qt emp-only"><div class="cir"><svg class="ic"><use href="#i-book"/></svg></div>Guides</div>
+              <div class="qt mgr-only"><div class="cir"><svg class="ic"><use href="#i-mega"/></svg></div>Announcements</div>
+              <div class="qt"><div class="cir"><svg class="ic"><use href="#i-cal"/></svg></div>Schedule</div>
+              <div class="qt emp-only"><div class="cir"><svg class="ic"><use href="#i-star"/></svg></div>Rewards</div>
+              <div class="qt mgr-only"><div class="cir"><svg class="ic"><use href="#i-clip"/></svg></div>Roster</div>
+            </div>
+          </div>
+          <div class="btn red" style="flex:0 0 auto"><svg class="ic"><use href="#i-out"/></svg>Log out</div>
+        </div>
+        <div class="tabbar">
+          <div class="t"><svg class="ic"><use href="#i-home"/></svg>Welcome</div><div class="t"><svg class="ic"><use href="#i-fork"/></svg>Menus</div><div class="t"><svg class="ic"><use href="#i-wrench"/></svg>Tools</div>
+          <div class="t emp-only"><svg class="ic"><use href="#i-star"/></svg>Rewards</div><div class="t mgr-only"><svg class="ic"><use href="#i-slider"/></svg>Manage</div>
+          <div class="t on"><svg class="ic"><use href="#i-user"/></svg>Profile</div>
+        </div>
+      </div>
+      <p class="bcap"><b>What changed:</b> the Welcome hero replaces the old header card (avatar keeps its camera badge — the only hero difference), the Bucks + Game Hub score ride as pills <em>above</em> the weather / mail / bell chips, the quick bar becomes four tinted tiles, the next shift is a Schedule-Kit ShiftRow, Profile information folds, Quick Tools keep their circle grid, and Log out is a ghost row. Same page, glass grammar.</p>
+    </div>
+
+    <!-- B · HUB -->
+    <div class="col">
+      <div class="concept"><b>B</b> Hub <span class="ln"></span> identity card · stats · favorites</div>
+      <div class="phone prof">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>4:07</span><span>●●● ᯤ ▮</span></div>
+        <div class="whead">
+          <div class="greet">Good afternoon, <span class="emp-only">Daisy</span><span class="mgr-only">Nick</span></div>
+          <div class="hrow">
+            <div class="av"><span class="emp-only">DD</span><span class="mgr-only">NZ</span><div class="cam"><svg class="ic"><use href="#i-cam"/></svg></div></div>
+            <div class="nm"><b class="emp-only">Daisy Dukes</b><b class="mgr-only">Nick Zebra</b><span class="emp-only">Server · Bartender</span><span class="mgr-only">Manager</span></div>
+            <div class="wx"><svg class="ic"><use href="#i-sun"/></svg>72°</div><div class="ib"><svg class="ic"><use href="#i-mail"/></svg><div class="dot">3</div></div><div class="ib"><svg class="ic"><use href="#i-bell"/></svg><div class="dot">2</div></div>
+          </div>
+        </div>
+        <div class="cnt">
+          <div class="card g">
+            <div class="idcard">
+              <div class="av big"><span class="emp-only">DD</span><span class="mgr-only">NZ</span><div class="cam"><svg class="ic"><use href="#i-cam"/></svg></div></div>
+              <div class="bd">
+                <div class="name"><span class="emp-only">Daisy Dukes</span><span class="mgr-only">Nick Zebra</span></div>
+                <div class="handle"><span class="emp-only">@ddukes</span><span class="mgr-only">@nzebra</span></div>
+                <div class="jts"><span class="rp emp-only">Server</span><span class="rp emp-only">Bartender</span><span class="rp mgr-only">Manager</span><span class="rp gold">★ Rising Star</span></div>
+                <div class="tagline">“Ask me about the wine list.”</div>
+              </div>
+              <div class="pen"><svg class="ic"><use href="#i-pen"/></svg></div>
+            </div>
+          </div>
+          <div class="stats3">
+            <div class="stat"><div class="big tint">$42</div><div class="eyeb">Bucks</div><span class="chev"><svg class="ic"><use href="#i-chr"/></svg></span></div>
+            <div class="stat"><div class="big gold">#4 <small>1,280</small></div><div class="eyeb">Game rank</div><span class="chev"><svg class="ic"><use href="#i-chr"/></svg></span></div>
+            <div class="stat"><div class="big">Thu <small>4 PM</small></div><div class="eyeb">Next shift</div><span class="chev"><svg class="ic"><use href="#i-chr"/></svg></span></div>
+          </div>
+          <div class="srule"><span class="eyeb tint">Favorites</span><span class="ln"></span><span class="gchip sm"><svg class="ic"><use href="#i-pen"/></svg>Edit</span></div>
+          <div class="grid2">
+            <div class="tile az emp-only"><svg class="ic"><use href="#i-wine"/></svg><div><div class="tt">Bar Assistant</div><div class="ts">Cocktails A–Z · closing</div></div><span class="chev"><svg class="ic"><use href="#i-chr"/></svg></span></div>
+            <div class="tile emp-only"><svg class="ic"><use href="#i-book"/></svg><div><div class="tt">Guides</div><div class="ts">12 guides · 2 new</div></div><span class="chev"><svg class="ic"><use href="#i-chr"/></svg></span></div>
+            <div class="tile vio emp-only pulse"><svg class="ic"><use href="#i-quiz"/></svg><div><div class="tt">Quizzes</div><div class="ts">Wine exam waiting</div></div><div class="bub">1</div></div>
+            <div class="tile em emp-only"><svg class="ic"><use href="#i-tips"/></svg><div><div class="tt">Tips</div><div class="ts">Log tonight's shift</div></div><span class="chev"><svg class="ic"><use href="#i-chr"/></svg></span></div>
+            <div class="tile mgr-only"><svg class="ic"><use href="#i-mega"/></svg><div><div class="tt">Announcements</div><div class="ts">3 live · 1 scheduled</div></div><span class="chev"><svg class="ic"><use href="#i-chr"/></svg></span></div>
+            <div class="tile az mgr-only"><svg class="ic"><use href="#i-clip"/></svg><div><div class="tt">Today's Roster</div><div class="ts">9 AM · 12 PM</div></div><span class="chev"><svg class="ic"><use href="#i-chr"/></svg></span></div>
+            <div class="tile gold mgr-only pulse"><svg class="ic"><use href="#i-check"/></svg><div><div class="tt">Approvals</div><div class="ts">2 waiting</div></div><div class="bub">2</div></div>
+            <div class="tile vio mgr-only"><svg class="ic"><use href="#i-quiz"/></svg><div><div class="tt">Quizzes Editor</div><div class="ts">Draft: Fall wines</div></div><span class="chev"><svg class="ic"><use href="#i-chr"/></svg></span></div>
+            <div class="tile wide"><svg class="ic"><use href="#i-gear"/></svg><div class="bd"><div class="tt">Settings</div><div class="ts">Appearance · Notifications · Language · Password</div></div><span class="chev"><svg class="ic"><use href="#i-chr"/></svg></span></div>
+          </div>
+          <div class="logout"><span>Signed in as <span class="mono emp-only">@ddukes</span><span class="mono mgr-only">@nzebra</span></span>·<b><svg class="ic"><use href="#i-out"/></svg>Log out</b></div>
+        </div>
+        <div class="tabbar">
+          <div class="t"><svg class="ic"><use href="#i-home"/></svg>Welcome</div><div class="t"><svg class="ic"><use href="#i-fork"/></svg>Menus</div><div class="t"><svg class="ic"><use href="#i-wrench"/></svg>Tools</div>
+          <div class="t emp-only"><svg class="ic"><use href="#i-star"/></svg>Rewards</div><div class="t mgr-only"><svg class="ic"><use href="#i-slider"/></svg>Manage</div>
+          <div class="t on"><svg class="ic"><use href="#i-user"/></svg>Profile</div>
+        </div>
+      </div>
+      <p class="bcap"><b>The hub:</b> an <b>identity card</b> (big avatar with the camera hint, @handle, job-title pills, the badge title, and the new <em>tagline</em>) whose pencil opens the Profile sheet; a <b>three-cell stat strip</b> (Bucks → Rewards, rank → Game Hub, next shift → My Schedule) that replaces both the hero pills and the tall next-shift card; <b>Favorites</b> = Quick Tools reborn as CommandTiles in family colours, waiting badges pulse; Settings is a wide tile that lists what lives inside; Log out shrinks to a footer line.</p>
+    </div>
+
+    <!-- C · PASSPORT -->
+    <div class="col">
+      <div class="concept"><b>C</b> Passport <span class="ln"></span> tall hero · dock · about me</div>
+      <div class="phone prof">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>4:07</span><span>●●● ᯤ ▮</span></div>
+        <div class="whead">
+          <div class="greet">Good afternoon, <span class="emp-only">Daisy</span><span class="mgr-only">Nick</span></div>
+          <div class="hrow" style="align-items:flex-start">
+            <div class="av xl"><span class="emp-only">DD</span><span class="mgr-only">NZ</span><div class="cam"><svg class="ic"><use href="#i-cam"/></svg></div></div>
+            <div class="nm" style="padding-top:2px">
+              <b style="font-size:16px" class="emp-only">Daisy Dukes</b><b style="font-size:16px" class="mgr-only">Nick Zebra</b>
+              <span class="emp-only">Server · Bartender · @ddukes</span><span class="mgr-only">Manager · @nzebra</span>
+              <div class="pills" style="margin-top:7px"><div class="pill"><svg class="ic"><use href="#i-dollar"/></svg>42 Bucks</div><div class="pill gold"><svg class="ic"><use href="#i-trophy"/></svg>#4 · 1,280</div></div>
+            </div>
+          </div>
+          <div class="chips" style="justify-content:flex-end"><div class="wx"><svg class="ic"><use href="#i-sun"/></svg>72° · Clear</div><div class="ib"><svg class="ic"><use href="#i-mail"/></svg><div class="dot">3</div></div><div class="ib"><svg class="ic"><use href="#i-bell"/></svg><div class="dot">2</div></div></div>
+        </div>
+        <div class="cnt">
+          <div class="upnext"><div class="lic"><svg class="ic"><use href="#i-cal"/></svg></div><div class="bd"><div class="l1">Thu Sep 17 · 4:00 – 11:00 PM</div><div class="l2"><span class="emp-only">Server · Main dining</span><span class="mgr-only">Manager · Floor</span></div></div><div class="go">Full schedule<svg class="ic"><use href="#i-chr"/></svg></div></div>
+          <div class="srule"><span class="eyeb tint">My dock</span><span class="ln"></span><span class="eyeb">6 of 8</span></div>
+          <div class="rail">
+            <div class="rit"><div class="cir"><svg class="ic"><use href="#i-mail"/></svg><div class="bub">3</div></div>Messages</div>
+            <div class="rit az emp-only"><div class="cir"><svg class="ic"><use href="#i-wine"/></svg></div>Bar Asst.</div>
+            <div class="rit az mgr-only"><div class="cir"><svg class="ic"><use href="#i-users"/></svg></div>Team</div>
+            <div class="rit"><div class="cir"><svg class="ic"><use href="#i-book"/></svg></div>Guides</div>
+            <div class="rit vio"><div class="cir"><svg class="ic"><use href="#i-quiz"/></svg></div>Quizzes</div>
+            <div class="rit em"><div class="cir"><svg class="ic"><use href="#i-tips"/></svg></div>Tips</div>
+            <div class="rit gold"><div class="cir"><svg class="ic"><use href="#i-game"/></svg></div>Game Hub</div>
+            <div class="rit add"><div class="cir"><svg class="ic"><use href="#i-plus"/></svg></div>Edit</div>
+          </div>
+          <div class="card">
+            <div class="chead"><div class="ct">About me</div><div class="pen"><svg class="ic"><use href="#i-pen"/></svg></div></div>
+            <div style="margin-top:4px">
+              <div class="info"><span class="k">Tagline</span><span class="v">Ask me about the wine list.</span></div>
+              <div class="info"><span class="k">Email</span><span class="v">daisy@myresto.test</span></div>
+              <div class="info"><span class="k">Phone</span><span class="v">(732) 555-0142</span></div>
+              <div class="info"><span class="k">Username</span><span class="v mut mono">ddukes</span><span class="lk"><svg class="ic"><use href="#i-lock"/></svg></span></div>
+            </div>
+          </div>
+          <div class="arow"><div class="lic"><svg class="ic"><use href="#i-gear"/></svg></div><div class="bd"><div class="l1">Settings</div><div class="l2">Appearance · Notifications · Language · Password</div></div><span class="chev"><svg class="ic"><use href="#i-chr"/></svg></span></div>
+          <div class="arow mgr-only own"><div class="lic"><svg class="ic"><use href="#i-card"/></svg></div><div class="bd"><div class="l1">Subscription <span class="own">Owner</span></div><div class="l2">Premium · renews Oct 3</div></div><span class="chev"><svg class="ic"><use href="#i-chr"/></svg></span></div>
+          <div class="logout"><b><svg class="ic"><use href="#i-out"/></svg>Log out</b></div>
+        </div>
+        <div class="tabbar">
+          <div class="t"><svg class="ic"><use href="#i-home"/></svg>Welcome</div><div class="t"><svg class="ic"><use href="#i-fork"/></svg>Menus</div><div class="t"><svg class="ic"><use href="#i-wrench"/></svg>Tools</div>
+          <div class="t emp-only"><svg class="ic"><use href="#i-star"/></svg>Rewards</div><div class="t mgr-only"><svg class="ic"><use href="#i-slider"/></svg>Manage</div>
+          <div class="t on"><svg class="ic"><use href="#i-user"/></svg>Profile</div>
+        </div>
+      </div>
+      <p class="bcap"><b>The passport:</b> the hero grows one row — the 64pt avatar, handle, and the Bucks / rank pills sit with the name, the chips drop to their own line. Below: <b>Up next</b> is a single glass line with “Full schedule”; <b>My dock</b> is the Quick Tools facelift — a horizontal launcher rail in family colours, cap raised from 4 to 8, badges ride the icons; <b>About me</b> shows the fields inline (tap the pencil for the sheet); Settings and the owner’s Subscription are list rows; Log out is a footer link.</p>
+    </div>
+
+    <!-- D · CONSOLE -->
+    <div class="col">
+      <div class="concept"><b>D</b> Console <span class="ln"></span> segmented · Me / Favorites / More</div>
+      <div class="phone prof">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>4:07</span><span>●●● ᯤ ▮</span></div>
+        <div class="whead">
+          <div class="greet">Good afternoon, <span class="emp-only">Daisy</span><span class="mgr-only">Nick</span></div>
+          <div class="hrow">
+            <div class="av"><span class="emp-only">DD</span><span class="mgr-only">NZ</span><div class="cam"><svg class="ic"><use href="#i-cam"/></svg></div></div>
+            <div class="nm"><b class="emp-only">Daisy Dukes</b><b class="mgr-only">Nick Zebra</b><span class="emp-only">Server · Bartender</span><span class="mgr-only">Manager</span></div>
+            <div class="rstack">
+              <div class="pills"><div class="pill"><svg class="ic"><use href="#i-dollar"/></svg>42</div><div class="pill gold"><svg class="ic"><use href="#i-trophy"/></svg>1,280</div></div>
+              <div class="chips"><div class="wx"><svg class="ic"><use href="#i-sun"/></svg>72°</div><div class="ib"><svg class="ic"><use href="#i-mail"/></svg><div class="dot">3</div></div><div class="ib"><svg class="ic"><use href="#i-bell"/></svg><div class="dot">2</div></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="cnt">
+          <div class="cseg"><span class="on"><svg class="ic"><use href="#i-user"/></svg>Me</span><span><svg class="ic"><use href="#i-grid"/></svg>Favorites</span><span><svg class="ic"><use href="#i-gear"/></svg>More</span></div>
+          <div class="card g">
+            <div class="idcard">
+              <div class="av big"><span class="emp-only">DD</span><span class="mgr-only">NZ</span><div class="cam"><svg class="ic"><use href="#i-cam"/></svg></div></div>
+              <div class="bd">
+                <div class="name"><span class="emp-only">Daisy Dukes</span><span class="mgr-only">Nick Zebra</span></div>
+                <div class="handle"><span class="emp-only">@ddukes</span><span class="mgr-only">@nzebra</span></div>
+                <div class="jts"><span class="rp emp-only">Server</span><span class="rp emp-only">Bartender</span><span class="rp mgr-only">Manager</span><span class="rp gold">★ Rising Star</span></div>
+                <div class="tagline add"><svg class="ic"><use href="#i-plus"/></svg>Add a tagline</div>
+              </div>
+            </div>
+            <div style="margin-top:10px;padding-top:4px;border-top:1px solid var(--hair)">
+              <div class="info"><span class="k">Email</span><span class="v">daisy@myresto.test</span></div>
+              <div class="info"><span class="k">Phone</span><span class="v">(732) 555-0142</span></div>
+              <div class="info"><span class="k">Username</span><span class="v mut mono">ddukes</span><span class="lk"><svg class="ic"><use href="#i-lock"/></svg></span></div>
+            </div>
+            <div class="btnrow" style="margin-top:10px"><div class="btn fill"><svg class="ic"><use href="#i-pen"/></svg>Edit profile</div></div>
+          </div>
+          <div class="card">
+            <div class="chead"><div class="ct">Your next shift</div><span class="chev"><svg class="ic"><use href="#i-chr"/></svg></span></div>
+            <div class="shift" style="margin-top:8px"><div class="day">THU<br>SEP 17</div><div class="tm">4:00 PM – 11:00 PM</div><span class="rp emp-only">Server</span><span class="rp mgr-only">Manager</span></div>
+          </div>
+          <div class="ftr">Favorites holds the tool grid · More holds Settings, Subscription, Team and Log out</div>
+        </div>
+        <div class="tabbar">
+          <div class="t"><svg class="ic"><use href="#i-home"/></svg>Welcome</div><div class="t"><svg class="ic"><use href="#i-fork"/></svg>Menus</div><div class="t"><svg class="ic"><use href="#i-wrench"/></svg>Tools</div>
+          <div class="t emp-only"><svg class="ic"><use href="#i-star"/></svg>Rewards</div><div class="t mgr-only"><svg class="ic"><use href="#i-slider"/></svg>Manage</div>
+          <div class="t on"><svg class="ic"><use href="#i-user"/></svg>Profile</div>
+        </div>
+      </div>
+      <p class="bcap"><b>The console:</b> the same hero as A, then a ConnectBar-style capsule splits the page into three swipeable panes — <b>Me</b> (identity + inline fields + next shift, Edit profile as one clear button), <b>Favorites</b> (B’s tile grid), <b>More</b> (Settings, Subscription, Team, Log out as rows). Shortest scroll of the four; the trade is that favorites are one swipe away instead of on the first screen.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ ROW 2 · MANAGER + SHEETS -->
+<div class="section">
+  <div class="sh">Row 2 · the O/M Team tile · the two shared sheets <span class="ln"></span><small>confirm-or-tweak</small></div>
+  <div class="row">
+
+    <!-- M · manager profile w/ Team tile (B applied) -->
+    <div class="col">
+      <div class="concept"><b>M</b> Manager · B applied <span class="ln"></span> Team tile retires the Employee Hub</div>
+      <div class="phone mgr">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>4:07</span><span>●●● ᯤ ▮</span></div>
+        <div class="whead">
+          <div class="greet">Good afternoon, <span>Nick</span></div>
+          <div class="hrow">
+            <div class="av p3">NZ<div class="cam"><svg class="ic"><use href="#i-cam"/></svg></div></div>
+            <div class="nm"><b>Nick Zebra</b><span>Manager</span></div>
+            <div class="wx"><svg class="ic"><use href="#i-sun"/></svg>72°</div><div class="ib"><svg class="ic"><use href="#i-mail"/></svg><div class="dot">3</div></div><div class="ib"><svg class="ic"><use href="#i-bell"/></svg><div class="dot">5</div></div>
+          </div>
+        </div>
+        <div class="cnt">
+          <div class="card g">
+            <div class="idcard">
+              <div class="av big p3">NZ<div class="cam"><svg class="ic"><use href="#i-cam"/></svg></div></div>
+              <div class="bd"><div class="name">Nick Zebra</div><div class="handle">@nzebra</div><div class="jts"><span class="rp">Manager</span><span class="rp mut">Bar Manager</span></div><div class="tagline">“Closing checklist or it didn’t happen.”</div></div>
+              <div class="pen"><svg class="ic"><use href="#i-pen"/></svg></div>
+            </div>
+          </div>
+          <div class="stats3">
+            <div class="stat"><div class="big tint">$118</div><div class="eyeb">Bucks</div><span class="chev"><svg class="ic"><use href="#i-chr"/></svg></span></div>
+            <div class="stat"><div class="big gold">#2 <small>2,910</small></div><div class="eyeb">Game rank</div><span class="chev"><svg class="ic"><use href="#i-chr"/></svg></span></div>
+            <div class="stat"><div class="big">Fri <small>9 AM</small></div><div class="eyeb">Next shift</div><span class="chev"><svg class="ic"><use href="#i-chr"/></svg></span></div>
+          </div>
+          <div class="tile wide az" style="display:flex">
+            <svg class="ic"><use href="#i-users"/></svg>
+            <div class="bd"><div class="tt">Team</div><div class="ts">14 staff · 2 inactive · join code MYRE-7F8A</div>
+              <div class="mini2"><span><svg class="ic"><use href="#i-users"/></svg>Employees</span><span><svg class="ic"><use href="#i-cal"/></svg>Schedules</span><span><svg class="ic"><use href="#i-at"/></svg>Invite</span></div>
+            </div>
+          </div>
+          <div class="srule"><span class="eyeb tint">Favorites</span><span class="ln"></span><span class="gchip sm"><svg class="ic"><use href="#i-pen"/></svg>Edit</span></div>
+          <div class="grid2">
+            <div class="tile" style="display:flex"><svg class="ic"><use href="#i-mega"/></svg><div><div class="tt">Announcements</div><div class="ts">3 live · 1 scheduled</div></div><span class="chev"><svg class="ic"><use href="#i-chr"/></svg></span></div>
+            <div class="tile gold pulse" style="display:flex"><svg class="ic"><use href="#i-check"/></svg><div><div class="tt">Approvals</div><div class="ts">2 waiting</div></div><div class="bub">2</div></div>
+            <div class="tile wide" style="display:flex"><svg class="ic"><use href="#i-gear"/></svg><div class="bd"><div class="tt">Settings</div><div class="ts">Appearance · Notifications · Language · Password</div></div><span class="chev"><svg class="ic"><use href="#i-chr"/></svg></span></div>
+          </div>
+          <div class="logout"><span>Signed in as <span class="mono">@nzebra</span></span>·<b><svg class="ic"><use href="#i-out"/></svg>Log out</b></div>
+        </div>
+        <div class="tabbar">
+          <div class="t"><svg class="ic"><use href="#i-home"/></svg>Welcome</div><div class="t"><svg class="ic"><use href="#i-fork"/></svg>Menus</div><div class="t"><svg class="ic"><use href="#i-wrench"/></svg>Tools</div><div class="t"><svg class="ic"><use href="#i-slider"/></svg>Manage</div><div class="t on"><svg class="ic"><use href="#i-user"/></svg>Profile</div>
+        </div>
+      </div>
+      <p class="bcap"><b>Team tile:</b> one wide azure tile with three chips — <em>Employees</em> opens the Manage page on its Employees pane (the pane already has the full roster, Add, Share-the-code and Show-inactive), <em>Schedules</em> opens the Schedules page, <em>Invite</em> opens the join-code share sheet. That lets us <b>delete employee-hub.tsx and employee-editor.tsx</b> outright: the quick-tool “Employee Hub” becomes “Team”, and the two Manage-page links that still point at the editor repoint to the pane.</p>
+    </div>
+
+    <!-- PROFILE SHEET -->
+    <div class="col">
+      <div class="concept"><b>Sheet</b> Your profile <span class="ln"></span> GlassSheet · FormKit</div>
+      <div class="phone">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>4:07</span><span>●●● ᯤ ▮</span></div>
+        <div class="whead" style="opacity:.55">
+          <div class="greet">Good afternoon, <span>Daisy</span></div>
+          <div class="hrow"><div class="av">DD</div><div class="nm"><b>Daisy Dukes</b><span>Server · Bartender</span></div><div class="wx"><svg class="ic"><use href="#i-sun"/></svg>72°</div><div class="ib"><svg class="ic"><use href="#i-mail"/></svg></div><div class="ib"><svg class="ic"><use href="#i-bell"/></svg></div></div>
+        </div>
+        <div class="cnt" style="opacity:.55"><div class="card g" style="height:120px"></div><div class="stats3"><div class="stat" style="height:58px"></div><div class="stat"></div><div class="stat"></div></div></div>
+        <div class="ovl"><div class="scr"></div>
+          <div class="sheet">
+            <div class="grabpill"></div>
+            <div class="shead"><div><div class="t">Your profile</div><span class="sub">Shown on your profile card and to managers</span></div><div class="xbtn"><svg class="ic"><use href="#i-x"/></svg></div></div>
+            <div class="sbody">
+              <div style="display:flex;align-items:center;gap:12px;padding:2px 0 4px"><div class="av xl">DD<div class="cam"><svg class="ic"><use href="#i-cam"/></svg></div></div><div><div style="font-size:13.5px;font-weight:600">Profile photo</div><div class="hintt" style="margin-top:2px">Tap the photo to change it · square crop</div></div></div>
+              <div class="two">
+                <div class="fld"><div class="flab">Username</div><div class="inp lock"><svg class="ic"><use href="#i-lock"/></svg><span class="fill">ddukes</span></div></div>
+                <div class="fld"><div class="flab">Full name</div><div class="inp lock"><svg class="ic"><use href="#i-lock"/></svg><span class="fill" style="font-family:'Inter',system-ui;font-size:14px">Daisy Dukes</span></div></div>
+              </div>
+              <div class="hintt" style="margin-top:-2px">Username and name are set by your manager.</div>
+              <div class="fld"><div class="flab">Email</div><div class="inp"><svg class="ic"><use href="#i-mail"/></svg><span class="fill">daisy@myresto.test</span></div></div>
+              <div class="fld"><div class="flab">Phone</div><div class="inp"><svg class="ic"><use href="#i-clock"/></svg><span class="fill">(732) 555-0142</span></div></div>
+              <div class="fld"><div class="flab">Tagline <span class="opt mono">24 / 60</span></div><div class="inp"><svg class="ic"><use href="#i-pen"/></svg><span class="fill">Ask me about the wine list.</span></div><div class="hintt">One line about you. It shows on your profile card now, and on the Shout-Out Wall later.</div></div>
+            </div>
+            <div class="sfoot"><div class="fbtn">Cancel</div><div class="fbtn save"><svg class="ic"><use href="#i-check"/></svg>Save</div></div>
+          </div>
+        </div>
+      </div>
+      <p class="bcap"><b>One sheet for every direction:</b> the locked pair (username, name) in mono with padlocks, Email and Phone editable, and the new <b>Tagline</b> field (60 chars, counter in the label) — a new <span class="mono">users.tagline</span> column + the profile-info RPC widened, so the Shout-Out Wall can read it later. The photo is changed <em>inside</em> the sheet (direct launch from the open sheet — the only proven picker pattern), not from a deferred action.</p>
+    </div>
+
+    <!-- FAVORITES EDITOR SHEET -->
+    <div class="col">
+      <div class="concept"><b>Sheet</b> Edit favorites <span class="ln"></span> chips · grouped · capped</div>
+      <div class="phone">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>4:07</span><span>●●● ᯤ ▮</span></div>
+        <div class="whead" style="opacity:.55">
+          <div class="greet">Good afternoon, <span>Daisy</span></div>
+          <div class="hrow"><div class="av">DD</div><div class="nm"><b>Daisy Dukes</b><span>Server · Bartender</span></div><div class="wx"><svg class="ic"><use href="#i-sun"/></svg>72°</div><div class="ib"><svg class="ic"><use href="#i-mail"/></svg></div><div class="ib"><svg class="ic"><use href="#i-bell"/></svg></div></div>
+        </div>
+        <div class="cnt" style="opacity:.55"><div class="card g" style="height:120px"></div></div>
+        <div class="ovl"><div class="scr"></div>
+          <div class="sheet">
+            <div class="grabpill"></div>
+            <div class="shead"><div><div class="t">Edit favorites</div><span class="sub">Pick up to 6 · they show on your Profile</span></div><div class="gchip sm"><span class="mono">4 / 6</span></div></div>
+            <div class="sbody">
+              <div class="psub">General</div>
+              <div class="chipwrap">
+                <span class="chip on"><svg class="ic"><use href="#i-check"/></svg>Messages</span><span class="chip on"><svg class="ic"><use href="#i-check"/></svg>Guides &amp; Training</span><span class="chip"><svg class="ic"><use href="#i-cal"/></svg>My Schedule</span><span class="chip"><svg class="ic"><use href="#i-fork"/></svg>Menus</span><span class="chip"><svg class="ic"><use href="#i-star"/></svg>Rewards</span><span class="chip"><svg class="ic"><use href="#i-game"/></svg>Game Hub</span><span class="chip on"><svg class="ic"><use href="#i-check"/></svg>Quizzes &amp; Exams</span><span class="chip"><svg class="ic"><use href="#i-tips"/></svg>Tips &amp; Checkouts</span><span class="chip"><svg class="ic"><use href="#i-clip"/></svg>Today's Roster</span>
+              </div>
+              <div class="psub">Assistants</div>
+              <div class="chipwrap"><span class="chip on"><svg class="ic"><use href="#i-check"/></svg>Bar Assistant</span><span class="chip dim"><svg class="ic"><use href="#i-lock"/></svg>Host Assistant</span><span class="chip dim"><svg class="ic"><use href="#i-lock"/></svg>Kitchen Assistant</span></div>
+              <div class="psub">Games</div>
+              <div class="chipwrap"><span class="chip"><svg class="ic"><use href="#i-game"/></svg>Memory Game</span><span class="chip"><svg class="ic"><use href="#i-cam"/></svg>Picture This!</span><span class="chip"><svg class="ic"><use href="#i-grid"/></svg>Word Search</span></div>
+              <div class="hintt">Dimmed tools need a matching job title. Managers also see Editors and Management here.</div>
+            </div>
+            <div class="sfoot"><div class="fbtn save" style="flex:1"><svg class="ic"><use href="#i-check"/></svg>Done</div></div>
+          </div>
+        </div>
+      </div>
+      <p class="bcap"><b>Favorites editor:</b> the old scrolling checklist becomes grouped chips (General · Assistants · Games; Editors · Management for O/M) with a live <span class="mono">4 / 6</span> counter; the cap moves from 4 to 6 (8 for C’s dock). Tools your job title doesn’t unlock stay visible but dimmed with a padlock — the manager-permissions grammar — rather than vanishing.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ ROW 3 · SETTINGS -->
+<div class="section">
+  <div class="sh">Row 3 · Settings <span class="ln"></span><small>pick a layout</small></div>
+  <div class="row">
+
+    <!-- S-A rows -->
+    <div class="col">
+      <div class="concept"><b>S-A</b> Rows <span class="ln"></span> reskin · folds inline</div>
+      <div class="phone">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>4:07</span><span>●●● ᯤ ▮</span></div>
+        <div class="hdr"><div class="c38"><svg class="ic"><use href="#i-chl"/></svg></div><div class="ttl">Settings</div><div style="width:38px"></div></div>
+        <div class="cnt">
+          <div class="arow"><div class="lic"><svg class="ic"><use href="#i-brush"/></svg></div><div class="bd"><div class="l1">Appearance</div><div class="l2"><b>Moonstone</b> · Dark</div></div><div class="swat"><i style="background:#E6EAEE"></i><i style="background:#FF7A2F"></i><i style="background:#181B21"></i></div><span class="chev"><svg class="ic"><use href="#i-chr"/></svg></span></div>
+          <div class="arow"><div class="lic vio"><svg class="ic"><use href="#i-bell"/></svg></div><div class="bd"><div class="l1">Notifications</div><div class="l2"><b>6 of 8</b> on · shift releases off</div></div><span class="chev"><svg class="ic"><use href="#i-chd"/></svg></span></div>
+          <div class="arow"><div class="lic az"><svg class="ic"><use href="#i-globe"/></svg></div><div class="bd"><div class="l1">Language</div><div class="l2"><b>English</b> · follows your phone</div></div><span class="chev"><svg class="ic"><use href="#i-chr"/></svg></span></div>
+          <div class="card" style="padding:12px 13px">
+            <div class="arow" style="padding:0;background:transparent;border:0"><div class="lic gold"><svg class="ic"><use href="#i-key"/></svg></div><div class="bd"><div class="l1">Change password</div><div class="l2">At least 6 characters</div></div><span class="chev"><svg class="ic"><use href="#i-chu"/></svg></span></div>
+            <div style="margin-top:12px;display:flex;flex-direction:column;gap:9px">
+              <div class="fld"><div class="flab">Current password</div><div class="inp"><svg class="ic"><use href="#i-lock"/></svg><span class="fill mono">••••••••</span><span class="eye"><svg class="ic"><use href="#i-eye"/></svg></span></div><div class="hintt">Forgot it? <b>A manager can reset it</b> from your employee card.</div></div>
+              <div class="fld"><div class="flab">New password</div><div class="inp"><svg class="ic"><use href="#i-key"/></svg><span class="fill">wineList!24</span><span class="eye"><svg class="ic"><use href="#i-eyeoff"/></svg></span></div></div>
+              <div class="fld"><div class="flab">Confirm new password</div><div class="inp"><svg class="ic"><use href="#i-key"/></svg><span class="fill ph">Type it again</span><span class="eye"><svg class="ic"><use href="#i-eye"/></svg></span></div></div>
+              <div class="btnrow"><div class="btn">Cancel</div><div class="btn fill"><svg class="ic"><use href="#i-check"/></svg>Update password</div></div>
+            </div>
+          </div>
+          <div class="arow own"><div class="lic"><svg class="ic"><use href="#i-card"/></svg></div><div class="bd"><div class="l1">Subscription <span class="own">Owner</span></div><div class="l2"><b>Premium</b> · renews Oct 3</div></div><span class="chev"><svg class="ic"><use href="#i-chr"/></svg></span></div>
+          <div class="ftr">MyResto Connect 1.0.0 (16) · Signed in as @ddukes</div>
+        </div>
+      </div>
+      <p class="bcap"><b>Rows:</b> ScreenHeader + back chip, then one list — Appearance (theme name + live swatches) and Language push; Notifications and Change password <em>fold open in place</em>. Shown with the password fold open: current / new / confirm with per-field eye toggles, and the “Forgot it?” line answers the lock-out worry. Owners get the Subscription row at the foot.</p>
+    </div>
+
+    <!-- S-B shelf -->
+    <div class="col">
+      <div class="concept"><b>S-B</b> Shelf <span class="ln"></span> Game-Hub grammar · content below</div>
+      <div class="phone">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>4:07</span><span>●●● ᯤ ▮</span></div>
+        <div class="hdr"><div class="c38"><svg class="ic"><use href="#i-chl"/></svg></div><div class="ttl">Settings</div><div style="width:38px"></div></div>
+        <div class="cnt">
+          <div class="shelf">
+            <div class="stile"><svg class="ic"><use href="#i-brush"/></svg>Appearance<span class="go"><svg class="ic"><use href="#i-chr"/></svg></span></div>
+            <div class="stile on"><svg class="ic"><use href="#i-bell"/></svg>Notifications</div>
+            <div class="stile"><svg class="ic"><use href="#i-globe"/></svg>Language<span class="go"><svg class="ic"><use href="#i-chr"/></svg></span></div>
+            <div class="stile"><svg class="ic"><use href="#i-key"/></svg>Password</div>
+          </div>
+          <div class="card g" style="margin-top:2px">
+            <div class="chead"><div class="ct">Notifications</div><span class="eyeb">6 of 8 on</span></div>
+            <div class="hintt" style="margin-top:2px">Choose which pushes reach this phone.</div>
+            <div style="display:flex;flex-direction:column;gap:7px;margin-top:10px">
+              <div class="frow thin"><svg class="ic"><use href="#i-mail"/></svg><div class="bd"><div class="l1">Messages</div><div class="l2">New messages and replies</div></div><div class="sw"></div></div>
+              <div class="frow thin"><svg class="ic"><use href="#i-dollar"/></svg><div class="bd"><div class="l1">Bucks</div><div class="l2">When you earn Bucks</div></div><div class="sw"></div></div>
+              <div class="frow thin"><svg class="ic"><use href="#i-mega"/></svg><div class="bd"><div class="l1">Announcements</div><div class="l2">New announcements</div></div><div class="sw"></div></div>
+              <div class="frow thin"><svg class="ic"><use href="#i-cal"/></svg><div class="bd"><div class="l1">Events</div><div class="l2">New events</div></div><div class="sw"></div></div>
+              <div class="frow thin"><svg class="ic"><use href="#i-star"/></svg><div class="bd"><div class="l1">Special features</div><div class="l2">New special features</div></div><div class="sw off"></div></div>
+              <div class="frow thin"><svg class="ic"><use href="#i-swap"/></svg><div class="bd"><div class="l1">Shift releases</div><div class="l2">A coworker released a shift you can pick up. Decisions on your own requests always come through.</div></div><div class="sw off"></div></div>
+              <div class="frow thin"><svg class="ic"><use href="#i-bell"/></svg><div class="bd"><div class="l1">Management updates</div><div class="l2">Important updates from management</div></div><div class="sw"></div></div>
+              <div class="frow thin"><svg class="ic"><use href="#i-game"/></svg><div class="bd"><div class="l1">Game Hub</div><div class="l2">Someone passes you on the leaderboard</div></div><div class="sw"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="bcap"><b>Shelf:</b> four square tiles across the top; the selected one grows a little pointer and its content renders below. Appearance and Language keep their arrow — tapping them <em>navigates</em> (page / prompt sheet) instead of selecting. Shown with Notifications selected: the eight toggle rows as FormKit SwitchRows, saving on flip like today.</p>
+    </div>
+
+    <!-- S-C launchers + folds -->
+    <div class="col">
+      <div class="concept"><b>S-C</b> Launchers <span class="ln"></span> two tiles · two folds · prompt sheet</div>
+      <div class="phone">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>4:07</span><span>●●● ᯤ ▮</span></div>
+        <div class="hdr"><div class="c38"><svg class="ic"><use href="#i-chl"/></svg></div><div class="ttl">Settings</div><div style="width:38px"></div></div>
+        <div class="cnt">
+          <div class="grid2">
+            <div class="bigtile"><div><svg class="ic"><use href="#i-brush"/></svg><div class="tt" style="margin-top:8px">Appearance</div><div class="ts">Moonstone · Dark</div></div><div class="strip"><i style="background:#E6EAEE"></i><i style="background:#C7CDD2"></i><i style="background:#FF7A2F"></i><i style="background:#181B21"></i></div><span class="chev"><svg class="ic"><use href="#i-chr"/></svg></span></div>
+            <div class="bigtile"><div><svg class="ic"><use href="#i-globe"/></svg><div class="tt" style="margin-top:8px">Language</div><div class="ts">Follows your phone</div></div><div class="lang2"><span class="on">English</span><span>Español</span></div><span class="chev"><svg class="ic"><use href="#i-chr"/></svg></span></div>
+          </div>
+          <div class="arow"><div class="lic vio"><svg class="ic"><use href="#i-bell"/></svg></div><div class="bd"><div class="l1">Notifications</div><div class="l2"><b>6 of 8</b> on</div></div><span class="chev"><svg class="ic"><use href="#i-chd"/></svg></span></div>
+          <div class="arow"><div class="lic gold"><svg class="ic"><use href="#i-key"/></svg></div><div class="bd"><div class="l1">Change password</div><div class="l2">At least 6 characters</div></div><span class="chev"><svg class="ic"><use href="#i-chd"/></svg></span></div>
+          <div class="arow own"><div class="lic"><svg class="ic"><use href="#i-card"/></svg></div><div class="bd"><div class="l1">Subscription <span class="own">Owner</span></div><div class="l2"><b>Premium</b> · renews Oct 3</div></div><span class="chev"><svg class="ic"><use href="#i-chr"/></svg></span></div>
+        </div>
+        <div class="ovl"><div class="scr"></div>
+          <div class="sheet">
+            <div class="grabpill"></div>
+            <div class="shead"><div><div class="t">Language</div><span class="sub">Menus, guides and pushes switch too</span></div><div class="xbtn"><svg class="ic"><use href="#i-x"/></svg></div></div>
+            <div class="sbody">
+              <div class="lrow on"><div class="bd">English<span class="sub">Matches your phone</span></div><div class="ck"><svg class="ic"><use href="#i-check"/></svg></div></div>
+              <div class="lrow"><div class="bd">Español<span class="sub">Menús, guías y avisos en español</span></div><div class="ck off"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="bcap"><b>Launchers:</b> the two things that leave the page (Appearance → its page, Language → this prompt sheet) are big tiles up top, each previewing its state; the two things that stay on the page (Notifications, Change password) are fold rows beneath. The Language prompt becomes a GlassSheet with two check rows — the old centered dialog is gone.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ ROW 4 · APPEARANCE -->
+<div class="section">
+  <div class="sh">Row 4 · Appearance · and the forced password screen <span class="ln"></span><small>pick a layout · pick themes</small></div>
+  <div class="row">
+
+    <!-- AP-A reskin -->
+    <div class="col">
+      <div class="concept"><b>AP-A</b> Reskin <span class="ln"></span> capsule · cards · honest preview</div>
+      <div class="phone">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>4:07</span><span>●●● ᯤ ▮</span></div>
+        <div class="hdr"><div class="c38"><svg class="ic"><use href="#i-chl"/></svg></div><div class="ttl">Appearance</div><div style="width:38px"></div></div>
+        <div class="cnt">
+          <div class="seg3"><span><svg class="ic"><use href="#i-sun"/></svg>Light</span><span class="on"><svg class="ic"><use href="#i-moon"/></svg>Dark</span><span><svg class="ic"><use href="#i-half"/></svg>Auto</span></div>
+          <div class="srule"><span class="eyeb tint">Theme</span><span class="ln"></span></div>
+          <div class="tgrid">
+            <div class="tcard on" style="--tb:#181B21;--tp:#FF7A2F;--tt:#F4F6F8;--tg:rgba(255,255,255,.08);--tgb:rgba(255,255,255,.12)"><div class="pvb"><div class="h"><i></i><b></b></div><div class="c"><i></i><i></i></div><span class="b"></span></div><div class="lab">Moonstone<div class="ck"><svg class="ic"><use href="#i-check"/></svg></div></div></div>
+            <div class="tcard" style="--tb:#1A2332;--tp:#5DA0E5;--tt:#FFFFFF;--tg:rgba(255,255,255,.08);--tgb:rgba(255,255,255,.13)"><div class="pvb"><div class="h"><i></i><b></b></div><div class="c"><i></i><i></i></div><span class="b"></span></div><div class="lab">Ocean<div class="sw2"><i style="background:#1976D2"></i><i style="background:#42A5F5"></i><i style="background:#E8F4F8"></i></div></div></div>
+          </div>
+          <div class="srule"><span class="eyeb tint">Preview</span><span class="ln"></span><span class="eyeb">Moonstone · Dark</span></div>
+          <div class="pv">
+            <div class="ph"><div class="g">Good afternoon, <span>Daisy</span></div><div class="r"><div class="av">DD</div><div class="nm">Daisy Dukes</div><div class="cb"><i></i></div><div class="cb"></div></div></div>
+            <div class="sg"><span class="on">Schedule</span><span>Today</span><span>Events</span></div>
+            <div class="cd"><div class="t">Fall wine dinner <em>New</em></div><div class="p">Thursday at 7 · tasting menu, five pairings.</div><div class="k">THU SEP 24 · 7:00 PM</div></div>
+            <div class="bt"><span>Later</span><span class="f">Save</span></div>
+            <div class="tbm"><i class="on"></i><i></i><i></i><i></i><i></i></div>
+          </div>
+        </div>
+      </div>
+      <p class="bcap"><b>Reskin:</b> Light / Dark / Auto is a filled glass capsule; each theme card is a mini <em>glass</em> render (glow, hero, card, button) instead of the old flat bars; the Preview is now an honest miniature of a real screen — greeting in the tint, a badge in the blue, a card, the filled button, the tab bar. The old preview’s “Messages” dot used <span class="mono">accent</span>, a token no glass surface reads — that was the colour that showed up nowhere.</p>
+    </div>
+
+    <!-- AP-B gallery -->
+    <div class="col">
+      <div class="concept"><b>AP-B</b> Gallery <span class="ln"></span> six themes · candidates marked</div>
+      <div class="phone">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>4:07</span><span>●●● ᯤ ▮</span></div>
+        <div class="hdr"><div class="c38"><svg class="ic"><use href="#i-chl"/></svg></div><div class="ttl">Appearance</div><div style="width:38px"></div></div>
+        <div class="cnt">
+          <div class="seg3"><span><svg class="ic"><use href="#i-sun"/></svg>Light</span><span class="on"><svg class="ic"><use href="#i-moon"/></svg>Dark</span><span><svg class="ic"><use href="#i-half"/></svg>Auto</span></div>
+          <div class="tgrid">
+            <div class="tcard on" style="--tb:#181B21;--tp:#FF7A2F;--tt:#F4F6F8;--tg:rgba(255,255,255,.08);--tgb:rgba(255,255,255,.12)"><div class="pvb"><div class="h"><i></i><b></b></div><div class="c"><i></i><i></i></div><span class="b"></span></div><div class="lab">Moonstone<div class="ck"><svg class="ic"><use href="#i-check"/></svg></div></div></div>
+            <div class="tcard" style="--tb:#1A2332;--tp:#5DA0E5;--tt:#FFFFFF;--tg:rgba(255,255,255,.08);--tgb:rgba(255,255,255,.13)"><div class="pvb"><div class="h"><i></i><b></b></div><div class="c"><i></i><i></i></div><span class="b"></span></div><div class="lab">Ocean</div></div>
+            <div class="tcard new" style="--tb:#141628;--tp:#8C7CFF;--tt:#F1F1FA;--tg:rgba(255,255,255,.08);--tgb:rgba(255,255,255,.13)"><div class="pvb"><div class="h"><i></i><b></b></div><div class="c"><i></i><i></i></div><span class="b"></span></div><div class="lab">Midnight<small style="margin-left:auto">Revived</small></div></div>
+            <div class="tcard new" style="--tb:#0E2220;--tp:#34D399;--tt:#ECFDF5;--tg:rgba(255,255,255,.08);--tgb:rgba(255,255,255,.13)"><div class="pvb"><div class="h"><i></i><b></b></div><div class="c"><i></i><i></i></div><span class="b"></span></div><div class="lab">Emerald<small style="margin-left:auto">Revived</small></div></div>
+            <div class="tcard" style="--tb:#0C0C0C;--tp:#D4AF37;--tt:#F5F1E6;--tg:rgba(255,255,255,.07);--tgb:rgba(255,255,255,.12)"><div class="pvb"><div class="h"><i></i><b></b></div><div class="c"><i></i><i></i></div><span class="b"></span></div><div class="lab">Gilded<small style="margin-left:auto">Revived</small></div></div>
+            <div class="tcard" style="--tb:#1C1512;--tp:#FF6B4A;--tt:#FBF2EC;--tg:rgba(255,255,255,.07);--tgb:rgba(255,255,255,.12)"><div class="pvb"><div class="h"><i></i><b></b></div><div class="c"><i></i><i></i></div><span class="b"></span></div><div class="lab">Ember<small style="margin-left:auto">New</small></div></div>
+          </div>
+          <div class="srule"><span class="eyeb tint">Preview</span><span class="ln"></span><span class="eyeb">Moonstone · Dark</span></div>
+          <div class="pv">
+            <div class="ph"><div class="g">Good afternoon, <span>Daisy</span></div><div class="r"><div class="av">DD</div><div class="nm">Daisy Dukes</div><div class="cb"><i></i></div><div class="cb"></div></div></div>
+            <div class="sg"><span class="on">Schedule</span><span>Today</span><span>Events</span></div>
+            <div class="cd"><div class="t">Fall wine dinner <em>New</em></div><div class="p">Thursday at 7 · tasting menu, five pairings.</div><div class="k">THU SEP 24 · 7:00 PM</div></div>
+            <div class="bt"><span>Later</span><span class="f">Save</span></div>
+          </div>
+        </div>
+      </div>
+      <p class="bcap"><b>Gallery:</b> the same page with the theme grid grown to six. <em>Midnight</em> (indigo-violet), <em>Emerald</em> and <em>Gilded</em> (the old Black &amp; Gold) are revived from the pre-glass 14 and rebuilt on the glass token set; <em>Ember</em> is a new warm one. Each tile is its own mini render, so a theme sells itself before you tap. Every revived theme needs a light and a dark set — that’s the real cost per theme, about twenty tokens.</p>
+    </div>
+
+    <!-- AP-C custom accent -->
+    <div class="col">
+      <div class="concept"><b>AP-C</b> Your accent <span class="ln"></span> presets · one hue slider · neutral base</div>
+      <div class="phone">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>4:07</span><span>●●● ᯤ ▮</span></div>
+        <div class="hdr"><div class="c38"><svg class="ic"><use href="#i-chl"/></svg></div><div class="ttl">Appearance</div><div style="width:38px"></div></div>
+        <div class="cnt">
+          <div class="seg3"><span><svg class="ic"><use href="#i-sun"/></svg>Light</span><span class="on"><svg class="ic"><use href="#i-moon"/></svg>Dark</span><span><svg class="ic"><use href="#i-half"/></svg>Auto</span></div>
+          <div class="srule"><span class="eyeb tint">Presets</span><span class="ln"></span></div>
+          <div class="prail">
+            <div class="pchip"><i style="background:linear-gradient(135deg,#FF7A2F 50%,#181B21 50%)"></i>Moonstone</div>
+            <div class="pchip"><i style="background:linear-gradient(135deg,#5DA0E5 50%,#1A2332 50%)"></i>Ocean</div>
+            <div class="pchip"><i style="background:linear-gradient(135deg,#8C7CFF 50%,#141628 50%)"></i>Midnight</div>
+            <div class="pchip"><i style="background:linear-gradient(135deg,#34D399 50%,#0E2220 50%)"></i>Emerald</div>
+            <div class="pchip on"><i style="background:linear-gradient(135deg,#2DD4BF 50%,#181B21 50%)"></i>Custom<svg class="ic"><use href="#i-check"/></svg></div>
+          </div>
+          <div class="card g">
+            <div class="chead"><div class="ct">Your accent</div><span class="eyeb mono">#2DD4BF</span></div>
+            <div class="hue"><i></i></div>
+            <div class="hintt">Drag to pick a hue. Buttons, highlights, the greeting and the glow follow it; text and glass stay readable on their own.</div>
+            <div class="flab" style="margin-top:12px">Neutral base</div>
+            <div class="nb"><span class="on"><i style="background:#181B21"></i>Graphite</span><span><i style="background:#141B2A"></i>Navy</span><span><i style="background:#1C1512"></i>Espresso</span></div>
+          </div>
+          <div class="srule"><span class="eyeb tint">Preview</span><span class="ln"></span><span class="eyeb">Custom · Dark</span></div>
+          <div class="pv" style="--ptint:#2DD4BF">
+            <div class="ph"><div class="g">Good afternoon, <span>Daisy</span></div><div class="r"><div class="av">DD</div><div class="nm">Daisy Dukes</div><div class="cb"><i></i></div><div class="cb"></div></div></div>
+            <div class="sg"><span class="on">Schedule</span><span>Today</span><span>Events</span></div>
+            <div class="cd"><div class="t">Fall wine dinner <em>New</em></div><div class="p">Thursday at 7 · tasting menu, five pairings.</div><div class="k">THU SEP 24 · 7:00 PM</div></div>
+            <div class="bt"><span>Later</span><span class="f" style="color:#0A1F1C">Save</span></div>
+          </div>
+        </div>
+      </div>
+      <p class="bcap"><b>Your accent:</b> the presets become a chip rail; the <em>Custom</em> chip opens one hue slider plus a three-way neutral base. Feasible and bounded: the app derives <span class="mono">tint / ember / glowA / glowB / blue</span> from a single hue with fixed lightness and chroma, keeps the neutrals (text, glass, surface, hairline) per base, and clamps <span class="mono">fireText</span> by contrast — so a theme can never pull itself apart. The family colours that follow the theme (Guides, the house tiles) follow the custom hue too.</p>
+    </div>
+
+    <!-- forced change-password -->
+    <div class="col">
+      <div class="concept"><b>P</b> Set a new password <span class="ln"></span> the forced screen, glassed</div>
+      <div class="phone">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>4:07</span><span>●●● ᯤ ▮</span></div>
+        <div class="cnt" style="padding-top:28px">
+          <div class="orgline"><i></i>MyResto Test</div>
+          <div class="lockhero">
+            <div class="disc"><svg class="ic"><use href="#i-key"/></svg></div>
+            <h2>Set a new password</h2>
+            <p>You signed in with the team’s starter password. Choose your own to keep going.</p>
+          </div>
+          <div class="card g" style="display:flex;flex-direction:column;gap:10px">
+            <div class="fld"><div class="flab">New password</div><div class="inp"><svg class="ic"><use href="#i-key"/></svg><span class="fill">wineList!24</span><span class="eye"><svg class="ic"><use href="#i-eyeoff"/></svg></span></div></div>
+            <div class="fld"><div class="flab">Confirm new password</div><div class="inp"><svg class="ic"><use href="#i-key"/></svg><span class="fill ph">Type it again</span><span class="eye"><svg class="ic"><use href="#i-eye"/></svg></span></div><div class="hintt">At least 6 characters. Only you will know it.</div></div>
+            <div class="btnrow" style="margin-top:2px"><div class="btn fill" style="height:47px"><svg class="ic"><use href="#i-check"/></svg>Update password</div></div>
+          </div>
+          <div class="logout" style="margin-top:6px"><span>Not you?</span>·<b><svg class="ic"><use href="#i-out"/></svg>Log out</b></div>
+        </div>
+      </div>
+      <p class="bcap"><b>Forced change:</b> the pre-portal screen that still wears the login palette moves onto the glow. The org’s name and logo anchor it, the copy says <em>why</em> you’re here, the two fields keep their eye toggles, and Log out stays as the escape. Same two-field rule as today (the starter password is already verified by the login itself).</p>
+    </div>
+  </div>
+
+  <div class="notes">
+    <div class="note"><b>The password question</b>Keep the current-password field. The app never stores the password — Remember Me keeps the <em>user row</em>, not the secret — so “prefilled but hidden” would mean writing plaintext to the phone, and the field is what stops a borrowed unlocked phone from locking its owner out. The lock-out worry is answered on the field itself: “Forgot it? A manager can reset it from your employee card.” (That reset already exists on Employee detail.)</div>
+    <div class="note"><b>Employee Hub · Editor</b>Retire both pages. The Manage page’s Employees pane already carries the roster, Add, Share the code, Show inactive and the edit path; the Team tile (row 2) and a “Team” quick-tool point there, Schedules points at the Schedules page. Two Manage links still aim at the editor — they move to the pane. The screen-count on the tracker drops by two.</div>
+    <div class="note"><b>Tagline</b>A new <em>users.tagline</em> column (60 chars, nullable) and the profile-info RPC widened to accept it; shows on the identity card and on the mini profile card now, and is ready for the Shout-Out Wall. Nothing else reads it yet.</div>
+    <div class="note"><b>Favorites cap</b>Today MAX_QUICK_TOOLS is 4. B’s grid reads best at 4 or 6 (pairs); C’s dock takes 6–8. The catalog itself gains the new families — Tips, Quizzes, Game Hub, Approvals — so favorites can finally point at the pages people actually use.</div>
+    <div class="note"><b>Theme candidates</b>From the retired 14: <em>Midnight</em> (you asked), <em>Emerald</em>, <em>Gilded</em> port cleanly to glass; Neon Noir, Watermelon and Wildflower fight the glass (the accent has to carry text). Ember is new. Each theme = one light + one dark token set; the preview and the theme cards read real tokens, so nothing lies.</div>
+    <div class="note"><b>Custom accent — should we?</b>Yes, as a <em>hue</em> not a palette: one slider, three neutral bases, derived tokens, contrast clamped. Free-form colour pickers are where themes fall apart (and where Ocean-blue text on Ocean-blue glass comes from). Ship presets first, the slider behind them.</div>
+    <div class="note"><b>Hero on Welcome / Manage</b>If the Bucks + score pills earn their place on Profile (A / D), the same stack drops into the Welcome and Manage heroes unchanged — the hero component just grows an optional pills slot.</div>
+    <div class="note"><b>Fixed regardless</b>Camera badge on the Profile avatar only · Log out stays but shrinks · Settings entry names what’s inside · Next shift never a tall card · Profile info edit through one sheet · every sheet action that opens another surface goes through the sheet hand-off.</div>
+  </div>
+</div>
+
+<script>
+document.querySelectorAll('[data-theme]').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('[data-theme]').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+  document.querySelectorAll('.phone').forEach(p=>{p.classList.remove('t-mono-l','t-ocean-d','t-ocean-l');if(b.dataset.theme)p.classList.add(b.dataset.theme)});
+}));
+document.querySelectorAll('[data-portal]').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('[data-portal]').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+  document.querySelectorAll('.phone.prof').forEach(p=>p.classList.toggle('mgr',b.dataset.portal==='mgr'));
+}));
+</script>
+</body>
+</html>

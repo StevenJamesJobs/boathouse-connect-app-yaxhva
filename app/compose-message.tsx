@@ -1,342 +1,151 @@
-
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  Alert,
-  ActivityIndicator,
-  Modal,
-  FlatList,
-  Image,
-} from 'react-native';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { View, Text, ScrollView, StyleSheet, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import * as ImagePicker from 'expo-image-picker';
-import * as DocumentPicker from 'expo-document-picker';
 import { useAuth } from '@/contexts/AuthContext';
-import { useOrganization } from '@/contexts/OrganizationContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
-import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useNotification } from '@/contexts/NotificationContext';
 import { bothLanguages } from '@/utils/notificationHelpers';
 import i18n from '@/i18n';
-import { uploadMessageImage, validateImageSize } from '@/utils/messageImages';
-import { uploadMessageFile, validateFileSize, getFileIconInfo } from '@/utils/messageFiles';
-import { getOrgDirectory } from '@/utils/orgDirectory';
+import { uploadMessageImage } from '@/utils/messageImages';
+import { uploadMessageFile } from '@/utils/messageFiles';
+import { isManagerOrOwner } from '@/utils/roles';
+import { fonts } from '@/constants/fonts';
+import AmbientGlow from '@/components/AmbientGlow';
+import ScreenHeader from '@/components/ScreenHeader';
+import GlassCard from '@/components/GlassCard';
+import { FieldLabel, GlassTextInput } from '@/components/content/FormKit';
+import Composer, { AttachmentStrip } from '@/components/messages/Composer';
+import AttachMenu from '@/components/messages/AttachMenu';
+import RecipientChips, {
+  EMPTY_SELECTION,
+  recipientIdsOf,
+  type RecipientSelection,
+} from '@/components/messages/RecipientChips';
+import RecipientsSheet, { type RecipientGroupDef } from '@/components/messages/RecipientsSheet';
+import { useThreadPeople } from '@/components/messages/useThreadPeople';
 
-interface User {
-  id: string;
-  name: string;
-  job_title: string | null;
-  job_titles: string[] | null;
-  role: string;
-}
-
-interface RecipientGroup {
-  id: string;
-  label: string;
-  description: string;
-  userIds: string[];
-}
+// The pre-glass picker listed these titles first, in this order; the rest follow alphabetically.
+const STANDARD_JOB_TITLES = ['Banquets', 'Bartender', 'Busser', 'Chef', 'Host', 'Kitchen', 'Manager', 'Runner', 'Server'];
 
 export default function ComposeMessageScreen() {
   const { t } = useTranslation('compose');
   const { user } = useAuth();
-  const { organizationId } = useOrganization();
   const { sendNotification } = useNotification();
   const router = useRouter();
   const params = useLocalSearchParams();
-  
-  // Reply/Reply All parameters
+  const colors = useThemeColors();
+
+  // Reply / Reply All parameters (still accepted from any caller that pushes them)
   const replyToMessageId = params.replyToMessageId as string;
   const replyToSenderId = params.replyToSenderId as string;
   const replyAllRecipientIds = params.replyAllRecipientIds as string;
   const replySubject = params.replySubject as string;
   const isReplyAll = params.isReplyAll === 'true';
 
-  // Direct-message deep link (e.g. from a mini-profile card's Message button):
+  // Direct-message deep link (mini-profile card / participants sheet "Message"):
   // pre-select this recipient and skip the picker.
   const directRecipientId = params.recipientId as string;
+  const directRecipientName = params.recipientName as string | undefined;
 
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
-  const [selectedRecipients, setSelectedRecipients] = useState<User[]>([]);
-  const [showRecipientPicker, setShowRecipientPicker] = useState(false);
-  const [allUsers, setAllUsers] = useState<User[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [selection, setSelection] = useState<RecipientSelection>(EMPTY_SELECTION);
+  const [recipientsOpen, setRecipientsOpen] = useState(false);
+  const [attachOpen, setAttachOpen] = useState(false);
   const [sending, setSending] = useState(false);
-  const [recipientGroups, setRecipientGroups] = useState<RecipientGroup[]>([]);
+  const [uploading, setUploading] = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
-  const [uploadingImage, setUploadingImage] = useState(false);
   const [selectedFileUri, setSelectedFileUri] = useState<string | null>(null);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
-  const [uploadingFile, setUploadingFile] = useState(false);
+  const [selectedFileSize, setSelectedFileSize] = useState<number | null>(null);
 
-  const colors = useThemeColors();
+  const { rows, byId, loaded, personOf } = useThreadPeople(user?.id);
+  const canAttachFiles = isManagerOrOwner(user);
 
-  const loadReplyRecipients = useCallback(async () => {
-    try {
-      if (isReplyAll && replyAllRecipientIds) {
-        // Reply All: Load all original recipients + sender
-        const recipientIds = replyAllRecipientIds.split(',').filter(id => id !== user?.id);
+  // Active members minus self, by name — the sheet's people list.
+  const directory = useMemo(
+    () =>
+      rows
+        .filter((r) => r.is_active)
+        .filter((r) => r.id !== (user?.id || ''))
+        .sort((a, b) => (a.name || '').localeCompare(b.name || '')),
+    [rows, user?.id],
+  );
 
-        const dir = await getOrgDirectory(user?.id || '');
-        setSelectedRecipients(dir.filter(r => recipientIds.includes(r.id)));
-      } else if (replyToSenderId) {
-        // Reply: Load only the sender
-        const dir = await getOrgDirectory(user?.id || '');
-        const sender = dir.find(r => r.id === replyToSenderId);
-        if (sender) {
-          setSelectedRecipients([sender]);
-        }
-      }
-    } catch (error) {
-      console.error('Error loading reply recipients:', error);
+  // Quick-select groups: All staff · Managers · one per job title present.
+  const groupDefs = useMemo<RecipientGroupDef[]>(() => {
+    const defs: RecipientGroupDef[] = [];
+    if (directory.length > 0) {
+      defs.push({ key: 'all', title: t('all_staff'), memberIds: directory.map((u) => u.id), icon: true });
     }
-  }, [isReplyAll, replyAllRecipientIds, replyToSenderId, user?.id]);
+    const managers = directory.filter((u) => u.role === 'manager' || u.role === 'owner');
+    if (managers.length > 0) {
+      defs.push({ key: 'managers', title: t('managers'), memberIds: managers.map((u) => u.id) });
+    }
+    const byTitle = new Map<string, string[]>();
+    directory.forEach((u) => {
+      const titles =
+        u.job_titles && Array.isArray(u.job_titles) && u.job_titles.length > 0
+          ? u.job_titles
+          : u.job_title
+            ? [u.job_title]
+            : [];
+      titles.forEach((title) => {
+        if (!byTitle.has(title)) byTitle.set(title, []);
+        byTitle.get(title)!.push(u.id);
+      });
+    });
+    const ordered = [
+      ...STANDARD_JOB_TITLES.filter((x) => byTitle.has(x)),
+      ...Array.from(byTitle.keys()).filter((x) => !STANDARD_JOB_TITLES.includes(x)).sort(),
+    ];
+    ordered.forEach((title) => {
+      defs.push({ key: `title:${title}`, title, memberIds: byTitle.get(title)! });
+    });
+    return defs;
+  }, [directory, t]);
 
-  // Initialize reply/reply all
+  // Reply prefill: "Re: " subject + the sender (Reply) or everyone (Reply All).
+  const replySeeded = useRef(false);
   useEffect(() => {
-    if (replyToMessageId && replyToSenderId) {
-      // Set subject with "Re: " prefix
-      if (replySubject) {
-        const subjectText = replySubject.startsWith('Re: ') ? replySubject : `Re: ${replySubject}`;
-        setSubject(subjectText);
-      }
-      
-      // Load reply recipients
-      loadReplyRecipients();
+    if (!replyToMessageId || !replyToSenderId) return;
+    if (replySubject) {
+      setSubject((prev) => prev || (replySubject.startsWith('Re: ') ? replySubject : `Re: ${replySubject}`));
     }
-  }, [replyToMessageId, replyToSenderId, replySubject, loadReplyRecipients]);
+    if (!loaded || replySeeded.current) return;
+    replySeeded.current = true;
+    const me = user?.id;
+    if (isReplyAll && replyAllRecipientIds) {
+      const ids = replyAllRecipientIds.split(',').filter((id) => id && id !== me && byId.has(id));
+      setSelection((prev) => ({ ...prev, people: Array.from(new Set([...prev.people, ...ids])) }));
+    } else if (byId.has(replyToSenderId)) {
+      setSelection((prev) => ({ ...prev, people: Array.from(new Set([...prev.people, replyToSenderId])) }));
+    }
+  }, [replyToMessageId, replyToSenderId, replySubject, isReplyAll, replyAllRecipientIds, loaded, byId, user?.id]);
 
   // Direct message: pre-select the target recipient from the deep link.
-  const loadDirectRecipient = useCallback(async () => {
-    try {
-      const dir = await getOrgDirectory(user?.id || '');
-      const recipient = dir.find(r => r.id === directRecipientId);
-      if (recipient) setSelectedRecipients([recipient]);
-    } catch (error) {
-      console.error('Error loading direct recipient:', error);
-    }
-  }, [directRecipientId, user?.id]);
-
+  const directSeeded = useRef(false);
   useEffect(() => {
-    // Only when arriving with a direct recipient and not in a reply flow.
-    if (directRecipientId && !replyToMessageId) {
-      loadDirectRecipient();
-    }
-  }, [directRecipientId, replyToMessageId, loadDirectRecipient]);
+    if (!directRecipientId || replyToMessageId || directSeeded.current) return;
+    if (directRecipientId === user?.id) return;
+    directSeeded.current = true;
+    setSelection((prev) => ({ ...prev, people: Array.from(new Set([...prev.people, directRecipientId])) }));
+  }, [directRecipientId, replyToMessageId, user?.id]);
 
-  const loadUsers = useCallback(async () => {
-    try {
-      const dir = await getOrgDirectory(user?.id || '');
-      const data = dir
-        .filter(r => r.is_active)
-        .filter(r => r.id !== (user?.id || ''))
-        .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  const personFor = useCallback(
+    (id: string) => personOf(id, id === directRecipientId ? directRecipientName : null),
+    [personOf, directRecipientId, directRecipientName],
+  );
 
-      console.log('Loaded users:', data?.length);
-      console.log('Sample user job_titles:', data?.[0]?.job_titles);
-
-      setAllUsers(data || []);
-    } catch (error) {
-      console.error('Error loading users:', error);
-      Alert.alert(t('common:error', { defaultValue: 'Error' }), t('error_load_users'));
-    }
-  }, [user?.id]);
-
-  const generateRecipientGroups = useCallback(() => {
-    const groups: RecipientGroup[] = [];
-
-    console.log('Generating recipient groups for role:', user?.role);
-    console.log('Total users:', allUsers.length);
-
-    // Default group for employees: All Managers
-    if (user?.role === 'employee') {
-      const managers = allUsers.filter(u => u.role === 'manager' || u.role === 'owner');
-      if (managers.length > 0) {
-        groups.push({
-          id: 'all-managers',
-          label: 'All Managers',
-          description: `Send to all ${managers.length} manager${managers.length > 1 ? 's' : ''}`,
-          userIds: managers.map(m => m.id),
-        });
-      }
-      console.log('Added All Managers group:', managers.length, 'managers');
-    }
-
-    // Default group for managers: All Employees
-    if (user?.role === 'manager' || user?.role === 'owner') {
-      const allCount = allUsers.length;
-      
-      groups.push({
-        id: 'all-employees',
-        label: 'All Employees',
-        description: `Send to all ${allCount} employee${allCount > 1 ? 's' : ''} and managers`,
-        userIds: allUsers.map(u => u.id),
-      });
-      console.log('Added All Employees group:', allCount, 'users');
-    }
-
-    // Group by job titles (using the new job_titles array)
-    const jobTitlesMap = new Map<string, string[]>();
-    
-    allUsers.forEach(u => {
-      if (u.job_titles && Array.isArray(u.job_titles) && u.job_titles.length > 0) {
-        u.job_titles.forEach(title => {
-          if (!jobTitlesMap.has(title)) {
-            jobTitlesMap.set(title, []);
-          }
-          jobTitlesMap.get(title)!.push(u.id);
-        });
-      }
-    });
-
-    console.log('Job titles found:', Array.from(jobTitlesMap.keys()));
-
-    // Define the standard job titles in the desired order
-    const standardJobTitles = ['Banquets', 'Bartender', 'Busser', 'Chef', 'Host', 'Kitchen', 'Manager', 'Runner', 'Server'];
-    
-    // Add job title groups in order
-    standardJobTitles.forEach(jobTitle => {
-      const userIds = jobTitlesMap.get(jobTitle);
-      if (userIds && userIds.length > 0) {
-        const pluralLabel = jobTitle === 'Chef' ? 'Chefs' : 
-                           jobTitle === 'Manager' ? 'Managers' :
-                           jobTitle + 's';
-        groups.push({
-          id: `job-${jobTitle}`,
-          label: `All ${pluralLabel}`,
-          description: `Send to all ${userIds.length} ${jobTitle}${userIds.length > 1 ? 's' : ''}`,
-          userIds: userIds,
-        });
-        console.log(`Added ${jobTitle} group:`, userIds.length, 'users');
-      }
-    });
-
-    // Add any non-standard job titles
-    Array.from(jobTitlesMap.keys())
-      .filter(title => !standardJobTitles.includes(title))
-      .sort()
-      .forEach(jobTitle => {
-        const userIds = jobTitlesMap.get(jobTitle);
-        if (userIds && userIds.length > 0) {
-          groups.push({
-            id: `job-${jobTitle}`,
-            label: `All ${jobTitle}s`,
-            description: `Send to all ${userIds.length} ${jobTitle}${userIds.length > 1 ? 's' : ''}`,
-            userIds: userIds,
-          });
-          console.log(`Added ${jobTitle} group (non-standard):`, userIds.length, 'users');
-        }
-      });
-
-    console.log('Total groups generated:', groups.length);
-    setRecipientGroups(groups);
-  }, [allUsers, user?.role]);
-
-  useEffect(() => {
-    loadUsers();
-  }, [loadUsers]);
-
-  useEffect(() => {
-    if (allUsers.length > 0) {
-      generateRecipientGroups();
-    }
-  }, [allUsers, generateRecipientGroups]);
-
-  const handleSelectGroup = (group: RecipientGroup) => {
-    const groupUsers = allUsers.filter(u => group.userIds.includes(u.id));
-    
-    // Add users that aren't already selected
-    const newRecipients = groupUsers.filter(
-      gu => !selectedRecipients.some(sr => sr.id === gu.id)
-    );
-    
-    setSelectedRecipients([...selectedRecipients, ...newRecipients]);
-    setShowRecipientPicker(false);
-    setSearchQuery('');
-  };
-
-  const handleSelectUser = (selectedUser: User) => {
-    if (selectedRecipients.some(r => r.id === selectedUser.id)) {
-      // Remove if already selected
-      setSelectedRecipients(selectedRecipients.filter(r => r.id !== selectedUser.id));
-    } else {
-      // Add to selected
-      setSelectedRecipients([...selectedRecipients, selectedUser]);
-    }
-  };
-
-  const handleRemoveRecipient = (userId: string) => {
-    setSelectedRecipients(selectedRecipients.filter(r => r.id !== userId));
-  };
-
-  const handlePickImage = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        quality: 0.8,
-        allowsEditing: false,
-      });
-
-      if (result.canceled || !result.assets?.[0]) return;
-
-      const uri = result.assets[0].uri;
-
-      // Validate file size (5MB limit)
-      const isValidSize = await validateImageSize(uri);
-      if (!isValidSize) {
-        Alert.alert(
-          t('common:error', { defaultValue: 'Error' }),
-          t('photo_too_large', { defaultValue: 'Image must be under 5MB' })
-        );
-        return;
-      }
-
-      setSelectedImageUri(uri);
-    } catch (error) {
-      console.error('Error picking image:', error);
-    }
-  };
-
-  const handlePickFile = async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: '*/*',
-        copyToCacheDirectory: true,
-      });
-
-      if (result.canceled || !result.assets?.[0]) return;
-
-      const asset = result.assets[0];
-
-      // Validate file size (10MB limit)
-      const isValidSize = await validateFileSize(asset.uri);
-      if (!isValidSize) {
-        Alert.alert(
-          t('common:error', { defaultValue: 'Error' }),
-          t('file_too_large', { defaultValue: 'File must be under 10MB' })
-        );
-        return;
-      }
-
-      setSelectedFileUri(asset.uri);
-      setSelectedFileName(asset.name);
-    } catch (error) {
-      console.error('Error picking file:', error);
-    }
-  };
+  const recipientIds = useMemo(() => recipientIdsOf(selection), [selection]);
+  const hasContent = !!(body.trim() || selectedImageUri || selectedFileUri);
 
   const handleSend = async () => {
     if (!user?.id) return;
     const actorId = user.id;
-    if (selectedRecipients.length === 0) {
+    if (recipientIds.length === 0) {
       Alert.alert(t('common:error', { defaultValue: 'Error' }), t('error_no_recipients'));
       return;
     }
@@ -352,13 +161,13 @@ export default function ComposeMessageScreen() {
       // Upload image if selected
       let imageUrl: string | null = null;
       if (selectedImageUri) {
-        setUploadingImage(true);
+        setUploading(true);
         imageUrl = await uploadMessageImage(selectedImageUri, actorId);
-        setUploadingImage(false);
+        setUploading(false);
         if (!imageUrl) {
           Alert.alert(
             t('common:error', { defaultValue: 'Error' }),
-            t('upload_failed', { defaultValue: 'Failed to upload image' })
+            t('upload_failed', { defaultValue: 'Failed to upload image' }),
           );
           setSending(false);
           return;
@@ -367,15 +176,15 @@ export default function ComposeMessageScreen() {
 
       // Upload file if selected
       let fileUrl: string | null = null;
-      let fileName: string | null = selectedFileName;
+      const fileName: string | null = selectedFileName;
       if (selectedFileUri && selectedFileName) {
-        setUploadingFile(true);
+        setUploading(true);
         fileUrl = await uploadMessageFile(selectedFileUri, selectedFileName, actorId);
-        setUploadingFile(false);
+        setUploading(false);
         if (!fileUrl) {
           Alert.alert(
             t('common:error', { defaultValue: 'Error' }),
-            t('file_upload_failed', { defaultValue: 'Failed to upload file' })
+            t('file_upload_failed', { defaultValue: 'Failed to upload file' }),
           );
           setSending(false);
           return;
@@ -386,7 +195,7 @@ export default function ComposeMessageScreen() {
       // recipient fan-out happens in the same transaction)
       const { data: newMessageId, error: messageError } = await supabase.rpc('send_message', {
         p_actor_id: actorId,
-        p_recipient_ids: selectedRecipients.map(recipient => recipient.id),
+        p_recipient_ids: recipientIds,
         p_subject: subject.trim() || null,
         p_body: body.trim() || '',
         p_image_url: imageUrl,
@@ -408,7 +217,7 @@ export default function ComposeMessageScreen() {
           ? 'notifications.sent_you_photo'
           : fileUrl ? 'notifications.sent_you_file' : 'notifications.sent_you_message';
         await sendNotification({
-          userIds: selectedRecipients.map(r => r.id),
+          userIds: recipientIds,
           notificationType: 'message',
           title: msgTitle.en,
           body: subj
@@ -434,630 +243,132 @@ export default function ComposeMessageScreen() {
       console.error('Error sending message:', error);
       Alert.alert(t('common:error', { defaultValue: 'Error' }), t('error_send'));
     } finally {
+      setUploading(false);
       setSending(false);
     }
   };
 
-  const getJobTitlesDisplay = (u: User) => {
-    if (u.job_titles && Array.isArray(u.job_titles) && u.job_titles.length > 0) {
-      return u.job_titles.join(', ');
-    }
-    return u.job_title || t('no_job_title');
-  };
-
-  // Filter users based on search query
-  // If no search query, show all users (for the "All Users" section)
-  const filteredUsers = searchQuery
-    ? allUsers.filter(u => {
-        const nameMatch = u.name.toLowerCase().includes(searchQuery.toLowerCase());
-        const jobTitlesMatch = u.job_titles && Array.isArray(u.job_titles) && 
-          u.job_titles.some(title => title.toLowerCase().includes(searchQuery.toLowerCase()));
-        const oldJobTitleMatch = u.job_title && u.job_title.toLowerCase().includes(searchQuery.toLowerCase());
-        
-        return nameMatch || jobTitlesMatch || oldJobTitleMatch;
-      })
-    : allUsers; // Show all users when no search query
+  const title = replyToMessageId ? (isReplyAll ? t('reply_all') : t('reply')) : t('new_message');
+  const hasAttachments = !!(selectedImageUri || selectedFileName);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.card }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <IconSymbol
-            ios_icon_name="chevron.left"
-            android_material_icon_name="chevron-left"
-            size={24}
-            color={colors.text}
-          />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
-          {replyToMessageId ? (isReplyAll ? t('reply_all') : t('reply')) : t('new_message')}
-        </Text>
-        <View style={styles.headerRight} />
-      </View>
+      <AmbientGlow />
+      <ScreenHeader title={title} />
 
-      <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
-        {/* Recipients */}
-        <View style={styles.section}>
-          <Text style={[styles.label, { color: colors.text }]}>{t('to')}</Text>
-          <TouchableOpacity
-            style={[styles.recipientButton, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onPress={() => setShowRecipientPicker(true)}
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        {/* The composer is absolute inside THIS view (not the KAV): Yoga places
+            absolute children against the border box, so the KAV's keyboard
+            padding alone would never lift it — this view's height shrinks instead. */}
+        <View style={styles.flex}>
+          <ScrollView
+            style={styles.flex}
+            contentContainerStyle={styles.content}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
           >
-            <IconSymbol
-              ios_icon_name="person.badge.plus"
-              android_material_icon_name="person-add"
-              size={20}
-              color={colors.primary || colors.highlight}
+            {/* To */}
+            <RecipientChips
+              selection={selection}
+              personOf={personFor}
+              onChange={setSelection}
+              onAdd={() => setRecipientsOpen(true)}
             />
-            <Text style={[styles.recipientButtonText, { color: colors.text }]}>
-              {selectedRecipients.length === 0
-                ? t('select_recipients')
-                : t('recipients_selected', { count: selectedRecipients.length })}
-            </Text>
-          </TouchableOpacity>
 
-          {/* Selected Recipients */}
-          {selectedRecipients.length > 0 && (
-            <View style={styles.selectedRecipients}>
-              {selectedRecipients.map((recipient, index) => (
-                <View key={index} style={[styles.recipientChip, { backgroundColor: colors.highlight }]}>
-                  <Text style={[styles.recipientChipText, { color: colors.text }]} numberOfLines={1}>
-                    {recipient.name}
-                  </Text>
-                  <TouchableOpacity onPress={() => handleRemoveRecipient(recipient.id)}>
-                    <IconSymbol
-                      ios_icon_name="xmark.circle.fill"
-                      android_material_icon_name="cancel"
-                      size={18}
-                      color={colors.text}
-                    />
-                  </TouchableOpacity>
-                </View>
-              ))}
+            {/* Subject */}
+            <View>
+              <FieldLabel label={t('subject_label')} trailing={t('optional')} />
+              <GlassTextInput
+                value={subject}
+                onChangeText={setSubject}
+                placeholder={t('subject_placeholder')}
+                returnKeyType="done"
+              />
             </View>
-          )}
-        </View>
 
-        {/* Subject */}
-        <View style={styles.section}>
-          <Text style={[styles.label, { color: colors.text }]}>{t('subject_optional')}</Text>
-          <TextInput
-            style={[styles.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
-            value={subject}
-            onChangeText={setSubject}
-            placeholder={t('subject_placeholder')}
-            placeholderTextColor={colors.textSecondary}
-          />
-        </View>
+            {/* Draft area — attachment previews live here before sending */}
+            <GlassCard variant="glass" radius={16} style={styles.draft}>
+              <Text style={[styles.draftEyebrow, { color: colors.tint }]}>
+                {uploading
+                  ? t('uploading', { defaultValue: 'Uploading...' })
+                  : t('draft_recipients', { count: recipientIds.length })}
+              </Text>
+              {hasAttachments ? (
+                <AttachmentStrip
+                  imageUri={selectedImageUri}
+                  onRemoveImage={() => setSelectedImageUri(null)}
+                  fileName={selectedFileName}
+                  fileSize={selectedFileSize}
+                  onRemoveFile={() => {
+                    setSelectedFileUri(null);
+                    setSelectedFileName(null);
+                    setSelectedFileSize(null);
+                  }}
+                />
+              ) : (
+                <Text style={[styles.draftHint, { color: colors.textSecondary }]}>{t('draft_hint')}</Text>
+              )}
+            </GlassCard>
+          </ScrollView>
 
-        {/* Message Body */}
-        <View style={styles.section}>
-          <Text style={[styles.label, { color: colors.text }]}>{t('message_label')}</Text>
-          <TextInput
-            style={[styles.textArea, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
+          <Composer
             value={body}
             onChangeText={setBody}
             placeholder={t('message_placeholder')}
-            placeholderTextColor={colors.textSecondary}
-            multiline
-            numberOfLines={10}
-            textAlignVertical="top"
+            canSend={hasContent}
+            sending={sending}
+            onSend={handleSend}
+            onPlus={() => setAttachOpen(true)}
           />
         </View>
+      </KeyboardAvoidingView>
 
-        {/* Attach Photo */}
-        <View style={styles.section}>
-          <TouchableOpacity
-            style={[styles.attachButton, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onPress={handlePickImage}
-          >
-            <IconSymbol
-              ios_icon_name="photo"
-              android_material_icon_name="photo"
-              size={20}
-              color={colors.primary || colors.highlight}
-            />
-            <Text style={[styles.attachButtonText, { color: colors.text }]}>
-              {t('attach_photo', { defaultValue: 'Attach Photo' })}
-            </Text>
-          </TouchableOpacity>
+      <RecipientsSheet
+        visible={recipientsOpen}
+        onClose={() => setRecipientsOpen(false)}
+        people={directory}
+        groups={groupDefs}
+        initial={selection}
+        onDone={(next) => {
+          setSelection(next);
+          setRecipientsOpen(false);
+        }}
+      />
 
-          {/* Image Preview */}
-          {selectedImageUri && (
-            <View style={[styles.imagePreviewContainer, { borderColor: colors.border }]}>
-              <Image source={{ uri: selectedImageUri }} style={styles.imagePreview} resizeMode="cover" />
-              <TouchableOpacity
-                style={styles.removeImageButton}
-                onPress={() => setSelectedImageUri(null)}
-              >
-                <IconSymbol
-                  ios_icon_name="xmark.circle.fill"
-                  android_material_icon_name="cancel"
-                  size={24}
-                  color="#E74C3C"
-                />
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* Attach File (Manager Only) */}
-          {(user?.role === 'manager' || user?.role === 'owner') && (
-            <TouchableOpacity
-              style={[styles.attachButton, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 10 }]}
-              onPress={handlePickFile}
-            >
-              <IconSymbol
-                ios_icon_name="paperclip"
-                android_material_icon_name="attach-file"
-                size={20}
-                color={colors.primary || colors.highlight}
-              />
-              <Text style={[styles.attachButtonText, { color: colors.text }]}>
-                {t('attach_file', { defaultValue: 'Attach File' })}
-              </Text>
-            </TouchableOpacity>
-          )}
-
-          {/* File Preview */}
-          {selectedFileUri && selectedFileName && (
-            <View style={[styles.filePreviewContainer, { backgroundColor: colors.highlight, borderColor: colors.border }]}>
-              <IconSymbol
-                ios_icon_name={getFileIconInfo(selectedFileName).iosIcon}
-                android_material_icon_name={getFileIconInfo(selectedFileName).androidIcon}
-                size={24}
-                color={getFileIconInfo(selectedFileName).color}
-              />
-              <Text style={[styles.filePreviewName, { color: colors.text }]} numberOfLines={1}>
-                {selectedFileName}
-              </Text>
-              <TouchableOpacity
-                onPress={() => {
-                  setSelectedFileUri(null);
-                  setSelectedFileName(null);
-                }}
-              >
-                <IconSymbol
-                  ios_icon_name="xmark.circle.fill"
-                  android_material_icon_name="cancel"
-                  size={22}
-                  color="#E74C3C"
-                />
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-
-        {/* Action Buttons */}
-        <View style={styles.buttonRow}>
-          <TouchableOpacity
-            style={[styles.cancelButton, { backgroundColor: colors.textSecondary }]}
-            onPress={() => router.back()}
-          >
-            <Text style={[styles.cancelButtonText, { color: (user?.role === 'manager' || user?.role === 'owner') ? colors.text : '#FFFFFF' }]}>
-              {t('common:cancel', { defaultValue: 'Cancel' })}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.sendButton, { backgroundColor: colors.primary || colors.highlight }]}
-            onPress={handleSend}
-            disabled={sending}
-          >
-            {sending ? (
-              <View style={styles.sendingContainer}>
-                <ActivityIndicator color={colors.fireText} />
-                {(uploadingImage || uploadingFile) && (
-                  <Text style={[styles.uploadingText, { color: colors.fireText }]}>
-                    {t('uploading', { defaultValue: 'Uploading...' })}
-                  </Text>
-                )}
-              </View>
-            ) : (
-              <>
-                <IconSymbol
-                  ios_icon_name="paperplane.fill"
-                  android_material_icon_name="send"
-                  size={20}
-                  color={colors.fireText}
-                />
-                <Text style={[styles.sendButtonText, { color: colors.fireText }]}>
-                  {t('common:send', { defaultValue: 'Send' })}
-                </Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-
-      {/* Recipient Picker Modal */}
-      <Modal
-        visible={showRecipientPicker}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowRecipientPicker(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
-            <View style={[styles.modalHeader, { backgroundColor: colors.card }]}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>{t('select_recipients')}</Text>
-              <TouchableOpacity onPress={() => setShowRecipientPicker(false)}>
-                <IconSymbol
-                  ios_icon_name="xmark.circle.fill"
-                  android_material_icon_name="cancel"
-                  size={28}
-                  color={colors.text}
-                />
-              </TouchableOpacity>
-            </View>
-
-            {/* Search */}
-            <View style={styles.searchContainer}>
-              <IconSymbol
-                ios_icon_name="magnifyingglass"
-                android_material_icon_name="search"
-                size={20}
-                color={colors.textSecondary}
-              />
-              <TextInput
-                style={[styles.searchInput, { color: colors.text }]}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                placeholder={t('search_placeholder')}
-                placeholderTextColor={colors.textSecondary}
-              />
-            </View>
-
-            {/* Recipient Groups - Only show when no search query */}
-            {searchQuery === '' && recipientGroups.length > 0 && (
-              <View style={styles.groupsSection}>
-                <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>{t('quick_select')}</Text>
-                {recipientGroups.map((group, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={[styles.groupItem, { backgroundColor: colors.card }]}
-                    onPress={() => handleSelectGroup(group)}
-                  >
-                    <View style={styles.groupInfo}>
-                      <Text style={[styles.groupLabel, { color: colors.text }]}>{group.label}</Text>
-                      <Text style={[styles.groupDescription, { color: colors.textSecondary }]}>
-                        {group.description}
-                      </Text>
-                    </View>
-                    <IconSymbol
-                      ios_icon_name="chevron.right"
-                      android_material_icon_name="chevron-right"
-                      size={20}
-                      color={colors.textSecondary}
-                    />
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-
-            {/* Individual Users - Always show, either filtered or all users */}
-            <View style={styles.usersSection}>
-              <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
-                {searchQuery === '' ? t('all_users') : t('search_results')}
-              </Text>
-              <FlatList
-                data={filteredUsers}
-                keyExtractor={(item) => item.id}
-                renderItem={({ item }) => {
-                  const isSelected = selectedRecipients.some(r => r.id === item.id);
-                  return (
-                    <TouchableOpacity
-                      style={[styles.userItem, { backgroundColor: colors.card }]}
-                      onPress={() => handleSelectUser(item)}
-                    >
-                      <View style={styles.userInfo}>
-                        <Text style={[styles.userName, { color: colors.text }]}>{item.name}</Text>
-                        <Text style={[styles.userJobTitle, { color: colors.textSecondary }]}>
-                          {getJobTitlesDisplay(item)}
-                        </Text>
-                      </View>
-                      {isSelected && (
-                        <IconSymbol
-                          ios_icon_name="checkmark.circle.fill"
-                          android_material_icon_name="check-circle"
-                          size={24}
-                          color={colors.primary || colors.highlight}
-                        />
-                      )}
-                    </TouchableOpacity>
-                  );
-                }}
-                ListEmptyComponent={
-                  <View style={styles.emptyList}>
-                    <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                      {t('no_users_found')}
-                    </Text>
-                  </View>
-                }
-              />
-            </View>
-
-            {/* Done Button */}
-            <TouchableOpacity
-              style={[styles.doneButton, { backgroundColor: colors.primary || colors.highlight }]}
-              onPress={() => setShowRecipientPicker(false)}
-            >
-              <Text style={[styles.doneButtonText, { color: colors.fireText }]}>
-                {t('done', { count: selectedRecipients.length })}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+      <AttachMenu
+        visible={attachOpen}
+        onClose={() => setAttachOpen(false)}
+        allowFiles={canAttachFiles}
+        onImage={(uri) => setSelectedImageUri(uri)}
+        onFile={(uri, name, size) => {
+          setSelectedFileUri(uri);
+          setSelectedFileName(name);
+          setSelectedFileSize(size);
+        }}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 60,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
-  },
-  backButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  headerRight: {
-    width: 40,
-  },
+  container: { flex: 1 },
+  flex: { flex: 1 },
   content: {
-    flex: 1,
-  },
-  contentContainer: {
-    padding: 16,
-    paddingBottom: 100,
-  },
-  section: {
-    marginBottom: 24,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  recipientButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 12,
-  },
-  recipientButtonText: {
-    fontSize: 16,
-    flex: 1,
-  },
-  selectedRecipients: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 12,
-  },
-  recipientChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    gap: 6,
-    maxWidth: '100%',
-  },
-  recipientChipText: {
-    fontSize: 14,
-    fontWeight: '500',
-    flexShrink: 1,
-  },
-  input: {
-    padding: 16,
-    borderRadius: 12,
-    fontSize: 16,
-    borderWidth: 1,
-  },
-  textArea: {
-    padding: 16,
-    borderRadius: 12,
-    fontSize: 16,
-    borderWidth: 1,
-    minHeight: 200,
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 8,
-  },
-  cancelButton: {
-    flex: 1,
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  sendButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    borderRadius: 12,
-    gap: 8,
-  },
-  sendButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    height: '90%',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    gap: 12,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-  },
-  groupsSection: {
     paddingHorizontal: 16,
-    marginBottom: 16,
+    paddingTop: 4,
+    paddingBottom: 220,
+    gap: 12,
   },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 12,
+  draft: { padding: 12, minHeight: 150, gap: 8 },
+  // The draft card is tall while it waits for an attachment — its two lines read bigger
+  // than the field eyebrows so they don't get lost in the space (Steve's round).
+  draftEyebrow: { fontFamily: fonts.mono.semibold, fontSize: 11, letterSpacing: 1.3, textTransform: 'uppercase' },
+  draftHint: { fontFamily: fonts.body.regular, fontSize: 13.5, lineHeight: 19 },
+  eyebrow: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 9,
+    letterSpacing: 1.2,
     textTransform: 'uppercase',
   },
-  groupItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-  },
-  groupInfo: {
-    flex: 1,
-  },
-  groupLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  groupDescription: {
-    fontSize: 13,
-  },
-  usersSection: {
-    flex: 1,
-    paddingHorizontal: 16,
-  },
-  userItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-  },
-  userInfo: {
-    flex: 1,
-  },
-  userName: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  userJobTitle: {
-    fontSize: 13,
-  },
-  emptyList: {
-    paddingVertical: 40,
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: 16,
-  },
-  attachButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    gap: 10,
-  },
-  attachButtonText: {
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  imagePreviewContainer: {
-    marginTop: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  imagePreview: {
-    width: '100%',
-    height: 200,
-    borderRadius: 12,
-  },
-  removeImageButton: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 12,
-  },
-  filePreviewContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 10,
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 10,
-  },
-  filePreviewName: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  sendingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  uploadingText: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  doneButton: {
-    margin: 16,
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  doneButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
+  hint: { fontFamily: fonts.body.regular, fontSize: 11.5, lineHeight: 16 },
 });

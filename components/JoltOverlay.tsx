@@ -21,7 +21,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { supabase } from '@/app/integrations/supabase/client';
 import { getOrgDirectory } from '@/utils/orgDirectory';
-import { getAvailableTools } from '@/config/quickTools';
+import { availableFavorites } from '@/config/favorites';
 import { useMiniProfile } from '@/contexts/MiniProfileContext';
 import { fonts } from '@/constants/fonts';
 
@@ -135,13 +135,24 @@ export default function JoltOverlay({ role }: { role: JoltRole }) {
   const tools: JoltResult[] = useMemo(() => {
     const jobTitles: string[] =
       (user as any)?.jobTitles || (user?.jobTitle ? [user.jobTitle] : []);
-    return getAvailableTools(isMgr ? 'manager' : 'employee', jobTitles).map((tl) => ({
+    // s84: the favorites catalog replaced the quick-tools catalog; 'hub/' verbs resolve here.
+    const portal = isMgr ? '/(portal)/manager' : '/(portal)/employee';
+    const resolve = (route: string): any => {
+      switch (route) {
+        case 'hub/rewards': return '/(portal)/employee/rewards';
+        case 'hub/schedule-tab': return { pathname: portal, params: { tab: 'schedule' } };
+        case 'hub/menus': return `${portal}/menus`;
+        case 'hub/team': return { pathname: '/(portal)/manager/manage', params: { pane: 'employees' } };
+        default: return route;
+      }
+    };
+    return availableFavorites((user?.role as any) || 'employee', jobTitles).map((tl) => ({
       id: `tool-${tl.id}`,
       type: 'tool' as const,
       label: t(tl.labelKey, tl.id),
       iosIcon: tl.iosIcon,
       androidIcon: tl.androidIcon,
-      go: () => router.push(tl.route as any),
+      go: () => router.push(resolve(tl.route)),
     }));
   }, [user, isMgr, t, router]);
 

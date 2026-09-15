@@ -12,7 +12,7 @@ export interface User {
   profilePictureUrl?: string;
   badgeTitle?: string; // Custom badge title override (e.g., "General Manager")
   mcloonesBucks?: number; // Rewards balance (display name from org.reward_currency_name)
-  quickTools?: string[]; // Array of quick tool IDs for profile dashboard
+  quickTools?: unknown; // s84: favorites (v1 id array or v2 { v, tiles }) — parse with config/favorites parseFavorites
   forcePasswordChange?: boolean;
 }
 

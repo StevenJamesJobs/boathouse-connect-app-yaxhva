@@ -1,5 +1,5 @@
-import React, { forwardRef, useMemo } from 'react';
-import { View, Text, TextInput, Pressable, Switch, StyleSheet, type TextInputProps } from 'react-native';
+import React, { forwardRef, useEffect, useMemo, useRef } from 'react';
+import { View, Text, TextInput, Pressable, Switch, StyleSheet, Animated, type TextInputProps } from 'react-native';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import type { ThemeColorSet } from '@/styles/commonStyles';
@@ -104,6 +104,59 @@ export function SegControl<T extends string>({
   );
 }
 
+/**
+ * A JS-drawn switch (46 × 28, tint track when on, animated thumb). Use it where the native
+ * `Switch` goes dead: a Modal presented from INSIDE another Modal on iOS renders UISwitch
+ * but never delivers its value change (the s84 Tile options sheet inside Edit favorites).
+ * Same props as Switch's value / onValueChange.
+ */
+export function GlassToggle({
+  value,
+  onValueChange,
+  disabled,
+}: {
+  value: boolean;
+  onValueChange: (v: boolean) => void;
+  disabled?: boolean;
+}) {
+  const colors = useThemeColors();
+  const anim = useRef(new Animated.Value(value ? 1 : 0)).current;
+  useEffect(() => {
+    Animated.timing(anim, { toValue: value ? 1 : 0, duration: 160, useNativeDriver: false }).start();
+  }, [value, anim]);
+  const track = anim.interpolate({ inputRange: [0, 1], outputRange: [colors.surfaceBorder, colors.tint] });
+  const left = anim.interpolate({ inputRange: [0, 1], outputRange: [2, 20] });
+  return (
+    <Pressable
+      onPress={() => onValueChange(!value)}
+      disabled={disabled}
+      hitSlop={8}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value, disabled: !!disabled }}
+      style={{ opacity: disabled ? 0.5 : 1 }}
+    >
+      <Animated.View style={[toggleStyles.track, { backgroundColor: track, borderColor: colors.glassBorder }]}>
+        <Animated.View style={[toggleStyles.thumb, { left, backgroundColor: value ? colors.fireText : colors.card }]} />
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+const toggleStyles = StyleSheet.create({
+  track: { width: 46, height: 28, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, justifyContent: 'center' },
+  thumb: {
+    position: 'absolute',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 2,
+  },
+});
+
 export function SwitchRow({
   iosIcon,
   androidIcon,
@@ -111,6 +164,7 @@ export function SwitchRow({
   subtitle,
   value,
   onValueChange,
+  native = true,
 }: {
   iosIcon: string;
   androidIcon: string;
@@ -118,6 +172,8 @@ export function SwitchRow({
   subtitle?: string;
   value: boolean;
   onValueChange: (v: boolean) => void;
+  /** false → GlassToggle (required inside a sheet that is itself inside a sheet). */
+  native?: boolean;
 }) {
   const colors = useThemeColors();
   const s = useFormStyles(colors);
@@ -128,12 +184,16 @@ export function SwitchRow({
         <Text style={s.featureRowTitle}>{title}</Text>
         {!!subtitle && <Text style={s.featureRowHint}>{subtitle}</Text>}
       </View>
-      <Switch
-        value={value}
-        onValueChange={onValueChange}
-        trackColor={{ false: colors.surfaceBorder, true: colors.primary }}
-        thumbColor={colors.card}
-      />
+      {native ? (
+        <Switch
+          value={value}
+          onValueChange={onValueChange}
+          trackColor={{ false: colors.surfaceBorder, true: colors.primary }}
+          thumbColor={colors.card}
+        />
+      ) : (
+        <GlassToggle value={value} onValueChange={onValueChange} />
+      )}
     </View>
   );
 }

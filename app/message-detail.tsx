@@ -1,8 +1,12 @@
-
-import React, { useState, useEffect, useCallback } from 'react';
+/**
+ * Message thread (s84, D-A/D-B). Chrome = AmbientGlow + ScreenHeader; the participants strip
+ * opens a GlassSheet roster, the composer's "+" opens the attach sheet (GlassActionSheet
+ * grammar), bubbles ride the messaging kit. The screen itself renders no glass card — the
+ * kit does — so this note is the tracker's marker.
+ */
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import {
   View,
-  Text,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
@@ -13,30 +17,41 @@ import {
   Modal,
   Dimensions,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
-import { getOrgDirectory } from '@/utils/orgDirectory';
-import { useOrganization } from '@/contexts/OrganizationContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { useIsDarkTheme } from '@/components/content/useIsDarkTheme';
 import { IconSymbol } from '@/components/IconSymbol';
 import * as WebBrowser from 'expo-web-browser';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { supabase } from '@/app/integrations/supabase/client';
 import { refreshAllUnreadCounts } from '@/hooks/useUnreadMessages';
-import { getFileIconInfo } from '@/utils/messageFiles';
+import { useNotification } from '@/contexts/NotificationContext';
+import { useMiniProfile } from '@/contexts/MiniProfileContext';
+import { bothLanguages } from '@/utils/notificationHelpers';
+import i18n from '@/i18n';
 import { imageContentTypeForExt } from '@/utils/storageBroker';
 import { StorageImage } from '@/components/StorageImage';
 import { resolveForOpen } from '@/utils/storageResolver';
+import { uploadMessageImage } from '@/utils/messageImages';
+import { uploadMessageFile } from '@/utils/messageFiles';
+import { isManagerOrOwner } from '@/utils/roles';
+import AmbientGlow from '@/components/AmbientGlow';
+import ScreenHeader from '@/components/ScreenHeader';
+import Composer, { AttachmentStrip } from '@/components/messages/Composer';
+import AttachMenu from '@/components/messages/AttachMenu';
+import Bubble, { DateDivider, SenderLine } from '@/components/messages/Bubble';
+import ParticipantsStrip from '@/components/messages/ParticipantsStrip';
+import ParticipantsSheet, { type ThreadParticipant } from '@/components/messages/ParticipantsSheet';
+import { useThreadPeople, firstNameOf, titlesOf } from '@/components/messages/useThreadPeople';
+import { msgHue, dateBucketOf } from '@/components/messages/messageVisuals';
 
 interface MessageThread {
   id: string;
   sender_id: string;
-  sender_name: string;
-  sender_job_title: string;
-  sender_profile_picture: string | null;
+  recipient_ids: string[];
   subject: string | null;
   body: string;
   image_url: string | null;
@@ -44,36 +59,43 @@ interface MessageThread {
   file_name: string | null;
   created_at: string;
   is_current_user: boolean;
-  recipient_names?: string[];
 }
 
+const STAMP_GAP_MS = 5 * 60 * 1000;
+
 export default function MessageDetailScreen() {
-  const { organizationId } = useOrganization();
   const { t } = useTranslation('message_detail');
   const { user } = useAuth();
+  const { sendNotification } = useNotification();
+  const { open: openMiniProfile } = useMiniProfile();
   const router = useRouter();
   const params = useLocalSearchParams();
   const messageId = params.messageId as string;
   const threadId = params.threadId as string;
-  
+
   const [messages, setMessages] = useState<MessageThread[]>([]);
   const [loading, setLoading] = useState(true);
-  const [allRecipientIds, setAllRecipientIds] = useState<string[]>([]);
   const [viewingImageUrl, setViewingImageUrl] = useState<string | null>(null);
-  const scrollViewRef = React.useRef<ScrollView>(null);
+  const [participantsOpen, setParticipantsOpen] = useState(false);
+  const [attachOpen, setAttachOpen] = useState(false);
+  const [reply, setReply] = useState('');
+  const [sending, setSending] = useState(false);
+  const [replyImageUri, setReplyImageUri] = useState<string | null>(null);
+  const [replyFileUri, setReplyFileUri] = useState<string | null>(null);
+  const [replyFileName, setReplyFileName] = useState<string | null>(null);
+  const [replyFileSize, setReplyFileSize] = useState<number | null>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const colors = useThemeColors();
-  const insets = useSafeAreaInsets();
+  const isDark = useIsDarkTheme();
+  const { byId, personOf, nameOf } = useThreadPeople(user?.id);
+  const canAttachFiles = isManagerOrOwner(user);
 
   const loadThread = useCallback(async () => {
     if (!user?.id) return;
 
     try {
       setLoading(true);
-
-      // Roster for sender/recipient name/title/avatar hydration (replaces the users(...) embeds).
-      const dir = await getOrgDirectory(user.id);
-      const dirById = new Map(dir.map((r) => [r.id, r]));
 
       // Whole thread in one call (participant-gated + expanded server-side, ascending)
       const { data: threadMessages, error: threadError } = await supabase.rpc('get_message_thread', {
@@ -88,18 +110,10 @@ export default function MessageDetailScreen() {
       const mainMessage = rows.find((msg: any) => msg.id === messageId);
       if (!mainMessage) throw new Error('Main message not found in thread');
 
-      // Store all recipient IDs and names (recipients of the original message)
-      const recipientIds: string[] = mainMessage.recipient_ids || [];
-      const recipientNames = recipientIds.map(id => dirById.get(id)?.name).filter((n): n is string => Boolean(n));
-      const allIds = [mainMessage.sender_id, ...recipientIds].filter(id => id !== user.id);
-      setAllRecipientIds(allIds);
-
       const formattedMessages: MessageThread[] = rows.map((msg: any) => ({
         id: msg.id,
         sender_id: msg.sender_id,
-        sender_name: dirById.get(msg.sender_id)?.name || 'Unknown',
-        sender_job_title: dirById.get(msg.sender_id)?.job_title || '',
-        sender_profile_picture: dirById.get(msg.sender_id)?.profile_picture_url || null,
+        recipient_ids: msg.recipient_ids || [],
         subject: msg.subject,
         body: msg.body,
         image_url: msg.image_url || null,
@@ -107,7 +121,6 @@ export default function MessageDetailScreen() {
         file_name: msg.file_name || null,
         created_at: msg.created_at,
         is_current_user: msg.sender_id === user.id,
-        recipient_names: msg.id === messageId ? recipientNames : undefined,
       }));
 
       setMessages(formattedMessages);
@@ -123,8 +136,6 @@ export default function MessageDetailScreen() {
     if (!user?.id) return;
 
     try {
-      console.log('Marking entire thread as read for user:', user.id, 'thread:', threadId);
-
       // Mark all messages in the thread as read for this user (expanded server-side)
       const { error: updateError } = await supabase.rpc('mark_thread_read', {
         p_actor_id: user.id,
@@ -137,7 +148,6 @@ export default function MessageDetailScreen() {
         throw updateError;
       }
 
-      console.log('Successfully marked thread as read');
       // Immediately refresh all badge counts across the app
       refreshAllUnreadCounts();
     } catch (error) {
@@ -145,18 +155,64 @@ export default function MessageDetailScreen() {
     }
   }, [messageId, threadId, user?.id]);
 
-  // Reload thread when screen gains focus (e.g., returning from compose reply)
+  const scrollToEnd = () => {
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: false });
+    }, 100);
+  };
+
+  // Reload thread when screen gains focus (e.g., returning from a one-to-one compose)
   useFocusEffect(
     useCallback(() => {
-      loadThread().then(() => {
-        // Auto-scroll to bottom after loading to show latest messages
-        setTimeout(() => {
-          scrollViewRef.current?.scrollToEnd({ animated: false });
-        }, 100);
-      });
+      loadThread().then(scrollToEnd);
       markThreadAsRead();
-    }, [loadThread, markThreadAsRead])
+    }, [loadThread, markThreadAsRead]),
   );
+
+  // ── Participants: sender + recipients across every row, minus nobody ──
+  const rootMessage = useMemo(
+    () => messages.find((m) => m.id === threadId) || messages[0] || null,
+    [messages, threadId],
+  );
+  const participantIds = useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    const push = (id: string) => {
+      if (id && !seen.has(id)) {
+        seen.add(id);
+        out.push(id);
+      }
+    };
+    messages.forEach((m) => {
+      push(m.sender_id);
+      m.recipient_ids.forEach(push);
+    });
+    return out;
+  }, [messages]);
+
+  const participants = useMemo<ThreadParticipant[]>(
+    () =>
+      participantIds.map((id) => ({
+        ...personOf(id, id === user?.id ? user?.name : null),
+        titles: titlesOf(byId.get(id)),
+        isRoot: rootMessage?.sender_id === id,
+        isMe: id === user?.id,
+      })),
+    [participantIds, personOf, byId, rootMessage?.sender_id, user?.id, user?.name],
+  );
+  const others = useMemo(() => participants.filter((p) => !p.isMe), [participants]);
+  const replyRecipientIds = useMemo(() => others.map((p) => p.id), [others]);
+
+  const stripLabel = useMemo(() => {
+    const names = others.slice(0, 3).map((p) => firstNameOf(p.name) || p.name).filter(Boolean);
+    const extra = others.length - names.length;
+    const joined = extra > 0 ? `${names.join(', ')} +${extra}` : names.join(', ');
+    return t('participants_and_you', { names: joined });
+  }, [others, t]);
+
+  const rootSenderFirst = rootMessage ? firstNameOf(nameOf(rootMessage.sender_id, user?.id === rootMessage.sender_id ? user?.name : null)) : '';
+  const headerTitle = rootMessage?.subject || (rootMessage ? nameOf(rootMessage.sender_id, user?.name) : t('title'));
+  const headerEyebrow = rootMessage ? t('people_started_by', { count: participantIds.length, name: rootSenderFirst }) : undefined;
 
   const [savingImage, setSavingImage] = useState(false);
 
@@ -197,45 +253,25 @@ export default function MessageDetailScreen() {
     }
   };
 
-  const handleReply = () => {
-    const originalMessage = messages[0];
-    router.push({
-      pathname: '/compose-message',
-      params: {
-        replyToMessageId: messageId,
-        replyToSenderId: originalMessage.sender_id,
-        replySubject: originalMessage.subject || '',
-        isReplyAll: 'false',
-      },
-    });
-  };
-
-  const handleReplyAll = () => {
-    const originalMessage = messages[0];
-    router.push({
-      pathname: '/compose-message',
-      params: {
-        replyToMessageId: messageId,
-        replyToSenderId: originalMessage.sender_id,
-        replyAllRecipientIds: allRecipientIds.join(','),
-        replySubject: originalMessage.subject || '',
-        isReplyAll: 'true',
-      },
-    });
+  const openFile = async (fileUrl: string) => {
+    try {
+      await WebBrowser.openBrowserAsync(await resolveForOpen(fileUrl, { tier: 'file' }));
+    } catch (err) {
+      console.error('Error opening file:', err);
+      Alert.alert('Error', 'Could not open the file');
+    }
   };
 
   const handleDelete = () => {
     if (!user?.id) return;
     const actorId = user.id;
     // Check if user is the sender of the original message
-    const originalMessage = messages.find(m => m.id === messageId || m.id === threadId);
+    const originalMessage = messages.find((m) => m.id === messageId || m.id === threadId);
     const isSender = originalMessage?.sender_id === user?.id;
 
     Alert.alert(
       t('delete_title'),
-      isSender
-        ? t('delete_sent_confirm')
-        : t('delete_inbox_confirm'),
+      isSender ? t('delete_sent_confirm') : t('delete_inbox_confirm'),
       [
         { text: t('common:cancel', { defaultValue: 'Cancel' }), style: 'cancel' },
         {
@@ -267,37 +303,140 @@ export default function MessageDetailScreen() {
             }
           },
         },
-      ]
+      ],
     );
   };
 
-  const formatDateTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    });
+  // ── Inline reply: send_message threaded on the ROOT, to everyone but me ──
+  const hasReplyContent = !!(reply.trim() || replyImageUri || replyFileUri);
+
+  const handleReply = async () => {
+    if (!user?.id || !rootMessage) return;
+    const actorId = user.id;
+    if (replyRecipientIds.length === 0) return;
+    if (!hasReplyContent) return;
+
+    try {
+      setSending(true);
+
+      let imageUrl: string | null = null;
+      if (replyImageUri) {
+        imageUrl = await uploadMessageImage(replyImageUri, actorId);
+        if (!imageUrl) {
+          Alert.alert(
+            t('common:error', { defaultValue: 'Error' }),
+            t('compose:upload_failed', { defaultValue: 'Failed to upload image' }),
+          );
+          setSending(false);
+          return;
+        }
+      }
+
+      let fileUrl: string | null = null;
+      const fileName: string | null = replyFileName;
+      if (replyFileUri && replyFileName) {
+        fileUrl = await uploadMessageFile(replyFileUri, replyFileName, actorId);
+        if (!fileUrl) {
+          Alert.alert(
+            t('common:error', { defaultValue: 'Error' }),
+            t('compose:file_upload_failed', { defaultValue: 'Failed to upload file' }),
+          );
+          setSending(false);
+          return;
+        }
+      }
+
+      const rootSubject = rootMessage.subject || '';
+      const subject = rootSubject ? (rootSubject.startsWith('Re: ') ? rootSubject : `Re: ${rootSubject}`) : null;
+
+      const { data: newMessageId, error: messageError } = await supabase.rpc('send_message', {
+        p_actor_id: actorId,
+        p_recipient_ids: replyRecipientIds,
+        p_subject: subject,
+        p_body: reply.trim() || '',
+        p_image_url: imageUrl,
+        p_file_url: fileUrl,
+        p_file_name: fileName,
+        p_reply_to_message_id: rootMessage.id,
+      });
+
+      if (messageError) throw messageError;
+
+      // Push to the recipients (same payload as compose; never blocks the send)
+      try {
+        const msgTitle = bothLanguages('notifications.new_message_title');
+        const subj = subject || '';
+        const attachSuffix = `${imageUrl ? ' 📷' : ''}${fileUrl ? ' 📎' : ''}`;
+        const noSubjKey = imageUrl
+          ? 'notifications.sent_you_photo'
+          : fileUrl ? 'notifications.sent_you_file' : 'notifications.sent_you_message';
+        await sendNotification({
+          userIds: replyRecipientIds,
+          notificationType: 'message',
+          title: msgTitle.en,
+          body: subj
+            ? `${user?.name}: ${subj}${attachSuffix}`
+            : i18n.t(noSubjKey, { lng: 'en', name: user?.name }),
+          title_es: msgTitle.es,
+          body_es: subj ? undefined : i18n.t(noSubjKey, { lng: 'es', name: user?.name }),
+          data: {
+            messageId: newMessageId,
+            senderId: user?.id,
+            senderName: user?.name,
+          },
+        });
+      } catch (notificationError) {
+        console.error('Failed to send push notification:', notificationError);
+      }
+
+      setReply('');
+      setReplyImageUri(null);
+      setReplyFileUri(null);
+      setReplyFileName(null);
+      setReplyFileSize(null);
+      await loadThread();
+      scrollToEnd();
+      refreshAllUnreadCounts();
+    } catch (error) {
+      console.error('Error sending reply:', error);
+      Alert.alert(t('common:error', { defaultValue: 'Error' }), t('error_send'));
+    } finally {
+      setSending(false);
+    }
   };
 
-  if (loading) {
+  // ── Formatting ──
+  const formatStamp = (iso: string) =>
+    new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+
+  const dividerLabel = (iso: string) => {
+    const bucket = dateBucketOf(iso);
+    if (bucket === 'today') return t('today');
+    if (bucket === 'yesterday') return t('yesterday');
+    const d = new Date(iso);
+    const sameYear = d.getFullYear() === new Date().getFullYear();
+    return d.toLocaleDateString(undefined, sameYear ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+  const dayKey = (iso: string) => {
+    const d = new Date(iso);
+    return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  };
+
+  const deleteChip = (
+    <TouchableOpacity
+      onPress={handleDelete}
+      hitSlop={8}
+      style={[styles.headerChip, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
+    >
+      <IconSymbol ios_icon_name="trash" android_material_icon_name="delete" size={20} color={msgHue('delete', isDark)} />
+    </TouchableOpacity>
+  );
+
+  if (loading && messages.length === 0) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { backgroundColor: colors.card }]}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <IconSymbol
-              ios_icon_name="chevron.left"
-              android_material_icon_name="chevron-left"
-              size={24}
-              color={colors.text}
-            />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>{t('title')}</Text>
-          <View style={styles.headerRight} />
-        </View>
+        <AmbientGlow />
+        <ScreenHeader title={t('title')} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary || colors.highlight} />
         </View>
@@ -306,227 +445,136 @@ export default function MessageDetailScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-    >
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.card }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <IconSymbol
-            ios_icon_name="chevron.left"
-            android_material_icon_name="chevron-left"
-            size={24}
-            color={colors.text}
-          />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Message</Text>
-        <View style={styles.headerActions}>
-          <TouchableOpacity onPress={handleReply} style={styles.headerActionButton}>
-            <IconSymbol
-              ios_icon_name="arrowshape.turn.up.left.fill"
-              android_material_icon_name="reply"
-              size={22}
-              color={colors.primary}
-            />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handleDelete} style={styles.headerActionButton}>
-            <IconSymbol
-              ios_icon_name="trash"
-              android_material_icon_name="delete"
-              size={22}
-              color="#E74C3C"
-            />
-          </TouchableOpacity>
-        </View>
-      </View>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <AmbientGlow />
+      <ScreenHeader title={headerTitle} eyebrow={headerEyebrow} right={deleteChip} rightWide />
 
-      {/* Messages Thread — iMessage-style bubbles */}
-      <ScrollView ref={scrollViewRef} style={styles.content} contentContainerStyle={styles.contentContainer}>
-        {/* Subject header card — shown once at top */}
-        {messages.length > 0 && messages[0].subject && (
-          <View style={[styles.subjectCard, { backgroundColor: colors.card }]}>
-            <Text style={[styles.subjectText, { color: colors.text }]}>
-              {messages[0].subject}
-            </Text>
-            {messages[0].recipient_names && messages[0].recipient_names.length > 0 && (
-              <Text style={[styles.subjectRecipients, { color: colors.textSecondary }]}>
-                {t('to', { names: messages[0].recipient_names.join(', ') })}
-              </Text>
-            )}
-          </View>
-        )}
-
-        {messages.map((message, index) => {
-          const isMe = message.is_current_user;
-          const showSenderInfo = !isMe || (messages.length > 2);
-          const prevMessage = index > 0 ? messages[index - 1] : null;
-          const sameSenderAsPrev = prevMessage && prevMessage.sender_id === message.sender_id;
-
-          return (
-            <View
-              key={index}
-              style={[
-                styles.bubbleRow,
-                isMe ? styles.bubbleRowRight : styles.bubbleRowLeft,
-                sameSenderAsPrev ? styles.bubbleRowGrouped : styles.bubbleRowSpaced,
-              ]}
-            >
-              {/* Small profile pic for other users (hidden if same sender consecutive) */}
-              {!isMe && (
-                <View style={styles.bubbleAvatarContainer}>
-                  {!sameSenderAsPrev ? (
-                    message.sender_profile_picture ? (
-                      <StorageImage source={{ uri: message.sender_profile_picture }} style={styles.bubbleAvatar} />
-                    ) : (
-                      <View style={[styles.bubbleAvatarPlaceholder, { backgroundColor: colors.highlight }]}>
-                        <Text style={[styles.bubbleAvatarText, { color: colors.text }]}>
-                          {message.sender_name.charAt(0).toUpperCase()}
-                        </Text>
-                      </View>
-                    )
-                  ) : (
-                    <View style={styles.bubbleAvatarSpacer} />
-                  )}
-                </View>
-              )}
-
-              <View style={[styles.bubbleContent, isMe ? styles.bubbleContentRight : styles.bubbleContentLeft]}>
-                {/* Sender name for group chats or other users — only if not consecutive */}
-                {!isMe && !sameSenderAsPrev && (
-                  <Text style={[styles.bubbleSenderName, { color: colors.textSecondary }]}>
-                    {message.sender_name}
-                  </Text>
-                )}
-
-                <View
-                  style={[
-                    styles.bubble,
-                    isMe
-                      ? [styles.bubbleRight, { backgroundColor: '#1976D2' }]
-                      : [styles.bubbleLeft, { backgroundColor: colors.card }],
-                    (message.image_url || message.file_url) ? styles.bubbleWithImage : null,
-                  ]}
-                >
-                  {message.image_url && (
-                    <TouchableOpacity
-                      onPress={() => setViewingImageUrl(message.image_url)}
-                      activeOpacity={0.9}
-                    >
-                      <StorageImage
-                        source={{ uri: message.image_url }}
-                        style={styles.bubbleImage}
-                        resizeMode="cover"
-                      />
-                    </TouchableOpacity>
-                  )}
-                  {message.file_url && message.file_name && (() => {
-                    const fileIcon = getFileIconInfo(message.file_name!);
-                    return (
-                      <TouchableOpacity
-                        style={[
-                          styles.fileAttachment,
-                          { backgroundColor: isMe ? 'rgba(255,255,255,0.15)' : (colors.highlight || 'rgba(0,0,0,0.05)') },
-                        ]}
-                        onPress={async () => {
-                          try {
-                            await WebBrowser.openBrowserAsync(await resolveForOpen(message.file_url!, { tier: 'file' }));
-                          } catch (err) {
-                            console.error('Error opening file:', err);
-                            Alert.alert('Error', 'Could not open the file');
-                          }
-                        }}
-                        activeOpacity={0.7}
-                      >
-                        <IconSymbol
-                          ios_icon_name={fileIcon.iosIcon}
-                          android_material_icon_name={fileIcon.androidIcon}
-                          size={28}
-                          color={isMe ? '#FFFFFF' : fileIcon.color}
-                        />
-                        <View style={styles.fileAttachmentInfo}>
-                          <Text
-                            style={[styles.fileAttachmentName, { color: isMe ? '#FFFFFF' : colors.text }]}
-                            numberOfLines={1}
-                          >
-                            {message.file_name}
-                          </Text>
-                          <Text style={[styles.fileAttachmentAction, { color: isMe ? 'rgba(255,255,255,0.7)' : colors.textSecondary }]}>
-                            Tap to open
-                          </Text>
-                        </View>
-                        <IconSymbol
-                          ios_icon_name="arrow.down.circle"
-                          android_material_icon_name="download"
-                          size={20}
-                          color={isMe ? 'rgba(255,255,255,0.7)' : colors.textSecondary}
-                        />
-                      </TouchableOpacity>
-                    );
-                  })()}
-                  {message.body ? (
-                    <Text style={[
-                      styles.bubbleText,
-                      { color: isMe ? '#FFFFFF' : colors.text },
-                      (message.image_url || message.file_url) ? styles.bubbleTextWithImage : null,
-                    ]}>
-                      {message.body}
-                    </Text>
-                  ) : null}
-                </View>
-
-                <Text
-                  style={[
-                    styles.bubbleTime,
-                    { color: colors.textSecondary },
-                    isMe ? styles.bubbleTimeRight : styles.bubbleTimeLeft,
-                  ]}
-                >
-                  {formatDateTime(message.created_at)}
-                </Text>
-              </View>
-            </View>
-          );
-        })}
-      </ScrollView>
-
-      {/* Reply Section — compact with safe area padding for Android dock bar */}
-      <View style={[styles.replyButtonContainer, { backgroundColor: colors.card, paddingBottom: Math.max(12, insets.bottom + 4) }]}>
-        <View style={styles.replyButtonRow}>
-          <TouchableOpacity
-            style={[styles.replyButton, { backgroundColor: colors.primary || colors.highlight }]}
-            onPress={handleReply}
-          >
-            <IconSymbol
-              ios_icon_name="arrowshape.turn.up.left.fill"
-              android_material_icon_name="reply"
-              size={18}
-              color={colors.fireText}
-            />
-            <Text style={[styles.replyButtonText, { color: colors.fireText }]}>
-              {t('reply')}
-            </Text>
-          </TouchableOpacity>
-
-          {allRecipientIds.length > 1 && (
-            <TouchableOpacity
-              style={[styles.replyAllButton, { backgroundColor: colors.highlight }]}
-              onPress={handleReplyAll}
-            >
-              <IconSymbol
-                ios_icon_name="arrowshape.turn.up.left.2.fill"
-                android_material_icon_name="reply-all"
-                size={18}
-                color={colors.text}
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        {/* The composer is absolute inside THIS view (not the KAV) — see compose-message. */}
+        <View style={styles.flex}>
+          {/* Pinned under the ScreenHeader (Steve's round): the strip stays reachable while the
+              thread scrolls, so "who's in this" and the one-to-one Message buttons are one tap away. */}
+          {participants.length > 0 && (
+            <View style={styles.stripWrap}>
+              <ParticipantsStrip
+                people={participants}
+                label={stripLabel}
+                eyebrow={t('replies_reach_everyone')}
+                onPress={() => setParticipantsOpen(true)}
               />
-              <Text style={[styles.replyButtonText, { color: colors.text }]}>
-                {t('reply_all')}
-              </Text>
-            </TouchableOpacity>
+            </View>
           )}
+
+          <ScrollView
+            ref={scrollViewRef}
+            style={styles.flex}
+            contentContainerStyle={styles.content}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: false })}
+          >
+            <View style={styles.thread}>
+              {messages.map((message, index) => {
+                const isMe = message.is_current_user;
+                const prev = index > 0 ? messages[index - 1] : null;
+                const next = index < messages.length - 1 ? messages[index + 1] : null;
+                const newDay = !prev || dayKey(prev.created_at) !== dayKey(message.created_at);
+                const sameSenderAsPrev = !!prev && !newDay && prev.sender_id === message.sender_id;
+                const endOfRun =
+                  !next ||
+                  next.sender_id !== message.sender_id ||
+                  new Date(next.created_at).getTime() - new Date(message.created_at).getTime() > STAMP_GAP_MS ||
+                  dayKey(next.created_at) !== dayKey(message.created_at);
+                const sender = personOf(message.sender_id);
+                const senderName = nameOf(message.sender_id, isMe ? user?.name : null) || t('you');
+
+                // A row can carry text, a photo and a file at once — each is its own bubble.
+                const parts: ('text' | 'photo' | 'file')[] = [];
+                if (message.body) parts.push('text');
+                if (message.image_url) parts.push('photo');
+                if (message.file_url && message.file_name) parts.push('file');
+                if (parts.length === 0) parts.push('text');
+
+                return (
+                  <React.Fragment key={message.id}>
+                    {newDay && <DateDivider label={dividerLabel(message.created_at)} />}
+                    {!isMe && !sameSenderAsPrev && <SenderLine name={senderName} />}
+                    {parts.map((kind, pi) => {
+                      const first = pi === 0 && !sameSenderAsPrev;
+                      const last = pi === parts.length - 1;
+                      return (
+                        <Bubble
+                          key={`${message.id}:${kind}`}
+                          mine={isMe}
+                          kind={kind}
+                          text={message.body}
+                          imageUrl={message.image_url}
+                          fileName={message.file_name}
+                          fileHint={t('tap_to_open')}
+                          onPress={
+                            kind === 'photo'
+                              ? () => setViewingImageUrl(message.image_url)
+                              : kind === 'file'
+                                ? () => openFile(message.file_url!)
+                                : undefined
+                          }
+                          avatar={first ? sender : null}
+                          onAvatarPress={() => openMiniProfile(message.sender_id)}
+                          stamp={last && endOfRun ? formatStamp(message.created_at) : null}
+                        />
+                      );
+                    })}
+                  </React.Fragment>
+                );
+              })}
+            </View>
+          </ScrollView>
+
+          <Composer
+            value={reply}
+            onChangeText={setReply}
+            placeholder={t('reply_placeholder')}
+            canSend={hasReplyContent && replyRecipientIds.length > 0}
+            sending={sending}
+            onSend={handleReply}
+            onPlus={() => setAttachOpen(true)}
+            attachments={
+              replyImageUri || replyFileName ? (
+                <AttachmentStrip
+                  imageUri={replyImageUri}
+                  onRemoveImage={() => setReplyImageUri(null)}
+                  fileName={replyFileName}
+                  fileSize={replyFileSize}
+                  onRemoveFile={() => {
+                    setReplyFileUri(null);
+                    setReplyFileName(null);
+                    setReplyFileSize(null);
+                  }}
+                />
+              ) : undefined
+            }
+          />
         </View>
-      </View>
+      </KeyboardAvoidingView>
+
+      <ParticipantsSheet
+        visible={participantsOpen}
+        onClose={() => setParticipantsOpen(false)}
+        participants={participants}
+      />
+
+      <AttachMenu
+        visible={attachOpen}
+        onClose={() => setAttachOpen(false)}
+        allowFiles={canAttachFiles}
+        onImage={(uri) => setReplyImageUri(uri)}
+        onFile={(uri, name, size) => {
+          setReplyFileUri(uri);
+          setReplyFileName(name);
+          setReplyFileSize(size);
+        }}
+      />
+
       {/* Full-screen Image Viewer Modal */}
       <Modal
         visible={!!viewingImageUrl}
@@ -535,16 +583,8 @@ export default function MessageDetailScreen() {
         onRequestClose={() => setViewingImageUrl(null)}
       >
         <View style={styles.imageViewerOverlay}>
-          <TouchableOpacity
-            style={styles.imageViewerClose}
-            onPress={() => setViewingImageUrl(null)}
-          >
-            <IconSymbol
-              ios_icon_name="xmark.circle.fill"
-              android_material_icon_name="cancel"
-              size={32}
-              color="#FFFFFF"
-            />
+          <TouchableOpacity style={styles.imageViewerClose} onPress={() => setViewingImageUrl(null)}>
+            <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={32} color="#FFFFFF" />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.imageViewerSave}
@@ -554,212 +594,38 @@ export default function MessageDetailScreen() {
             {savingImage ? (
               <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
-              <IconSymbol
-                ios_icon_name="arrow.down.circle.fill"
-                android_material_icon_name="download"
-                size={32}
-                color="#FFFFFF"
-              />
+              <IconSymbol ios_icon_name="arrow.down.circle.fill" android_material_icon_name="download" size={32} color="#FFFFFF" />
             )}
           </TouchableOpacity>
           {viewingImageUrl && (
-            <StorageImage
-              source={{ uri: viewingImageUrl }}
-              style={styles.imageViewerImage}
-              resizeMode="contain"
-            />
+            <StorageImage source={{ uri: viewingImageUrl }} style={styles.imageViewerImage} resizeMode="contain" />
           )}
         </View>
       </Modal>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 60,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
-  },
-  backButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  headerRight: {
-    width: 40,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  headerActionButton: {
-    padding: 8,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  content: {
-    flex: 1,
-  },
-  contentContainer: {
-    paddingHorizontal: 12,
-    paddingTop: 12,
-    paddingBottom: 20,
-  },
-  // Subject header card
-  subjectCard: {
-    padding: 12,
+  container: { flex: 1 },
+  flex: { flex: 1 },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  headerChip: {
+    width: 38,
+    height: 38,
     borderRadius: 12,
-    marginBottom: 12,
-    boxShadow: '0px 1px 3px rgba(0, 0, 0, 0.08)',
-    elevation: 1,
-  },
-  subjectText: {
-    fontSize: 15,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  subjectRecipients: {
-    fontSize: 12,
-    fontStyle: 'italic',
-  },
-  // iMessage-style bubble layout
-  bubbleRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 4,
-  },
-  bubbleRowLeft: {
-    flexDirection: 'row',
-    justifyContent: 'flex-start',
-  },
-  bubbleRowRight: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-  },
-  bubbleRowSpaced: {
-    marginTop: 12,
-  },
-  bubbleRowGrouped: {
-    marginTop: 3,
-  },
-  bubbleAvatarContainer: {
-    width: 28,
-    marginRight: 6,
-    alignSelf: 'flex-end',
-    marginBottom: 16,
-  },
-  bubbleAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-  },
-  bubbleAvatarPlaceholder: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  bubbleAvatarText: {
-    fontSize: 12,
-    fontWeight: 'bold',
+  stripWrap: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 10 },
+  content: {
+    paddingHorizontal: 16,
+    paddingTop: 2,
+    paddingBottom: 90,
+    gap: 12,
   },
-  bubbleAvatarSpacer: {
-    width: 28,
-    height: 28,
-  },
-  bubbleContent: {
-    maxWidth: '75%',
-  },
-  bubbleContentLeft: {
-    alignItems: 'flex-start',
-  },
-  bubbleContentRight: {
-    alignItems: 'flex-end',
-  },
-  bubbleSenderName: {
-    fontSize: 11,
-    fontWeight: '600',
-    marginBottom: 2,
-    marginLeft: 8,
-  },
-  bubble: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    boxShadow: '0px 1px 2px rgba(0, 0, 0, 0.06)',
-    elevation: 1,
-  },
-  bubbleLeft: {
-    borderRadius: 18,
-    borderBottomLeftRadius: 4,
-  },
-  bubbleRight: {
-    borderRadius: 18,
-    borderBottomRightRadius: 4,
-  },
-  bubbleText: {
-    fontSize: 15,
-    lineHeight: 20,
-  },
-  bubbleTime: {
-    fontSize: 10,
-    marginTop: 2,
-    marginHorizontal: 8,
-  },
-  bubbleTimeLeft: {
-    textAlign: 'left',
-  },
-  bubbleTimeRight: {
-    textAlign: 'right',
-  },
-  // Image in bubble
-  bubbleWithImage: {
-    padding: 0,
-    overflow: 'hidden',
-  },
-  bubbleImage: {
-    width: 220,
-    height: 165,
-    borderRadius: 0,
-  },
-  bubbleTextWithImage: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  // File attachment in bubble
-  fileAttachment: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    margin: 8,
-    padding: 10,
-    borderRadius: 10,
-    gap: 10,
-  },
-  fileAttachmentInfo: {
-    flex: 1,
-  },
-  fileAttachmentName: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  fileAttachmentAction: {
-    fontSize: 11,
-    marginTop: 1,
-  },
+  thread: { gap: 0 },
   // Full-screen image viewer
   imageViewerOverlay: {
     flex: 1,
@@ -767,55 +633,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  imageViewerClose: {
-    position: 'absolute',
-    top: 60,
-    right: 20,
-    zIndex: 10,
-    padding: 8,
-  },
-  imageViewerSave: {
-    position: 'absolute',
-    top: 60,
-    left: 20,
-    zIndex: 10,
-    padding: 8,
-  },
+  imageViewerClose: { position: 'absolute', top: 60, right: 20, zIndex: 10, padding: 8 },
+  imageViewerSave: { position: 'absolute', top: 60, left: 20, zIndex: 10, padding: 8 },
   imageViewerImage: {
     width: Dimensions.get('window').width,
     height: Dimensions.get('window').height * 0.7,
-  },
-  // Reply buttons — compact
-  replyButtonContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0, 0, 0, 0.1)',
-  },
-  replyButtonRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  replyButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 10,
-    gap: 6,
-  },
-  replyAllButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 10,
-    gap: 6,
-  },
-  replyButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
   },
 });
