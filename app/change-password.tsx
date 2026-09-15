@@ -1,29 +1,50 @@
-
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
+  Pressable,
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Animated,
   Alert,
-  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { useAuth, getStashedLoginPassword } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
-import { splashColors } from '@/styles/commonStyles';
+import { useThemeColors } from '@/hooks/useThemeColors';
+import { useIsDarkTheme } from '@/components/content/useIsDarkTheme';
+import { hexToRgba, type ThemeColorSet } from '@/styles/commonStyles';
+import { fonts } from '@/constants/fonts';
 import { IconSymbol } from '@/components/IconSymbol';
+import AmbientGlow from '@/components/AmbientGlow';
+import GlassCard from '@/components/GlassCard';
+import ShineButton from '@/components/quiz/ShineButton';
+import { FieldLabel, GlassTextInput, Hint } from '@/components/content/FormKit';
+import { StorageImage } from '@/components/StorageImage';
 import { supabase } from '@/app/integrations/supabase/client';
 import { translateServerError } from '@/utils/serverErrors';
-import { useTranslation } from 'react-i18next';
+
+/**
+ * The FORCED change-password screen (s84 "P · Set a new password"): reached by
+ * app/_layout.tsx's redirect while user.forcePasswordChange is true, with the
+ * back gesture disabled. Themed on the glow now (no more splashColors); the
+ * submit contract is unchanged — update_password with the stashed login
+ * password as p_current_password, refreshUser, then the role's portal.
+ */
+
+// Fixed error / log-out red, stepped for the light theme.
+const RED = { dark: '#EF4444', light: '#DC2626' };
 
 export default function ChangePasswordScreen() {
   const { t } = useTranslation();
+  const colors = useThemeColors();
+  const isDark = useIsDarkTheme();
+  const insets = useSafeAreaInsets();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -34,42 +55,9 @@ export default function ChangePasswordScreen() {
   const { user, refreshUser, logout } = useAuth();
   const { organizationId, organization, isLoading: orgLoading } = useOrganization();
 
-  // Animation values
-  const headerOpacity = useRef(new Animated.Value(0)).current;
-  const headerTranslateY = useRef(new Animated.Value(-20)).current;
-  const formOpacity = useRef(new Animated.Value(0)).current;
-  const formTranslateY = useRef(new Animated.Value(50)).current;
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(headerOpacity, {
-        toValue: 1,
-        duration: 600,
-        useNativeDriver: true,
-      }),
-      Animated.timing(headerTranslateY, {
-        toValue: 0,
-        duration: 600,
-        useNativeDriver: true,
-      }),
-    ]).start();
-
-    setTimeout(() => {
-      Animated.parallel([
-        Animated.timing(formOpacity, {
-          toValue: 1,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-        Animated.timing(formTranslateY, {
-          toValue: 0,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }, 300);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const errorColor = isDark ? RED.dark : RED.light;
+  const orgName = organization?.name ?? '';
+  const orgInitial = orgName.trim().charAt(0).toUpperCase();
 
   const handleChangePassword = async () => {
     setError('');
@@ -151,133 +139,119 @@ export default function ChangePasswordScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
+    <View style={styles.root}>
+      <AmbientGlow />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.flex}
       >
-        <Animated.View
-          style={[
-            styles.headerContainer,
-            {
-              opacity: headerOpacity,
-              transform: [{ translateY: headerTranslateY }],
-            },
-          ]}
+        <ScrollView
+          contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 28 }]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          <IconSymbol
-            ios_icon_name="lock.rotation"
-            android_material_icon_name="lock-reset"
-            size={48}
-            color={splashColors.primary}
-          />
-          <Text style={styles.header}>{t('change_password_screen.title')}</Text>
-          <Text style={styles.subtext}>{t('change_password_screen.subtitle')}</Text>
-        </Animated.View>
-
-        <Animated.View
-          style={[
-            styles.formContainer,
-            {
-              opacity: formOpacity,
-              transform: [{ translateY: formTranslateY }],
-            },
-          ]}
-        >
-          {/* New Password */}
-          <View style={styles.inputContainer}>
-            <IconSymbol
-              ios_icon_name="lock.fill"
-              android_material_icon_name="lock"
-              size={20}
-              color={splashColors.textSecondary}
-              style={styles.inputIcon}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder={t('change_password_screen.new_password')}
-              placeholderTextColor={splashColors.textSecondary}
-              value={newPassword}
-              onChangeText={(text) => {
-                setNewPassword(text);
-                setError('');
-              }}
-              secureTextEntry={!showNewPassword}
-              autoCapitalize="none"
-              returnKeyType="next"
-              editable={!isLoading}
-            />
-            <TouchableOpacity
-              onPress={() => setShowNewPassword(!showNewPassword)}
-              style={styles.eyeIcon}
-              disabled={isLoading}
-            >
-              <IconSymbol
-                ios_icon_name={showNewPassword ? 'eye.slash.fill' : 'eye.fill'}
-                android_material_icon_name={showNewPassword ? 'visibility-off' : 'visibility'}
-                size={20}
-                color={splashColors.textSecondary}
-              />
-            </TouchableOpacity>
-          </View>
-
-          {/* Confirm New Password */}
-          <View style={styles.inputContainer}>
-            <IconSymbol
-              ios_icon_name="lock.fill"
-              android_material_icon_name="lock"
-              size={20}
-              color={splashColors.textSecondary}
-              style={styles.inputIcon}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder={t('profile.confirm_new_password')}
-              placeholderTextColor={splashColors.textSecondary}
-              value={confirmPassword}
-              onChangeText={(text) => {
-                setConfirmPassword(text);
-                setError('');
-              }}
-              secureTextEntry={!showConfirmPassword}
-              autoCapitalize="none"
-              returnKeyType="done"
-              onSubmitEditing={handleChangePassword}
-              editable={!isLoading}
-            />
-            <TouchableOpacity
-              onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-              style={styles.eyeIcon}
-              disabled={isLoading}
-            >
-              <IconSymbol
-                ios_icon_name={showConfirmPassword ? 'eye.slash.fill' : 'eye.fill'}
-                android_material_icon_name={showConfirmPassword ? 'visibility-off' : 'visibility'}
-                size={20}
-                color={splashColors.textSecondary}
-              />
-            </TouchableOpacity>
-          </View>
-
-          <Text style={styles.hintText}>{t('change_password_screen.password_hint')}</Text>
-
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
-          <TouchableOpacity
-            style={[styles.primaryButton, (isLoading || orgLoading) && styles.buttonDisabled]}
-            onPress={handleChangePassword}
-            disabled={isLoading || orgLoading}
-          >
-            {isLoading || orgLoading ? (
-              <ActivityIndicator color="#FFFFFF" />
+          {/* Org line */}
+          <View style={styles.orgLine}>
+            {organization?.logo_url ? (
+              <StorageImage source={{ uri: organization.logo_url }} style={styles.orgLogo} />
             ) : (
-              <Text style={styles.primaryButtonText}>{t('profile.update_password')}</Text>
+              <View style={[styles.orgLogo, { backgroundColor: hexToRgba(colors.tint, 0.18) }]}>
+                <Text style={[styles.orgInitial, { color: colors.tint }]}>{orgInitial}</Text>
+              </View>
             )}
-          </TouchableOpacity>
+            <Text style={styles.orgName} numberOfLines={1}>{orgName}</Text>
+          </View>
+
+          {/* Key disc + copy */}
+          <View style={styles.hero}>
+            <GlassCard variant="glass" radius={22} style={styles.disc}>
+              <IconSymbol ios_icon_name="key.fill" android_material_icon_name="vpn-key" size={28} color={colors.tint} />
+            </GlassCard>
+            <Text style={styles.title}>{t('change_password_screen.title2')}</Text>
+            <Text style={styles.subtitle}>{t('change_password_screen.subtitle2')}</Text>
+          </View>
+
+          {/* Fields */}
+          <GlassCard variant="glass" radius={16} style={styles.card}>
+            <View>
+              <FieldLabel label={t('change_password_screen.new_password')} />
+              <View style={styles.inputWrap}>
+                <GlassTextInput
+                  style={styles.inputWithEye}
+                  placeholder={t('change_password_screen.new_password')}
+                  value={newPassword}
+                  onChangeText={(text) => {
+                    setNewPassword(text);
+                    setError('');
+                  }}
+                  secureTextEntry={!showNewPassword}
+                  autoCapitalize="none"
+                  returnKeyType="next"
+                  editable={!isLoading}
+                />
+                <Pressable
+                  style={styles.eye}
+                  onPress={() => setShowNewPassword((v) => !v)}
+                  disabled={isLoading}
+                  hitSlop={6}
+                >
+                  <IconSymbol
+                    ios_icon_name={showNewPassword ? 'eye.slash.fill' : 'eye.fill'}
+                    android_material_icon_name={showNewPassword ? 'visibility-off' : 'visibility'}
+                    size={18}
+                    color={colors.textSecondary}
+                  />
+                </Pressable>
+              </View>
+            </View>
+
+            <View>
+              <FieldLabel label={t('profile.confirm_new_password')} />
+              <View style={styles.inputWrap}>
+                <GlassTextInput
+                  style={styles.inputWithEye}
+                  placeholder={t('change_password_screen.confirm_placeholder')}
+                  value={confirmPassword}
+                  onChangeText={(text) => {
+                    setConfirmPassword(text);
+                    setError('');
+                  }}
+                  secureTextEntry={!showConfirmPassword}
+                  autoCapitalize="none"
+                  returnKeyType="done"
+                  onSubmitEditing={handleChangePassword}
+                  editable={!isLoading}
+                />
+                <Pressable
+                  style={styles.eye}
+                  onPress={() => setShowConfirmPassword((v) => !v)}
+                  disabled={isLoading}
+                  hitSlop={6}
+                >
+                  <IconSymbol
+                    ios_icon_name={showConfirmPassword ? 'eye.slash.fill' : 'eye.fill'}
+                    android_material_icon_name={showConfirmPassword ? 'visibility-off' : 'visibility'}
+                    size={18}
+                    color={colors.textSecondary}
+                  />
+                </Pressable>
+              </View>
+              <Hint>{t('change_password_screen.hint2')}</Hint>
+            </View>
+
+            {error ? <Text style={[styles.error, { color: errorColor }]}>{error}</Text> : null}
+
+            <ShineButton
+              label={t('profile.update_password')}
+              gradient={[colors.tint, colors.tint]}
+              iosIcon="checkmark"
+              androidIcon="check"
+              onPress={handleChangePassword}
+              disabled={orgLoading}
+              loading={isLoading || orgLoading}
+              style={styles.submit}
+            />
+          </GlassCard>
 
           {/* Escape hatch. This route is a trap by design: _layout.tsx re-redirects
               here on every navigation while forcePasswordChange is true and disables
@@ -285,109 +259,155 @@ export default function ChangePasswordScreen() {
               no organization_id) the default-password fallback is permanently wrong
               and the user can neither pass nor leave. Deliberately NOT disabled while
               isLoading — a hung RPC is exactly when this needs to still work. */}
-          <TouchableOpacity
-            style={styles.logOutContainer}
-            onPress={async () => { await logout(); router.replace('/login'); }}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.logOutText}>{t('profile.log_out')}</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+          <View style={styles.notYou}>
+            <Text style={styles.notYouText}>{t('change_password_screen.not_you')}</Text>
+            <Text style={styles.notYouText}>·</Text>
+            <TouchableOpacity
+              style={styles.logout}
+              onPress={async () => { await logout(); router.replace('/login'); }}
+              activeOpacity={0.7}
+              hitSlop={8}
+            >
+              <IconSymbol
+                ios_icon_name="rectangle.portrait.and.arrow.right"
+                android_material_icon_name="logout"
+                size={13}
+                color={errorColor}
+              />
+              <Text style={[styles.logoutText, { color: errorColor }]}>{t('profile.log_out')}</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: splashColors.background,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingTop: 120,
-    paddingHorizontal: 24,
-    paddingBottom: 40,
-  },
-  headerContainer: {
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  header: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: splashColors.text,
-    marginTop: 16,
-  },
-  subtext: {
-    fontSize: 16,
-    color: splashColors.textSecondary,
-    textAlign: 'center',
-    marginTop: 8,
-  },
-  formContainer: {
-    width: '100%',
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    marginBottom: 16,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  inputIcon: {
-    marginRight: 12,
-  },
-  input: {
-    flex: 1,
-    height: 50,
-    fontSize: 16,
-    color: splashColors.text,
-  },
-  eyeIcon: {
-    padding: 8,
-  },
-  hintText: {
-    fontSize: 13,
-    color: splashColors.textSecondary,
-    marginBottom: 20,
-    marginLeft: 4,
-  },
-  primaryButton: {
-    backgroundColor: splashColors.primary,
-    borderRadius: 12,
-    height: 54,
-    alignItems: 'center',
-    justifyContent: 'center',
-    boxShadow: '0px 4px 8px rgba(44, 95, 141, 0.2)',
-    elevation: 4,
-    marginTop: 8,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  primaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  logOutContainer: {
-    alignItems: 'center',
-    marginTop: 24,
-    paddingVertical: 12,
-  },
-  logOutText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#E74C3C',
-  },
-  errorText: {
-    color: '#D32F2F',
-    fontSize: 14,
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-});
+function createStyles(colors: ThemeColorSet) {
+  return StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    flex: { flex: 1 },
+    scroll: {
+      flexGrow: 1,
+      paddingHorizontal: 24,
+      paddingBottom: 40,
+    },
+
+    // Org line
+    orgLine: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+    },
+    orgLogo: {
+      width: 18,
+      height: 18,
+      borderRadius: 5,
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden',
+    },
+    orgInitial: {
+      fontFamily: fonts.mono.semibold,
+      fontSize: 9,
+    },
+    orgName: {
+      fontFamily: fonts.mono.semibold,
+      fontSize: 10,
+      letterSpacing: 1,
+      textTransform: 'uppercase',
+      color: colors.textSecondary,
+      flexShrink: 1,
+    },
+
+    // Hero
+    hero: {
+      alignItems: 'center',
+      gap: 10,
+      paddingTop: 26,
+      paddingHorizontal: 8,
+      paddingBottom: 6,
+      marginBottom: 14,
+    },
+    disc: {
+      width: 64,
+      height: 64,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    title: {
+      fontFamily: fonts.display.bold,
+      fontSize: 24,
+      letterSpacing: -0.4,
+      color: colors.text,
+      textAlign: 'center',
+    },
+    subtitle: {
+      fontFamily: fonts.body.regular,
+      fontSize: 13,
+      lineHeight: 18,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      maxWidth: 280,
+    },
+
+    // Card
+    card: {
+      padding: 14,
+      gap: 10,
+    },
+    inputWrap: {
+      position: 'relative',
+      justifyContent: 'center',
+    },
+    inputWithEye: {
+      paddingRight: 44,
+    },
+    eye: {
+      position: 'absolute',
+      right: 4,
+      top: 0,
+      bottom: 0,
+      width: 36,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    error: {
+      fontFamily: fonts.body.regular,
+      fontSize: 12,
+      lineHeight: 16,
+      textAlign: 'center',
+    },
+    submit: {
+      marginTop: 2,
+    },
+
+    // Not you? · Log out
+    notYou: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      marginTop: 6,
+      paddingVertical: 12,
+    },
+    notYouText: {
+      fontFamily: fonts.body.regular,
+      fontSize: 12,
+      color: colors.textSecondary,
+    },
+    logout: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    logoutText: {
+      fontFamily: fonts.body.semibold,
+      fontSize: 12,
+    },
+  });
+}

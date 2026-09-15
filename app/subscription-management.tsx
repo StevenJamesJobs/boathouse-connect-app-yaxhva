@@ -13,52 +13,70 @@ import {
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { useIsDarkTheme } from '@/components/content/useIsDarkTheme';
+import { hexToRgba, type ThemeColorSet } from '@/styles/commonStyles';
+import { fonts } from '@/constants/fonts';
 import { IconSymbol } from '@/components/IconSymbol';
+import AmbientGlow from '@/components/AmbientGlow';
+import ScreenHeader from '@/components/ScreenHeader';
+import GlassCard from '@/components/GlassCard';
+import ShineButton from '@/components/quiz/ShineButton';
+import { SegControl } from '@/components/content/FormKit';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
-import { useSubscription, SubscriptionTier } from '@/contexts/SubscriptionContext';
-import { REVENUECAT_CONFIGURED, PRODUCTS, ENTITLEMENTS } from '@/config/revenueCat';
+import { useSubscription } from '@/contexts/SubscriptionContext';
+import { REVENUECAT_CONFIGURED, PRODUCTS } from '@/config/revenueCat';
 import { translateServerError } from '@/utils/serverErrors';
 
-const BASE_FEATURES = [
-  'Manual Schedule Builder',
-  'Menu Editor',
-  'Employee Management',
-  'Messaging & Notifications',
-  'Rewards System',
-  'Word Search Game',
-  'Guides & Training',
-  'Announcements & Events',
-];
+/**
+ * Subscription — SUB-B "Compare" (s84): the current-plan strip, the feature
+ * matrix (premium rows first, gold checks, faint gold wash), two CTAs under
+ * the columns reflecting the real tier, Restore, footer. Every string lives in
+ * the `subscription` namespace.
+ *
+ * The Monthly | Yearly capsule is wired but hidden behind SHOW_YEARLY until the
+ * yearly RevenueCat products exist (the copy keys are already in i18n).
+ */
+const SHOW_YEARLY: boolean = false;
+type Billing = 'monthly' | 'yearly';
+type Plan = 'base' | 'premium';
 
-const PREMIUM_FEATURES = [
-  'AI Schedule Upload',
-  'Quizzes & Exams',
-  'Menu Memory Tiles',
-  'Picture This! Game',
-  'Auto Google Reviews',
-];
+// Feature order is the existing screen's order — premium five first, then the base eight.
+const PREMIUM_FEATURE_KEYS = [
+  'feature_ai_schedule_upload',
+  'feature_quizzes_exams',
+  'feature_menu_memory_tiles',
+  'feature_picture_this',
+  'feature_auto_google_reviews',
+] as const;
 
-const TIER_LABELS: Record<SubscriptionTier, string> = {
-  trial: 'Free Trial',
-  base: 'Base',
-  premium: 'Premium',
-  expired: 'Expired',
-  none: 'No Plan',
-};
+const BASE_FEATURE_KEYS = [
+  'feature_manual_schedule_builder',
+  'feature_menu_editor',
+  'feature_employee_management',
+  'feature_messaging_notifications',
+  'feature_rewards_system',
+  'feature_word_search',
+  'feature_guides_training',
+  'feature_announcements_events',
+] as const;
 
-const TIER_COLORS: Record<SubscriptionTier, string> = {
-  trial: '#4A90D9',
-  base: '#5B8C5A',
-  premium: '#D4A843',
-  expired: '#CC4444',
-  none: '#888888',
-};
+// Fixed hues (mockup --gold / --azure / --bad / --ok), stepped for the light theme.
+const GOLD = { dark: '#F59E0B', light: '#B45309' };
+const AZURE = { dark: '#3B82F6', light: '#2563EB' };
+const RED = { dark: '#EF4444', light: '#DC2626' };
+const EMERALD = { dark: '#10A56F', light: '#087A52' };
+const GOLD_INK = '#1A1200';
+const PREMIUM_GRADIENT = ['#B45309', '#F59E0B'] as const;
+const TRIAL_LENGTH_DAYS = 14;
+
+const MARK_SIZE = 17;
 
 export default function SubscriptionManagementScreen() {
   const router = useRouter();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const colors = useThemeColors();
+  const isDark = useIsDarkTheme();
   const { user } = useAuth();
   const { organization } = useOrganization();
   const {
@@ -66,30 +84,45 @@ export default function SubscriptionManagementScreen() {
     isTrialActive,
     trialDaysRemaining,
     trialEndDate,
-    hasBase,
-    hasPremium,
     refreshSubscription,
   } = useSubscription();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [purchasing, setPurchasing] = useState(false);
+  // Which CTA is mid-flight (null while a restore runs) — drives the spinners.
+  const [pendingProduct, setPendingProduct] = useState<string | null>(null);
+  const [billing, setBilling] = useState<Billing>('monthly');
+
+  const hues = useMemo(
+    () => ({
+      gold: isDark ? GOLD.dark : GOLD.light,
+      azure: isDark ? AZURE.dark : AZURE.light,
+      red: isDark ? RED.dark : RED.light,
+      ok: isDark ? EMERALD.dark : EMERALD.light,
+    }),
+    [isDark],
+  );
+
+  // Yearly product ids slot in here once they exist in RevenueCat; until then
+  // `billing` is always 'monthly' (the capsule is hidden behind SHOW_YEARLY).
+  const productFor = useCallback(
+    (plan: Plan) => (plan === 'base' ? PRODUCTS.BASE_MONTHLY : PRODUCTS.PREMIUM_MONTHLY),
+    [],
+  );
 
   const handlePurchase = useCallback(async (productId: string) => {
     if (!REVENUECAT_CONFIGURED) {
-      Alert.alert(
-        'Setup Required',
-        'In-app purchases are not configured yet. This will be available when the app is published to the App Store.',
-      );
+      Alert.alert(t('subscription.setup_required_title'), t('subscription.setup_required_msg'));
       return;
     }
 
     setPurchasing(true);
+    setPendingProduct(productId);
     try {
       const Purchases = (await import('react-native-purchases')).default;
       const offerings = await Purchases.getOfferings();
 
       if (!offerings.current) {
-        Alert.alert('Error', 'No subscription plans are currently available. Please try again later.');
-        setPurchasing(false);
+        Alert.alert(t('common.error'), t('subscription.no_plans'));
         return;
       }
 
@@ -98,44 +131,48 @@ export default function SubscriptionManagementScreen() {
       );
 
       if (!pkg) {
-        Alert.alert('Error', 'The selected plan is not available. Please try again later.');
-        setPurchasing(false);
+        Alert.alert(t('common.error'), t('subscription.plan_unavailable'));
         return;
       }
 
       await Purchases.purchasePackage(pkg);
       await refreshSubscription();
 
-      Alert.alert('Success', 'Your subscription has been activated. Thank you!');
+      Alert.alert(t('common.success'), t('subscription.purchase_success'));
     } catch (err: any) {
       if (err.userCancelled) {
         // User cancelled — no alert needed
       } else {
-        Alert.alert('Purchase Error', translateServerError(err, 'Something went wrong. Please try again.'));
+        Alert.alert(
+          t('subscription.purchase_error_title'),
+          translateServerError(err, t('subscription.purchase_error')),
+        );
       }
     } finally {
       setPurchasing(false);
+      setPendingProduct(null);
     }
-  }, [refreshSubscription]);
+  }, [refreshSubscription, t]);
 
   const handleRestore = useCallback(async () => {
     if (!REVENUECAT_CONFIGURED) {
-      Alert.alert('Setup Required', 'In-app purchases are not configured yet.');
+      Alert.alert(t('subscription.setup_required_title'), t('subscription.setup_required_short'));
       return;
     }
 
     setPurchasing(true);
+    setPendingProduct(null);
     try {
       const Purchases = (await import('react-native-purchases')).default;
       await Purchases.restorePurchases();
       await refreshSubscription();
-      Alert.alert('Restored', 'Your purchases have been restored.');
+      Alert.alert(t('subscription.restored_title'), t('subscription.restored_msg'));
     } catch (err: any) {
-      Alert.alert('Error', translateServerError(err, 'Could not restore purchases.'));
+      Alert.alert(t('common.error'), translateServerError(err, t('subscription.restore_error')));
     } finally {
       setPurchasing(false);
     }
-  }, [refreshSubscription]);
+  }, [refreshSubscription, t]);
 
   const handleManageSubscription = useCallback(async () => {
     const url = Platform.OS === 'ios'
@@ -145,469 +182,436 @@ export default function SubscriptionManagementScreen() {
     try {
       await Linking.openURL(url);
     } catch {
-      Alert.alert('Error', 'Could not open subscription settings.');
+      Alert.alert(t('common.error'), t('subscription.manage_error'));
     }
-  }, []);
+  }, [t]);
 
   // Owner-only gate — must sit BELOW every hook so both roles run the same count.
   if (user?.role !== 'owner') {
     return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <Text style={[styles.sectionTitle, { textAlign: 'center' }]}>
-          {t('subscription:owner_only')}
-        </Text>
-        <TouchableOpacity style={styles.primaryButton} onPress={() => router.back()}>
-          <Text style={styles.primaryButtonText}>{t('subscription:go_back')}</Text>
-        </TouchableOpacity>
+      <View style={styles.root}>
+        <AmbientGlow />
+        <ScreenHeader title={t('subscription.title')} />
+        <View style={styles.gateWrap}>
+          <GlassCard radius={16} style={styles.gateCard}>
+            <IconSymbol ios_icon_name="lock.fill" android_material_icon_name="lock" size={22} color={colors.tint} />
+            <Text style={styles.gateText}>{t('subscription.owner_only')}</Text>
+            <TouchableOpacity style={styles.glassBtn} onPress={() => router.back()} activeOpacity={0.8}>
+              <Text style={styles.glassBtnLabel}>{t('subscription.go_back')}</Text>
+            </TouchableOpacity>
+          </GlassCard>
+        </View>
       </View>
     );
   }
 
-  const tierColor = TIER_COLORS[tier];
+  // ── Current-plan strip state ─────────────────────────────────────────────
+  const isPaid = tier === 'base' || tier === 'premium';
+  const tierHue =
+    tier === 'trial' ? hues.azure
+    : tier === 'expired' ? hues.red
+    : tier === 'none' ? colors.textSecondary
+    : hues.gold;
+  const tierInk = isPaid ? GOLD_INK : '#FFFFFF';
+  const tierLabel = t(`subscription.tier_${tier}`);
+  const stripTinted = tier !== 'none';
+
+  const dateLocale = i18n.language?.startsWith('es') ? 'es-ES' : 'en-US';
   const trialEndFormatted = trialEndDate
-    ? trialEndDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    ? trialEndDate.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' })
     : '';
+  const trialElapsedPct = Math.max(
+    5,
+    Math.min(100, ((TRIAL_LENGTH_DAYS - trialDaysRemaining) / TRIAL_LENGTH_DAYS) * 100),
+  );
+
+  const priceBase = t('subscription.price_base');
+  const pricePremium = t('subscription.price_premium');
+  const perMonth = t('subscription.per_month');
+
+  let planLine: string;
+  if (isTrialActive) {
+    planLine = t('subscription.days_left', { count: trialDaysRemaining, date: trialEndFormatted });
+  } else if (tier === 'expired') {
+    planLine = t('subscription.expired_warning');
+  } else if (tier === 'none') {
+    planLine = t('subscription.none_line');
+  } else {
+    planLine = t('subscription.paid_line', { price: tier === 'premium' ? pricePremium : priceBase });
+  }
+
+  // ── CTA labels by real state ─────────────────────────────────────────────
+  const baseLabel =
+    tier === 'base' ? t('subscription.current_plan')
+    : tier === 'premium' ? t('subscription.switch_to_base')
+    : `${t('subscription.plan_base')} · ${priceBase}`;
+  const premiumLabel =
+    tier === 'premium' ? t('subscription.current_plan')
+    : tier === 'base' ? t('subscription.upgrade_premium')
+    : `${t('subscription.plan_premium')} · ${pricePremium}`;
+  const baseProduct = productFor('base');
+  const premiumProduct = productFor('premium');
+  const baseBusy = purchasing && pendingProduct === baseProduct;
+  const premiumBusy = purchasing && pendingProduct === premiumProduct;
+  const restoreBusy = purchasing && pendingProduct === null;
+
+  const storeName = Platform.OS === 'ios' ? t('subscription.store_ios') : t('subscription.store_android');
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <IconSymbol
-            ios_icon_name="chevron.left"
-            android_material_icon_name="arrow-back"
-            size={24}
-            color={colors.primary}
-          />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Subscription</Text>
-        <View style={{ width: 40 }} />
-      </View>
+    <View style={styles.root}>
+      <AmbientGlow />
+      <ScreenHeader title={t('subscription.title')} />
 
-      {/* Current Plan Card */}
-      <View style={[styles.currentPlanCard, { borderColor: tierColor }]}>
-        <View style={styles.currentPlanHeader}>
-          <View style={[styles.tierBadge, { backgroundColor: tierColor }]}>
-            <Text style={styles.tierBadgeText}>{TIER_LABELS[tier]}</Text>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Current plan strip */}
+        <GlassCard
+          radius={16}
+          style={[styles.planCard, stripTinted && { borderColor: hexToRgba(tierHue, 0.34) }]}
+        >
+          {stripTinted && (
+            <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: hexToRgba(tierHue, 0.09) }]} />
+          )}
+          <View style={styles.planBody}>
+            <View style={[styles.tierPill, { backgroundColor: tierHue }]}>
+              <Text style={[styles.tierPillText, { color: tierInk }]}>{tierLabel}</Text>
+            </View>
+            <Text style={styles.orgName} numberOfLines={1}>{organization.name}</Text>
+            {tier === 'expired' ? (
+              <View style={styles.expiredRow}>
+                <IconSymbol
+                  ios_icon_name="exclamationmark.triangle.fill"
+                  android_material_icon_name="warning"
+                  size={14}
+                  color={hues.red}
+                />
+                <Text style={[styles.planLine, { color: hues.red, flex: 1 }]}>{planLine}</Text>
+              </View>
+            ) : (
+              <Text style={styles.planLine}>{planLine}</Text>
+            )}
+            {isTrialActive && (
+              <View style={styles.meter}>
+                <View style={[styles.meterFill, { width: `${trialElapsedPct}%`, backgroundColor: hues.azure }]} />
+              </View>
+            )}
           </View>
-          {tier === 'base' || tier === 'premium' ? (
-            <TouchableOpacity onPress={handleManageSubscription}>
-              <Text style={[styles.manageLink, { color: colors.primary }]}>Manage</Text>
+          {isPaid && (
+            <TouchableOpacity style={styles.manageChip} onPress={handleManageSubscription} activeOpacity={0.8}>
+              <Text style={styles.manageLabel}>{t('subscription.manage')}</Text>
             </TouchableOpacity>
-          ) : null}
-        </View>
+          )}
+        </GlassCard>
 
-        <Text style={styles.currentPlanName}>{organization.name}</Text>
+        {/* Monthly | Yearly — hidden until the yearly products exist */}
+        {SHOW_YEARLY && (
+          <SegControl<Billing>
+            options={[
+              { key: 'monthly', label: t('subscription.monthly') },
+              { key: 'yearly', label: `${t('subscription.yearly')} · ${t('subscription.yearly_save')}` },
+            ]}
+            value={billing}
+            onChange={setBilling}
+          />
+        )}
 
-        {isTrialActive && (
-          <View style={styles.trialInfo}>
-            <View style={styles.trialProgressContainer}>
-              <View
-                style={[
-                  styles.trialProgressBar,
-                  {
-                    backgroundColor: tierColor,
-                    width: `${Math.max(5, ((14 - trialDaysRemaining) / 14) * 100)}%`,
-                  },
-                ]}
-              />
+        {/* Feature matrix */}
+        <GlassCard radius={16} style={styles.matrix}>
+          <View style={[styles.mxRow, styles.mxHead]}>
+            <Text style={styles.eyebrow} numberOfLines={1}>{t('subscription.whats_included')}</Text>
+            <View style={styles.colBase}>
+              <Text style={styles.colHead}>{t('subscription.plan_base')}</Text>
+              <Text style={styles.colSub}>{priceBase} {perMonth}</Text>
             </View>
-            <Text style={styles.trialText}>
-              {trialDaysRemaining} {trialDaysRemaining === 1 ? 'day' : 'days'} remaining
-            </Text>
-            <Text style={styles.trialSubtext}>
-              Trial ends {trialEndFormatted}
-            </Text>
+            <View style={styles.colPrem}>
+              <Text style={[styles.colHead, { color: hues.gold }]}>{t('subscription.plan_premium')}</Text>
+              <Text style={styles.colSub}>{pricePremium} {perMonth}</Text>
+            </View>
           </View>
-        )}
 
-        {tier === 'expired' && (
-          <View style={styles.expiredInfo}>
-            <IconSymbol
-              ios_icon_name="exclamationmark.triangle.fill"
-              android_material_icon_name="warning"
-              size={20}
-              color={TIER_COLORS.expired}
-            />
-            <Text style={styles.expiredText}>
-              Your free trial has ended. Choose a plan to continue using all features.
-            </Text>
-          </View>
-        )}
-      </View>
-
-      {/* Plan Comparison */}
-      <Text style={styles.sectionTitle}>Choose Your Plan</Text>
-
-      {/* Base Plan Card */}
-      <View style={[
-        styles.planCard,
-        tier === 'base' && { borderColor: TIER_COLORS.base, borderWidth: 2 },
-      ]}>
-        <View style={styles.planHeader}>
-          <Text style={styles.planName}>Base</Text>
-          <View style={styles.priceRow}>
-            <Text style={styles.priceAmount}>$11</Text>
-            <Text style={styles.pricePeriod}>/month</Text>
-          </View>
-        </View>
-
-        {tier === 'base' && (
-          <View style={[styles.currentBadge, { backgroundColor: TIER_COLORS.base }]}>
-            <Text style={styles.currentBadgeText}>Current Plan</Text>
-          </View>
-        )}
-
-        <View style={styles.featureList}>
-          {BASE_FEATURES.map((feature) => (
-            <View key={feature} style={styles.featureRow}>
-              <IconSymbol
-                ios_icon_name="checkmark.circle.fill"
-                android_material_icon_name="check-circle"
-                size={18}
-                color={TIER_COLORS.base}
-              />
-              <Text style={styles.featureText}>{feature}</Text>
+          {PREMIUM_FEATURE_KEYS.map((key) => (
+            <View key={key} style={[styles.mxRow, styles.mxRowLine, { backgroundColor: hexToRgba(hues.gold, 0.05) }]}>
+              <Text style={styles.mxLabel}>{t(`subscription.${key}`)}</Text>
+              <View style={styles.colBase}>
+                <Mark kind="no" hue={colors.textSecondary} fill={colors.glass} />
+              </View>
+              <View style={styles.colPrem}>
+                <Mark kind="ok" hue={hues.gold} fill={hexToRgba(hues.gold, 0.2)} />
+              </View>
             </View>
           ))}
-          {PREMIUM_FEATURES.map((feature) => (
-            <View key={feature} style={styles.featureRow}>
-              <IconSymbol
-                ios_icon_name="xmark.circle"
-                android_material_icon_name="cancel"
-                size={18}
-                color={colors.textSecondary}
-              />
-              <Text style={[styles.featureText, styles.featureDisabled]}>{feature}</Text>
+
+          {BASE_FEATURE_KEYS.map((key) => (
+            <View key={key} style={[styles.mxRow, styles.mxRowLine]}>
+              <Text style={styles.mxLabel}>{t(`subscription.${key}`)}</Text>
+              <View style={styles.colBase}>
+                <Mark kind="ok" hue={hues.ok} fill={hexToRgba(hues.ok, 0.18)} />
+              </View>
+              <View style={styles.colPrem}>
+                <Mark kind="ok" hue={hues.ok} fill={hexToRgba(hues.ok, 0.18)} />
+              </View>
             </View>
           ))}
-        </View>
+        </GlassCard>
 
-        {tier !== 'base' && (
+        {/* CTAs under the columns */}
+        <View style={styles.btnRow}>
           <TouchableOpacity
-            style={[styles.planButton, { backgroundColor: TIER_COLORS.base }]}
-            onPress={() => handlePurchase(PRODUCTS.BASE_MONTHLY)}
-            disabled={purchasing}
+            style={[styles.glassBtn, styles.btnFlex, (purchasing || tier === 'base') && styles.btnDim]}
+            onPress={() => handlePurchase(baseProduct)}
+            disabled={purchasing || tier === 'base'}
+            activeOpacity={0.8}
           >
-            {purchasing ? (
-              <ActivityIndicator color="#FFFFFF" />
+            {baseBusy ? (
+              <ActivityIndicator color={colors.text} />
             ) : (
-              <Text style={styles.planButtonText}>
-                {tier === 'premium' ? 'Switch to Base' : 'Subscribe — $11/mo'}
-              </Text>
+              <Text style={styles.glassBtnLabel} numberOfLines={1}>{baseLabel}</Text>
             )}
           </TouchableOpacity>
-        )}
-      </View>
-
-      {/* Premium Plan Card */}
-      <View style={[
-        styles.planCard,
-        styles.premiumCard,
-        tier === 'premium' && { borderColor: TIER_COLORS.premium, borderWidth: 2 },
-      ]}>
-        <View style={styles.bestValueBadge}>
-          <Text style={styles.bestValueText}>BEST VALUE</Text>
+          <ShineButton
+            style={styles.btnFlex}
+            label={premiumLabel}
+            gradient={PREMIUM_GRADIENT}
+            // The star is dropped on the long "Upgrade to Premium" label so it fits the half-width.
+            iosIcon={tier === 'base' ? undefined : 'star.fill'}
+            androidIcon={tier === 'base' ? undefined : 'star'}
+            onPress={() => handlePurchase(premiumProduct)}
+            disabled={purchasing || tier === 'premium'}
+            loading={premiumBusy}
+          />
         </View>
 
-        <View style={styles.planHeader}>
-          <Text style={styles.planName}>Premium</Text>
-          <View style={styles.priceRow}>
-            <Text style={styles.priceAmount}>$15</Text>
-            <Text style={styles.pricePeriod}>/month</Text>
-          </View>
-        </View>
+        {/* Restore purchases */}
+        <TouchableOpacity style={styles.restore} onPress={handleRestore} disabled={purchasing} activeOpacity={0.7}>
+          {restoreBusy ? (
+            <ActivityIndicator size="small" color={colors.tint} />
+          ) : (
+            <IconSymbol ios_icon_name="arrow.clockwise" android_material_icon_name="refresh" size={14} color={colors.tint} />
+          )}
+          <Text style={styles.restoreLabel}>{t('subscription.restore')}</Text>
+        </TouchableOpacity>
 
-        {tier === 'premium' && (
-          <View style={[styles.currentBadge, { backgroundColor: TIER_COLORS.premium }]}>
-            <Text style={styles.currentBadgeText}>Current Plan</Text>
-          </View>
-        )}
-
-        <View style={styles.featureList}>
-          {BASE_FEATURES.map((feature) => (
-            <View key={feature} style={styles.featureRow}>
-              <IconSymbol
-                ios_icon_name="checkmark.circle.fill"
-                android_material_icon_name="check-circle"
-                size={18}
-                color={TIER_COLORS.premium}
-              />
-              <Text style={styles.featureText}>{feature}</Text>
-            </View>
-          ))}
-          {PREMIUM_FEATURES.map((feature) => (
-            <View key={feature} style={styles.featureRow}>
-              <IconSymbol
-                ios_icon_name="checkmark.circle.fill"
-                android_material_icon_name="check-circle"
-                size={18}
-                color={TIER_COLORS.premium}
-              />
-              <Text style={[styles.featureText, { fontWeight: '600' }]}>{feature}</Text>
-            </View>
-          ))}
-        </View>
-
-        {tier !== 'premium' && (
-          <TouchableOpacity
-            style={[styles.planButton, { backgroundColor: TIER_COLORS.premium }]}
-            onPress={() => handlePurchase(PRODUCTS.PREMIUM_MONTHLY)}
-            disabled={purchasing}
-          >
-            {purchasing ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text style={styles.planButtonText}>
-                {isTrialActive ? 'Subscribe — $15/mo' :
-                 tier === 'base' ? 'Upgrade to Premium' : 'Subscribe — $15/mo'}
-              </Text>
-            )}
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* Restore Purchases */}
-      <TouchableOpacity
-        style={styles.restoreButton}
-        onPress={handleRestore}
-        disabled={purchasing}
-      >
-        <Text style={[styles.restoreText, { color: colors.primary }]}>
-          Restore Purchases
-        </Text>
-      </TouchableOpacity>
-
-      {/* Footer */}
-      <Text style={styles.footerText}>
-        Subscriptions renew monthly. You can cancel anytime from your{' '}
-        {Platform.OS === 'ios' ? 'App Store' : 'Google Play'} subscription settings.
-      </Text>
-
-      <View style={{ height: 40 }} />
-    </ScrollView>
+        {/* Footer */}
+        <Text style={styles.footer}>{t('subscription.footer', { store: storeName })}</Text>
+      </ScrollView>
+    </View>
   );
 }
 
-function createStyles(colors: ReturnType<typeof useThemeColors>) {
+/** The 17pt check / X circle in a matrix cell. */
+function Mark({ kind, hue, fill }: { kind: 'ok' | 'no'; hue: string; fill: string }) {
+  return (
+    <View style={[markStyles.circle, { backgroundColor: fill }]}>
+      {kind === 'ok' ? (
+        <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={11} color={hue} />
+      ) : (
+        <IconSymbol ios_icon_name="xmark" android_material_icon_name="close" size={11} color={hue} />
+      )}
+    </View>
+  );
+}
+
+const markStyles = StyleSheet.create({
+  circle: {
+    width: MARK_SIZE,
+    height: MARK_SIZE,
+    borderRadius: MARK_SIZE / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});
+
+function createStyles(colors: ThemeColorSet) {
   return StyleSheet.create({
-    container: {
+    root: {
       flex: 1,
       backgroundColor: colors.background,
     },
     content: {
-      padding: 16,
-      paddingTop: Platform.OS === 'ios' ? 60 : 16,
+      paddingHorizontal: 16,
+      paddingBottom: 40,
+      gap: 12,
     },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: 24,
-    },
-    backButton: {
-      width: 40,
-      height: 40,
+
+    // Owner gate
+    gateWrap: {
+      flex: 1,
       justifyContent: 'center',
+      paddingHorizontal: 16,
+      paddingBottom: 60,
     },
-    headerTitle: {
-      fontSize: 20,
-      fontWeight: '700',
-      color: colors.text,
-    },
-    currentPlanCard: {
-      backgroundColor: colors.card,
-      borderRadius: 16,
+    gateCard: {
       padding: 20,
-      marginBottom: 24,
-      borderWidth: 2,
-    },
-    currentPlanHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: 8,
+      gap: 12,
     },
-    tierBadge: {
-      paddingHorizontal: 12,
-      paddingVertical: 4,
-      borderRadius: 12,
-    },
-    tierBadgeText: {
-      color: '#FFFFFF',
-      fontSize: 13,
-      fontWeight: '700',
-    },
-    manageLink: {
-      fontSize: 14,
-      fontWeight: '600',
-    },
-    currentPlanName: {
-      fontSize: 18,
-      fontWeight: '600',
-      color: colors.text,
-      marginBottom: 12,
-    },
-    trialInfo: {
-      marginTop: 4,
-    },
-    trialProgressContainer: {
-      height: 6,
-      backgroundColor: colors.border,
-      borderRadius: 3,
-      overflow: 'hidden',
-      marginBottom: 8,
-    },
-    trialProgressBar: {
-      height: '100%',
-      borderRadius: 3,
-    },
-    trialText: {
+    gateText: {
+      fontFamily: fonts.display.semibold,
       fontSize: 15,
-      fontWeight: '600',
+      lineHeight: 21,
       color: colors.text,
+      textAlign: 'center',
     },
-    trialSubtext: {
-      fontSize: 13,
+
+    // Current plan strip
+    planCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingVertical: 12,
+      paddingHorizontal: 13,
+    },
+    planBody: { flex: 1, minWidth: 0 },
+    tierPill: {
+      alignSelf: 'flex-start',
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 7,
+    },
+    tierPillText: {
+      fontFamily: fonts.mono.semibold,
+      fontSize: 9,
+      letterSpacing: 1.3,
+      textTransform: 'uppercase',
+    },
+    orgName: {
+      fontFamily: fonts.display.bold,
+      fontSize: 16,
+      color: colors.text,
+      marginTop: 3,
+    },
+    planLine: {
+      fontFamily: fonts.body.regular,
+      fontSize: 11.5,
+      lineHeight: 15,
       color: colors.textSecondary,
+      marginTop: 1,
+    },
+    expiredRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 6,
       marginTop: 2,
     },
-    expiredInfo: {
+    meter: {
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: colors.glassBorder,
+      overflow: 'hidden',
+      marginTop: 7,
+    },
+    meterFill: {
+      height: '100%',
+      borderRadius: 2,
+    },
+    manageChip: {
+      height: 30,
+      paddingHorizontal: 10,
+      borderRadius: 9,
+      backgroundColor: colors.glass,
+      borderWidth: StyleSheet.hairlineWidth + 0.5,
+      borderColor: colors.glassBorder,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    manageLabel: {
+      fontFamily: fonts.body.semibold,
+      fontSize: 12,
+      color: colors.text,
+    },
+
+    // Feature matrix
+    matrix: {
+      padding: 0,
+    },
+    mxRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 8,
-      marginTop: 4,
+      paddingVertical: 7,
+      paddingHorizontal: 12,
     },
-    expiredText: {
+    mxRowLine: {
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.hairline,
+    },
+    mxHead: {
+      paddingVertical: 10,
+      backgroundColor: colors.glass,
+    },
+    eyebrow: {
       flex: 1,
-      fontSize: 14,
-      color: TIER_COLORS.expired,
-      lineHeight: 20,
-    },
-    sectionTitle: {
-      fontSize: 18,
-      fontWeight: '700',
-      color: colors.text,
-      marginBottom: 16,
-    },
-    planCard: {
-      backgroundColor: colors.card,
-      borderRadius: 16,
-      padding: 20,
-      marginBottom: 16,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    premiumCard: {
-      position: 'relative',
-      overflow: 'visible',
-    },
-    bestValueBadge: {
-      position: 'absolute',
-      top: -10,
-      right: 16,
-      backgroundColor: TIER_COLORS.premium,
-      paddingHorizontal: 10,
-      paddingVertical: 3,
-      borderRadius: 8,
-      zIndex: 1,
-    },
-    bestValueText: {
-      color: '#FFFFFF',
-      fontSize: 11,
-      fontWeight: '800',
-      letterSpacing: 1,
-    },
-    planHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 16,
-    },
-    planName: {
-      fontSize: 22,
-      fontWeight: '700',
-      color: colors.text,
-    },
-    priceRow: {
-      flexDirection: 'row',
-      alignItems: 'baseline',
-    },
-    priceAmount: {
-      fontSize: 28,
-      fontWeight: '800',
-      color: colors.text,
-    },
-    pricePeriod: {
-      fontSize: 14,
+      fontFamily: fonts.mono.semibold,
+      fontSize: 9,
+      letterSpacing: 1.2,
+      textTransform: 'uppercase',
       color: colors.textSecondary,
-      marginLeft: 2,
     },
-    currentBadge: {
-      alignSelf: 'flex-start',
-      paddingHorizontal: 10,
-      paddingVertical: 3,
-      borderRadius: 8,
-      marginBottom: 12,
-    },
-    currentBadgeText: {
-      color: '#FFFFFF',
-      fontSize: 12,
-      fontWeight: '700',
-    },
-    featureList: {
-      marginBottom: 16,
-    },
-    featureRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-      paddingVertical: 5,
-    },
-    featureText: {
+    colBase: { width: 66, alignItems: 'center' },
+    colPrem: { width: 74, alignItems: 'center' },
+    colHead: {
+      fontFamily: fonts.display.bold,
       fontSize: 14,
       color: colors.text,
+      textAlign: 'center',
     },
-    featureDisabled: {
-      color: colors.textSecondary,
-      textDecorationLine: 'line-through',
-    },
-    planButton: {
-      paddingVertical: 14,
-      borderRadius: 12,
-      alignItems: 'center',
-    },
-    planButtonText: {
-      color: '#FFFFFF',
-      fontSize: 16,
-      fontWeight: '700',
-    },
-    restoreButton: {
-      alignItems: 'center',
-      paddingVertical: 16,
-    },
-    restoreText: {
-      fontSize: 15,
-      fontWeight: '600',
-    },
-    footerText: {
-      fontSize: 12,
+    colSub: {
+      fontFamily: fonts.mono.semibold,
+      fontSize: 9.5,
       color: colors.textSecondary,
       textAlign: 'center',
-      lineHeight: 18,
-      paddingHorizontal: 20,
     },
-    primaryButton: {
-      backgroundColor: colors.primary,
-      paddingVertical: 14,
-      paddingHorizontal: 28,
-      borderRadius: 12,
+    mxLabel: {
+      flex: 1,
+      fontFamily: fonts.body.regular,
+      fontSize: 12.5,
+      color: colors.text,
+      paddingRight: 6,
+    },
+
+    // CTAs
+    btnRow: {
+      flexDirection: 'row',
+      gap: 10,
+      marginTop: 2,
+    },
+    btnFlex: { flex: 1 },
+    glassBtn: {
+      minHeight: 50,
+      borderRadius: 13,
+      paddingHorizontal: 12,
+      backgroundColor: colors.glass,
+      borderWidth: StyleSheet.hairlineWidth + 0.5,
+      borderColor: colors.glassBorder,
       alignItems: 'center',
+      justifyContent: 'center',
     },
-    primaryButtonText: {
-      color: colors.fireText,
-      fontSize: 16,
-      fontWeight: '700',
+    glassBtnLabel: {
+      fontFamily: fonts.body.semibold,
+      fontSize: 14,
+      color: colors.text,
+    },
+    btnDim: { opacity: 0.55 },
+
+    // Restore + footer
+    restore: {
+      alignSelf: 'center',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      paddingVertical: 6,
+      paddingHorizontal: 8,
+    },
+    restoreLabel: {
+      fontFamily: fonts.body.semibold,
+      fontSize: 13,
+      color: colors.tint,
+    },
+    footer: {
+      fontFamily: fonts.body.regular,
+      fontSize: 11,
+      lineHeight: 15,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      paddingHorizontal: 12,
     },
   });
 }

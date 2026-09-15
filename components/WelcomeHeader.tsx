@@ -26,6 +26,8 @@ interface WeatherInfo {
 interface WelcomeHeaderProps {
   onWeatherPress: () => void;
   onNotificationPress: () => void;
+  /** s84: the Profile hub passes this so the avatar flips to My Info instead of navigating. */
+  onProfilePress?: () => void;
   notificationCount?: number;
   newContentCount?: number;
   weather?: WeatherInfo | null;
@@ -39,6 +41,7 @@ export default function WelcomeHeader({
   notificationCount = 0,
   newContentCount = 0,
   weather: externalWeather,
+  onProfilePress,
 }: WelcomeHeaderProps) {
   const colors = useThemeColors();
   const { user } = useAuth();
@@ -104,6 +107,10 @@ export default function WelcomeHeader({
   const profilePictureUrl = getProfilePictureUrl(user?.profilePictureUrl);
 
   const handleProfilePress = () => {
+    if (onProfilePress) {
+      onProfilePress();
+      return;
+    }
     if (user?.role === 'manager' || user?.role === 'owner') {
       router.push('/(portal)/manager/profile' as any);
     } else {

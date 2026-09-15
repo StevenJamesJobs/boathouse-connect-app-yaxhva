@@ -2916,6 +2916,7 @@ export type Database = {
           profile_picture_url: string | null
           quick_tools: Json | null
           role: string
+          tagline: string | null
           updated_at: string | null
           username: string
         }
@@ -2962,6 +2963,7 @@ export type Database = {
           profile_picture_url?: string | null
           quick_tools?: Json | null
           role?: string
+          tagline?: string | null
           updated_at?: string | null
           username?: string
         }
@@ -4337,6 +4339,7 @@ export type Database = {
           name: string
           profile_picture_url: string
           role: string
+          tagline: string | null
           username: string
         }[]
       }
@@ -6191,6 +6194,7 @@ export type Database = {
           new_email: string
           new_phone_number: string
           p_organization_id?: string
+          p_tagline?: string
           user_id: string
         }
         Returns: undefined

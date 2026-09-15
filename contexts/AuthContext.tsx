@@ -85,7 +85,10 @@ function mapRowToUser(row: any): User {
     profilePictureUrl: row.profile_picture_url || undefined,
     badgeTitle: row.badge_title || undefined,
     mcloonesBucks: row.mcloones_bucks || 0,
-    quickTools: row.quick_tools ? (Array.isArray(row.quick_tools) ? row.quick_tools : JSON.parse(row.quick_tools)) : undefined,
+    // s84: v1 = an array of ids, v2 = { v: 2, tiles: [...] }; a string is either, JSON-encoded.
+    quickTools: row.quick_tools
+      ? (typeof row.quick_tools === 'string' ? (() => { try { return JSON.parse(row.quick_tools); } catch { return undefined; } })() : row.quick_tools)
+      : undefined,
     forcePasswordChange: row.force_password_change || false,
   };
 }

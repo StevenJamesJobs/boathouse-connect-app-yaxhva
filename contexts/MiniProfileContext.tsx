@@ -52,6 +52,8 @@ interface MiniProfileData {
   profile_picture_url: string | null;
   mcloones_bucks: number | null;
   role: string | null;
+  /** s84: the user's one-liner (users.tagline, ≤60) — get_user_card returns it. */
+  tagline?: string | null;
 }
 
 interface MiniProfileContextValue {
@@ -271,6 +273,11 @@ export function MiniProfileProvider({ children }: { children: React.ReactNode })
                           {jobTitleLine}
                         </Text>
                       )}
+                      {!!data.tagline && (
+                        <Text style={[styles.tagline, { color: colors.text }]} numberOfLines={2}>
+                          “{data.tagline}”
+                        </Text>
+                      )}
                     </View>
                   </View>
 
@@ -417,6 +424,13 @@ const makeStyles = (colors: ThemeColorSet) =>
       fontFamily: fonts.body.medium,
       fontSize: 13,
       marginTop: 4,
+    },
+    tagline: {
+      fontFamily: fonts.body.regular,
+      fontStyle: 'italic',
+      fontSize: 12.5,
+      lineHeight: 17,
+      marginTop: 5,
     },
     stats: {
       marginTop: 16,

@@ -44,7 +44,7 @@ export default function ManagerLayout() {
   // transparent spacer + transparent scenes let it read continuously.
   const lastSeg = segments[segments.length - 1] as string;
   // Tools joined the glass wave in s79 — only Profile still paints its own bg.
-  const showAmbient = lastSeg !== 'profile';
+  const showAmbient = true; // s84: every manager tab, the Profile hub included, is a glass page
 
   // Role guard: the manager shell (incl. Manage) is for managers/owners only.
   // An employee who reaches a /(portal)/manager URL — deep link, stale route,

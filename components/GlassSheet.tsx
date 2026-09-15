@@ -94,6 +94,11 @@ interface GlassSheetProps {
   /** Pinned under the scroll body — button rows that must never scroll away. */
   footer?: React.ReactNode;
   /**
+   * Hold the sheet at its 88% cap and let the body fill it — for a body whose height
+   * changes with a tab (the Favorites editor): the sheet stops breathing as you switch.
+   */
+  fill?: boolean;
+  /**
    * iOS ONLY (RN exposes it nowhere else): fires once the Modal has finished
    * dismissing. A sheet that hands off to another root-level modal or an Alert
    * uses it to sequence the presentation — see GlassActionSheet.
@@ -127,6 +132,7 @@ export default function GlassSheet({
   scroll = true,
   footer,
   onDismiss,
+  fill = false,
 }: GlassSheetProps) {
   const colors = useThemeColors();
   // The sheet is anchored to the bottom edge, so its last row lands under the
@@ -155,7 +161,7 @@ export default function GlassSheet({
           variant="glass"
           radius={26}
           intensity={32}
-          style={[styles.sheet, { paddingBottom: bottomPad }]}
+          style={[styles.sheet, { paddingBottom: bottomPad }, fill && styles.sheetFill]}
         >
           <View style={[styles.grab, { backgroundColor: colors.glassBorder }]} />
           <View style={[styles.titleRow, !!subtitle && styles.titleRowTight]}>
@@ -187,7 +193,7 @@ export default function GlassSheet({
               {children}
             </ScrollView>
           ) : (
-            <View style={styles.body}>{children}</View>
+            <View style={[styles.body, fill && styles.bodyFill]}>{children}</View>
           )}
 
           {footer}
@@ -216,6 +222,8 @@ const styles = StyleSheet.create({
     // sheet's content is taller than the cap, keyboard open included.
     flexShrink: 1,
   },
+  sheetFill: { height: '88%' },
+  bodyFill: { flex: 1 },
   grab: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 10 },
   titleRow: {
     flexDirection: 'row',

@@ -1,403 +1,272 @@
-import React from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import React, { useMemo, useState } from 'react';
+import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
+import AmbientGlow from '@/components/AmbientGlow';
+import ScreenHeader from '@/components/ScreenHeader';
+import { IconSymbol } from '@/components/IconSymbol';
+import { SegControl, type SegOption } from '@/components/content/FormKit';
+import ThemeTile from '@/components/appearance/ThemeTile';
+import ThemePreview from '@/components/appearance/ThemePreview';
+import AccentEditorSheet from '@/components/appearance/AccentEditorSheet';
+import {
+  alpha,
+  HUE_GRADIENT_COLORS,
+  HUE_GRADIENT_LOCATIONS,
+  THEME_LABEL_KEY,
+} from '@/components/appearance/appearanceKit';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useAppTheme } from '@/contexts/ThemeContext';
+import { fonts } from '@/constants/fonts';
 import {
   themePalettes,
   THEME_PALETTE_IDS,
-  ThemePaletteId,
-  ThemeMode,
+  type PresetPaletteId,
+  type ThemeMode,
 } from '@/styles/commonStyles';
-import { IconSymbol } from '@/components/IconSymbol';
+import { hslToHex } from '@/utils/theme/customAccent';
 
+const TILE_TAG: Partial<Record<PresetPaletteId, 'revived' | 'new'>> = {
+  midnight: 'revived',
+  emerald: 'revived',
+  gilded: 'revived',
+  ember: 'new',
+};
+
+const BASE_LABEL_KEY = {
+  graphite: 'appearance:custom_base_graphite',
+  navy: 'appearance:custom_base_navy',
+  espresso: 'appearance:custom_base_espresso',
+  onyx: 'appearance:custom_base_onyx',
+  slate: 'appearance:custom_base_slate',
+  ivory: 'appearance:custom_base_ivory',
+} as const;
+
+/** Pairs of preset ids — one grid row each (flex halves + a 10pt gap). */
+function pairs<T>(items: T[]): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += 2) out.push(items.slice(i, i + 2));
+  return out;
+}
+
+/**
+ * Appearance (mockup AP1): Light / Dark / Auto, the six-theme gallery, the wide
+ * Custom tile (→ the AP2 editor sheet) and the honest preview of the theme in
+ * force. Everything is a device preference held by ThemeContext.
+ */
 export default function AppearanceScreen() {
   const { t } = useTranslation();
   const colors = useThemeColors();
-  const { palette, mode, resolvedMode, setPalette, setMode } = useAppTheme();
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const { palette, mode, resolvedMode, activePalette, customAccent, setPalette, setMode } = useAppTheme();
+  const [editorOpen, setEditorOpen] = useState(false);
 
-  const handleModeToggle = (newMode: ThemeMode) => {
-    setMode(newMode);
-  };
+  const modeOptions = useMemo<SegOption<ThemeMode>[]>(
+    () => [
+      {
+        key: 'light',
+        label: t('appearance.light_mode'),
+        iosIcon: 'sun.max.fill',
+        androidIcon: 'light-mode',
+        activeColor: colors.tint,
+        activeInk: colors.fireText,
+      },
+      {
+        key: 'dark',
+        label: t('appearance.dark_mode'),
+        iosIcon: 'moon.fill',
+        androidIcon: 'dark-mode',
+        activeColor: colors.tint,
+        activeInk: colors.fireText,
+      },
+      {
+        key: 'auto',
+        label: t('appearance.auto_mode'),
+        iosIcon: 'circle.lefthalf.filled',
+        androidIcon: 'brightness-auto',
+        activeColor: colors.tint,
+        activeInk: colors.fireText,
+      },
+    ],
+    [t, colors.tint, colors.fireText],
+  );
 
-  const handlePaletteSelect = (id: ThemePaletteId) => {
-    setPalette(id);
+  const customSelected = palette === 'custom';
+  const customHex = customAccent ? hslToHex(customAccent.hue, 86, 60) : null;
+  const modeLabel = t(resolvedMode === 'dark' ? 'appearance:dark_mode' : 'appearance:light_mode');
+  const previewLabel = `${t(THEME_LABEL_KEY[palette])} · ${modeLabel}`;
+
+  const onCustomTilePress = () => {
+    if (customAccent) {
+      if (!customSelected) setPalette('custom');
+      else setEditorOpen(true);
+    } else {
+      setEditorOpen(true);
+    }
   };
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={[styles.contentContainer, { paddingTop: insets.top + 12 }]}
-    >
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <IconSymbol
-            ios_icon_name="chevron.left"
-            android_material_icon_name="arrow-back"
-            size={24}
-            color={colors.primary}
-          />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
-          {t('appearance.title')}
-        </Text>
-        <View style={styles.headerSpacer} />
-      </View>
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
+      <AmbientGlow />
+      <ScreenHeader title={t('appearance.title')} />
 
-      {/* Light / Dark / Auto Toggle */}
-      <View style={[styles.modeToggleContainer, { backgroundColor: colors.card }]}>
-        <TouchableOpacity
-          style={[
-            styles.modeButton,
-            mode === 'light' && [styles.modeButtonActive, { backgroundColor: colors.primary }],
-          ]}
-          onPress={() => handleModeToggle('light')}
-          activeOpacity={0.7}
-        >
-          <IconSymbol
-            ios_icon_name="sun.max.fill"
-            android_material_icon_name="light-mode"
-            size={20}
-            color={mode === 'light' ? colors.fireText : colors.textSecondary}
-          />
-          <Text
-            style={[
-              styles.modeButtonText,
-              { color: mode === 'light' ? colors.fireText : colors.textSecondary },
-            ]}
-          >
-            {t('appearance.light_mode')}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.modeButton,
-            mode === 'dark' && [styles.modeButtonActive, { backgroundColor: colors.primary }],
-          ]}
-          onPress={() => handleModeToggle('dark')}
-          activeOpacity={0.7}
-        >
-          <IconSymbol
-            ios_icon_name="moon.fill"
-            android_material_icon_name="dark-mode"
-            size={20}
-            color={mode === 'dark' ? colors.fireText : colors.textSecondary}
-          />
-          <Text
-            style={[
-              styles.modeButtonText,
-              { color: mode === 'dark' ? colors.fireText : colors.textSecondary },
-            ]}
-          >
-            {t('appearance.dark_mode')}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.modeButton,
-            mode === 'auto' && [styles.modeButtonActive, { backgroundColor: colors.primary }],
-          ]}
-          onPress={() => handleModeToggle('auto')}
-          activeOpacity={0.7}
-        >
-          <IconSymbol
-            ios_icon_name="circle.lefthalf.filled"
-            android_material_icon_name="brightness-auto"
-            size={20}
-            color={mode === 'auto' ? colors.fireText : colors.textSecondary}
-          />
-          <Text
-            style={[
-              styles.modeButtonText,
-              { color: mode === 'auto' ? colors.fireText : colors.textSecondary },
-            ]}
-          >
-            {t('appearance.auto_mode')}
-          </Text>
-        </TouchableOpacity>
-      </View>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Light / Dark / Auto */}
+        <SegControl options={modeOptions} value={mode} onChange={(m) => setMode(m)} />
 
-      {/* Theme Palette Grid */}
-      <Text style={[styles.sectionTitle, { color: colors.text }]}>
-        {t('appearance.select_theme')}
-      </Text>
+        {/* Theme rule + gallery */}
+        <View style={styles.srule}>
+          <Text style={[styles.eyeb, { color: colors.tint }]}>{t('appearance.select_theme')}</Text>
+          <View style={[styles.ln, { backgroundColor: colors.hairline }]} />
+        </View>
+        <View style={styles.grid}>
+          {pairs(THEME_PALETTE_IDS).map((row) => (
+            <View key={row.join('-')} style={styles.gridRow}>
+              {row.map((id) => (
+                <ThemeTile
+                  key={id}
+                  id={id}
+                  palette={themePalettes[id]}
+                  selected={palette === id}
+                  tag={TILE_TAG[id]}
+                  onPress={() => setPalette(id)}
+                />
+              ))}
+            </View>
+          ))}
 
-      <View style={styles.paletteGrid}>
-        {THEME_PALETTE_IDS.map((id) => {
-          const pal = themePalettes[id];
-          const isSelected = palette === id;
-          const previewColors = pal[resolvedMode];
-
-          return (
-            <TouchableOpacity
-              key={id}
-              style={[
-                styles.paletteCard,
-                { backgroundColor: colors.card },
-                isSelected && { borderColor: colors.primary, borderWidth: 2 },
+          {/* The wide Custom tile */}
+          <View style={styles.customWrap}>
+            <Pressable
+              onPress={onCustomTilePress}
+              accessibilityRole="button"
+              accessibilityState={{ selected: customSelected }}
+              style={({ pressed }) => [
+                styles.custom,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: customSelected ? colors.tint : colors.surfaceBorder,
+                  opacity: pressed ? 0.85 : 1,
+                },
               ]}
-              onPress={() => handlePaletteSelect(id)}
-              activeOpacity={0.7}
             >
-              {/* Color preview bar */}
-              <View style={styles.previewBar}>
-                <View style={[styles.previewSwatch, { backgroundColor: previewColors.primary, flex: 2 }]} />
-                <View style={[styles.previewSwatch, { backgroundColor: previewColors.primaryLight, flex: 1.5 }]} />
-                <View style={[styles.previewSwatch, { backgroundColor: previewColors.highlight, flex: 1 }]} />
-                <View style={[styles.previewSwatch, { backgroundColor: previewColors.background, flex: 1 }]} />
+              {customAccent && customHex ? (
+                <View style={[styles.customSwatch, { backgroundColor: customHex, borderColor: colors.glassBorder }]} />
+              ) : (
+                <LinearGradient
+                  colors={HUE_GRADIENT_COLORS}
+                  locations={HUE_GRADIENT_LOCATIONS}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.ring}
+                >
+                  <View style={[styles.ringInner, { backgroundColor: colors.card }]} />
+                </LinearGradient>
+              )}
+
+              <View style={styles.customBody}>
+                <Text style={[styles.customTitle, { color: colors.text }]} numberOfLines={1}>
+                  {customHex ? `${t('appearance.theme_custom')} · ${customHex}` : t('appearance.theme_custom')}
+                </Text>
+                <Text style={[styles.customSub, { color: colors.textSecondary }]} numberOfLines={1}>
+                  {customAccent ? t(BASE_LABEL_KEY[customAccent.base]) : t('appearance.custom_tile_sub')}
+                </Text>
               </View>
 
-              {/* Mini mockup */}
-              <View style={[styles.miniMockup, { backgroundColor: previewColors.background }]}>
-                <View style={[styles.mockupHeader, { backgroundColor: previewColors.primary }]} />
-                <View style={styles.mockupBody}>
-                  <View style={[styles.mockupCard, { backgroundColor: previewColors.card }]}>
-                    <View style={[styles.mockupLine, { backgroundColor: previewColors.text, width: '60%' }]} />
-                    <View style={[styles.mockupLine, { backgroundColor: previewColors.textSecondary, width: '80%' }]} />
-                  </View>
-                </View>
-              </View>
-
-              {/* Label row */}
-              <View style={styles.paletteLabelRow}>
-                <Text
-                  style={[
-                    styles.paletteName,
-                    { color: colors.text },
-                    isSelected && { color: colors.primary, fontWeight: '700' },
+              {customSelected ? (
+                <Pressable
+                  onPress={() => setEditorOpen(true)}
+                  hitSlop={6}
+                  style={({ pressed }) => [
+                    styles.editChip,
+                    {
+                      backgroundColor: alpha(colors.tint, 0.16),
+                      borderColor: alpha(colors.tint, 0.4),
+                      opacity: pressed ? 0.8 : 1,
+                    },
                   ]}
                 >
-                  {t(`appearance.theme_${id}`)}
-                </Text>
-                {isSelected && (
-                  <IconSymbol
-                    ios_icon_name="checkmark.circle.fill"
-                    android_material_icon_name="check-circle"
-                    size={18}
-                    color={colors.primary}
-                  />
-                )}
-              </View>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+                  <IconSymbol ios_icon_name="pencil" android_material_icon_name="edit" size={13} color={colors.tint} />
+                  <Text style={[styles.editChipText, { color: colors.tint }]}>{t('appearance.custom_edit')}</Text>
+                </Pressable>
+              ) : (
+                <IconSymbol
+                  ios_icon_name="chevron.right"
+                  android_material_icon_name="chevron-right"
+                  size={20}
+                  color={colors.textSecondary}
+                />
+              )}
+            </Pressable>
+            {customSelected && <View pointerEvents="none" style={[styles.ring1, { borderColor: colors.tint }]} />}
+          </View>
+        </View>
 
-      {/* Live Preview Card */}
-      <Text style={[styles.sectionTitle, { color: colors.text }]}>
-        {t('appearance.preview')}
-      </Text>
-      <View style={[styles.livePreview, { backgroundColor: colors.background, borderColor: colors.border }]}>
-        <View style={[styles.previewHeaderBar, { backgroundColor: colors.primary }]}>
-          <Text style={[styles.previewHeaderText, { color: colors.fireText }]}>
-            {t(`appearance.theme_${palette}`)}
+        {/* Preview rule + the honest preview */}
+        <View style={styles.srule}>
+          <Text style={[styles.eyeb, { color: colors.tint }]}>{t('appearance.preview')}</Text>
+          <View style={[styles.ln, { backgroundColor: colors.hairline }]} />
+          <Text style={[styles.eyeb, { color: colors.textSecondary }]} numberOfLines={1}>
+            {previewLabel}
           </Text>
         </View>
-        <View style={styles.previewContent}>
-          <View style={[styles.previewCardItem, { backgroundColor: colors.card }]}>
-            <View style={[styles.previewDot, { backgroundColor: colors.primary }]} />
-            <View style={styles.previewTextBlock}>
-              <Text style={[styles.previewTitle, { color: colors.text }]}>
-                {t('settings.title')}
-              </Text>
-              <Text style={[styles.previewSubtext, { color: colors.textSecondary }]}>
-                {t('settings.appearance_desc')}
-              </Text>
-            </View>
-          </View>
-          <View style={[styles.previewCardItem, { backgroundColor: colors.card }]}>
-            <View style={[styles.previewDot, { backgroundColor: colors.accent }]} />
-            <View style={styles.previewTextBlock}>
-              <Text style={[styles.previewTitle, { color: colors.text }]}>
-                {t('common.messages')}
-              </Text>
-              <Text style={[styles.previewSubtext, { color: colors.textSecondary }]}>
-                {t('profile.no_new_messages')}
-              </Text>
-            </View>
-          </View>
-        </View>
-        <View style={[styles.previewTabBar, { backgroundColor: colors.tabBarBackground }]}>
-          <View style={[styles.previewTabDot, { backgroundColor: colors.tabBarActive }]} />
-          <View style={[styles.previewTabDot, { backgroundColor: colors.tabBarInactive }]} />
-          <View style={[styles.previewTabDot, { backgroundColor: colors.tabBarInactive }]} />
-          <View style={[styles.previewTabDot, { backgroundColor: colors.tabBarInactive }]} />
-        </View>
-      </View>
-    </ScrollView>
+        <ThemePreview palette={activePalette[resolvedMode]} label={previewLabel} />
+      </ScrollView>
+
+      <AccentEditorSheet visible={editorOpen} onClose={() => setEditorOpen(false)} initial={customAccent} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  root: { flex: 1 },
+  scroll: { flex: 1, zIndex: 2 },
+  content: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 40, gap: 12 },
+  srule: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 2, marginBottom: -2 },
+  ln: { flex: 1, height: 1 },
+  eyeb: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 9,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    flexShrink: 1,
   },
-  contentContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 100,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  backButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: 24,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginRight: 40,
-  },
-  headerSpacer: {
-    width: 40,
-  },
-  modeToggleContainer: {
-    flexDirection: 'row',
-    borderRadius: 12,
-    padding: 4,
-    marginBottom: 24,
-    gap: 4,
-  },
-  modeButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 10,
-    gap: 8,
-  },
-  modeButtonActive: {},
-  modeButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 12,
-  },
-  paletteGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 28,
-  },
-  paletteCard: {
-    width: '47%',
+  grid: { gap: 10 },
+  gridRow: { flexDirection: 'row', gap: 10 },
+  customWrap: {},
+  custom: {
     borderRadius: 14,
-    overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.08)',
-    boxShadow: '0px 2px 6px rgba(0,0,0,0.08)',
-    elevation: 2,
-  },
-  previewBar: {
-    flexDirection: 'row',
-    height: 8,
-  },
-  previewSwatch: {
-    height: '100%',
-  },
-  miniMockup: {
-    height: 72,
-    padding: 6,
-  },
-  mockupHeader: {
-    height: 12,
-    borderRadius: 3,
-    marginBottom: 6,
-  },
-  mockupBody: {
-    flex: 1,
-  },
-  mockupCard: {
-    flex: 1,
-    borderRadius: 4,
-    padding: 6,
-    justifyContent: 'center',
-    gap: 4,
-  },
-  mockupLine: {
-    height: 4,
-    borderRadius: 2,
-    opacity: 0.6,
-  },
-  paletteLabelRow: {
+    borderStyle: 'dashed',
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-  },
-  paletteName: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  livePreview: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    borderWidth: 1,
-    marginBottom: 20,
-  },
-  previewHeaderBar: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  previewHeaderText: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  previewContent: {
-    padding: 12,
-    gap: 8,
-  },
-  previewCardItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 10,
-    gap: 10,
-  },
-  previewDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  previewTextBlock: {
-    flex: 1,
-  },
-  previewTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  previewSubtext: {
-    fontSize: 11,
-    marginTop: 2,
-  },
-  previewTabBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
+    gap: 12,
     paddingVertical: 10,
-    paddingHorizontal: 20,
+    paddingHorizontal: 12,
+    minHeight: 58,
   },
-  previewTabDot: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+  ring1: {
+    position: 'absolute',
+    top: -2,
+    left: -2,
+    right: -2,
+    bottom: -2,
+    borderRadius: 16,
+    borderWidth: 1,
   },
+  ring: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  ringInner: { width: 22, height: 22, borderRadius: 11 },
+  customSwatch: { width: 18, height: 18, borderRadius: 9, borderWidth: 1, marginHorizontal: 9 },
+  customBody: { flex: 1, minWidth: 0 },
+  customTitle: { fontFamily: fonts.display.semibold, fontSize: 14 },
+  customSub: { fontFamily: fonts.body.regular, fontSize: 11, marginTop: 1 },
+  editChip: {
+    height: 30,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderWidth: 1,
+  },
+  editChipText: { fontFamily: fonts.body.semibold, fontSize: 12 },
 });
