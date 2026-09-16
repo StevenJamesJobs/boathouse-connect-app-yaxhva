@@ -7,7 +7,7 @@ import React, { useEffect, Component, ErrorInfo, ReactNode } from "react";
 import { useFonts } from "expo-font";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import { SystemBars } from "react-native-edge-to-edge";
+import { SystemBarsSafe } from "@/components/SystemBarsSafe";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Alert, Platform, View, Text, StyleSheet } from "react-native";
 import AnimatedSplash from "@/components/AnimatedSplash";
@@ -310,7 +310,7 @@ function RootLayoutNav() {
                   <Stack.Screen name="paywall" options={{ gestureEnabled: false }} />
                 </Stack>
               </MiniProfileProvider>
-              <SystemBars style="auto" />
+              <SystemBarsSafe style={resolvedMode === 'dark' ? 'light' : 'dark'} />
             </GestureHandlerRootView>
           </NotificationProvider>
         </WidgetProvider>

@@ -8,13 +8,12 @@ import {
   StyleSheet,
   Alert,
   Animated,
-  Platform,
   useWindowDimensions,
   type LayoutChangeEvent,
   type NativeSyntheticEvent,
   type NativeScrollEvent,
 } from 'react-native';
-import { BlurView } from 'expo-blur';
+import GlassBlur from '@/components/GlassBlur';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as WebBrowser from 'expo-web-browser';
 import * as Sharing from 'expo-sharing';
@@ -313,10 +312,9 @@ export default function ContentDetailModal({
       {/* The blur wash — fades in with the scroll so the photo blurs and
           darkens behind the rising title + panel. */}
       <Animated.View style={[StyleSheet.absoluteFill, { opacity: washOpacity }]} pointerEvents="none">
-        <BlurView
+        <GlassBlur
           intensity={55}
           tint="dark"
-          experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined}
           style={StyleSheet.absoluteFill}
         />
         <View style={[StyleSheet.absoluteFill, { backgroundColor: WASH_TINT }]} />
@@ -379,10 +377,9 @@ export default function ContentDetailModal({
       {/* The details panel — its own glass over the (blurred) photo as it
           rises; at rest it sits under the hero on the sheet's ground. */}
       <View style={styles.panel}>
-        <BlurView
+        <GlassBlur
           intensity={28}
           tint={isDark ? 'dark' : 'light'}
-          experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined}
           style={StyleSheet.absoluteFill}
         />
         {!!start && (

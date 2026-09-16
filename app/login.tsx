@@ -31,7 +31,7 @@ const DEFAULT_LOGO = IS_MCLOONES
   : require('@/assets/images/MyRestoPlateOnTopLogo.png');
 
 export default function LoginScreen() {
-  console.log('[iOS Login] Screen mounted, Platform:', Platform.OS);
+  console.log('[Login] Screen mounted, Platform:', Platform.OS);
   const { t } = useTranslation();
 
   const [username, setUsername] = useState('');
@@ -77,7 +77,7 @@ export default function LoginScreen() {
   const formOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    console.log('[iOS Login] Starting animations');
+    console.log('[Login] Starting animations');
     // Animate logo
     Animated.parallel([
       Animated.spring(logoScale, {
@@ -120,7 +120,7 @@ export default function LoginScreen() {
   // portal/paywall before the success screen + trial load.
   useEffect(() => {
     if (pathname === '/login' && isAuthenticated && user) {
-      console.log('[iOS Login] Already authenticated, redirecting to portal');
+      console.log('[Login] Already authenticated, redirecting to portal');
       const timeout = setTimeout(() => {
         try {
           if (user.role === 'manager' || user.role === 'owner') {
@@ -129,7 +129,7 @@ export default function LoginScreen() {
             router.replace('/(portal)/employee');
           }
         } catch (error) {
-          console.error('[iOS Login] Navigation error:', error);
+          console.error('[Login] Navigation error:', error);
         }
       }, 100);
       return () => clearTimeout(timeout);
@@ -137,41 +137,41 @@ export default function LoginScreen() {
   }, [pathname, isAuthenticated, user, router]);
 
   const handleLogin = async () => {
-    console.log('[iOS Login] Login button pressed');
+    console.log('[Login] Login button pressed');
     
     if (!username.trim() || !password.trim()) {
-      console.log('[iOS Login] Empty username or password');
+      console.log('[Login] Empty username or password');
       Alert.alert(t('common.error'), t('login.error_empty_fields'));
       return;
     }
 
-    console.log('[iOS Login] Starting login process for username:', username.trim());
+    console.log('[Login] Starting login process for username:', username.trim());
     setIsLoading(true);
     
     try {
       const success = await login(username.trim(), password, rememberMe);
-      console.log('[iOS Login] Login result:', success);
+      console.log('[Login] Login result:', success);
       
       setIsLoading(false);
 
       if (success) {
-        console.log('[iOS Login] Login successful, navigating to portal');
+        console.log('[Login] Login successful, navigating to portal');
         // Wait a moment for auth state to update, then navigate
         setTimeout(() => {
           try {
             router.replace('/(portal)');
           } catch (navError) {
-            console.error('[iOS Login] Navigation error:', navError);
+            console.error('[Login] Navigation error:', navError);
             // Try alternative navigation
             router.push('/(portal)');
           }
         }, 200);
       } else {
-        console.log('[iOS Login] Login failed - invalid credentials');
+        console.log('[Login] Login failed - invalid credentials');
         Alert.alert(t('login.error_login_failed'), t('login.error_invalid'));
       }
     } catch (error) {
-      console.error('[iOS Login] Login error:', error);
+      console.error('[Login] Login error:', error);
       setIsLoading(false);
       if (error instanceof Error && error.message === 'rate_limited') {
         Alert.alert(t('login.error_login_failed'), t('login.error_rate_limited'));

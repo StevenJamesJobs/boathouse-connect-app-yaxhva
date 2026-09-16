@@ -1,9 +1,9 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform, Animated, LayoutChangeEvent } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, LayoutChangeEvent } from 'react-native';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useAppTheme } from '@/contexts/ThemeContext';
 import { hexToRgba } from '@/styles/commonStyles';
-import { BlurView } from 'expo-blur';
+import GlassBlur from '@/components/GlassBlur';
 import { MessageBadge } from '@/components/MessageBadge';
 
 export type PortalRole = 'manager' | 'employee' | 'owner';
@@ -52,10 +52,10 @@ export default function PortalTabBar({ state, descriptors, navigation, role, bad
 
   return (
     <View style={styles.floatingTabBarContainer}>
-      <BlurView
+      <GlassBlur
         intensity={80}
         tint={mode === 'dark' ? 'dark' : 'light'}
-        experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined}
+        androidBaseAlpha={0.97}
         style={[
           styles.blurContainer,
           isManager ? styles.blurContainerManager : styles.blurContainerEmployee,
@@ -140,7 +140,7 @@ export default function PortalTabBar({ state, descriptors, navigation, role, bad
             );
           })}
         </View>
-      </BlurView>
+      </GlassBlur>
     </View>
   );
 }

@@ -17,6 +17,12 @@ const clearLogAfterDelay = (logKey: string) => {
 const MUTED_MESSAGES = [
   'each child in a list should have a unique "key" prop',
   'Each child in a list should have a unique "key" prop',
+  // RN 0.86 deprecation fired by react-native-draggable-flatlist (runAfterInteractions)
+  // and expo-router's stack Card (interaction handles) — dependency code, nothing to
+  // fix here; it is a dev-only LogBox toast that sat over the tab bar on Android (s85).
+  'InteractionManager has been deprecated',
+  // Same dependency, Android only: the drag list still calls the pre-Fabric layout-animation switch.
+  'setLayoutAnimationEnabledExperimental is currently a no-op',
 ];
 
 // Check if a message should be muted
@@ -311,12 +317,12 @@ export const setupErrorLogging = () => {
 
   // Override console.warn to capture and send to server
   console.warn = (...args: any[]) => {
-    // Always call original first
-    originalConsoleWarn.apply(console, args);
-
-    // Queue log for sending to server (skip muted messages)
+    // Muted messages never reach LogBox either (same contract as console.error below)
     const message = stringifyArgs(args);
     if (shouldMuteMessage(message)) return;
+
+    // Always call original first
+    originalConsoleWarn.apply(console, args);
 
     const source = getCallerInfo();
     queueLog('warn', message, source);
