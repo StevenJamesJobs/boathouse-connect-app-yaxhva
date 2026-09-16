@@ -141,6 +141,7 @@ export default function GlassHeroSheet({
           <GlassCard
             variant="glass"
             radius={26}
+            androidBaseAlpha={0.98}
             intensity={32}
             style={[styles.sheet, { paddingBottom: bottomPad }]}
           >

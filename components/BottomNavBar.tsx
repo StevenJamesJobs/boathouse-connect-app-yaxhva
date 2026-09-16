@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
-import { BlurView } from 'expo-blur';
+import GlassBlur from '@/components/GlassBlur';
 import { useAuth } from '@/contexts/AuthContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useAppTheme } from '@/contexts/ThemeContext';
@@ -75,9 +75,10 @@ export default function BottomNavBar({ activeTab }: BottomNavBarProps) {
 
   return (
     <View style={styles.floatingTabBarContainer}>
-      <BlurView
+      <GlassBlur
         intensity={80}
         tint={mode === 'dark' ? 'dark' : 'light'}
+        androidBaseAlpha={0.97}
         style={[styles.blurContainer, { backgroundColor: blurBgColor }]}
       >
         <View style={styles.tabBarContent}>
@@ -137,7 +138,7 @@ export default function BottomNavBar({ activeTab }: BottomNavBarProps) {
             );
           })}
         </View>
-      </BlurView>
+      </GlassBlur>
     </View>
   );
 }

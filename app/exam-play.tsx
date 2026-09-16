@@ -28,7 +28,7 @@ import {
   AppState,
   Alert,
 } from 'react-native';
-import { BlurView } from 'expo-blur';
+import GlassBlur from '@/components/GlassBlur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useAppTheme } from '@/contexts/ThemeContext';
@@ -801,7 +801,7 @@ export default function ExamPlayScreen() {
 
   const consoleStrip = (
     <View style={styles.ovcon} onLayout={(e) => setConsoleH(e.nativeEvent.layout.height)}>
-      <BlurView intensity={26} tint="dark" style={StyleSheet.absoluteFill} />
+      <GlassBlur intensity={26} tint="dark" style={StyleSheet.absoluteFill} />
       <View style={[StyleSheet.absoluteFill, { backgroundColor: visual.console[0] + '6E' }]} />
       <View style={styles.ovRow}>
         <Text style={styles.ovStat}>
@@ -896,7 +896,7 @@ export default function ExamPlayScreen() {
 
               {hasPhoto ? (
                 <View style={styles.qPanel}>
-                  <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                  <GlassBlur intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                   <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(10,14,16,0.38)' }]} />
                   {catLabel && (
                     <View style={styles.qPanelChip}>

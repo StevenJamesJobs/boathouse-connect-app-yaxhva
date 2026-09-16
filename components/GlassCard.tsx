@@ -1,6 +1,6 @@
 import React from 'react';
-import { View, StyleSheet, ViewStyle, StyleProp, Platform } from 'react-native';
-import { BlurView } from 'expo-blur';
+import { View, StyleSheet, ViewStyle, StyleProp } from 'react-native';
+import GlassBlur from '@/components/GlassBlur';
 import { useAppTheme } from '@/contexts/ThemeContext';
 
 /**
@@ -10,9 +10,13 @@ import { useAppTheme } from '@/contexts/ThemeContext';
  * Use `variant="glass"` for the header treatment (--glass/--glassbd in the
  * mockup) and `variant="surface"` for cards/segments (--surf/--surfbd).
  *
- * Android: BlurView uses the dimezis fork via `experimentalBlurMethod`. Pass
- * `solid` to fall back to an opaque `colors.card` surface on low-end devices
- * (BlurView overdraw is the main perf risk) — `card` is intentionally solid.
+ * Android: NO blur — translucent glass only. expo-blur 57 (SDK 57) only blurs
+ * on Android when the BlurView is a *sibling outside* a `BlurTargetView`, which a
+ * card inside scrolling content can never be; without a target the native side
+ * falls back to 'none' anyway (and `experimentalBlurMethod` is deprecated), so
+ * the kit leaves `blurMethod` unset there and relies on the `colors.glass` /
+ * `colors.surface` fills. Pass `solid` for an opaque `colors.card` surface on
+ * perf-sensitive callers — `card` is intentionally solid.
  */
 type GlassVariant = 'glass' | 'surface';
 
@@ -24,6 +28,8 @@ interface GlassCardProps {
   radius?: number;
   bordered?: boolean;
   solid?: boolean;
+  /** Android only: opacity of the themed base under the tint (GlassBlur default 0.95). */
+  androidBaseAlpha?: number;
 }
 
 export default function GlassCard({
@@ -34,6 +40,7 @@ export default function GlassCard({
   radius = 16,
   bordered = true,
   solid = false,
+  androidBaseAlpha,
 }: GlassCardProps) {
   const { colors, resolvedMode } = useAppTheme();
 
@@ -61,10 +68,10 @@ export default function GlassCard({
   }
 
   return (
-    <BlurView
+    <GlassBlur
       intensity={blurIntensity}
       tint={resolvedMode === 'dark' ? 'dark' : 'light'}
-      experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined}
+      androidBaseAlpha={androidBaseAlpha}
       style={[
         { borderRadius: radius, overflow: 'hidden', backgroundColor: fill },
         borderStyle,
@@ -72,6 +79,6 @@ export default function GlassCard({
       ]}
     >
       {children}
-    </BlurView>
+    </GlassBlur>
   );
 }

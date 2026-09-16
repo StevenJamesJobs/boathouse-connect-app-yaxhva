@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef, ReactNode } from 'react';
 import { Platform } from 'react-native';
-import * as Notifications from 'expo-notifications';
+import { getNotifications } from '@/utils/expoNotifications';
 import { useOrganization } from './OrganizationContext';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/app/integrations/supabase/client';
@@ -180,7 +180,8 @@ function SubscriptionProviderInner({ children }: { children: ReactNode }) {
   }, []);
 
   const scheduleTrialNotifications = useCallback(async (trialEnd: Date) => {
-    if (Platform.OS === 'web') return;
+    const Notifications = getNotifications();
+    if (!Notifications) return; // web + Android Expo Go
 
     try {
       await Notifications.cancelAllScheduledNotificationsAsync();

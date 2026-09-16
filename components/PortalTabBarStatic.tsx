@@ -7,7 +7,7 @@ import {
   Platform,
 } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
-import { BlurView } from 'expo-blur';
+import GlassBlur from '@/components/GlassBlur';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useAppTheme } from '@/contexts/ThemeContext';
 import { hexToRgba } from '@/styles/commonStyles';
@@ -80,9 +80,10 @@ export default function PortalTabBarStatic({ activeTab = null }: PortalTabBarSta
 
   return (
     <View style={styles.floatingTabBarContainer} pointerEvents="box-none">
-      <BlurView
+      <GlassBlur
         intensity={80}
         tint={mode === 'dark' ? 'dark' : 'light'}
+        androidBaseAlpha={0.97}
         style={[styles.blurContainer, { backgroundColor: blurBgColor }]}
       >
         <View style={styles.tabBarContent}>
@@ -125,7 +126,7 @@ export default function PortalTabBarStatic({ activeTab = null }: PortalTabBarSta
             );
           })}
         </View>
-      </BlurView>
+      </GlassBlur>
     </View>
   );
 }

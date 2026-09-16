@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
-import * as Notifications from 'expo-notifications';
+import type { Notification } from 'expo-notifications';
+import { getNotifications, NotificationsModule } from '@/utils/expoNotifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { Platform, AppState } from 'react-native';
@@ -20,8 +21,13 @@ import { useUnreadAwards } from '@/hooks/useUnreadAwards';
 import { useUnreadLeaderboardPasses } from '@/hooks/useUnreadLeaderboardPasses';
 import { useScheduleAttention } from '@/hooks/useScheduleAttention';
 
+// The module is null on web and on Android Expo Go (see utils/expoNotifications) —
+// every call below is skipped there.
+const Notifications = getNotifications();
+type NotificationSubscription = ReturnType<NotificationsModule['addNotificationReceivedListener']>;
+
 // Configure how notifications are handled when app is in foreground
-if (Platform.OS !== 'web') {
+if (Notifications) {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
       // expo-notifications 0.32 (SDK 54) replaced shouldShowAlert with
@@ -36,7 +42,7 @@ if (Platform.OS !== 'web') {
 
 interface NotificationContextType {
   expoPushToken: string | null;
-  notification: Notifications.Notification | null;
+  notification: Notification | null;
   sendNotification: (params: SendNotificationParams) => Promise<void>;
 }
 
@@ -56,16 +62,16 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
   const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
-  const [notification, setNotification] = useState<Notifications.Notification | null>(null);
-  const notificationListener = useRef<Notifications.Subscription | undefined>(undefined);
-  const responseListener = useRef<Notifications.Subscription | undefined>(undefined);
+  const [notification, setNotification] = useState<Notification | null>(null);
+  const notificationListener = useRef<NotificationSubscription | undefined>(undefined);
+  const responseListener = useRef<NotificationSubscription | undefined>(undefined);
   const { user } = useAuth();
   const { organizationId } = useOrganization();
 
   useEffect(() => {
     console.log('[NotificationContext] useEffect triggered', { hasUser: !!user });
     if (user) {
-      if (Platform.OS === 'web') return;
+      if (!Notifications) return; // web + Android Expo Go
 
       console.log('[NotificationContext] User found, registering for push notifications...');
       registerForPushNotificationsAsync().then(token => {
@@ -118,6 +124,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     console.log('[NotificationContext] Starting push notification registration...');
     console.log('[NotificationContext] Platform:', Platform.OS);
     console.log('[NotificationContext] Is device?', Device.isDevice);
+    if (!Notifications) return; // web + Android Expo Go
     let token;
 
     if (Platform.OS === 'android') {
@@ -147,15 +154,6 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       }
       
       console.log('[NotificationContext] ✅ Permission granted, getting push token...');
-
-      // Android Expo Go lost remote push in SDK 53 — getExpoPushTokenAsync only
-      // logs a loud console.error there. Skip the token fetch in that dev env
-      // (the permission flow above still covers local notifications; real
-      // builds and iOS Expo Go are unaffected).
-      if (Platform.OS === 'android' && Constants.appOwnership === 'expo') {
-        console.log('[NotificationContext] Skipping push token fetch — Android Expo Go has no remote push (SDK 53+)');
-        return;
-      }
 
       try {
         const projectId = EAS_PROJECT_ID; // variant-aware (see top of file)
@@ -400,7 +398,7 @@ function BadgeSyncer() {
       (unreadLeaderboardPasses || 0) +
       (scheduleAttention.pendingApprovals || 0) +
       (scheduleAttention.unseenDecisions || 0);
-    Notifications.setBadgeCountAsync(total).catch(() => {});
+    Notifications?.setBadgeCountAsync(total).catch(() => {});
   }, [unreadMessages, unreadQuizzes, pendingApprovals, unreadAwards, unreadLeaderboardPasses, scheduleAttention.pendingApprovals, scheduleAttention.unseenDecisions]);
 
   return null;

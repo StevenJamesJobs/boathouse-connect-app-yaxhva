@@ -7,9 +7,8 @@ import {
   StyleSheet,
   Animated,
   Dimensions,
-  Platform,
 } from 'react-native';
-import { BlurView } from 'expo-blur';
+import GlassBlur from '@/components/GlassBlur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAppTheme } from '@/contexts/ThemeContext';
 import { hexToRgba } from '@/styles/commonStyles';
@@ -125,10 +124,9 @@ export default function MenuCategoryTabs({
   return (
     <View style={styles.wrap}>
       <Animated.View pointerEvents="none" style={[styles.backdrop, { opacity: backdropAnim }]}>
-        <BlurView
+        <GlassBlur
           intensity={18}
           tint={resolvedMode === 'dark' ? 'dark' : 'light'}
-          experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined}
           style={StyleSheet.absoluteFill}
         />
         {/* The wash fades in from its top edge so the bar doesn't meet the

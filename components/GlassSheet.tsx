@@ -159,6 +159,7 @@ export default function GlassSheet({
         <Pressable style={styles.scrim} onPress={onClose} />
         <GlassCard
           variant="glass"
+          androidBaseAlpha={0.98}
           radius={26}
           intensity={32}
           style={[styles.sheet, { paddingBottom: bottomPad }, fill && styles.sheetFill]}

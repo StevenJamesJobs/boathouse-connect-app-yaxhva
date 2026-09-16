@@ -21,7 +21,7 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { BlurView } from 'expo-blur';
+import GlassBlur from '@/components/GlassBlur';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -573,7 +573,7 @@ export default function PictureThisPlayScreen() {
 
           {/* Frosted console — the photo blurs beneath it. */}
           <View style={styles.overconsole} onLayout={(e) => setConsoleH(e.nativeEvent.layout.height)}>
-            <BlurView intensity={26} tint="dark" style={StyleSheet.absoluteFill} />
+            <GlassBlur intensity={26} tint="dark" style={StyleSheet.absoluteFill} />
             <View style={[StyleSheet.absoluteFill, styles.consoleTintOverlay]} />
             <View style={styles.consoleRow}>
               {playMode === 'lives' ? (
@@ -608,7 +608,7 @@ export default function PictureThisPlayScreen() {
 
           {/* Name + question — thin-bordered glass panel on the image. */}
           <View style={styles.namePanel}>
-            <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+            <GlassBlur intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
             <View style={[StyleSheet.absoluteFill, styles.panelTintOverlay]} />
             {!currentQuestion.hideItemName && (
               <Text style={styles.nameText} numberOfLines={2}>
