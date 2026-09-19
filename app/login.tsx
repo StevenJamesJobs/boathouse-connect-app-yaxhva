@@ -1,126 +1,109 @@
-
+/**
+ * Login (s86, mockup L-C "fold-down") — ONE file for both platforms and both variants.
+ *
+ * Opens on the username alone; return / leaving the field UNFOLDS the password, "Stay
+ * signed in", Sign In and the reset note beneath it. Both inputs are mounted from the
+ * first frame with autofill hints, so iOS Keychain / Google can fill the pair in one go —
+ * a password arriving while folded opens the card by itself. A returning device wears its
+ * last org's logo and pre-fills the last username (never the password; ✕ clears it).
+ */
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  Pressable,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  Animated,
-  Alert,
-  ActivityIndicator,
-} from 'react-native';
-import { useRouter, usePathname, Link } from 'expo-router';
-import { useAuth } from '@/contexts/AuthContext';
-import { splashColors } from '@/styles/commonStyles';
-import { IconSymbol } from '@/components/IconSymbol';
-import { StorageImage } from '@/components/StorageImage';
-import { IS_MCLOONES } from '@/constants/buildVariant';
+import { View, Text, TextInput, Pressable, StyleSheet, Animated, Easing } from 'react-native';
+import { useRouter, usePathname } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '@/contexts/AuthContext';
+import { useThemeColors } from '@/hooks/useThemeColors';
+import { fonts } from '@/constants/fonts';
+import { IconSymbol } from '@/components/IconSymbol';
+import GlassCard from '@/components/GlassCard';
+import { IS_MCLOONES } from '@/constants/buildVariant';
+import {
+  DEVICE_FLAGS,
+  deviceHasReachedDashboard,
+  getLastUsername,
+  clearLastUsername,
+  resetDeviceFirstRun,
+} from '@/utils/deviceFlags';
+import {
+  OnbScreen,
+  BrandMark,
+  Hero,
+  IconField,
+  EyeToggle,
+  CheckRow,
+  CtaButton,
+  ErrorLine,
+  LinkRow,
+  LegalFooter,
+  useOnbAccents,
+} from '@/components/onboarding/OnboardingKit';
 
-// Default logo shown on the login screen when the user has no cached
-// restaurant logo yet. McLoone's keeps its branded mark; the public
-// (MyResto Connect) variant shows the MyResto plate logo until an owner
-// uploads their own branding.
-const DEFAULT_LOGO = IS_MCLOONES
-  ? require('@/assets/images/43c91958-d4c9-4b12-8d2a-51e85de57f94.jpeg')
-  : require('@/assets/images/MyRestoPlateOnTopLogo.png');
+interface CachedOrg {
+  orgId: string;
+  orgName: string;
+  logoUrl: string | null;
+}
 
 export default function LoginScreen() {
-  console.log('[Login] Screen mounted, Platform:', Platform.OS);
   const { t } = useTranslation();
-
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [cachedOrg, setCachedOrg] = useState<{ orgId: string; orgName: string; logoUrl: string | null } | null>(null);
+  const colors = useThemeColors();
+  const a = useOnbAccents();
   const router = useRouter();
   const pathname = usePathname();
   const { login, isAuthenticated, user } = useAuth();
 
-  // First-time entry points (join / owner setup) show only until this device
-  // has had a signed-in account — flag set by AuthContext.establishSession.
-  const [showEntryOptions, setShowEntryOptions] = useState(false);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [staySignedIn, setStaySignedIn] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [cachedOrg, setCachedOrg] = useState<CachedOrg | null>(null);
+  const [remembered, setRemembered] = useState(false);
+  const [unfolded, setUnfolded] = useState(false);
+  // Welcome is still this device's front door until it has reached a dashboard.
+  const [firstRun, setFirstRun] = useState(false);
+
+  const passwordRef = useRef<TextInput>(null);
+  const usernameRef = useRef<TextInput>(null);
+  const fold = useRef(new Animated.Value(0)).current;
+  const enter = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
+    Animated.timing(enter, { toValue: 1, duration: 520, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
     (async () => {
       try {
         const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-        const had = await AsyncStorage.getItem('@mrc_device_has_account');
-        if (had !== '1') setShowEntryOptions(true);
-      } catch {
-        setShowEntryOptions(true);
-      }
-    })();
-  }, []);
-
-  useEffect(() => {
-    async function loadCachedOrg() {
-      try {
-        const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-        const cached = await AsyncStorage.getItem('@mrc_last_org');
+        const cached = await AsyncStorage.getItem(DEVICE_FLAGS.LAST_ORG);
         if (cached) setCachedOrg(JSON.parse(cached));
       } catch {}
-    }
-    loadCachedOrg();
-  }, []);
-
-  // Animation values - use useRef to avoid re-renders
-  const logoScale = useRef(new Animated.Value(0)).current;
-  const logoOpacity = useRef(new Animated.Value(0)).current;
-  const formTranslateY = useRef(new Animated.Value(50)).current;
-  const formOpacity = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    console.log('[Login] Starting animations');
-    // Animate logo
-    Animated.parallel([
-      Animated.spring(logoScale, {
-        toValue: 1,
-        tension: 50,
-        friction: 7,
-        useNativeDriver: true,
-      }),
-      Animated.timing(logoOpacity, {
-        toValue: 1,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-    ]).start();
-
-    // Animate form after logo
-    setTimeout(() => {
-      Animated.parallel([
-        Animated.timing(formTranslateY, {
-          toValue: 0,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-        Animated.timing(formOpacity, {
-          toValue: 1,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }, 400);
-    // Empty dependency array is correct - we only want to run this animation once on mount
-    // The animated values are stable because they're wrapped in useRef
+      const last = await getLastUsername();
+      if (last) {
+        setUsername(last);
+        setRemembered(true);
+        setUnfolded(true);
+      }
+      if (!IS_MCLOONES) setFirstRun(!(await deviceHasReachedDashboard()));
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    Animated.timing(fold, { toValue: unfolded ? 1 : 0, duration: 420, easing: Easing.bezier(0.22, 0.9, 0.3, 1), useNativeDriver: false }).start();
+  }, [unfolded, fold]);
+
+  // A password manager can fill the (still folded) password field — open up for it.
+  useEffect(() => {
+    if (password.length > 0 && !unfolded) setUnfolded(true);
+  }, [password, unfolded]);
+
   // Check if already authenticated and redirect.
-  // Guard on pathname: this screen stays mounted underneath the onboarding
-  // stack (login -> signup -> create-restaurant), so without this check it
-  // would hijack the auth flip mid-signup and yank a brand-new owner to the
-  // portal/paywall before the success screen + trial load.
+  // Guard on pathname: this screen can stay mounted underneath the onboarding
+  // stack (welcome -> login, or login -> signup -> create-restaurant), so without
+  // this check it would hijack the auth flip mid-signup and yank a brand-new owner
+  // to the portal/paywall before the success screen + trial load.
   useEffect(() => {
     if (pathname === '/login' && isAuthenticated && user) {
-      console.log('[Login] Already authenticated, redirecting to portal');
       const timeout = setTimeout(() => {
         try {
           if (user.role === 'manager' || user.role === 'owner') {
@@ -128,391 +111,179 @@ export default function LoginScreen() {
           } else {
             router.replace('/(portal)/employee');
           }
-        } catch (error) {
-          console.error('[Login] Navigation error:', error);
+        } catch (navError) {
+          console.error('[Login] Navigation error:', navError);
         }
       }, 100);
       return () => clearTimeout(timeout);
     }
   }, [pathname, isAuthenticated, user, router]);
 
+  const advance = () => {
+    if (!username.trim()) return;
+    setUnfolded(true);
+    // Let the unfold start before the keyboard retargets.
+    setTimeout(() => passwordRef.current?.focus(), 60);
+  };
+
+  const clearUsername = async () => {
+    setUsername('');
+    setPassword('');
+    setRemembered(false);
+    setUnfolded(false);
+    setError('');
+    await clearLastUsername();
+    usernameRef.current?.focus();
+  };
+
   const handleLogin = async () => {
-    console.log('[Login] Login button pressed');
-    
     if (!username.trim() || !password.trim()) {
-      console.log('[Login] Empty username or password');
-      Alert.alert(t('common.error'), t('login.error_empty_fields'));
+      setError(t('login.error_empty_fields'));
       return;
     }
-
-    console.log('[Login] Starting login process for username:', username.trim());
+    setError('');
     setIsLoading(true);
-    
     try {
-      const success = await login(username.trim(), password, rememberMe);
-      console.log('[Login] Login result:', success);
-      
+      const success = await login(username.trim(), password, staySignedIn);
       setIsLoading(false);
-
       if (success) {
-        console.log('[Login] Login successful, navigating to portal');
         // Wait a moment for auth state to update, then navigate
         setTimeout(() => {
           try {
             router.replace('/(portal)');
           } catch (navError) {
             console.error('[Login] Navigation error:', navError);
-            // Try alternative navigation
             router.push('/(portal)');
           }
         }, 200);
       } else {
-        console.log('[Login] Login failed - invalid credentials');
-        Alert.alert(t('login.error_login_failed'), t('login.error_invalid'));
+        setError(t('login.error_invalid'));
       }
-    } catch (error) {
-      console.error('[Login] Login error:', error);
+    } catch (e) {
       setIsLoading(false);
-      if (error instanceof Error && error.message === 'rate_limited') {
-        Alert.alert(t('login.error_login_failed'), t('login.error_rate_limited'));
+      if (e instanceof Error && e.message === 'rate_limited') {
+        setError(t('login.error_rate_limited'));
       } else {
-        Alert.alert(t('common.error'), t('login.error_generic'));
+        setError(t('login.error_generic'));
       }
     }
   };
 
+  const showOrg = !!cachedOrg && remembered;
+
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Logo Section */}
-        <Animated.View
-          style={[
-            styles.logoContainer,
-            {
-              transform: [{ scale: logoScale }],
-              opacity: logoOpacity,
-            },
-          ]}
-        >
-          {/* Returning user: greet by org name above the logo. */}
-          {cachedOrg && (
-            <Text style={styles.welcomeBackText}>
-              {t('login.welcome_back', { orgName: cachedOrg.orgName })}
-            </Text>
-          )}
-          {/* Their uploaded logo if they have one, otherwise the MyResto
-              plate placeholder (or McLoone's mark on that variant). */}
-          <StorageImage
-            source={cachedOrg?.logoUrl ? { uri: cachedOrg.logoUrl } : DEFAULT_LOGO}
-            fallbackSource={DEFAULT_LOGO}
-            style={styles.logo}
-            resizeMode="contain"
+    <OnbScreen front>
+      <BrandMark size="sm" org={showOrg ? cachedOrg : null} />
+      <Hero title={t('login.sign_in')} subtitle={showOrg ? undefined : t('login.subtitle')} />
+
+      <Animated.View style={{ opacity: enter, transform: [{ translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }}>
+        <GlassCard variant="glass" radius={16} style={styles.card}>
+          <IconField
+            ref={usernameRef}
+            label={t('login.username')}
+            labelTrailing={remembered ? <Text style={[styles.labelNote, { color: colors.textSecondary }]}>{t('login.not_you')}</Text> : undefined}
+            iosIcon="person.fill"
+            androidIcon="person"
+            placeholder={t('login.username')}
+            value={username}
+            onChangeText={(v) => { setUsername(v); setError(''); }}
+            autoCapitalize="none"
+            autoCorrect={false}
+            textContentType="username"
+            autoComplete="username"
+            returnKeyType="next"
+            onSubmitEditing={advance}
+            onBlur={advance}
+            blurOnSubmit={false}
+            editable={!isLoading}
+            trailing={
+              remembered ? (
+                <Pressable onPress={clearUsername} hitSlop={10} accessibilityLabel={t('login.not_you')}>
+                  <IconSymbol ios_icon_name="xmark" android_material_icon_name="close" size={15} color={colors.textSecondary} />
+                </Pressable>
+              ) : unfolded && !!username.trim() ? (
+                <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={15} color={a.ok} />
+              ) : undefined
+            }
           />
-        </Animated.View>
 
-        {/* Form Section */}
-        <Animated.View
-          style={[
-            styles.formContainer,
-            {
-              transform: [{ translateY: formTranslateY }],
-              opacity: formOpacity,
-            },
-          ]}
-        >
-          {/* Username Input */}
-          <View style={styles.inputContainer}>
-            <IconSymbol
-              ios_icon_name="person.fill"
-              android_material_icon_name="person"
-              size={20}
-              color={splashColors.textSecondary}
-              style={styles.inputIcon}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder={t('login.username')}
-              placeholderTextColor={splashColors.textSecondary}
-              value={username}
-              onChangeText={setUsername}
-              autoCapitalize="none"
-              keyboardType="default"
-              returnKeyType="next"
-              editable={!isLoading}
-            />
-          </View>
-
-          {/* Username hint — MyResto usernames follow first-initial + last name.
-              Hidden on the McLoone's build, whose existing accounts predate
-              this convention. */}
-          {!IS_MCLOONES && (
-            <Text style={styles.usernameHint}>
-              {t('login.username_hint')}
-            </Text>
+          {/* Username tip — MyResto usernames follow first-initial + last name. Hidden on the
+              McLoone's build, whose accounts predate the convention. Shown while the card is
+              folded or the field is empty; a plain conditional on purpose — the height-clipped
+              fade it replaced could catch the line half-cut (Steve's s86 device round). */}
+          {!IS_MCLOONES && (!unfolded || !username.trim()) && (
+            <Text style={[styles.tip, { color: colors.textSecondary }]}>{t('login.username_hint')}</Text>
           )}
 
-          {/* Password Input */}
-          <View style={styles.inputContainer}>
-            <IconSymbol
-              ios_icon_name="lock.fill"
-              android_material_icon_name="lock"
-              size={20}
-              color={splashColors.textSecondary}
-              style={styles.inputIcon}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder={t('login.password')}
-              placeholderTextColor={splashColors.textSecondary}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry={!showPassword}
-              autoCapitalize="none"
-              returnKeyType="done"
-              onSubmitEditing={handleLogin}
-              editable={!isLoading}
-            />
-            <TouchableOpacity
-              onPress={() => setShowPassword(!showPassword)}
-              style={styles.eyeIcon}
-              disabled={isLoading}
-            >
-              <IconSymbol
-                ios_icon_name={showPassword ? 'eye.slash.fill' : 'eye.fill'}
-                android_material_icon_name={showPassword ? 'visibility-off' : 'visibility'}
-                size={20}
-                color={splashColors.textSecondary}
+          <Animated.View
+            style={{
+              maxHeight: fold.interpolate({ inputRange: [0, 1], outputRange: [0, 320] }),
+              opacity: fold,
+              transform: [{ translateY: fold.interpolate({ inputRange: [0, 1], outputRange: [-6, 0] }) }],
+              overflow: 'hidden',
+            }}
+            pointerEvents={unfolded ? 'auto' : 'none'}
+          >
+            <View style={styles.unfold}>
+              <IconField
+                ref={passwordRef}
+                label={t('login.password')}
+                iosIcon="lock.fill"
+                androidIcon="lock"
+                placeholder={t('login.password')}
+                value={password}
+                onChangeText={(v) => { setPassword(v); setError(''); }}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                autoCorrect={false}
+                textContentType="password"
+                autoComplete="current-password"
+                returnKeyType="done"
+                onSubmitEditing={handleLogin}
+                editable={!isLoading}
+                trailing={<EyeToggle shown={showPassword} onToggle={() => setShowPassword((v) => !v)} disabled={isLoading} />}
               />
-            </TouchableOpacity>
-          </View>
-
-          {/* Remember Me */}
-          <TouchableOpacity
-            style={styles.rememberMeContainer}
-            onPress={() => setRememberMe(!rememberMe)}
-            disabled={isLoading}
-          >
-            <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
-              {rememberMe && (
-                <IconSymbol
-                  ios_icon_name="checkmark"
-                  android_material_icon_name="check"
-                  size={16}
-                  color="#FFFFFF"
-                />
-              )}
+              <CheckRow checked={staySignedIn} onToggle={() => setStaySignedIn((v) => !v)} disabled={isLoading}>
+                <Text style={[styles.stay, { color: colors.text }]}>{t('login.stay_signed_in')}</Text>
+              </CheckRow>
+              <ErrorLine message={error} />
+              <CtaButton label={t('login.sign_in')} iosIcon={null} androidIcon={null} onPress={handleLogin} loading={isLoading} disabled={!password} />
+              <Text style={[styles.forgot, { color: colors.textSecondary }]}>{t('login.forgot_password')}</Text>
             </View>
-            <Text style={styles.rememberMeText}>{t('login.remember_me')}</Text>
-          </TouchableOpacity>
+          </Animated.View>
+        </GlassCard>
+      </Animated.View>
 
-          {/* Login Button */}
-          <TouchableOpacity
-            style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
-            onPress={handleLogin}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text style={styles.loginButtonText}>{t('login.sign_in')}</Text>
-            )}
-          </TouchableOpacity>
+      {/* Until this device has reached a dashboard, Welcome is one tap back. */}
+      {!IS_MCLOONES && firstRun && (
+        <LinkRow back lead={t('login.new_here')} label={t('login.back_to_welcome')} onPress={() => router.replace('/welcome')} />
+      )}
 
-          {/* Forgot Password */}
-          <Text style={styles.forgotPasswordText}>
-            {t('login.forgot_password')}
-          </Text>
+      {/* Dev-only: make this device first-run again (re-opens Welcome). Never renders in production builds. */}
+      {__DEV__ && !IS_MCLOONES && !firstRun && (
+        <Pressable
+          style={styles.devReset}
+          onPress={async () => {
+            await resetDeviceFirstRun();
+            router.replace('/welcome');
+          }}
+        >
+          <Text style={[styles.devResetText, { color: colors.textSecondary }]}>Show the Welcome screen again (dev only)</Text>
+        </Pressable>
+      )}
 
-          {/* First-time entry points — multi-tenant builds only, and only until
-              this device has had a signed-in account. */}
-          {!IS_MCLOONES && showEntryOptions && (
-            <View style={styles.linksContainer}>
-              <View style={styles.entryBlock}>
-                <Text style={styles.entryQuestion}>{t('login.join_code_q')}</Text>
-                <Link href="/join" asChild>
-                  <Pressable style={styles.entryButton}>
-                    <Text style={styles.entryButtonText}>{t('login.join_code_btn')}</Text>
-                  </Pressable>
-                </Link>
-              </View>
-              <View style={styles.entryBlock}>
-                <Text style={styles.entryQuestion}>{t('login.owner_setup_q')}</Text>
-                <Link href="/onboarding/getting-started" asChild>
-                  <Pressable style={styles.entryButton}>
-                    <Text style={styles.entryButtonText}>{t('login.owner_setup_btn')}</Text>
-                  </Pressable>
-                </Link>
-              </View>
-            </View>
-          )}
-
-          {/* Dev-only: reveal the first-time entry points again on a device
-              that already has an account (clears the hide flag). Never
-              renders in production builds. */}
-          {__DEV__ && !IS_MCLOONES && !showEntryOptions && (
-            <TouchableOpacity
-              style={styles.devResetLink}
-              onPress={async () => {
-                try {
-                  const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-                  await AsyncStorage.removeItem('@mrc_device_has_account');
-                } catch {}
-                setShowEntryOptions(true);
-              }}
-            >
-              <Text style={styles.devResetText}>Show first-time setup options (dev only)</Text>
-            </TouchableOpacity>
-          )}
-        </Animated.View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      <LegalFooter />
+    </OnbScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: splashColors.background,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingTop: 80,
-    paddingHorizontal: 24,
-    paddingBottom: 40,
-  },
-  logoContainer: {
-    alignItems: 'center',
-    marginBottom: 60,
-  },
-  logo: {
-    width: 340,
-    height: 240,
-  },
-  formContainer: {
-    width: '100%',
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    marginBottom: 16,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  inputIcon: {
-    marginRight: 12,
-  },
-  input: {
-    flex: 1,
-    height: 50,
-    fontSize: 16,
-    color: splashColors.text,
-  },
-  eyeIcon: {
-    padding: 8,
-  },
-  rememberMeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: splashColors.primary,
-    marginRight: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkboxChecked: {
-    backgroundColor: splashColors.primary,
-  },
-  rememberMeText: {
-    fontSize: 16,
-    color: splashColors.text,
-  },
-  loginButton: {
-    backgroundColor: splashColors.primary,
-    borderRadius: 12,
-    height: 54,
-    alignItems: 'center',
-    justifyContent: 'center',
-    boxShadow: '0px 4px 8px rgba(44, 95, 141, 0.2)',
-    elevation: 4,
-  },
-  loginButtonDisabled: {
-    opacity: 0.6,
-  },
-  loginButtonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  forgotPasswordText: {
-    textAlign: 'center',
-    marginTop: 20,
-    fontSize: 14,
-    color: splashColors.textSecondary,
-    fontStyle: 'italic',
-  },
-  usernameHint: {
-    fontSize: 12,
-    color: splashColors.textSecondary,
-    marginTop: -6,
-    marginBottom: 16,
-    paddingHorizontal: 4,
-  },
-  welcomeBackText: {
-    fontSize: 16,
-    color: splashColors.text,
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  linksContainer: {
-    alignItems: 'center',
-    marginTop: 24,
-  },
-  entryBlock: {
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  entryQuestion: {
-    fontSize: 14,
-    color: splashColors.textSecondary,
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  entryButton: {
-    borderWidth: 1.5,
-    borderColor: splashColors.primary,
-    borderRadius: 22,
-    paddingHorizontal: 22,
-    paddingVertical: 9,
-  },
-  entryButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: splashColors.primary,
-    textAlign: 'center',
-  },
-  devResetLink: {
-    marginTop: 24,
-    alignItems: 'center',
-  },
-  devResetText: {
-    fontSize: 12,
-    color: splashColors.textSecondary,
-    textDecorationLine: 'underline',
-  },
+  card: { padding: 14 },
+  unfold: { paddingTop: 10, gap: 10 },
+  labelNote: { fontFamily: fonts.body.regular, fontSize: 10.5 },
+  tip: { fontFamily: fonts.body.regular, fontSize: 11.5, lineHeight: 16, marginTop: 6 },
+  stay: { fontFamily: fonts.body.semibold, fontSize: 13.5 },
+  forgot: { fontFamily: fonts.body.regular, fontSize: 11.5, lineHeight: 16, textAlign: 'center' },
+  devReset: { alignItems: 'center', paddingVertical: 8 },
+  devResetText: { fontFamily: fonts.body.regular, fontSize: 12, textDecorationLine: 'underline' },
 });

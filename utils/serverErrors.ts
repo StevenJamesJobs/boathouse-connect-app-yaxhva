@@ -55,6 +55,8 @@ const EXACT_MAP: Record<string, string> = {
   'Content item not found': 'server_errors.content_item_not_found',
   'Content item is not in your organization': 'server_errors.content_item_other_org',
   // join_signup
+  'This email is already in use on this team. If this is an error, speak to your manager right away!': 'server_errors.s86_email_on_team',
+  'One or more positions are not available': 'server_errors.s86_positions_unavailable',
   'Invalid join code': 'server_errors.invalid_join_code',
   'Self-registration is disabled for this organization': 'server_errors.self_signup_disabled',
   'This organization has no default password configured': 'server_errors.org_no_default_password',
@@ -160,7 +162,7 @@ export function translateServerError(
     // users has BOTH a raw and a lower(username) unique index — a case-variant
     // duplicate violates only the _lower_ one.
     if (/duplicate key value.*users_username(_lower)?_key/.test(msg)) return i18n.t('server_errors.username_taken');
-    if (/duplicate key value.*users_email_key/.test(msg)) return i18n.t('server_errors.email_in_use');
+    if (/duplicate key value.*users_(org_)?email_key/.test(msg)) return i18n.t('server_errors.email_in_use');
     // The two interpolated redemption RAISEs (s63; the only dynamic RAISE
     // templates among the mapped RPCs).
     if (/^Redemption request is not pending/.test(msg)) return i18n.t('server_errors.redemption_not_pending');

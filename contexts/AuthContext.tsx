@@ -404,9 +404,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await AsyncStorage.removeItem(STORAGE_KEY);
         await AsyncStorage.setItem(REMEMBER_ME_KEY, 'false');
       }
-      // This device has had a signed-in account — the login screens use this
-      // to hide the first-time join/owner-setup entry points from now on.
-      await AsyncStorage.setItem('@mrc_device_has_account', '1');
+      // The last username that signed in here — Login pre-fills it for a returning device
+      // (never the password). '@mrc_device_has_account' is no longer set here: it flips on
+      // the first PORTAL mount (utils/deviceFlags.markDeviceReachedDashboard), so a device
+      // that quit mid-signup still opens on Welcome.
+      await AsyncStorage.setItem('@mrc_last_username', user.username);
     }
 
     setAuthState({

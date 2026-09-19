@@ -1,27 +1,41 @@
+/**
+ * You're All Set! (s86, mockup F-1) — the owner's finish line. The success tick sits LEFT of
+ * the title (a row, not a centered hero) so the join code, the two bullets and the gold trial
+ * card fit with barely a scroll. Share's message carries the one web link that forwards to the
+ * right store (LEGAL.appUrl).
+ */
 import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-  ActivityIndicator,
-  Share,
-  Platform,
-  ScrollView,
-} from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Share } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
+import * as WebBrowser from 'expo-web-browser';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { splashColors } from '@/styles/commonStyles';
+import { hexToRgba } from '@/styles/commonStyles';
+import { fonts } from '@/constants/fonts';
 import { IconSymbol } from '@/components/IconSymbol';
+import GlassCard from '@/components/GlassCard';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useThemeColors } from '@/hooks/useThemeColors';
+import { LEGAL } from '@/config/legal';
+import {
+  OnbScreen,
+  OnboardingDock,
+  Disc,
+  GhostButton,
+  InfoBlurb,
+  Bullet,
+  B,
+  Pill,
+  useOnbAccents,
+} from '@/components/onboarding/OnboardingKit';
 
 export default function JoinCodeScreen() {
   const router = useRouter();
   const { t } = useTranslation();
+  const colors = useThemeColors();
+  const a = useOnbAccents();
   const { organization } = useOrganization();
   const { user } = useAuth();
 
@@ -70,7 +84,7 @@ export default function JoinCodeScreen() {
     if (!joinCode) return;
     try {
       await Share.share({
-        message: t('onboarding.share_message', { orgName, joinCode }),
+        message: t('onboarding.share_message', { orgName, joinCode, appUrl: LEGAL.appUrl }),
       });
     } catch (err) {
       console.error('[JoinCode] Share error:', err);
@@ -81,308 +95,132 @@ export default function JoinCodeScreen() {
     router.replace('/(portal)/manager');
   };
 
+  const openTutorials = () => {
+    WebBrowser.openBrowserAsync(LEGAL.tutorialsUrl).catch(() => {});
+  };
+
   if (isLoading) {
     return (
-      <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color={splashColors.primary} />
+      <View style={[styles.loading, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.tint} />
       </View>
     );
   }
 
+  const gold = a.isDark ? '#F59E0B' : '#B45309';
+  const trialFeatures = [
+    t('onboarding.trial_feature_1'),
+    t('onboarding.trial_feature_2'),
+    t('onboarding.trial_feature_3'),
+    t('onboarding.trial_feature_4'),
+    t('onboarding.trial_feature_5'),
+  ];
+
   return (
-    <View style={styles.container}>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Success icon */}
-        <View style={styles.iconCircle}>
-          <IconSymbol
-            ios_icon_name="checkmark.circle.fill"
-            android_material_icon_name="check-circle"
-            size={48}
-            color="#FFFFFF"
-          />
+    <OnbScreen
+      contentStyle={styles.content}
+      dock={<OnboardingDock nextLabel={t('onboarding.go_to_dashboard')} onNext={handleGoToDashboard} />}
+    >
+      {/* Header row — tick left of the title */}
+      <View style={styles.head}>
+        <Disc tone="ok" style={styles.disc}>
+          <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={28} color={a.ok} />
+        </Disc>
+        <View style={styles.headText}>
+          <Text style={[styles.title, { color: colors.text }]}>{t('onboarding.join_all_set_title')}</Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{t('onboarding.join_code_ready', { orgName })}</Text>
         </View>
+      </View>
 
-        <Text style={styles.title}>{t('onboarding.join_all_set_title')}</Text>
-        <Text style={styles.subtitle}>
-          {t('onboarding.join_code_ready', { orgName })}
+      {/* Join code */}
+      <GlassCard variant="glass" radius={18} style={styles.codeCard}>
+        <View style={styles.codeTop}>
+          <Text style={[styles.eyebrow, { color: a.quiet }]} numberOfLines={1}>{t('onboarding.join_code_title')}</Text>
+          {organization.allow_self_signup && <Pill tone="ok" label={t('onboarding.self_signup_on')} />}
+        </View>
+        <Text style={[styles.code, { color: colors.text }]} selectable adjustsFontSizeToFit numberOfLines={1}>
+          {joinCode || '----'}
         </Text>
-
-        {/* Join code display */}
-        <View style={styles.codeCard}>
-          <Text style={styles.codeLabel}>{t('onboarding.join_code_title')}</Text>
-          <Text style={styles.codeText}>{joinCode || '----'}</Text>
-        </View>
-
-        {/* Action buttons */}
-        <View style={styles.actions}>
-          <TouchableOpacity style={styles.actionButton} onPress={handleCopy}>
-            <IconSymbol
-              ios_icon_name={copied ? 'checkmark' : 'doc.on.doc'}
-              android_material_icon_name={copied ? 'check' : 'content-copy'}
-              size={20}
-              color={splashColors.primary}
-            />
-            <Text style={styles.actionText}>
-              {copied ? t('onboarding.copied') : t('onboarding.copy_code')}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
-            <IconSymbol
-              ios_icon_name="square.and.arrow.up"
-              android_material_icon_name="share"
-              size={20}
-              color={splashColors.primary}
-            />
-            <Text style={styles.actionText}>{t('onboarding.share')}</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Instructions */}
-        <View style={styles.instructionsCard}>
-          <IconSymbol
-            ios_icon_name="info.circle.fill"
-            android_material_icon_name="info"
-            size={20}
-            color={splashColors.primary}
+        <View style={styles.btnRow}>
+          <GhostButton
+            label={copied ? t('onboarding.copied') : t('onboarding.copy_code')}
+            iosIcon={copied ? 'checkmark' : 'doc.on.doc'}
+            androidIcon={copied ? 'check' : 'content-copy'}
+            onPress={handleCopy}
+            style={styles.codeBtn}
           />
-          <Text style={styles.instructionsText}>
-            {t('onboarding.join_code_instructions')}
-          </Text>
+          <GhostButton
+            label={t('onboarding.share')}
+            iosIcon="square.and.arrow.up"
+            androidIcon="share"
+            onPress={handleShare}
+            style={styles.codeBtn}
+          />
         </View>
+      </GlassCard>
 
-        {/* Premium trial features */}
-        <View style={styles.trialCard}>
-          <View style={styles.trialHeader}>
-            <IconSymbol
-              ios_icon_name="crown.fill"
-              android_material_icon_name="workspace-premium"
-              size={20}
-              color={splashColors.primary}
-            />
-            <Text style={styles.trialTitle}>{t('onboarding.trial_title')}</Text>
-          </View>
-          <Text style={styles.trialBody}>
-            {t('onboarding.trial_body')}
+      {/* The two bullets */}
+      <InfoBlurb>
+        <Bullet>
+          <B>{t('onboarding.join_code_instructions_lead')}</B> {t('onboarding.join_code_instructions')}
+        </Bullet>
+        <Bullet>
+          {t('onboarding.tutorials_note')}{' '}
+          <Text style={{ fontFamily: fonts.body.semibold, color: a.pop }} onPress={openTutorials} accessibilityRole="link">
+            {LEGAL.tutorialsHost}
           </Text>
-          {[
-            t('onboarding.trial_feature_1'),
-            t('onboarding.trial_feature_2'),
-            t('onboarding.trial_feature_3'),
-            t('onboarding.trial_feature_4'),
-            t('onboarding.trial_feature_5'),
-          ].map((f) => (
-            <View key={f} style={styles.trialRow}>
+        </Bullet>
+      </InfoBlurb>
+
+      {/* Premium trial */}
+      <View style={[styles.trial, { backgroundColor: hexToRgba(gold, 0.08), borderColor: hexToRgba(gold, 0.34) }]}>
+        <View style={styles.trialHead}>
+          <IconSymbol ios_icon_name="crown.fill" android_material_icon_name="workspace-premium" size={17} color={gold} />
+          <Text style={[styles.trialTitle, { color: colors.text }]}>{t('onboarding.trial_title')}</Text>
+        </View>
+        <Text style={[styles.trialNote, { color: colors.textSecondary, marginTop: -3 }]}>{t('onboarding.trial_body')}</Text>
+        <View style={styles.feats}>
+          {trialFeatures.map((f, i) => (
+            <View key={f} style={styles.featRow}>
               <IconSymbol
-                ios_icon_name="checkmark.circle.fill"
-                android_material_icon_name="check-circle"
-                size={16}
-                color={splashColors.primary}
+                ios_icon_name="checkmark"
+                android_material_icon_name="check"
+                size={13}
+                color={i === trialFeatures.length - 1 ? a.ok : gold}
+                style={{ marginTop: 2 }}
               />
-              <Text style={styles.trialItem}>{f}</Text>
+              <Text style={[styles.featText, { color: colors.text }]}>{f}</Text>
             </View>
           ))}
-          <Text style={styles.trialFooter}>
-            {t('onboarding.trial_footer')}
-          </Text>
         </View>
-      </ScrollView>
-
-      {/* Go to Dashboard */}
-      <View style={styles.bottomBar}>
-        <TouchableOpacity
-          style={styles.primaryButton}
-          onPress={handleGoToDashboard}
-        >
-          <Text style={styles.primaryButtonText}>{t('onboarding.go_to_dashboard')}</Text>
-        </TouchableOpacity>
+        <Text style={[styles.trialNote, { color: colors.textSecondary }]}>{t('onboarding.trial_footer')}</Text>
       </View>
-    </View>
+    </OnbScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: splashColors.background,
-  },
-  centered: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  scroll: {
-    flex: 1,
-  },
-  content: {
-    flexGrow: 1,
-    paddingTop: 80,
-    paddingHorizontal: 24,
-    paddingBottom: 24,
-    alignItems: 'center',
-  },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  content: { paddingTop: 22 },
 
-  // Success icon
-  iconCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: splashColors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 24,
-  },
+  head: { flexDirection: 'row', alignItems: 'center', gap: 13, paddingTop: 6, paddingHorizontal: 2 },
+  disc: { width: 58, height: 58, borderRadius: 20, marginBottom: 0 },
+  headText: { flex: 1, minWidth: 0 },
+  title: { fontFamily: fonts.display.bold, fontSize: 23, letterSpacing: -0.4 },
+  subtitle: { fontFamily: fonts.body.regular, fontSize: 12.5, lineHeight: 17, marginTop: 2 },
 
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: splashColors.text,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: splashColors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 32,
-    paddingHorizontal: 16,
-  },
+  codeCard: { padding: 13, gap: 11 },
+  codeTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  eyebrow: { flex: 1, fontFamily: fonts.mono.semibold, fontSize: 9, letterSpacing: 1.2, textTransform: 'uppercase' },
+  code: { fontFamily: fonts.mono.semibold, fontSize: 30, letterSpacing: 3, textAlign: 'center', paddingTop: 4 },
+  btnRow: { flexDirection: 'row', gap: 10 },
+  codeBtn: { flex: 1, height: 42 },
 
-  // Code card
-  codeCard: {
-    width: '100%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 24,
-    alignItems: 'center',
-    marginBottom: 24,
-    borderWidth: 2,
-    borderColor: splashColors.secondary,
-  },
-  codeLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: splashColors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 8,
-  },
-  codeText: {
-    fontSize: 36,
-    fontWeight: '800',
-    color: splashColors.primary,
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    letterSpacing: 3,
-  },
-
-  // Action buttons
-  actions: {
-    flexDirection: 'row',
-    gap: 16,
-    marginBottom: 24,
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: splashColors.secondary,
-  },
-  actionText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: splashColors.primary,
-  },
-
-  // Instructions
-  instructionsCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    backgroundColor: '#EDF5FA',
-    borderRadius: 12,
-    padding: 16,
-    width: '100%',
-  },
-  instructionsText: {
-    flex: 1,
-    fontSize: 14,
-    color: splashColors.text,
-    lineHeight: 20,
-  },
-
-  // Premium trial card
-  trialCard: {
-    width: '100%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 16,
-    marginTop: 16,
-    borderWidth: 1,
-    borderColor: splashColors.secondary,
-  },
-  trialHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
-  },
-  trialTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: splashColors.text,
-  },
-  trialBody: {
-    fontSize: 14,
-    color: splashColors.textSecondary,
-    lineHeight: 20,
-    marginBottom: 10,
-  },
-  trialRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    marginBottom: 6,
-  },
-  trialItem: {
-    flex: 1,
-    fontSize: 14,
-    color: splashColors.text,
-    lineHeight: 19,
-  },
-  trialFooter: {
-    fontSize: 13,
-    color: splashColors.textSecondary,
-    lineHeight: 18,
-    marginTop: 8,
-    fontStyle: 'italic',
-  },
-
-  // Bottom bar
-  bottomBar: {
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-    paddingBottom: 34,
-    borderTopWidth: 1,
-    borderTopColor: '#E8E8E8',
-    backgroundColor: splashColors.background,
-  },
-  primaryButton: {
-    backgroundColor: splashColors.primary,
-    borderRadius: 12,
-    height: 54,
-    alignItems: 'center',
-    justifyContent: 'center',
-    boxShadow: '0px 4px 8px rgba(44, 95, 141, 0.2)',
-    elevation: 4,
-  },
-  primaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '600',
-  },
+  trial: { borderRadius: 18, borderWidth: 1, padding: 13, gap: 8 },
+  trialHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  trialTitle: { flex: 1, fontFamily: fonts.display.semibold, fontSize: 15 },
+  trialNote: { fontFamily: fonts.body.regular, fontSize: 11, lineHeight: 15 },
+  feats: { gap: 6 },
+  featRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  featText: { flex: 1, fontFamily: fonts.body.regular, fontSize: 12.5, lineHeight: 17 },
 });

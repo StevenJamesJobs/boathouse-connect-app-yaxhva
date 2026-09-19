@@ -1,41 +1,41 @@
 
 import { Redirect } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
-import { View, ActivityIndicator, StyleSheet, Platform, Text } from 'react-native';
-import React from 'react';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { useThemeColors } from '@/hooks/useThemeColors';
+import { IS_MCLOONES } from '@/constants/buildVariant';
+import { deviceHasReachedDashboard } from '@/utils/deviceFlags';
 
 export default function Index() {
   const { isAuthenticated, isLoading, user } = useAuth();
+  const colors = useThemeColors();
+  // null = still reading the device flag
+  const [hasAccount, setHasAccount] = useState<boolean | null>(IS_MCLOONES ? true : null);
 
-  console.log('[Index] Screen rendering, Platform:', Platform.OS, 'Auth state:', { 
-    isAuthenticated, 
-    isLoading, 
-    role: user?.role 
-  });
+  useEffect(() => {
+    if (IS_MCLOONES) return;
+    deviceHasReachedDashboard().then(setHasAccount);
+  }, []);
 
-  if (isLoading) {
-    console.log('[Index] Still loading auth state...');
+  if (isLoading || hasAccount === null) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#3498DB" />
-        <Text style={styles.loadingText}>Loading...</Text>
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.tint} />
       </View>
     );
   }
 
   if (isAuthenticated && user) {
-    // Redirect to appropriate portal based on role
-    console.log('[Index] Authenticated, redirecting to portal for role:', user.role);
     if (user.role === 'manager' || user.role === 'owner') {
       return <Redirect href="/(portal)/manager" />;
-    } else {
-      return <Redirect href="/(portal)/employee" />;
     }
+    return <Redirect href="/(portal)/employee" />;
   }
 
-  // Not authenticated, redirect to login
-  console.log('[Index] Not authenticated, redirecting to login');
-  return <Redirect href="/login" />;
+  // Signed out: a device that has never reached a dashboard opens on Welcome (MyResto
+  // only — the Boathouse build has no join codes or owner setup); everyone else, Login.
+  return <Redirect href={hasAccount ? '/login' : '/welcome'} />;
 }
 
 const styles = StyleSheet.create({
@@ -43,11 +43,5 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666666',
   },
 });

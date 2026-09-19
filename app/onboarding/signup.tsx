@@ -1,24 +1,33 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  Alert,
-} from 'react-native';
+/**
+ * Create Your Account (s86, mockup O-2) — owner setup 1 of 2. One glass card: names, the
+ * username preview chip (the thing they must remember), email, password pair, inline error.
+ * Nothing is created here — the details ride to create-restaurant, which makes the org +
+ * owner atomically.
+ */
+import React, { useRef, useState } from 'react';
+import { View, Text, TextInput, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { splashColors } from '@/styles/commonStyles';
-import { IconSymbol } from '@/components/IconSymbol';
+import GlassCard from '@/components/GlassCard';
+import { useThemeColors } from '@/hooks/useThemeColors';
+import { fonts } from '@/constants/fonts';
 import { deriveUsername } from '@/utils/username';
+import {
+  OnbScreen,
+  TopBar,
+  Hero,
+  IconField,
+  EyeToggle,
+  UsernameChip,
+  ErrorLine,
+  CtaButton,
+  LinkRow,
+} from '@/components/onboarding/OnboardingKit';
 
 export default function SignupScreen() {
   const router = useRouter();
   const { t } = useTranslation();
+  const colors = useThemeColors();
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -27,6 +36,12 @@ export default function SignupScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [error, setError] = useState('');
+
+  const lastNameRef = useRef<TextInput>(null);
+  const emailRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
+  const confirmRef = useRef<TextInput>(null);
 
   const validate = (): string | null => {
     if (!firstName.trim()) return t('onboarding.first_name_required');
@@ -44,9 +59,9 @@ export default function SignupScreen() {
   const usernamePreview = deriveUsername(firstName, lastName);
 
   const handleContinue = () => {
-    const error = validate();
-    if (error) {
-      Alert.alert(t('onboarding.validation_error'), error);
+    const message = validate();
+    if (message) {
+      setError(message);
       return;
     }
 
@@ -65,275 +80,119 @@ export default function SignupScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Header */}
-        <View style={styles.headerContainer}>
-          <Text style={styles.title}>{t('onboarding.signup_title')}</Text>
-          <Text style={styles.subtitle}>
-            {t('onboarding.signup_subtitle')}
-          </Text>
+    <OnbScreen header={<TopBar onBack={() => router.back()} eyebrow={t('onboarding.owner_setup_step', { n: 1 })} />}>
+      <Hero align="left" title={t('onboarding.signup_title')} subtitle={t('onboarding.signup_subtitle')} />
+
+      <GlassCard variant="glass" radius={16} style={styles.card}>
+        {/* First / Last name row */}
+        <View style={styles.nameRow}>
+          <IconField
+            containerStyle={styles.nameField}
+            label={t('onboarding.first_name')}
+            placeholder={t('onboarding.first_name')}
+            value={firstName}
+            onChangeText={(v) => { setFirstName(v); setError(''); }}
+            autoCapitalize="words"
+            autoCorrect={false}
+            textContentType="givenName"
+            autoComplete="given-name"
+            returnKeyType="next"
+            onSubmitEditing={() => lastNameRef.current?.focus()}
+            blurOnSubmit={false}
+          />
+          <IconField
+            ref={lastNameRef}
+            containerStyle={styles.nameField}
+            label={t('onboarding.last_name')}
+            placeholder={t('onboarding.last_name')}
+            value={lastName}
+            onChangeText={(v) => { setLastName(v); setError(''); }}
+            autoCapitalize="words"
+            autoCorrect={false}
+            textContentType="familyName"
+            autoComplete="family-name"
+            returnKeyType="next"
+            onSubmitEditing={() => emailRef.current?.focus()}
+            blurOnSubmit={false}
+          />
         </View>
 
-        {/* Form */}
-        <View style={styles.formContainer}>
-          {/* First / Last name row */}
-          <View style={styles.nameRow}>
-            <View style={[styles.inputContainer, styles.nameField]}>
-              <IconSymbol
-                ios_icon_name="person.fill"
-                android_material_icon_name="person"
-                size={20}
-                color={splashColors.textSecondary}
-                style={styles.inputIcon}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder={t('onboarding.first_name')}
-                placeholderTextColor={splashColors.textSecondary}
-                value={firstName}
-                onChangeText={setFirstName}
-                autoCapitalize="words"
-              />
-            </View>
-            <View style={[styles.inputContainer, styles.nameField]}>
-              <TextInput
-                style={styles.input}
-                placeholder={t('onboarding.last_name')}
-                placeholderTextColor={splashColors.textSecondary}
-                value={lastName}
-                onChangeText={setLastName}
-                autoCapitalize="words"
-              />
-            </View>
+        {/* Username preview — your login name is first initial + last name. */}
+        {usernamePreview ? (
+          <View style={styles.usernameRow}>
+            <Text style={[styles.usernameLead, { color: colors.textSecondary }]}>{t('onboarding.username_will_be')}</Text>
+            <UsernameChip username={usernamePreview} />
           </View>
+        ) : null}
 
-          {/* Email */}
-          <View style={styles.inputContainer}>
-            <IconSymbol
-              ios_icon_name="envelope.fill"
-              android_material_icon_name="email"
-              size={20}
-              color={splashColors.textSecondary}
-              style={styles.inputIcon}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder={t('onboarding.email')}
-              placeholderTextColor={splashColors.textSecondary}
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              keyboardType="email-address"
-            />
-          </View>
+        <IconField
+          ref={emailRef}
+          label={t('onboarding.email')}
+          iosIcon="envelope.fill"
+          androidIcon="email"
+          placeholder={t('onboarding.email')}
+          value={email}
+          onChangeText={(v) => { setEmail(v); setError(''); }}
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="email-address"
+          textContentType="emailAddress"
+          autoComplete="email"
+          returnKeyType="next"
+          onSubmitEditing={() => passwordRef.current?.focus()}
+          blurOnSubmit={false}
+        />
 
-          {/* Username hint — your login name is first initial + last name. */}
-          {usernamePreview ? (
-            <View style={styles.usernameHint}>
-              <IconSymbol
-                ios_icon_name="info.circle.fill"
-                android_material_icon_name="info"
-                size={16}
-                color={splashColors.primary}
-              />
-              <Text style={styles.usernameHintText}>
-                {t('onboarding.username_will_be')}{' '}
-                <Text style={styles.usernameHintBold}>{usernamePreview}</Text>
-                {'  '}{t('onboarding.username_use_hint')}
-              </Text>
-            </View>
-          ) : null}
+        <IconField
+          ref={passwordRef}
+          label={t('onboarding.password')}
+          iosIcon="lock.fill"
+          androidIcon="lock"
+          placeholder={t('onboarding.password')}
+          value={password}
+          onChangeText={(v) => { setPassword(v); setError(''); }}
+          secureTextEntry={!showPassword}
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="new-password"
+          returnKeyType="next"
+          onSubmitEditing={() => confirmRef.current?.focus()}
+          blurOnSubmit={false}
+          trailing={<EyeToggle shown={showPassword} onToggle={() => setShowPassword((v) => !v)} />}
+        />
 
-          {/* Password */}
-          <View style={styles.inputContainer}>
-            <IconSymbol
-              ios_icon_name="lock.fill"
-              android_material_icon_name="lock"
-              size={20}
-              color={splashColors.textSecondary}
-              style={styles.inputIcon}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder={t('onboarding.password')}
-              placeholderTextColor={splashColors.textSecondary}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry={!showPassword}
-              autoCapitalize="none"
-            />
-            <TouchableOpacity
-              onPress={() => setShowPassword(!showPassword)}
-              style={styles.eyeIcon}
-            >
-              <IconSymbol
-                ios_icon_name={showPassword ? 'eye.slash.fill' : 'eye.fill'}
-                android_material_icon_name={showPassword ? 'visibility-off' : 'visibility'}
-                size={20}
-                color={splashColors.textSecondary}
-              />
-            </TouchableOpacity>
-          </View>
+        <IconField
+          ref={confirmRef}
+          label={t('onboarding.confirm_password')}
+          iosIcon="lock.fill"
+          androidIcon="lock"
+          placeholder={t('onboarding.confirm_password_ph')}
+          value={confirmPassword}
+          onChangeText={(v) => { setConfirmPassword(v); setError(''); }}
+          secureTextEntry={!showConfirmPassword}
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="new-password"
+          returnKeyType="done"
+          onSubmitEditing={handleContinue}
+          hint={t('onboarding.password_hint')}
+          trailing={<EyeToggle shown={showConfirmPassword} onToggle={() => setShowConfirmPassword((v) => !v)} />}
+        />
 
-          {/* Confirm Password */}
-          <View style={styles.inputContainer}>
-            <IconSymbol
-              ios_icon_name="lock.fill"
-              android_material_icon_name="lock"
-              size={20}
-              color={splashColors.textSecondary}
-              style={styles.inputIcon}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder={t('onboarding.confirm_password')}
-              placeholderTextColor={splashColors.textSecondary}
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              secureTextEntry={!showConfirmPassword}
-              autoCapitalize="none"
-            />
-            <TouchableOpacity
-              onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-              style={styles.eyeIcon}
-            >
-              <IconSymbol
-                ios_icon_name={showConfirmPassword ? 'eye.slash.fill' : 'eye.fill'}
-                android_material_icon_name={showConfirmPassword ? 'visibility-off' : 'visibility'}
-                size={20}
-                color={splashColors.textSecondary}
-              />
-            </TouchableOpacity>
-          </View>
+        <ErrorLine message={error} />
+        <CtaButton label={t('onboarding.continue')} onPress={handleContinue} />
+      </GlassCard>
 
-          {/* Continue Button */}
-          <TouchableOpacity style={styles.primaryButton} onPress={handleContinue}>
-            <Text style={styles.primaryButtonText}>{t('onboarding.continue')}</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Sign In Link */}
-        <TouchableOpacity
-          style={styles.signInLink}
-          onPress={() => router.replace('/login')}
-        >
-          <Text style={styles.signInText}>
-            {t('onboarding.already_have_account')}{' '}
-            <Text style={styles.signInTextBold}>{t('login.sign_in')}</Text>
-          </Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      {/* The last escape route — back to Welcome, not /login. */}
+      <LinkRow lead={t('onboarding.already_have_account')} label={t('login.sign_in')} onPress={() => router.replace('/welcome')} />
+    </OnbScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: splashColors.background,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingTop: 80,
-    paddingHorizontal: 24,
-    paddingBottom: 40,
-  },
-  headerContainer: {
-    marginBottom: 32,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: splashColors.text,
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: splashColors.textSecondary,
-    lineHeight: 22,
-  },
-  formContainer: {
-    width: '100%',
-  },
-  nameRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  nameField: {
-    flex: 1,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    marginBottom: 16,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  inputIcon: {
-    marginRight: 12,
-  },
-  input: {
-    flex: 1,
-    height: 50,
-    fontSize: 16,
-    color: splashColors.text,
-  },
-  eyeIcon: {
-    padding: 8,
-  },
-  usernameHint: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: -4,
-    marginBottom: 16,
-    paddingHorizontal: 4,
-  },
-  usernameHintText: {
-    flex: 1,
-    fontSize: 13,
-    color: splashColors.textSecondary,
-  },
-  usernameHintBold: {
-    color: splashColors.primary,
-    fontWeight: '700',
-  },
-  primaryButton: {
-    backgroundColor: splashColors.primary,
-    borderRadius: 12,
-    height: 54,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 8,
-    boxShadow: '0px 4px 8px rgba(44, 95, 141, 0.2)',
-    elevation: 4,
-  },
-  primaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  signInLink: {
-    marginTop: 24,
-    alignItems: 'center',
-  },
-  signInText: {
-    fontSize: 15,
-    color: splashColors.textSecondary,
-  },
-  signInTextBold: {
-    color: splashColors.primary,
-    fontWeight: '600',
-  },
+  card: { padding: 14, gap: 10 },
+  nameRow: { flexDirection: 'row', gap: 10 },
+  nameField: { flex: 1, minWidth: 0 },
+  usernameRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
+  usernameLead: { fontFamily: fonts.body.regular, fontSize: 12 },
 });

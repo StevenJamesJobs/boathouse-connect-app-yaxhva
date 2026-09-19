@@ -4225,8 +4225,26 @@ export type Database = {
         Args: { p_actor_id: string; p_published: boolean; p_review_id: string }
         Returns: boolean
       }
+      join_prepare: {
+        Args: { p_email: string; p_join_code: string; p_username: string }
+        Returns: {
+          allow_self_signup: boolean
+          email_in_use: boolean
+          job_titles: string[]
+          org_name: string
+          username: string
+        }[]
+      }
       join_signup: {
-        Args: { p_email?: string; p_join_code: string; p_name: string; p_username: string }
+        Args: {
+          p_email?: string
+          p_job_titles?: string[]
+          p_join_code: string
+          p_name: string
+          p_phone?: string
+          p_tagline?: string
+          p_username: string
+        }
         Returns: {
           badge_title: string
           email: string
@@ -5823,6 +5841,7 @@ export type Database = {
           p_restaurant_name: string
           p_reward_currency_name?: string
           p_state?: string
+          p_tos_version?: string
           p_weather_location?: string
           p_zip?: string
         }
