@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, ScrollView } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { hexToRgba } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { MENU_ICON_OPTIONS } from '@/constants/menuIcons';
 
@@ -78,13 +79,19 @@ export default function MenuIconPicker({ label, value, onChange, compact }: Menu
   if (compact) {
     return (
       <View>
+        {/* s86: a 43pt tinted-glass square (sits flush beside a 43pt field) + a chevron badge
+            that says "this opens a picker". */}
         <TouchableOpacity
-          style={[styles.compactTrigger, { backgroundColor: colors.card, borderColor: colors.border }]}
+          style={[styles.compactTrigger, { backgroundColor: hexToRgba(colors.tint, 0.12), borderColor: hexToRgba(colors.tint, 0.32) }]}
           onPress={() => setOpen(true)}
           activeOpacity={0.7}
+          accessibilityRole="button"
           accessibilityLabel={label}
         >
-          <IconSymbol ios_icon_name={value} android_material_icon_name={value} size={24} color={colors.primary} />
+          <IconSymbol ios_icon_name={value} android_material_icon_name={value} size={20} color={colors.tint} />
+          <View style={[styles.compactBadge, { backgroundColor: colors.card, borderColor: colors.glassBorder }]}>
+            <IconSymbol ios_icon_name="chevron.down" android_material_icon_name="expand-more" size={9} color={colors.textSecondary} />
+          </View>
         </TouchableOpacity>
         {pickerModal}
       </View>
@@ -122,9 +129,20 @@ const styles = StyleSheet.create({
   },
   triggerText: { flex: 1, fontSize: 14 },
   compactTrigger: {
-    width: 52,
-    height: 52,
-    borderRadius: 10,
+    width: 43,
+    height: 43,
+    borderRadius: 13,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  compactBadge: {
+    position: 'absolute',
+    right: -4,
+    bottom: -4,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',

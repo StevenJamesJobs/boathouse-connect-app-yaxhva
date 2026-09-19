@@ -3,7 +3,6 @@ import {
   View,
   Text,
   TouchableOpacity,
-  Pressable,
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
@@ -22,8 +21,7 @@ import { fonts } from '@/constants/fonts';
 import { IconSymbol } from '@/components/IconSymbol';
 import AmbientGlow from '@/components/AmbientGlow';
 import GlassCard from '@/components/GlassCard';
-import ShineButton from '@/components/quiz/ShineButton';
-import { FieldLabel, GlassTextInput, Hint } from '@/components/content/FormKit';
+import { CtaButton, UsernameChip, IconField, EyeToggle } from '@/components/onboarding/OnboardingKit';
 import { StorageImage } from '@/components/StorageImage';
 import { supabase } from '@/app/integrations/supabase/client';
 import { translateServerError } from '@/utils/serverErrors';
@@ -169,83 +167,62 @@ export default function ChangePasswordScreen() {
             </GlassCard>
             <Text style={styles.title}>{t('change_password_screen.title2')}</Text>
             <Text style={styles.subtitle}>{t('change_password_screen.subtitle2')}</Text>
+            {/* The one thing they must remember — shown here instead of a pop-up (s86). */}
+            {!!user?.username && (
+              <View style={styles.usernameRow}>
+                <Text style={styles.usernameLead}>{t('change_password_screen.your_username_is')}</Text>
+                <UsernameChip username={user.username} />
+              </View>
+            )}
           </View>
 
           {/* Fields */}
           <GlassCard variant="glass" radius={16} style={styles.card}>
-            <View>
-              <FieldLabel label={t('change_password_screen.new_password')} />
-              <View style={styles.inputWrap}>
-                <GlassTextInput
-                  style={styles.inputWithEye}
-                  placeholder={t('change_password_screen.new_password')}
-                  value={newPassword}
-                  onChangeText={(text) => {
-                    setNewPassword(text);
-                    setError('');
-                  }}
-                  secureTextEntry={!showNewPassword}
-                  autoCapitalize="none"
-                  returnKeyType="next"
-                  editable={!isLoading}
-                />
-                <Pressable
-                  style={styles.eye}
-                  onPress={() => setShowNewPassword((v) => !v)}
-                  disabled={isLoading}
-                  hitSlop={6}
-                >
-                  <IconSymbol
-                    ios_icon_name={showNewPassword ? 'eye.slash.fill' : 'eye.fill'}
-                    android_material_icon_name={showNewPassword ? 'visibility-off' : 'visibility'}
-                    size={18}
-                    color={colors.textSecondary}
-                  />
-                </Pressable>
-              </View>
-            </View>
+            <IconField
+              label={t('change_password_screen.new_password')}
+              iosIcon="key.fill"
+              androidIcon="vpn-key"
+              placeholder={t('change_password_screen.new_password')}
+              value={newPassword}
+              onChangeText={(text) => {
+                setNewPassword(text);
+                setError('');
+              }}
+              secureTextEntry={!showNewPassword}
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="next"
+              editable={!isLoading}
+              trailing={<EyeToggle shown={showNewPassword} onToggle={() => setShowNewPassword((v) => !v)} disabled={isLoading} />}
+            />
 
-            <View>
-              <FieldLabel label={t('profile.confirm_new_password')} />
-              <View style={styles.inputWrap}>
-                <GlassTextInput
-                  style={styles.inputWithEye}
-                  placeholder={t('change_password_screen.confirm_placeholder')}
-                  value={confirmPassword}
-                  onChangeText={(text) => {
-                    setConfirmPassword(text);
-                    setError('');
-                  }}
-                  secureTextEntry={!showConfirmPassword}
-                  autoCapitalize="none"
-                  returnKeyType="done"
-                  onSubmitEditing={handleChangePassword}
-                  editable={!isLoading}
-                />
-                <Pressable
-                  style={styles.eye}
-                  onPress={() => setShowConfirmPassword((v) => !v)}
-                  disabled={isLoading}
-                  hitSlop={6}
-                >
-                  <IconSymbol
-                    ios_icon_name={showConfirmPassword ? 'eye.slash.fill' : 'eye.fill'}
-                    android_material_icon_name={showConfirmPassword ? 'visibility-off' : 'visibility'}
-                    size={18}
-                    color={colors.textSecondary}
-                  />
-                </Pressable>
-              </View>
-              <Hint>{t('change_password_screen.hint2')}</Hint>
-            </View>
+            <IconField
+              label={t('profile.confirm_new_password')}
+              iosIcon="key.fill"
+              androidIcon="vpn-key"
+              placeholder={t('change_password_screen.confirm_placeholder')}
+              value={confirmPassword}
+              onChangeText={(text) => {
+                setConfirmPassword(text);
+                setError('');
+              }}
+              secureTextEntry={!showConfirmPassword}
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="done"
+              onSubmitEditing={handleChangePassword}
+              editable={!isLoading}
+              trailing={<EyeToggle shown={showConfirmPassword} onToggle={() => setShowConfirmPassword((v) => !v)} disabled={isLoading} />}
+              hint={t('change_password_screen.hint2')}
+            />
 
             {error ? <Text style={[styles.error, { color: errorColor }]}>{error}</Text> : null}
 
-            <ShineButton
+            <CtaButton
               label={t('profile.update_password')}
-              gradient={[colors.tint, colors.tint]}
               iosIcon="checkmark"
               androidIcon="check"
+              leading
               onPress={handleChangePassword}
               disabled={orgLoading}
               loading={isLoading || orgLoading}
@@ -355,26 +332,22 @@ function createStyles(colors: ThemeColorSet) {
       maxWidth: 280,
     },
 
+    usernameRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginTop: 4,
+    },
+    usernameLead: {
+      fontFamily: fonts.body.regular,
+      fontSize: 12,
+      color: colors.textSecondary,
+    },
+
     // Card
     card: {
       padding: 14,
       gap: 10,
-    },
-    inputWrap: {
-      position: 'relative',
-      justifyContent: 'center',
-    },
-    inputWithEye: {
-      paddingRight: 44,
-    },
-    eye: {
-      position: 'absolute',
-      right: 4,
-      top: 0,
-      bottom: 0,
-      width: 36,
-      alignItems: 'center',
-      justifyContent: 'center',
     },
     error: {
       fontFamily: fonts.body.regular,

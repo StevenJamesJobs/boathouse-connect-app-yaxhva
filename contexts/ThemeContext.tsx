@@ -20,9 +20,10 @@ import {
 const PALETTE_STORAGE_KEY = '@app_theme_palette';
 const MODE_STORAGE_KEY = '@app_theme_mode';
 
-// Locked redesign defaults: MyResto → Moonstone Dark, Boathouse → Ocean Dark.
+// Defaults (Steve, s86): MyResto → Moonstone Dark (the logo palette), Boathouse → Ocean Light.
+// Only devices that never saved a mode feel a default change.
 const DEFAULT_PALETTE: PresetPaletteId = IS_MCLOONES ? 'ocean' : 'moonstone';
-const DEFAULT_MODE: ThemeMode = 'dark';
+const DEFAULT_MODE: ThemeMode = IS_MCLOONES ? 'light' : 'dark';
 
 interface ThemeContextType {
   palette: ThemePaletteId;
@@ -42,8 +43,8 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType>({
   palette: DEFAULT_PALETTE,
   mode: DEFAULT_MODE,
-  resolvedMode: 'dark',
-  colors: themePalettes[DEFAULT_PALETTE].dark,
+  resolvedMode: DEFAULT_MODE === 'light' ? 'light' : 'dark',
+  colors: themePalettes[DEFAULT_PALETTE][DEFAULT_MODE === 'light' ? 'light' : 'dark'],
   activePalette: themePalettes[DEFAULT_PALETTE],
   customAccent: null,
   setPalette: async () => {},

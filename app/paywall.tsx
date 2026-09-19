@@ -1,54 +1,43 @@
-import React, { useState, useMemo, useCallback } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  Alert,
-  ActivityIndicator,
-  Platform,
-  Linking,
-} from 'react-native';
+/**
+ * Paywall (s86, mockup F-2) — the trial-ended wall, drawn in the s84 Subscription grammar:
+ * the compare matrix (premium rows first, faint gold wash, gold checks), Get Base beside the
+ * gold Get Premium, then Restore · Log out. Every string lives in the `paywall` namespace.
+ * Log out is the screen's one exit for someone signed in to the wrong account.
+ */
+import React, { useState, useCallback } from 'react';
+import { View, Text, Pressable, StyleSheet, Alert, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { hexToRgba } from '@/styles/commonStyles';
+import { fonts } from '@/constants/fonts';
 import { IconSymbol } from '@/components/IconSymbol';
+import GlassCard from '@/components/GlassCard';
+import ShineButton from '@/components/quiz/ShineButton';
+import { useAuth } from '@/contexts/AuthContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { REVENUECAT_CONFIGURED, PRODUCTS } from '@/config/revenueCat';
 import { translateServerError } from '@/utils/serverErrors';
+import { OnbScreen, Disc, GhostButton, LegalFooter, useOnbAccents } from '@/components/onboarding/OnboardingKit';
 
-const BASE_FEATURES = [
-  { label: 'Manual Schedule Builder', included: true },
-  { label: 'Menu Editor', included: true },
-  { label: 'Employee Management', included: true },
-  { label: 'Messaging & Notifications', included: true },
-  { label: 'Rewards System', included: true },
-  { label: 'Word Search Game', included: true },
-  { label: 'Guides & Training', included: true },
-];
-
-const PREMIUM_EXTRAS = [
-  'AI Schedule Upload',
-  'Quizzes & Exams',
-  'Menu Memory Tiles',
-  'Picture This! Game',
-  'Auto Google Reviews',
-];
+const GOLD_INK = '#1A1200';
 
 export default function PaywallScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const colors = useThemeColors();
+  const a = useOnbAccents();
+  const { logout } = useAuth();
   const { organization } = useOrganization();
   const { refreshSubscription } = useSubscription();
-  const styles = useMemo(() => createStyles(colors), [colors]);
   const [purchasing, setPurchasing] = useState(false);
 
   const handlePurchase = useCallback(async (productId: string) => {
     if (!REVENUECAT_CONFIGURED) {
       Alert.alert(
-        'Setup Required',
-        'In-app purchases will be available when the app is published to the App Store.',
+        t('paywall.setup_required_title'),
+        t('paywall.setup_required_msg'),
       );
       return;
     }
@@ -59,7 +48,7 @@ export default function PaywallScreen() {
       const offerings = await Purchases.getOfferings();
 
       if (!offerings.current) {
-        Alert.alert('Error', 'No subscription plans are currently available.');
+        Alert.alert(t('paywall.error_title'), t('paywall.no_plans'));
         setPurchasing(false);
         return;
       }
@@ -69,7 +58,7 @@ export default function PaywallScreen() {
       );
 
       if (!pkg) {
-        Alert.alert('Error', 'The selected plan is not available.');
+        Alert.alert(t('paywall.error_title'), t('paywall.plan_unavailable'));
         setPurchasing(false);
         return;
       }
@@ -77,21 +66,21 @@ export default function PaywallScreen() {
       await Purchases.purchasePackage(pkg);
       await refreshSubscription();
 
-      Alert.alert('Welcome Back!', 'Your subscription is active. Enjoy MyResto Connect!', [
-        { text: 'Continue', onPress: () => router.replace('/(portal)/manager' as any) },
+      Alert.alert(t('paywall.welcome_back_title'), t('paywall.welcome_back_msg'), [
+        { text: t('paywall.continue'), onPress: () => router.replace('/(portal)/manager' as any) },
       ]);
     } catch (err: any) {
       if (!err.userCancelled) {
-        Alert.alert('Purchase Error', translateServerError(err, 'Something went wrong.'));
+        Alert.alert(t('paywall.purchase_error_title'), translateServerError(err, t('paywall.purchase_error_fallback')));
       }
     } finally {
       setPurchasing(false);
     }
-  }, [refreshSubscription, router]);
+  }, [refreshSubscription, router, t]);
 
   const handleRestore = useCallback(async () => {
     if (!REVENUECAT_CONFIGURED) {
-      Alert.alert('Setup Required', 'In-app purchases are not configured yet.');
+      Alert.alert(t('paywall.setup_required_title'), t('paywall.setup_required_short'));
       return;
     }
 
@@ -105,295 +94,165 @@ export default function PaywallScreen() {
 
       if (hasActive) {
         await refreshSubscription();
-        Alert.alert('Restored!', 'Your subscription has been restored.', [
-          { text: 'Continue', onPress: () => router.replace('/(portal)/manager' as any) },
+        Alert.alert(t('paywall.restored_title'), t('paywall.restored_msg'), [
+          { text: t('paywall.continue'), onPress: () => router.replace('/(portal)/manager' as any) },
         ]);
       } else {
-        Alert.alert('No Active Subscription', 'No previous subscription was found for this account.');
+        Alert.alert(t('paywall.no_active_title'), t('paywall.no_active_msg'));
       }
     } catch (err: any) {
-      Alert.alert('Error', translateServerError(err, 'Could not restore purchases.'));
+      Alert.alert(t('paywall.error_title'), translateServerError(err, t('paywall.restore_error_fallback')));
     } finally {
       setPurchasing(false);
     }
-  }, [refreshSubscription, router]);
+  }, [refreshSubscription, router, t]);
+
+  // The one way out for someone signed in to the wrong account.
+  const handleLogout = useCallback(async () => {
+    await logout();
+    router.replace('/login');
+  }, [logout, router]);
+
+  const gold = a.isDark ? '#F59E0B' : '#B45309';
+
+  // One literal t() per feature — the i18n harvester greps for literals.
+  const premiumFeatures = [
+    t('paywall.feat_ai_schedule'),
+    t('paywall.feat_quizzes'),
+    t('paywall.feat_memory'),
+    t('paywall.feat_picture_this'),
+    t('paywall.feat_auto_reviews'),
+  ];
+  const baseFeatures = [
+    t('paywall.feat_schedule_builder'),
+    t('paywall.feat_menu_editor'),
+    t('paywall.feat_employees'),
+    t('paywall.feat_messaging'),
+    t('paywall.feat_rewards_games_guides'),
+  ];
+
+  const hairline = { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.hairline };
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      bounces={false}
-    >
-      {/* Hero Section */}
-      <View style={styles.hero}>
-        <View style={styles.heroIconWrap}>
-          <IconSymbol
-            ios_icon_name="bolt.circle.fill"
-            android_material_icon_name="bolt"
-            size={56}
-            color={colors.primary}
-          />
+    <OnbScreen contentStyle={styles.content}>
+      {/* Header row — bolt left of the trial-ended line */}
+      <View style={styles.head}>
+        <Disc style={styles.disc}>
+          <IconSymbol ios_icon_name="bolt.fill" android_material_icon_name="bolt" size={28} color={gold} />
+        </Disc>
+        <View style={styles.headText}>
+          <Text style={[styles.title, { color: colors.text }]}>{t('paywall.title')}</Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{t('paywall.subtitle', { orgName: organization.name })}</Text>
         </View>
-        <Text style={styles.heroTitle}>Your Free Trial Has Ended</Text>
-        <Text style={styles.heroSubtitle}>
-          Choose a plan to keep {organization.name} connected.
-        </Text>
       </View>
 
-      {/* Premium Plan — highlighted first */}
-      <View style={[styles.planCard, styles.premiumHighlight]}>
-        <View style={styles.recommendedBadge}>
-          <Text style={styles.recommendedText}>RECOMMENDED</Text>
-        </View>
-
-        <View style={styles.planHeader}>
-          <Text style={styles.planTitle}>Premium</Text>
-          <View style={styles.priceRow}>
-            <Text style={styles.priceAmount}>$15</Text>
-            <Text style={styles.pricePeriod}>/month</Text>
+      {/* Compare matrix — premium rows first */}
+      <GlassCard variant="glass" radius={18} style={styles.matrix}>
+        <View style={[styles.mxRow, styles.mxHead, { backgroundColor: colors.glass }]}>
+          <Text style={[styles.eyebrow, { color: colors.textSecondary }]} numberOfLines={1}>{t('paywall.whats_included')}</Text>
+          <View style={styles.colBase}>
+            <Text style={[styles.colHead, { color: colors.text }]} numberOfLines={1}>{t('paywall.base')}</Text>
+            <Text style={[styles.colSub, { color: colors.textSecondary }]} numberOfLines={1}>{t('paywall.price_base')}</Text>
+          </View>
+          <View style={styles.colPrem}>
+            <Text style={[styles.colHead, { color: gold }]} numberOfLines={1}>{t('paywall.premium')}</Text>
+            <Text style={[styles.colSub, { color: colors.textSecondary }]} numberOfLines={1}>{t('paywall.price_premium')}</Text>
           </View>
         </View>
 
-        <Text style={styles.planDesc}>
-          Everything your team needs — all features unlocked.
-        </Text>
-
-        <View style={styles.featureList}>
-          {BASE_FEATURES.map(f => (
-            <View key={f.label} style={styles.featureRow}>
-              <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={14} color="#D4A843" />
-              <Text style={styles.featureText}>{f.label}</Text>
+        {premiumFeatures.map((label) => (
+          <View key={label} style={[styles.mxRow, hairline, { backgroundColor: hexToRgba(gold, 0.06) }]}>
+            <Text style={[styles.mxLabel, { color: colors.text }]}>{label}</Text>
+            <View style={styles.colBase}>
+              <Text style={[styles.dash, { color: colors.textSecondary }]}>—</Text>
             </View>
-          ))}
-          {PREMIUM_EXTRAS.map(label => (
-            <View key={label} style={styles.featureRow}>
-              <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={14} color="#D4A843" />
-              <Text style={[styles.featureText, styles.premiumFeatureText]}>{label}</Text>
+            <View style={styles.colPrem}>
+              <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={14} color={gold} />
             </View>
-          ))}
-        </View>
-
-        <TouchableOpacity
-          style={styles.premiumButton}
-          onPress={() => handlePurchase(PRODUCTS.PREMIUM_MONTHLY)}
-          disabled={purchasing}
-        >
-          {purchasing ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text style={styles.premiumButtonText}>Get Premium — $15/mo</Text>
-          )}
-        </TouchableOpacity>
-      </View>
-
-      {/* Base Plan */}
-      <View style={[styles.planCard, { borderColor: colors.border }]}>
-        <View style={styles.planHeader}>
-          <Text style={styles.planTitle}>Base</Text>
-          <View style={styles.priceRow}>
-            <Text style={styles.priceAmount}>$11</Text>
-            <Text style={styles.pricePeriod}>/month</Text>
           </View>
-        </View>
+        ))}
 
-        <Text style={styles.planDesc}>
-          Core features for managing your team.
-        </Text>
-
-        <View style={styles.featureList}>
-          {BASE_FEATURES.map(f => (
-            <View key={f.label} style={styles.featureRow}>
-              <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={14} color="#5B8C5A" />
-              <Text style={styles.featureText}>{f.label}</Text>
+        {baseFeatures.map((label) => (
+          <View key={label} style={[styles.mxRow, hairline]}>
+            <Text style={[styles.mxLabel, { color: colors.text }]}>{label}</Text>
+            <View style={styles.colBase}>
+              <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={14} color={a.ok} />
             </View>
-          ))}
-        </View>
+            <View style={styles.colPrem}>
+              <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={14} color={a.ok} />
+            </View>
+          </View>
+        ))}
+      </GlassCard>
 
-        <TouchableOpacity
-          style={[styles.baseButton, { borderColor: colors.primary }]}
+      {/* Get Base · Get Premium */}
+      <View style={styles.btnRow}>
+        <GhostButton
+          label={t('paywall.get_base')}
           onPress={() => handlePurchase(PRODUCTS.BASE_MONTHLY)}
           disabled={purchasing}
-        >
-          {purchasing ? (
-            <ActivityIndicator color={colors.primary} />
-          ) : (
-            <Text style={[styles.baseButtonText, { color: colors.primary }]}>Get Base — $11/mo</Text>
-          )}
-        </TouchableOpacity>
+          style={styles.baseBtn}
+        />
+        <ShineButton
+          label={t('paywall.get_premium')}
+          gradient={[gold, gold]}
+          ink={GOLD_INK}
+          onPress={() => handlePurchase(PRODUCTS.PREMIUM_MONTHLY)}
+          disabled={purchasing}
+          loading={purchasing}
+          style={styles.premBtn}
+        />
       </View>
 
-      {/* Restore Purchases */}
-      <TouchableOpacity
-        style={styles.restoreButton}
-        onPress={handleRestore}
-        disabled={purchasing}
-      >
-        <Text style={[styles.restoreText, { color: colors.primary }]}>
-          Restore Previous Purchase
-        </Text>
-      </TouchableOpacity>
+      {/* Restore · Log out */}
+      <View style={styles.links}>
+        <Pressable onPress={handleRestore} disabled={purchasing} hitSlop={8} style={purchasing && styles.dim}>
+          <Text style={[styles.link, { color: a.pop }]}>{t('paywall.restore')}</Text>
+        </Pressable>
+        <Text style={[styles.linkDot, { color: colors.textSecondary }]}>·</Text>
+        <Pressable onPress={handleLogout} disabled={purchasing} hitSlop={8} style={purchasing && styles.dim}>
+          <Text style={[styles.link, { color: a.bad }]}>{t('paywall.log_out')}</Text>
+        </Pressable>
+      </View>
 
-      {/* Legal Footer */}
-      <Text style={styles.legalText}>
-        Subscriptions renew monthly and can be cancelled anytime from your{' '}
-        {Platform.OS === 'ios' ? 'App Store' : 'Google Play'} subscription settings.
-        Payment will be charged to your {Platform.OS === 'ios' ? 'Apple ID' : 'Google'} account.
+      <Text style={[styles.legalNote, { color: colors.textSecondary }]}>
+        {Platform.OS === 'ios' ? t('paywall.legal_ios') : t('paywall.legal_android')}
       </Text>
-
-      <View style={{ height: 40 }} />
-    </ScrollView>
+      <LegalFooter showVersion={false} />
+    </OnbScreen>
   );
 }
 
-function createStyles(colors: ReturnType<typeof useThemeColors>) {
-  return StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.background,
-    },
-    content: {
-      padding: 20,
-      paddingTop: Platform.OS === 'ios' ? 80 : 40,
-    },
-    hero: {
-      alignItems: 'center',
-      marginBottom: 28,
-    },
-    heroIconWrap: {
-      width: 80,
-      height: 80,
-      borderRadius: 40,
-      backgroundColor: colors.primary + '15',
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginBottom: 16,
-    },
-    heroTitle: {
-      fontSize: 24,
-      fontWeight: '800',
-      color: colors.text,
-      textAlign: 'center',
-    },
-    heroSubtitle: {
-      fontSize: 15,
-      color: colors.textSecondary,
-      textAlign: 'center',
-      marginTop: 8,
-      lineHeight: 22,
-    },
-    planCard: {
-      backgroundColor: colors.card,
-      borderRadius: 16,
-      padding: 20,
-      marginBottom: 16,
-      borderWidth: 1,
-    },
-    premiumHighlight: {
-      borderColor: '#D4A843',
-      borderWidth: 2,
-    },
-    recommendedBadge: {
-      position: 'absolute',
-      top: -11,
-      alignSelf: 'center',
-      backgroundColor: '#D4A843',
-      paddingHorizontal: 14,
-      paddingVertical: 4,
-      borderRadius: 10,
-      zIndex: 1,
-      left: '50%',
-      transform: [{ translateX: -55 }],
-    },
-    recommendedText: {
-      color: '#FFFFFF',
-      fontSize: 11,
-      fontWeight: '800',
-      letterSpacing: 1,
-    },
-    planHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 8,
-      marginTop: 4,
-    },
-    planTitle: {
-      fontSize: 22,
-      fontWeight: '700',
-      color: colors.text,
-    },
-    priceRow: {
-      flexDirection: 'row',
-      alignItems: 'baseline',
-    },
-    priceAmount: {
-      fontSize: 28,
-      fontWeight: '800',
-      color: colors.text,
-    },
-    pricePeriod: {
-      fontSize: 14,
-      color: colors.textSecondary,
-      marginLeft: 2,
-    },
-    planDesc: {
-      fontSize: 14,
-      color: colors.textSecondary,
-      marginBottom: 16,
-      lineHeight: 20,
-    },
-    featureList: {
-      marginBottom: 16,
-    },
-    featureRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-      paddingVertical: 4,
-    },
-    featureText: {
-      fontSize: 14,
-      color: colors.text,
-    },
-    premiumFeatureText: {
-      fontWeight: '600',
-    },
-    premiumButton: {
-      backgroundColor: '#D4A843',
-      paddingVertical: 16,
-      borderRadius: 12,
-      alignItems: 'center',
-    },
-    premiumButtonText: {
-      color: '#FFFFFF',
-      fontSize: 17,
-      fontWeight: '700',
-    },
-    baseButton: {
-      paddingVertical: 14,
-      borderRadius: 12,
-      alignItems: 'center',
-      borderWidth: 2,
-    },
-    baseButtonText: {
-      fontSize: 16,
-      fontWeight: '700',
-    },
-    restoreButton: {
-      alignItems: 'center',
-      paddingVertical: 16,
-    },
-    restoreText: {
-      fontSize: 15,
-      fontWeight: '600',
-    },
-    legalText: {
-      fontSize: 11,
-      color: colors.textSecondary,
-      textAlign: 'center',
-      lineHeight: 17,
-      paddingHorizontal: 16,
-      marginTop: 8,
-    },
-  });
-}
+const styles = StyleSheet.create({
+  content: { paddingTop: 26 },
+
+  head: { flexDirection: 'row', alignItems: 'center', gap: 13, paddingTop: 6, paddingHorizontal: 2 },
+  disc: { width: 58, height: 58, borderRadius: 20, marginBottom: 0 },
+  headText: { flex: 1, minWidth: 0 },
+  title: { fontFamily: fonts.display.bold, fontSize: 21, letterSpacing: -0.4 },
+  subtitle: { fontFamily: fonts.body.regular, fontSize: 12.5, lineHeight: 17, marginTop: 2 },
+
+  // Compare matrix (mirrors app/subscription-management.tsx)
+  matrix: { padding: 0 },
+  mxRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 7, paddingHorizontal: 12 },
+  mxHead: { paddingTop: 10, paddingBottom: 8 },
+  eyebrow: { flex: 1, fontFamily: fonts.mono.semibold, fontSize: 9, letterSpacing: 1.2, textTransform: 'uppercase' },
+  colBase: { width: 62, alignItems: 'center' },
+  colPrem: { width: 72, alignItems: 'center' },
+  colHead: { fontFamily: fonts.display.bold, fontSize: 14, textAlign: 'center' },
+  colSub: { fontFamily: fonts.mono.semibold, fontSize: 10, textAlign: 'center' },
+  mxLabel: { flex: 1, fontFamily: fonts.body.regular, fontSize: 12.5, paddingRight: 6 },
+  dash: { fontFamily: fonts.body.regular, fontSize: 12.5, opacity: 0.5 },
+
+  btnRow: { flexDirection: 'row', gap: 10 },
+  baseBtn: { flex: 0.8 },
+  // Tighter side padding so "Get Premium — $15/mo" fits the 1 : 0.8 split on a 375pt phone.
+  premBtn: { flex: 1, paddingHorizontal: 8 },
+
+  links: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 6 },
+  link: { fontFamily: fonts.body.semibold, fontSize: 12.5 },
+  linkDot: { fontFamily: fonts.body.regular, fontSize: 12.5 },
+  dim: { opacity: 0.5 },
+
+  legalNote: { fontFamily: fonts.body.regular, fontSize: 11, lineHeight: 15, textAlign: 'center', paddingHorizontal: 8 },
+});

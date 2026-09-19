@@ -236,7 +236,7 @@ function RootLayoutNav() {
         if (isAuthenticated && user?.role === 'owner' &&
             subscriptionTier === 'expired') {
           const onPaywall = segments[0] === 'paywall';
-          const inOnboarding = segments[0] === 'onboarding' || segments[0] === 'join';
+          const inOnboarding = segments[0] === 'onboarding' || segments[0] === 'join' || segments[0] === 'welcome' || segments[0] === 'personalize';
           if (!onPaywall && !onLogin && !onIndex && !inOnboarding) {
             console.log('[RootLayout] Redirecting to paywall — subscription expired');
             router.replace('/paywall' as any);
@@ -297,7 +297,9 @@ function RootLayoutNav() {
               <MiniProfileProvider>
                 <Stack screenOptions={{ headerShown: false }}>
                   <Stack.Screen name="index" />
+                  <Stack.Screen name="welcome" />
                   <Stack.Screen name="login" />
+                  <Stack.Screen name="personalize" options={{ gestureEnabled: false }} />
                   <Stack.Screen name="onboarding" />
                   <Stack.Screen name="join" />
                   <Stack.Screen name="change-password" options={{ gestureEnabled: false }} />

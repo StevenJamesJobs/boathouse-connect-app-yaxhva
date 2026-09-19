@@ -32,6 +32,10 @@ export interface ShineButtonProps {
   /** Replaces the label with a spinner (button stays pressable-disabled). */
   loading?: boolean;
   style?: ViewStyle;
+  /** Label / icon / spinner colour — literal white unless the fill needs a dark ink. */
+  ink?: string;
+  /** Put the icon after the label (the onboarding "Continue →" grammar). */
+  iconTrailing?: boolean;
 }
 
 export default function ShineButton({
@@ -43,6 +47,8 @@ export default function ShineButton({
   disabled,
   loading,
   style,
+  ink = '#FFFFFF',
+  iconTrailing,
 }: ShineButtonProps) {
   const anim = useRef(new Animated.Value(0)).current;
   const [width, setWidth] = React.useState(0);
@@ -98,18 +104,18 @@ export default function ShineButton({
         />
       )}
       {loading ? (
-        <ActivityIndicator color="#FFFFFF" />
+        <ActivityIndicator color={ink} />
       ) : (
-        <View style={styles.row}>
+        <View style={[styles.row, iconTrailing && { flexDirection: 'row-reverse' }]}>
           {!!iosIcon && !!androidIcon && (
             <IconSymbol
               ios_icon_name={iosIcon as any}
               android_material_icon_name={androidIcon as any}
               size={17}
-              color="#FFFFFF"
+              color={ink}
             />
           )}
-          <Text style={styles.label} numberOfLines={1}>
+          <Text style={[styles.label, { color: ink }]} numberOfLines={1}>
             {label}
           </Text>
         </View>

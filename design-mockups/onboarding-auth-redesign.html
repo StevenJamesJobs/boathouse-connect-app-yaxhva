@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Onboarding & Auth Round 1</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{min-height:100vh;display:flex;flex-direction:column;align-items:center;gap:14px;padding:24px 16px 60px;background:#0C0D11;color:#D6D9DE;font-family:'Inter','SF Pro Text',system-ui,sans-serif}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+h1{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:22px;letter-spacing:-0.3px;color:#F4F6F8;text-wrap:balance;text-align:center}
+h1 span{color:#F99861}
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center;max-width:1000px}
+.grp{display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);padding:6px;border-radius:16px}
+.gl2{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:#6E7681;margin:0 4px 0 6px}
+.tb{background:rgba(255,255,255,0.06);color:#D6D9DE;border:1px solid rgba(255,255,255,0.10);border-radius:11px;padding:7px 11px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:.18s}
+.tb:hover{background:rgba(255,255,255,0.12)}
+.tb:focus-visible{outline:2px solid #F99861;outline-offset:2px}
+.tb.on{background:#F4F6F8;color:#15171C;border-color:#F4F6F8}
+.tb.sm{padding:4px 9px;font-size:11px;border-radius:9px}
+.hint{color:#8A9098;font-size:11.5px;font-family:'JetBrains Mono',ui-monospace,monospace;text-align:center;max-width:980px;line-height:1.7}
+.hint b{color:#D6D9DE;font-weight:600}
+.hint em{font-style:normal;color:#2FBF8F}
+.section{width:100%;max-width:2100px;display:flex;flex-direction:column;align-items:center;gap:12px;margin-top:18px}
+.sh{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#F99861;display:flex;align-items:center;gap:12px;width:100%;max-width:1240px}
+.sh .ln{flex:1;height:1px;background:rgba(255,255,255,0.10)}
+.sh small{color:#8A9098;letter-spacing:1px}
+.row{display:flex;flex-wrap:wrap;gap:18px;justify-content:center;align-items:flex-start;max-width:2100px}
+.col{display:flex;flex-direction:column;gap:10px;align-items:center}
+.concept{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:#8A9098;display:flex;align-items:center;gap:8px;width:392px;max-width:100%}
+.concept b{color:#F99861}
+.concept .ln{flex:1;height:1px;background:rgba(255,255,255,0.08)}
+.bcap{width:392px;max-width:100%;font-size:11.5px;color:#9AA1A8;line-height:1.55}
+.bcap b{color:#E6EAEE;font-weight:600}
+.bcap em{font-style:normal;color:#2FBF8F;font-weight:600}
+.notes{max-width:1240px;width:100%;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;margin-top:6px}
+.note{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:12px 14px;font-size:11.5px;line-height:1.55;color:#AEB4BD}
+.note b{display:block;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:#F99861;margin-bottom:5px}
+.note em{font-style:normal;color:#F4F6F8;font-weight:600}
+.note.warn{border-color:rgba(239,68,68,.35);background:rgba(239,68,68,.06)}
+.note.warn b{color:#F87171}
+
+/* ── the phone shell. Default = the proposed LOGO palette (dark): navy ground, grey quiet-tint, soft-orange highlight ── */
+.phone{
+  --bg:#141724; --text:#FCFCFC; --muted:#A3A8B8; --tint:#F99861; --fireText:#1F2334; --quiet:#ACAFB3; --pop:#F99861;
+  --glass:rgba(255,255,255,0.07); --glassbd:rgba(255,255,255,0.12); --surf:rgba(255,255,255,0.05); --surfbd:rgba(255,255,255,0.09); --hair:rgba(255,255,255,0.07);
+  --glowA:rgba(92,106,178,0.42); --glowB:rgba(249,152,97,0.12); --scrim:rgba(6,8,16,0.58); --thumb:#262B40; --sheetbg:#1C2032; --ringhl:rgba(255,255,255,0.22);
+  --azure:#3B82F6; --violet:#7C5CE0; --gold:#F59E0B; --bad:#EF4444; --ok:#10A56F; --ember:#FFB07A;
+  position:relative;width:392px;max-width:100%;height:840px;background:var(--bg);border-radius:46px;border:1px solid #2A2E36;overflow:hidden;
+  box-shadow:0 40px 90px -30px rgba(0,0,0,0.8);transition:background .3s;display:flex;flex-direction:column;color:var(--text)}
+.phone.t-logo-l{--bg:#F2F3F6;--text:#1F2334;--muted:#6B7084;--tint:#1F2334;--fireText:#FCFCFC;--quiet:#5B6178;--pop:#DC6A2E;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.66);--surfbd:rgba(31,35,52,0.08);--hair:rgba(31,35,52,0.08);--glowA:rgba(31,35,52,0.16);--glowB:rgba(249,152,97,0.22);--scrim:rgba(20,24,40,0.35);--thumb:#DDDFE6;--sheetbg:#F7F8FA;--ringhl:transparent;--azure:#2563EB;--violet:#6D28D9;--gold:#B45309;--ok:#087A52;--bad:#DC2626}
+.phone.t-ocean-d{--bg:#1A2332;--text:#FFFFFF;--muted:#A8B8D8;--tint:#5DA0E5;--fireText:#0A1422;--quiet:var(--tint);--pop:var(--tint);--glass:rgba(255,255,255,0.07);--glassbd:rgba(255,255,255,0.13);--surf:rgba(255,255,255,0.05);--surfbd:rgba(255,255,255,0.10);--hair:rgba(255,255,255,0.08);--glowA:rgba(74,144,226,0.32);--glowB:rgba(93,173,226,0.15);--thumb:#2A3A50;--sheetbg:#222E40}
+.phone.t-ocean-l{--bg:#E8F4F8;--text:#1A3A52;--muted:#4A6B7C;--tint:#1976D2;--fireText:#FFFFFF;--quiet:var(--tint);--pop:var(--tint);--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.7);--surfbd:rgba(13,71,161,0.10);--hair:rgba(13,71,161,0.08);--glowA:rgba(25,118,210,0.18);--glowB:rgba(66,165,245,0.14);--scrim:rgba(10,30,50,0.35);--thumb:#CFE0EA;--sheetbg:#F3F9FC;--ringhl:transparent;--azure:#2563EB;--violet:#6D28D9;--gold:#B45309;--ok:#087A52;--bad:#DC2626}
+.phone.t-mono-d{--bg:#181B21;--text:#F4F6F8;--muted:#9AA1A8;--tint:#FF7A2F;--fireText:#1A1E24;--quiet:var(--tint);--pop:var(--tint);--glowA:rgba(230,234,238,0.12);--glowB:rgba(143,160,172,0.10);--thumb:#2C313A;--sheetbg:#20242B}
+.phone.t-mono-l{--bg:#ECECEE;--text:#22262C;--muted:#6E747C;--tint:#EC6A1E;--fireText:#FFFFFF;--quiet:var(--tint);--pop:var(--tint);--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.66);--surfbd:rgba(0,0,0,0.07);--hair:rgba(0,0,0,0.07);--glowA:rgba(58,66,80,0.10);--glowB:rgba(126,138,148,0.10);--scrim:rgba(20,24,32,0.35);--thumb:#D9DBDF;--sheetbg:#F6F6F8;--ringhl:transparent;--azure:#2563EB;--violet:#6D28D9;--gold:#B45309;--ok:#087A52;--bad:#DC2626}
+.phone.t-midnight-d{--bg:#141628;--text:#F1F1FA;--muted:#A3A6C4;--tint:#8C7CFF;--fireText:#0F0F26;--quiet:var(--tint);--pop:var(--tint);--glowA:rgba(140,124,255,0.30);--glowB:rgba(127,166,255,0.14);--sheetbg:#1C1F36}
+.phone.t-midnight-l{--bg:#EEEEF8;--text:#1E1F3A;--muted:#62648A;--tint:#5B4FD9;--fireText:#FFFFFF;--quiet:var(--tint);--pop:var(--tint);--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.66);--surfbd:rgba(0,0,0,0.07);--hair:rgba(0,0,0,0.07);--glowA:rgba(91,79,217,0.16);--glowB:rgba(76,125,232,0.12);--sheetbg:#F6F6FC;--ringhl:transparent;--ok:#087A52;--gold:#B45309}
+.phone.t-emerald-d{--bg:#0E2220;--text:#ECFDF5;--muted:#97B8AF;--tint:#34D399;--fireText:#062A1F;--quiet:var(--tint);--pop:var(--tint);--glowA:rgba(52,211,153,0.28);--glowB:rgba(95,184,216,0.13);--sheetbg:#15302C}
+.phone.t-emerald-l{--bg:#EAF6F1;--text:#10312A;--muted:#4E6F66;--tint:#0F8A62;--fireText:#FFFFFF;--quiet:var(--tint);--pop:var(--tint);--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.66);--surfbd:rgba(0,0,0,0.07);--hair:rgba(0,0,0,0.07);--glowA:rgba(15,138,98,0.16);--glowB:rgba(46,143,176,0.12);--sheetbg:#F4FBF8;--ringhl:transparent;--ok:#087A52;--gold:#B45309}
+.phone.t-gilded-d{--bg:#0C0C0C;--text:#F5F1E6;--muted:#A89F8E;--tint:#D4AF37;--fireText:#1A1200;--quiet:var(--tint);--pop:var(--tint);--glowA:rgba(212,175,55,0.26);--glowB:rgba(127,163,184,0.10);--sheetbg:#171717}
+.phone.t-gilded-l{--bg:#F8F5ED;--text:#24201A;--muted:#6E665A;--tint:#A88618;--fireText:#FFFFFF;--quiet:var(--tint);--pop:var(--tint);--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.66);--surfbd:rgba(0,0,0,0.07);--hair:rgba(0,0,0,0.07);--glowA:rgba(168,134,24,0.16);--glowB:rgba(78,124,149,0.11);--sheetbg:#FCFAF5;--ringhl:transparent;--ok:#087A52;--gold:#B45309}
+.phone.t-ember-d{--bg:#1C1512;--text:#FBF2EC;--muted:#B5A398;--tint:#FF6B4A;--fireText:#2A0F08;--quiet:var(--tint);--pop:var(--tint);--glowA:rgba(255,107,74,0.28);--glowB:rgba(240,168,108,0.12);--sheetbg:#271D19}
+.phone.t-ember-l{--bg:#F6EEE9;--text:#2B1E18;--muted:#7A675C;--tint:#D9482A;--fireText:#FFFFFF;--quiet:var(--tint);--pop:var(--tint);--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.66);--surfbd:rgba(0,0,0,0.07);--hair:rgba(0,0,0,0.07);--glowA:rgba(217,72,42,0.16);--glowB:rgba(198,122,44,0.11);--sheetbg:#FBF6F3;--ringhl:transparent;--ok:#087A52;--gold:#B45309}
+
+.glow{position:absolute;top:-120px;right:-80px;width:360px;height:320px;border-radius:50%;background:radial-gradient(circle,var(--glowA),transparent 66%);z-index:0;pointer-events:none}
+.glow2{position:absolute;top:-70px;left:-90px;width:300px;height:280px;border-radius:50%;background:radial-gradient(circle,var(--glowB),transparent 68%);z-index:0;pointer-events:none}
+/* the login family turns the glow UP: a bigger crown + a low counter-glow so the glass has something to sit on */
+.phone.front .glow{top:-150px;right:-120px;width:480px;height:440px}
+.phone.front .glow2{top:-60px;left:-130px;width:380px;height:360px}
+.glow3{position:absolute;bottom:-160px;left:-60px;width:460px;height:380px;border-radius:50%;background:radial-gradient(circle,var(--glowA),transparent 68%);opacity:.75;z-index:0;pointer-events:none}
+.sb{position:relative;z-index:3;display:flex;justify-content:space-between;align-items:center;padding:16px 30px 4px;font-size:13px;font-weight:600;font-family:'JetBrains Mono',ui-monospace,monospace;color:var(--text)}
+.ic{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.eyeb{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);font-weight:600}
+.eyeb.q{color:var(--quiet)}
+.eyeb.pop{color:var(--pop)}
+@keyframes shine{0%,70%{transform:skewX(-18deg) translateX(-160%)}100%{transform:skewX(-18deg) translateX(420%)}}
+
+.cnt{position:relative;z-index:2;flex:1;overflow-y:auto;padding:12px 16px 24px;display:flex;flex-direction:column;gap:12px;scrollbar-width:none}
+.cnt::-webkit-scrollbar{display:none}
+.cnt.dockpad{padding-bottom:96px}
+.card{border-radius:16px;background:var(--surf);border:1px solid var(--surfbd);padding:12px;position:relative}
+.card.g{background:var(--glass);border-color:var(--glassbd)}
+.ct{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:600;font-size:15px}
+.c38{width:38px;height:38px;border-radius:12px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;justify-content:center;flex:0 0 auto;color:var(--text)}
+.c38 .ic{width:20px;height:20px}
+.gchip{height:38px;padding:0 11px 0 9px;border-radius:12px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:var(--text);flex:0 0 auto}
+.gchip .ic{width:15px;height:15px}
+.gchip.sm{height:30px;padding:0 9px;font-size:11.5px;border-radius:10px}
+.gchip.sm .ic{width:13px;height:13px}
+
+/* form kit */
+.btnrow{display:flex;gap:10px}
+.btn{flex:1;height:47px;min-height:47px;border-radius:13px;display:flex;align-items:center;justify-content:center;gap:7px;font-size:14.5px;font-weight:600;background:var(--glass);border:1px solid var(--glassbd);color:var(--text);cursor:pointer}
+.btn .ic{width:16px;height:16px}
+.btn.fill{background:var(--tint);border-color:var(--tint);color:var(--fireText);position:relative;overflow:hidden}
+.btn.fill::after{content:"";position:absolute;left:0;top:0;bottom:0;width:38%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.30),transparent);transform:skewX(-18deg) translateX(-160%);animation:shine 4.5s ease-in-out infinite}
+.btn.fill.dis{opacity:.38;cursor:default}
+.btn.fill.dis::after{display:none}
+.flab{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;letter-spacing:1.1px;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.flab .opt{margin-left:auto;text-transform:none;letter-spacing:.3px;font-weight:500;opacity:.8}
+.flab .req{color:var(--pop)}
+.inp{min-height:43px;border-radius:13px;padding:11px 13px;font-size:14px;color:var(--text);background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;gap:8px}
+.inp .ic{width:17px;height:17px;color:var(--muted)}
+.inp .ph{color:var(--muted)}
+.inp .fill{flex:1;min-width:0}
+.inp.focus{border-color:color-mix(in srgb,var(--pop) 60%,transparent);box-shadow:0 0 0 3px color-mix(in srgb,var(--pop) 14%,transparent)}
+.inp.multi{min-height:66px;align-items:flex-start;line-height:1.45}
+.inp .eye .ic{width:16px;height:16px}
+.hintt{font-size:11.5px;line-height:16px;color:var(--muted);margin-top:6px}
+.hintt b{color:var(--pop);font-weight:600}
+.fld{display:flex;flex-direction:column}
+.two{display:flex;gap:10px}
+.two>*{flex:1;min-width:0}
+.link{color:var(--pop);font-weight:600}
+.caret{display:inline-block;width:1.5px;height:17px;background:var(--pop);margin-left:1px;vertical-align:-3px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+
+/* brand block */
+.brand{display:flex;flex-direction:column;align-items:center;gap:8px;padding-top:26px}
+.brand .mark{width:92px;height:92px;border-radius:50%;box-shadow:0 0 0 1px var(--ringhl),0 18px 40px -14px rgba(0,0,0,.55)}
+.brand.sm{flex-direction:row;gap:10px;padding-top:18px;justify-content:center}
+.brand.sm .mark{width:44px;height:44px;box-shadow:0 0 0 1px var(--ringhl),0 8px 20px -8px rgba(0,0,0,.5)}
+.wm{display:flex;flex-direction:column;align-items:center;line-height:1}
+.wm b{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:800;font-size:27px;letter-spacing:-0.8px}
+.wm span{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:5px;margin-top:5px;color:var(--muted);padding-left:5px}
+.brand.sm .wm{align-items:flex-start}
+.brand.sm .wm b{font-size:19px}
+.brand.sm .wm span{font-size:8px;letter-spacing:3.6px;margin-top:3px;padding-left:1px}
+.orgmark{width:44px;height:44px;border-radius:14px;background:linear-gradient(140deg,#8A5A2B,#3E2610);display:flex;align-items:center;justify-content:center;font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:800;font-size:16px;color:#FCE9D2;border:1px solid var(--glassbd);flex:0 0 auto}
+.hero{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;padding:14px 8px 2px}
+.hero h2{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:25px;letter-spacing:-0.5px;text-wrap:balance}
+.hero p{font-size:13px;line-height:18px;color:var(--muted);max-width:300px}
+.hero.left{align-items:flex-start;text-align:left;padding:6px 2px 0}
+.hero.left p{max-width:none}
+.disc{width:64px;height:64px;border-radius:22px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;justify-content:center;color:var(--quiet);flex:0 0 auto}
+.disc .ic{width:28px;height:28px}
+.disc.s{width:36px;height:36px;border-radius:12px}
+.disc.s .ic{width:17px;height:17px}
+.disc.ok{color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,transparent);border-color:color-mix(in srgb,var(--ok) 32%,transparent)}
+.legal{margin-top:auto;padding-top:10px;display:flex;align-items:center;justify-content:center;gap:8px;font-size:11px;color:var(--muted)}
+.legal u{text-decoration:none;border-bottom:1px solid color-mix(in srgb,var(--muted) 45%,transparent);padding-bottom:1px}
+.legal .mono{font-size:9.5px;opacity:.7}
+.backlink{display:flex;align-items:center;justify-content:center;gap:5px;font-size:12.5px;color:var(--muted);padding:6px 0;cursor:pointer}
+.backlink b{color:var(--text);font-weight:600}
+.backlink .ic{width:13px;height:13px}
+.tophdr{position:relative;z-index:3;display:flex;align-items:center;gap:10px;padding:10px 16px 2px}
+.tophdr .mid{flex:1;text-align:center}
+.pill{height:20px;padding:0 7px;border-radius:7px;display:inline-flex;align-items:center;gap:4px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;letter-spacing:1px;text-transform:uppercase;font-weight:700;background:var(--glass);color:var(--muted);border:1px solid var(--glassbd);white-space:nowrap}
+.pill.ok{background:color-mix(in srgb,var(--ok) 14%,transparent);color:var(--ok);border-color:color-mix(in srgb,var(--ok) 30%,transparent)}
+.pill.gold{background:color-mix(in srgb,var(--gold) 16%,transparent);color:var(--gold);border-color:color-mix(in srgb,var(--gold) 34%,transparent)}
+.pill.pop{background:color-mix(in srgb,var(--pop) 14%,transparent);color:var(--pop);border-color:color-mix(in srgb,var(--pop) 30%,transparent)}
+.pill .ic{width:10px;height:10px;stroke-width:2.6}
+
+/* W-A — inline expanding roles */
+.role{border-radius:18px;background:var(--glass);border:1px solid var(--glassbd);overflow:hidden;transition:border-color .25s}
+.role.open{border-color:color-mix(in srgb,var(--pop) 45%,transparent)}
+.rolehd{display:flex;align-items:center;gap:12px;padding:13px 14px;cursor:pointer}
+.rolehd .bd{flex:1;min-width:0}
+.rolehd .bd b{display:block;font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:17px;letter-spacing:-0.2px}
+.rolehd .bd span{font-size:12px;color:var(--muted)}
+.rolehd .chev{color:var(--muted);transition:transform .3s}
+.role.open .rolehd .chev{transform:rotate(180deg)}
+.role.open .disc.s{color:var(--pop);border-color:color-mix(in srgb,var(--pop) 35%,transparent)}
+.rolebd{max-height:0;overflow:hidden;transition:max-height .45s cubic-bezier(.22,.9,.3,1)}
+.role.open .rolebd{max-height:340px}
+.rolein{padding:0 12px 12px;display:flex;flex-direction:column;gap:8px}
+.rolein .opt,.wbin .opt{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:13px;background:var(--surf);border:1px solid var(--surfbd);font-size:13.5px;font-weight:600;cursor:pointer}
+.rolein .opt .ic,.wbin .opt .ic{width:16px;height:16px;color:var(--quiet)}
+.rolein .opt .go,.wbin .opt .go{margin-left:auto;color:var(--muted)}
+.rolein .opt small,.wbin .opt small{display:block;font-weight:400;font-size:11.5px;color:var(--muted);margin-top:1px}
+.gate{font-size:12.5px;line-height:18px;color:var(--muted)}
+.gate b{color:var(--text);font-weight:600}
+.herechip{display:inline-flex;align-items:center;gap:3px;height:20px;padding:0 7px;border-radius:7px;background:color-mix(in srgb,var(--pop) 14%,transparent);border:1px solid color-mix(in srgb,var(--pop) 30%,transparent);color:var(--pop);font-weight:600;font-size:11.5px;vertical-align:1px;cursor:pointer}
+.chk{display:flex;align-items:flex-start;gap:10px;padding:10px 11px;border-radius:13px;background:var(--surf);border:1px solid var(--surfbd);font-size:12.5px;line-height:17px;cursor:pointer}
+.chk .box{width:22px;height:22px;border-radius:7px;border:1.5px solid var(--muted);flex:0 0 auto;display:flex;align-items:center;justify-content:center;color:transparent;transition:.2s}
+.chk .box .ic{width:13px;height:13px;stroke-width:3}
+.chk.on .box{background:var(--tint);border-color:var(--tint);color:var(--fireText)}
+.chk.on{border-color:color-mix(in srgb,var(--pop) 38%,transparent)}
+.chk.bare{align-items:center;background:none;border:none;padding:2px 2px}
+
+/* W-B tiles + sheet */
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tile{border-radius:20px;padding:16px 14px 14px;display:flex;flex-direction:column;gap:10px;min-height:150px;background:color-mix(in srgb,var(--quiet) 9%,transparent);border:1px solid color-mix(in srgb,var(--quiet) 26%,transparent)}
+.tile b{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:19px;letter-spacing:-0.3px}
+.tile span{font-size:12px;line-height:16px;color:var(--muted)}
+.tile .disc.s{background:color-mix(in srgb,var(--quiet) 14%,transparent);border-color:color-mix(in srgb,var(--quiet) 30%,transparent)}
+.tile.sel{background:color-mix(in srgb,var(--pop) 11%,transparent);border-color:color-mix(in srgb,var(--pop) 40%,transparent)}
+.tile.sel .disc.s{color:var(--pop)}
+.scrim{position:absolute;inset:0;background:var(--scrim);z-index:6}
+.sheet{position:absolute;left:0;right:0;bottom:0;z-index:7;background:var(--sheetbg);border-radius:26px 26px 0 0;border-top:1px solid var(--glassbd);padding:8px 16px 26px;display:flex;flex-direction:column;gap:11px}
+.grab{width:38px;height:5px;border-radius:3px;background:var(--hair);margin:2px auto 4px;box-shadow:inset 0 0 0 1px var(--glassbd)}
+.sheet h3{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:20px;letter-spacing:-0.3px}
+
+/* W-C doors */
+.doors{border-radius:20px;background:var(--glass);border:1px solid var(--glassbd);overflow:hidden}
+.door{display:flex;align-items:center;gap:12px;padding:14px;cursor:pointer}
+.door+.door{border-top:1px solid var(--hair)}
+.door .bd{flex:1;min-width:0}
+.door .bd b{display:block;font-size:15px;font-weight:600}
+.door .bd span{font-size:12px;color:var(--muted)}
+.door .go{color:var(--muted)}
+.door.lead .disc.s{color:var(--pop);background:color-mix(in srgb,var(--pop) 12%,transparent);border-color:color-mix(in srgb,var(--pop) 30%,transparent)}
+
+/* L-A the slide */
+.slidewin{overflow:hidden;height:104px;transition:height .45s cubic-bezier(.22,.9,.3,1)}
+.track{display:flex;width:200%;transition:transform .5s cubic-bezier(.22,.9,.3,1)}
+.pane{width:50%;padding:1px 1px;display:flex;flex-direction:column;gap:9px}
+.lslide[data-step="2"] .track,.lslide[data-step="3"] .track{transform:translateX(-50%)}
+.lslide[data-step="2"] .slidewin,.lslide[data-step="3"] .slidewin{height:176px}
+.signin{height:0;opacity:0;overflow:hidden;transform:translateY(8px);transition:height .4s cubic-bezier(.22,.9,.3,1),opacity .35s .1s,transform .4s}
+.lslide[data-step="3"] .signin{height:57px;opacity:1;transform:none}
+.signin .btn{margin-top:10px}
+.gobtn{width:30px;height:30px;border-radius:10px;background:var(--tint);color:var(--fireText);display:flex;align-items:center;justify-content:center;margin:-5px -6px -5px 0;cursor:pointer}
+.gobtn .ic{width:15px;height:15px;color:var(--fireText);stroke-width:2.6}
+.idchip{align-self:flex-start;display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px 0 6px;border-radius:10px;background:var(--surf);border:1px solid var(--surfbd);font-size:12px;font-weight:600;cursor:pointer}
+.idchip .ic{width:13px;height:13px;color:var(--muted)}
+.idchip .mono{font-size:12px}
+.idrow{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:14px;background:var(--surf);border:1px solid var(--surfbd)}
+.idrow .av{width:34px;height:34px;border-radius:17px;background:linear-gradient(140deg,#5A6C86,#2C3646);display:flex;align-items:center;justify-content:center;font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:12px;color:#fff;flex:0 0 auto}
+.idrow .bd{flex:1;min-width:0}
+.idrow .bd b{display:block;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:13px}
+.idrow .bd span{font-size:11px;color:var(--muted)}
+.dots{letter-spacing:3px;font-size:16px}
+
+/* checklist rows (getting started) */
+.rows{border-radius:18px;background:var(--glass);border:1px solid var(--glassbd);overflow:hidden}
+.rw{display:flex;align-items:flex-start;gap:12px;padding:13px}
+.rw+.rw{border-top:1px solid var(--hair)}
+.rw .bd{flex:1;min-width:0}
+.rw .bd .t{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:14px;font-weight:600}
+.rw .bd .s{font-size:12px;line-height:16px;color:var(--muted);margin-top:2px}
+.rw .bd .ex{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;line-height:15px;color:var(--muted);margin-top:5px;opacity:.85}
+.nub{width:20px;height:20px;border-radius:10px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--quiet) 16%,transparent);color:var(--quiet);flex:0 0 auto}
+.infob{display:flex;gap:9px;align-items:flex-start;padding:10px 11px;border-radius:13px;background:color-mix(in srgb,var(--quiet) 8%,transparent);border:1px solid color-mix(in srgb,var(--quiet) 22%,transparent);font-size:12px;line-height:17px;color:var(--muted)}
+.infob .ic{width:15px;height:15px;color:var(--quiet);margin-top:1px}
+.infob b{color:var(--text);font-weight:600}
+.infob ul{margin:0;padding-left:15px;display:flex;flex-direction:column;gap:6px}
+.unchip{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 8px;border-radius:8px;background:color-mix(in srgb,var(--pop) 13%,transparent);border:1px solid color-mix(in srgb,var(--pop) 28%,transparent);color:var(--pop);font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;font-weight:600}
+
+/* credentials */
+.cred{display:flex;align-items:center;gap:10px;padding:11px 12px}
+.cred+.cred{border-top:1px solid var(--hair)}
+.cred .bd{flex:1;min-width:0}
+.cred .v{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:17px;font-weight:600;margin-top:2px;letter-spacing:.3px}
+.cred .h{font-size:11px;color:var(--muted);margin-top:2px}
+.sq{width:34px;height:34px;border-radius:11px;background:var(--surf);border:1px solid var(--surfbd);display:flex;align-items:center;justify-content:center;color:var(--text);flex:0 0 auto}
+.sq .ic{width:15px;height:15px}
+
+/* wizard rail + dock */
+.rail{position:relative;z-index:3;padding:8px 16px 4px;display:flex;flex-direction:column;gap:7px}
+.rail .top{display:flex;align-items:center;gap:8px}
+.rail .top .eyeb{flex:1}
+.segs{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}
+.seg{display:flex;flex-direction:column;gap:5px;align-items:flex-start}
+.seg i{display:block;width:100%;height:4px;border-radius:2px;background:var(--hair);box-shadow:inset 0 0 0 1px var(--surfbd)}
+.seg span{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);font-weight:600;display:flex;align-items:center;gap:3px}
+.seg span .ic{width:9px;height:9px;stroke-width:3}
+.seg.done i{background:color-mix(in srgb,var(--pop) 55%,transparent);box-shadow:none}
+.seg.done span{color:var(--text);opacity:.75}
+.seg.now i{background:var(--pop);box-shadow:0 0 10px color-mix(in srgb,var(--pop) 60%,transparent)}
+.seg.now span{color:var(--pop)}
+.dock{position:absolute;left:0;right:0;bottom:0;z-index:5;padding:14px 16px 26px;background:linear-gradient(to bottom,transparent,color-mix(in srgb,var(--bg) 88%,transparent) 34%,var(--bg));display:flex;gap:10px}
+.dock .btn.back{flex:0 0 96px}
+
+/* job chips */
+.jobs{display:flex;flex-wrap:wrap;gap:8px}
+.job{height:36px;padding:0 13px;border-radius:12px;display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;background:var(--glass);border:1px solid var(--glassbd);color:var(--muted);cursor:pointer;transition:.18s}
+.job .ic{width:13px;height:13px;stroke-width:2.8;display:none}
+.job.on{background:color-mix(in srgb,var(--pop) 13%,transparent);border-color:color-mix(in srgb,var(--pop) 42%,transparent);color:var(--text)}
+.job.on .ic{display:block;color:var(--pop)}
+.job.add{border-style:dashed;color:var(--text)}
+.job.add .ic{display:block;color:var(--quiet)}
+
+/* menu step */
+.numq{display:flex;align-items:center;gap:10px}
+.numq .ct{flex:1;font-size:17px}
+.cap2{display:flex;padding:3px;border-radius:13px;background:var(--surf);border:1px solid var(--surfbd);gap:3px}
+.cap2 span{min-width:44px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:16px;color:var(--muted);cursor:pointer;padding:0 12px;transition:.2s}
+.cap2 span.on{background:var(--tint);color:var(--fireText)}
+.cap2.txt span{font-family:'Inter',system-ui,sans-serif;font-size:13px;font-weight:600;flex:1}
+.cap2.wide{display:flex}
+.mrow{display:flex;gap:8px;align-items:flex-end}
+.icbtn{width:43px;height:43px;border-radius:13px;background:color-mix(in srgb,var(--pop) 12%,transparent);border:1px solid color-mix(in srgb,var(--pop) 32%,transparent);display:flex;align-items:center;justify-content:center;color:var(--pop);position:relative;flex:0 0 auto}
+.icbtn .ic{width:20px;height:20px}
+.icbtn em{position:absolute;right:-4px;bottom:-4px;width:16px;height:16px;border-radius:8px;background:var(--sheetbg);border:1px solid var(--glassbd);display:flex;align-items:center;justify-content:center;color:var(--muted)}
+.icbtn em .ic{width:9px;height:9px;stroke-width:3;color:var(--muted)}
+.blt{margin:0;padding-left:16px;display:flex;flex-direction:column;gap:7px;font-size:12px;line-height:17px;color:var(--muted)}
+.blt b{color:var(--text);font-weight:600}
+.blt li::marker{color:var(--pop)}
+.scopebd{display:none}
+.scopebd.on{display:block}
+.uprow{display:flex;align-items:center;gap:10px}
+.uprow .bd{flex:1;min-width:0}
+.uprow .bd b{display:block;font-size:14px;font-weight:600}
+.uprow .bd span{font-size:11.5px;line-height:16px;color:var(--muted);display:block;margin-top:2px}
+.freepill{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;letter-spacing:1px;font-weight:700;padding:2px 6px;border-radius:6px;background:color-mix(in srgb,var(--ok) 16%,transparent);color:var(--ok);vertical-align:2px;margin-left:4px}
+
+/* review step */
+.orgcard{display:flex;align-items:center;gap:12px;padding:13px;border-radius:18px;background:var(--glass);border:1px solid var(--glassbd)}
+.orgcard .bd{flex:1;min-width:0}
+.orgcard .bd b{display:block;font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:17px;letter-spacing:-0.2px}
+.orgcard .bd span{font-size:11.5px;color:var(--muted);display:block;margin-top:1px}
+.rv{display:flex;flex-direction:column;gap:9px}
+.rvh{display:flex;align-items:center;gap:8px}
+.rvh .ct{flex:1;font-size:14px}
+.rvh .ic{width:15px;height:15px;color:var(--quiet)}
+.mini{display:flex;flex-wrap:wrap;gap:6px}
+.mini span{height:26px;padding:0 9px;border-radius:9px;font-size:11.5px;font-weight:600;display:flex;align-items:center;background:var(--glass);border:1px solid var(--glassbd)}
+.mtile{flex:1;display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:13px;background:var(--glass);border:1px solid var(--glassbd);font-size:13px;font-weight:600;min-width:0}
+.mtile .ic{width:16px;height:16px;color:var(--pop)}
+.kv{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.kv b{color:var(--text);font-weight:600}
+.sw{width:22px;height:22px;border-radius:8px;border:1px solid var(--glassbd);flex:0 0 auto}
+
+/* final */
+.donehd{display:flex;align-items:center;gap:13px;padding:6px 2px 0}
+.donehd .disc{width:58px;height:58px;border-radius:20px}
+.donehd h2{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:23px;letter-spacing:-0.4px}
+.donehd p{font-size:12.5px;line-height:17px;color:var(--muted);margin-top:2px}
+.codecard{border-radius:18px;padding:13px;background:var(--glass);border:1px solid var(--glassbd);display:flex;flex-direction:column;gap:11px}
+.codecard .code{font-family:'JetBrains Mono',ui-monospace,monospace;font-weight:700;font-size:30px;letter-spacing:3px;text-align:center;padding:4px 0 0}
+.trial{border-radius:18px;padding:13px;background:color-mix(in srgb,var(--gold) 8%,var(--surf));border:1px solid color-mix(in srgb,var(--gold) 34%,transparent);display:flex;flex-direction:column;gap:8px}
+.trial .hd{display:flex;align-items:center;gap:8px}
+.trial .hd .ic{color:var(--gold);width:17px;height:17px}
+.trial .hd .ct{flex:1}
+.feat{display:flex;flex-direction:column;gap:6px;font-size:12.5px}
+.feat div{display:flex;gap:8px;align-items:flex-start;line-height:17px}
+.feat .ic{width:13px;height:13px;color:var(--gold);stroke-width:2.8;margin-top:2px}
+.feat .ic.ok{color:var(--ok)}
+.ftr{font-size:11px;line-height:15px;color:var(--muted)}
+
+/* paywall matrix */
+.mx{border-radius:18px;background:var(--glass);border:1px solid var(--glassbd);overflow:hidden}
+.mxh,.mxr{display:grid;grid-template-columns:1fr 62px 72px;align-items:center}
+.mxh{padding:10px 12px 8px;border-bottom:1px solid var(--hair)}
+.mxh div{text-align:center;font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:14px}
+.mxh div small{display:block;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;color:var(--muted);font-weight:600}
+.mxh div.p{color:var(--gold)}
+.mxr{padding:7px 12px;font-size:12.5px}
+.mxr+.mxr{border-top:1px solid var(--hair)}
+.mxr.prem{background:color-mix(in srgb,var(--gold) 6%,transparent)}
+.mxr span{display:flex;justify-content:center}
+.mxr .ic{width:14px;height:14px;stroke-width:2.8;color:var(--ok)}
+.mxr .ic.g{color:var(--gold)}
+.mxr .no{color:var(--muted);opacity:.5}
+
+/* join code */
+.codein{height:64px;border-radius:16px;background:var(--glass);border:1px solid color-mix(in srgb,var(--pop) 55%,transparent);box-shadow:0 0 0 3px color-mix(in srgb,var(--pop) 13%,transparent);display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',ui-monospace,monospace;font-weight:700;font-size:27px;letter-spacing:5px}
+.codein .ph{color:var(--muted);opacity:.45}
+.orgbadge{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:color-mix(in srgb,var(--ok) 9%,transparent);border:1px solid color-mix(in srgb,var(--ok) 30%,transparent)}
+.orgbadge .bd{flex:1;min-width:0}
+.orgbadge .bd b{display:block;font-size:14px;font-weight:600}
+.orgbadge .ic{color:var(--ok)}
+
+/* personalize */
+.tgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.tcard{border-radius:14px;padding:9px 9px 8px;background:var(--glass);border:1px solid var(--glassbd);display:flex;flex-direction:column;gap:7px;cursor:pointer;transition:.18s;position:relative}
+.tcard .sws{display:flex;height:30px;border-radius:9px;overflow:hidden;border:1px solid rgba(0,0,0,.18)}
+.tcard .sws i{flex:1;display:block}
+.tcard b{font-size:11.5px;font-weight:600;display:flex;align-items:center;gap:4px}
+.tcard.on{border-color:var(--pop);box-shadow:0 0 0 2px color-mix(in srgb,var(--pop) 22%,transparent)}
+.tcard .tk{position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:9px;background:var(--tint);color:var(--fireText);display:none;align-items:center;justify-content:center}
+.tcard .tk .ic{width:10px;height:10px;stroke-width:3.2}
+.tcard.on .tk{display:flex}
+.prev{border-radius:18px;padding:11px 12px;background:var(--glass);border:1px solid var(--glassbd);display:flex;flex-direction:column;gap:9px}
+.prev .greet{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:17px;letter-spacing:-0.3px}
+.prev .greet span{color:var(--pop)}
+.prev .qa{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.prev .qa div{height:44px;border-radius:11px;background:color-mix(in srgb,var(--tint) 11%,transparent);border:1px solid color-mix(in srgb,var(--tint) 28%,transparent);display:flex;align-items:center;justify-content:center;color:var(--pop)}
+.prev .qa .ic{width:16px;height:16px}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-user" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-chr" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></symbol>
+  <symbol id="i-chl" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
+  <symbol id="i-chd" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-arr" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+  <symbol id="i-key" viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.78 7.78 5.5 5.5 0 0 1 7.78-7.78zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-eyeoff" viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24M1 1l22 22"/></symbol>
+  <symbol id="i-ticket" viewBox="0 0 24 24"><path d="M3 9a3 3 0 0 0 0 6v3a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1v-3a3 3 0 0 1 0-6V6a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v3z"/><path d="M14 5v3M14 11v2M14 16v3"/></symbol>
+  <symbol id="i-store" viewBox="0 0 24 24"><path d="M3 9l1.5-5h15L21 9M3 9v11h18V9M3 9c0 1.7 1.3 3 3 3s3-1.3 3-3c0 1.7 1.3 3 3 3s3-1.3 3-3c0 1.7 1.3 3 3 3s3-1.3 3-3M9 20v-5h6v5"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></symbol>
+  <symbol id="i-map" viewBox="0 0 24 24"><path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4zM8 2v16M16 6v16"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><path d="M22 6l-10 7L2 6"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+  <symbol id="i-share" viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v13"/></symbol>
+  <symbol id="i-crown" viewBox="0 0 24 24"><path d="M2 7l5 5 5-8 5 8 5-5-2 12H4L2 7z"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></symbol>
+  <symbol id="i-snow" viewBox="0 0 24 24"><path d="M12 2v20M4.2 7l15.6 10M19.8 7L4.2 17M9 4l3 3 3-3M9 20l3-3 3 3"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></symbol>
+  <symbol id="i-half" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 0 20z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-fork" viewBox="0 0 24 24"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2M7 2v20M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3zm0 0v7"/></symbol>
+  <symbol id="i-brief" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></symbol>
+  <symbol id="i-quote" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+  <symbol id="i-pal" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.4A4.6 4.6 0 0 0 22 10.8C22 5.9 17.5 2 12 2z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10.5" cy="7" r="1"/><circle cx="15.5" cy="7.5" r="1"/></symbol>
+  <symbol id="i-out" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+  <symbol id="i-cal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+  <!-- the MyResto plate mark, redrawn from assets/images/MyRestoPlateOnTopLogo.svg: #1F2334 ring · #F99861 dashes · #FCFCFC plate -->
+  <symbol id="m-plate" viewBox="0 0 100 100">
+    <circle cx="50" cy="50" r="46" fill="#FCFCFC" stroke="#1F2334" stroke-width="7"/>
+    <circle cx="50" cy="50" r="37.5" fill="none" stroke="#F99861" stroke-width="3" stroke-dasharray="7.2 4.6" stroke-linecap="round"/>
+    <circle cx="50" cy="50" r="31" fill="none" stroke="#ACAFB3" stroke-opacity=".35" stroke-width="1.2"/>
+    <path d="M37 39c0-5.5 4.5-9 10-9h6c5.500 0 10 3.500 10 9v7c0 5.500-4.500 9-10 9h-4l-6 8 1.500-8.300C39.500 54.500 37 51 37 46z" fill="#1F2334"/>
+    <path d="M52.500 34l-7 10h4.600l-1.800 8.500 7.200-10.500h-4.700z" fill="#F99861"/>
+  </symbol>
+</svg>
+
+<h1>Onboarding &amp; Auth — <span>Round 1</span></h1>
+<div class="toolbar">
+  <div class="grp"><span class="gl2">Default palette</span>
+    <button class="tb on" data-theme="">Logo · dark</button>
+    <button class="tb" data-theme="t-logo-l">Logo · light</button>
+    <button class="tb" data-theme="t-ocean-d">Ocean dark</button>
+    <button class="tb" data-theme="t-ocean-l">Ocean light</button>
+    <button class="tb" data-theme="t-mono-d">Moonstone dark (today)</button>
+    <button class="tb" data-theme="t-mono-l">Moonstone light (today)</button>
+  </div>
+</div>
+<p class="hint">Every phone repaints with the palette buttons. <b>Logo</b> is the palette you described, read straight off the logo file: ring navy <b>#1F2334</b> as the ground and the glow, notch grey <b>#ACAFB3</b> as the quiet tint (icon discs, eyebrows, Jolt), bolt orange <b>#F99861</b> as the highlight and the button, plate white <b>#FCFCFC</b> as the text. <b>Ocean light</b> is Boathouse’s, always. <em>Phones marked ▶ are live — tap inside them.</em></p>
+
+<!-- ───────── Row 1 · Welcome ───────── -->
+<div class="section">
+  <div class="sh">Row 1 · Welcome — the pre-login screen <span class="ln"></span><small>pick A, B or C · shows until this device reaches a dashboard</small></div>
+  <div class="row">
+
+    <div class="col">
+      <div class="concept"><b>W-A ▶</b> I am an… <span class="ln"></span> your spec · expands in place</div>
+      <div class="phone front" id="wa">
+        <div class="glow"></div><div class="glow2"></div><div class="glow3"></div>
+        <div class="sb"><span>9:41</span><span>●●● ᯤ ▮</span></div>
+        <div class="cnt">
+          <div class="brand"><svg class="mark"><use href="#m-plate"/></svg><div class="wm"><b>MyResto</b><span>CONNECT</span></div></div>
+          <div class="hero"><h2>Welcome to MyResto!</h2><p>Please select an option</p></div>
+          <div class="eyeb q" style="padding-left:4px;margin-bottom:-4px">I am an</div>
+
+          <div class="role open" data-role="emp">
+            <div class="rolehd"><div class="disc s"><svg class="ic"><use href="#i-users"/></svg></div><div class="bd"><b>Employee</b><span>I work at a restaurant on MyResto</span></div><svg class="ic chev"><use href="#i-chd"/></svg></div>
+            <div class="rolebd"><div class="rolein">
+              <div class="opt"><svg class="ic"><use href="#i-ticket"/></svg><div>I have an employee join code<small>Create your account with the code from your manager</small></div><svg class="ic go"><use href="#i-chr"/></svg></div>
+              <div class="opt"><svg class="ic"><use href="#i-key"/></svg><div>I already have a login<small>Sign in with your username and password</small></div><svg class="ic go"><use href="#i-chr"/></svg></div>
+            </div></div>
+          </div>
+
+          <div class="role" data-role="own">
+            <div class="rolehd"><div class="disc s"><svg class="ic"><use href="#i-store"/></svg></div><div class="bd"><b>Owner</b><span>I’m setting up my restaurant</span></div><svg class="ic chev"><use href="#i-chd"/></svg></div>
+            <div class="rolebd"><div class="rolein">
+              <p class="gate"><b>Only owners of a business should continue past this point.</b> If you already have a login or a join code, please sign in <span class="herechip" data-here>here <svg class="ic" style="width:10px;height:10px"><use href="#i-chr"/></svg></span> Confirm you’re the owner and let’s get started!</p>
+              <div class="chk" data-chk><span class="box"><svg class="ic"><use href="#i-check"/></svg></span><span>I am the owner, and I agree to the <span class="link">Terms of Service</span> and <span class="link">Privacy Policy</span>.</span></div>
+              <div class="btn fill dis" data-cta>Create Account<svg class="ic"><use href="#i-arr"/></svg></div>
+            </div></div>
+          </div>
+
+          <div class="legal"><u>Terms</u>·<u>Privacy</u>·<span class="mono">v1.0.0</span></div>
+        </div>
+      </div>
+      <p class="bcap"><b>W-A — yours, as written.</b> Logo, “Welcome to MyResto!”, <em>I am an</em> → two glass rows that <b>expand in place</b> (tap both). Employee opens the two doors; Owner opens the blurb, the <b>here</b> chip (flips you back to Employee), the owner checkbox and a Create Account button that only lights — and only starts shining — once the box is ticked. The checkbox carries the Terms &amp; Privacy agreement in the same tick (see the clickwrap note).</p>
+    </div>
+
+    <div class="col">
+      <div class="concept"><b>W-B</b> Two tiles + a sheet <span class="ln"></span> the choice opens a GlassSheet</div>
+      <div class="phone front">
+        <div class="glow"></div><div class="glow2"></div><div class="glow3"></div>
+        <div class="sb"><span>9:41</span><span>●●● ᯤ ▮</span></div>
+        <div class="cnt">
+          <div class="brand"><svg class="mark"><use href="#m-plate"/></svg><div class="wm"><b>MyResto</b><span>CONNECT</span></div></div>
+          <div class="hero"><h2>Welcome to MyResto!</h2><p>Who’s joining us today?</p></div>
+          <div class="tiles">
+            <div class="tile"><div class="disc s"><svg class="ic"><use href="#i-users"/></svg></div><div><b>Employee</b></div><span>Join your team with a code, or sign in.</span></div>
+            <div class="tile sel"><div class="disc s"><svg class="ic"><use href="#i-store"/></svg></div><div><b>Owner</b></div><span>Set up your restaurant. 14-day free trial.</span></div>
+          </div>
+        </div>
+        <div class="scrim"></div>
+        <div class="sheet">
+          <div class="grab"></div>
+          <div style="display:flex;align-items:center;gap:10px"><div class="disc s" style="color:var(--pop)"><svg class="ic"><use href="#i-shield"/></svg></div><h3>Owners only</h3></div>
+          <p class="gate"><b>Only owners of a business should continue past this point.</b> If you already have a login or a join code, go back and choose <span class="herechip">Employee</span></p>
+          <div class="chk on"><span class="box"><svg class="ic"><use href="#i-check"/></svg></span><span>I am the owner, and I agree to the <span class="link">Terms of Service</span> and <span class="link">Privacy Policy</span>.</span></div>
+          <div class="btn fill">Create Account<svg class="ic"><use href="#i-arr"/></svg></div>
+          <div class="backlink">Not an owner? <b>Go back</b></div>
+        </div>
+      </div>
+      <p class="bcap"><b>W-B:</b> the two roles become big tinted-glass <b>tiles</b>; tapping one raises a <b>GlassSheet</b> (Owner’s gate shown, ticked — the button is live and shining). Employee’s sheet is the same two doors as W-A. The welcome page itself never reflows, the gate feels like a deliberate <em>stop-and-confirm</em>, and the sheet is a kit piece we already trust on both platforms.</p>
+    </div>
+
+    <div class="col">
+      <div class="concept"><b>W-C</b> Three doors <span class="ln"></span> one tap fewer · no “I am an” step</div>
+      <div class="phone front">
+        <div class="glow"></div><div class="glow2"></div><div class="glow3"></div>
+        <div class="sb"><span>9:41</span><span>●●● ᯤ ▮</span></div>
+        <div class="cnt">
+          <div class="brand"><svg class="mark"><use href="#m-plate"/></svg><div class="wm"><b>MyResto</b><span>CONNECT</span></div></div>
+          <div class="hero"><h2>Welcome to MyResto!</h2><p>How would you like to get started?</p></div>
+          <div class="doors">
+            <div class="door lead"><div class="disc s"><svg class="ic"><use href="#i-ticket"/></svg></div><div class="bd"><b>I have a join code</b><span>New here — my manager shared a code</span></div><svg class="ic go"><use href="#i-chr"/></svg></div>
+            <div class="door"><div class="disc s"><svg class="ic"><use href="#i-key"/></svg></div><div class="bd"><b>I already have a login</b><span>Sign in with my username</span></div><svg class="ic go"><use href="#i-chr"/></svg></div>
+            <div class="door"><div class="disc s"><svg class="ic"><use href="#i-store"/></svg></div><div class="bd"><b>I’m a restaurant owner</b><span>Set up my restaurant · 14-day free trial</span></div><svg class="ic go"><use href="#i-chr"/></svg></div>
+          </div>
+          <div class="infob"><svg class="ic"><use href="#i-info"/></svg><span><b>No code yet?</b> Ask your manager for your restaurant’s join code — it looks like <span class="mono" style="color:var(--text)">JOES-7X4K</span>.</span></div>
+          <div class="legal"><u>Terms</u>·<u>Privacy</u>·<span class="mono">v1.0.0</span></div>
+        </div>
+      </div>
+      <p class="bcap"><b>W-C:</b> skips the role question — the <b>three real destinations</b> are one glass list, most-common first (nine of ten first-timers are staff with a code). Every row says what happens next, so nobody has to know which “kind” they are. The owner row still lands on the <b>Owners-only gate</b> as its own page (first phone of Row 3). Fewest taps, least to read; loses the little expanding moment of W-A.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ───────── Row 2 · Login ───────── -->
+<div class="section">
+  <div class="sh">Row 2 · Login <span class="ln"></span><small>pick A, B or C · the logo shrinks, the glow leads</small></div>
+  <div class="row">
+
+    <div class="col">
+      <div class="concept"><b>L-A ▶</b> The slide <span class="ln"></span> your spec · <button class="tb sm" id="laplay">▶ play</button> <button class="tb sm" id="lareset">reset</button></div>
+      <div class="phone front lslide" id="la" data-step="1">
+        <div class="glow"></div><div class="glow2"></div><div class="glow3"></div>
+        <div class="sb"><span>9:41</span><span>●●● ᯤ ▮</span></div>
+        <div class="cnt">
+          <div class="brand sm"><svg class="mark"><use href="#m-plate"/></svg><div class="wm"><b>MyResto</b><span>CONNECT</span></div></div>
+          <div class="hero" style="padding-top:22px"><h2>Sign in</h2><p>Welcome back. Let’s get you to your dashboard.</p></div>
+          <div class="card g" style="padding:14px">
+            <div class="slidewin"><div class="track">
+              <div class="pane">
+                <div class="fld"><div class="flab">Username</div>
+                  <div class="inp focus"><svg class="ic"><use href="#i-user"/></svg><span class="fill">seccles<i class="caret"></i></span><span class="gobtn" data-go><svg class="ic"><use href="#i-arr"/></svg></span></div>
+                  <div class="hintt">Tip: your username is your first initial + last name.</div>
+                </div>
+              </div>
+              <div class="pane">
+                <span class="idchip" data-back><svg class="ic"><use href="#i-chl"/></svg><span class="mono">seccles</span></span>
+                <div class="fld"><div class="flab">Password</div>
+                  <div class="inp focus" data-pw><svg class="ic"><use href="#i-lock"/></svg><span class="fill ph" data-pwtxt>Enter your password</span><span class="eye"><svg class="ic"><use href="#i-eye"/></svg></span></div>
+                </div>
+                <div class="chk bare on" data-chk><span class="box"><svg class="ic"><use href="#i-check"/></svg></span><span style="font-size:13.5px;font-weight:600">Stay signed in</span></div>
+                <div class="hintt" style="margin-top:-2px">Forgot your login or password? Contact a manager to have it reset.</div>
+              </div>
+            </div></div>
+            <div class="signin"><div class="btn fill">Sign In</div></div>
+          </div>
+          <div class="legal"><u>Terms</u>·<u>Privacy</u>·<span class="mono">v1.0.0</span></div>
+        </div>
+      </div>
+      <p class="bcap"><b>L-A — yours, as written.</b> Username alone → <em>return</em>, tapping away, or the arrow slides it left while the password flies in from the right with <b>Stay signed in</b> and the reset hint; once the password is in, <b>Sign In</b> rises under it, shining. Two things I added: the <b>arrow button</b> in the field (return / tap-away aren’t discoverable on their own) and the <b>‹ seccles chip</b> — after the slide a typo’d username is invisible, so this shows who’s signing in and steps back. Tap the arrow → the password field → the chip.</p>
+    </div>
+
+    <div class="col">
+      <div class="concept"><b>L-B</b> Identity chip <span class="ln"></span> returning user · the org’s own logo</div>
+      <div class="phone front">
+        <div class="glow"></div><div class="glow2"></div><div class="glow3"></div>
+        <div class="sb"><span>9:41</span><span>●●● ᯤ ▮</span></div>
+        <div class="cnt">
+          <div class="brand sm"><div class="orgmark">RA</div><div class="wm"><span style="margin:0 0 4px;letter-spacing:1.6px;font-size:8.5px">WELCOME BACK TO</span><b style="font-size:18px;letter-spacing:-0.3px">Robinson Ale House</b></div></div>
+          <div class="hero" style="padding-top:22px"><h2>Sign in</h2></div>
+          <div class="card g" style="padding:14px;display:flex;flex-direction:column;gap:10px">
+            <div class="idrow"><div class="av">SE</div><div class="bd"><b>seccles</b><span>Not you? Tap to change</span></div><svg class="ic" style="color:var(--muted);width:15px;height:15px"><use href="#i-x"/></svg></div>
+            <div class="fld"><div class="flab">Password</div>
+              <div class="inp focus"><svg class="ic"><use href="#i-lock"/></svg><span class="fill dots">••••••••<i class="caret"></i></span><span class="eye"><svg class="ic"><use href="#i-eye"/></svg></span></div>
+            </div>
+            <div class="chk bare on"><span class="box"><svg class="ic"><use href="#i-check"/></svg></span><span style="font-size:13.5px;font-weight:600">Stay signed in</span></div>
+            <div class="btn fill">Sign In</div>
+            <div class="hintt" style="text-align:center;margin-top:0">Forgot your login or password? Contact a manager to have it reset.</div>
+          </div>
+          <div class="legal"><u>Terms</u>·<u>Privacy</u>·<span class="mono">v1.0.0</span></div>
+        </div>
+      </div>
+      <p class="bcap"><b>L-B:</b> same two-step idea, but the username doesn’t leave — it <b>folds into an identity row</b> at the top of the card (the Apple / Google sign-in grammar) and the password takes its place. Shown as a <b>returning user</b>: the device remembers the last org, so the header wears <em>their</em> logo and “Welcome back to…”. Sign In is on the card from the start of step two (dimmed until there’s a password) — nothing to wait for.</p>
+    </div>
+
+    <div class="col">
+      <div class="concept"><b>L-C</b> Fold-down <span class="ln"></span> both fields stay · password unfolds</div>
+      <div class="phone front">
+        <div class="glow"></div><div class="glow2"></div><div class="glow3"></div>
+        <div class="sb"><span>9:41</span><span>●●● ᯤ ▮</span></div>
+        <div class="cnt">
+          <div class="brand sm"><svg class="mark"><use href="#m-plate"/></svg><div class="wm"><b>MyResto</b><span>CONNECT</span></div></div>
+          <div class="hero" style="padding-top:22px"><h2>Sign in</h2><p>Welcome back. Let’s get you to your dashboard.</p></div>
+          <div class="card g" style="padding:14px;display:flex;flex-direction:column;gap:10px">
+            <div class="fld"><div class="flab">Username</div><div class="inp"><svg class="ic"><use href="#i-user"/></svg><span class="fill">seccles</span><svg class="ic" style="color:var(--ok);width:15px;height:15px;stroke-width:2.8"><use href="#i-check"/></svg></div></div>
+            <div class="fld"><div class="flab">Password</div><div class="inp focus"><svg class="ic"><use href="#i-lock"/></svg><span class="fill dots">••••••<i class="caret"></i></span><span class="eye"><svg class="ic"><use href="#i-eye"/></svg></span></div></div>
+            <div class="chk bare on"><span class="box"><svg class="ic"><use href="#i-check"/></svg></span><span style="font-size:13.5px;font-weight:600">Stay signed in</span></div>
+            <div class="btn fill">Sign In</div>
+            <div class="hintt" style="text-align:center;margin-top:0">Forgot your login or password? Contact a manager to have it reset.</div>
+          </div>
+          <div class="backlink"><svg class="ic"><use href="#i-chl"/></svg>New here? <b>Back to welcome</b></div>
+          <div class="legal"><u>Terms</u>·<u>Privacy</u>·<span class="mono">v1.0.0</span></div>
+        </div>
+      </div>
+      <p class="bcap"><b>L-C:</b> the page opens with the username alone; on return the password row, <b>Stay signed in</b> and the button <b>unfold beneath it</b> (the FoldGroup motion) instead of replacing it. Least theatre, but both fields are always readable and it’s the friendliest to the iOS / Android <b>password managers</b>, which like to see both fields at once. Also shows the <em>Back to welcome</em> link that every login variant carries until the device has reached a dashboard.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ───────── Row 3 · Owner path ───────── -->
+<div class="section">
+  <div class="sh">Row 3 · Owner — account &amp; restaurant <span class="ln"></span><small>one design each · the AGGD treatment + your copy</small></div>
+  <div class="row">
+
+    <div class="col">
+      <div class="concept"><b>O-0</b> Owners only <span class="ln"></span> the gate as a page (W-C’s owner door)</div>
+      <div class="phone front">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>9:41</span><span>●●● ᯤ ▮</span></div>
+        <div class="tophdr"><div class="c38"><svg class="ic"><use href="#i-chl"/></svg></div><div class="mid"></div><div style="width:38px"></div></div>
+        <div class="cnt">
+          <div class="hero"><div class="disc" style="color:var(--pop)"><svg class="ic"><use href="#i-shield"/></svg></div><h2>Owners only</h2><p>This sets up a brand-new restaurant on MyResto Connect.</p></div>
+          <div class="card g" style="display:flex;flex-direction:column;gap:11px;padding:14px">
+            <p class="gate"><b>Only owners of a business should continue past this point.</b> If you already have a login or a join code, please sign in <span class="herechip">here <svg class="ic" style="width:10px;height:10px"><use href="#i-chr"/></svg></span></p>
+            <p class="gate">Confirm you’re the owner and let’s get started!</p>
+            <div class="chk on"><span class="box"><svg class="ic"><use href="#i-check"/></svg></span><span>I am the owner, and I agree to the <span class="link">Terms of Service</span> and <span class="link">Privacy Policy</span>.</span></div>
+            <div class="btn fill">Create Account<svg class="ic"><use href="#i-arr"/></svg></div>
+          </div>
+          <div class="legal"><u>Terms</u>·<u>Privacy</u></div>
+        </div>
+      </div>
+      <p class="bcap"><b>O-0:</b> only needed if you pick W-C (or want the gate as a page rather than a sheet / an expander). Same words, same tick-to-unlock button.</p>
+    </div>
+
+    <div class="col">
+      <div class="concept"><b>O-1</b> Getting Started <span class="ln"></span> getting-started.tsx</div>
+      <div class="phone">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>9:41</span><span>●●● ᯤ ▮</span></div>
+        <div class="tophdr"><div class="c38"><svg class="ic"><use href="#i-chl"/></svg></div><div class="mid"><span class="eyeb q">Owner setup</span></div><div style="width:38px"></div></div>
+        <div class="cnt">
+          <div class="hero left"><h2>Getting Started</h2><p>In under two minutes, we’ll have you all set up! Here’s what you’ll need:</p></div>
+          <div class="rows">
+            <div class="rw"><div class="disc s"><svg class="ic"><use href="#i-store"/></svg></div><div class="bd"><div class="t">Organization Info</div><div class="s">Your restaurant’s name and basic details</div></div></div>
+            <div class="rw"><div class="disc s"><svg class="ic"><use href="#i-pin"/></svg></div><div class="bd"><div class="t">Location</div><div class="s">Street address, city, state &amp; zip</div></div></div>
+            <div class="rw"><div class="disc s"><svg class="ic"><use href="#i-doc"/></svg></div><div class="bd"><div class="t">PDF or clear image of your menu(s) <span class="pill">Optional</span></div><div class="s">Our AI builds your menu from it — you can also add this later</div></div></div>
+            <div class="rw"><div class="disc s"><svg class="ic"><use href="#i-map"/></svg></div><div class="bd"><div class="t">Google Maps location <span class="pill">Optional</span></div><div class="s">Your organization exactly as displayed on Google</div><div class="ex">ex. Belmont Tavern, 123 Main Street, Seaport, MA 02210</div></div></div>
+          </div>
+          <div class="ftr" style="text-align:center">You can skip the optional items and add them anytime later in the app.</div>
+          <div class="btn fill" style="flex:0 0 47px">Continue<svg class="ic"><use href="#i-arr"/></svg></div>
+          <div class="backlink"><svg class="ic"><use href="#i-chl"/></svg><b>Back to welcome</b></div>
+        </div>
+      </div>
+      <p class="bcap"><b>O-1:</b> the four cards become <b>one glass list</b> with hairlines (quiet-tint discs, mono example line, Optional pills), your new sentence under the title, a shining Continue. The back chip and the link both return to Welcome.</p>
+    </div>
+
+    <div class="col">
+      <div class="concept"><b>O-2</b> Create Your Account <span class="ln"></span> signup.tsx</div>
+      <div class="phone">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>9:41</span><span>●●● ᯤ ▮</span></div>
+        <div class="tophdr"><div class="c38"><svg class="ic"><use href="#i-chl"/></svg></div><div class="mid"><span class="eyeb q">Owner setup · 1 of 2</span></div><div style="width:38px"></div></div>
+        <div class="cnt">
+          <div class="hero left"><h2>Create Your Account</h2><p>Your owner account runs your organization’s subscription and every permission in the app — and starts your free 14-day trial.</p></div>
+          <div class="card g" style="display:flex;flex-direction:column;gap:10px;padding:14px">
+            <div class="two"><div class="fld"><div class="flab">First name</div><div class="inp"><span class="fill">Steven</span></div></div><div class="fld"><div class="flab">Last name</div><div class="inp"><span class="fill">Eccles</span></div></div></div>
+            <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)">Your username will be <span class="unchip">seccles</span></div>
+            <div class="fld"><div class="flab">Email</div><div class="inp"><svg class="ic"><use href="#i-mail"/></svg><span class="fill">steven@robinsonalehouse.com</span></div></div>
+            <div class="fld"><div class="flab">Password</div><div class="inp"><svg class="ic"><use href="#i-lock"/></svg><span class="fill dots">••••••••••</span><span class="eye"><svg class="ic"><use href="#i-eye"/></svg></span></div></div>
+            <div class="fld"><div class="flab">Confirm password</div><div class="inp"><svg class="ic"><use href="#i-lock"/></svg><span class="fill ph">Type it again</span><span class="eye"><svg class="ic"><use href="#i-eye"/></svg></span></div><div class="hintt">At least 6 characters.</div></div>
+            <div class="btn fill">Continue<svg class="ic"><use href="#i-arr"/></svg></div>
+          </div>
+          <div class="backlink">Already have an account? <b class="link">Sign In</b></div>
+        </div>
+      </div>
+      <p class="bcap"><b>O-2:</b> one glass card, FormKit labels, the username preview as a mono chip right under the names (it’s the thing they must remember). <em>Sign In</em> is the last exit — it returns to Welcome, as you asked. Errors move from pop-up alerts to a red line inside the card, like the s84 password screen.</p>
+    </div>
+
+    <div class="col">
+      <div class="concept"><b>O-3</b> Create Your Restaurant <span class="ln"></span> create-restaurant.tsx</div>
+      <div class="phone">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>9:41</span><span>●●● ᯤ ▮</span></div>
+        <div class="tophdr"><div class="c38"><svg class="ic"><use href="#i-chl"/></svg></div><div class="mid"><span class="eyeb q">Owner setup · 2 of 2</span></div><div style="width:38px"></div></div>
+        <div class="cnt">
+          <div class="hero left"><h2>Create Your Restaurant</h2><p>Tell us about your restaurant to get set up.</p></div>
+          <div class="card g" style="display:flex;flex-direction:column;gap:10px;padding:14px">
+            <div class="fld"><div class="flab">Restaurant name <span class="req">*</span></div><div class="inp"><svg class="ic"><use href="#i-store"/></svg><span class="fill">The Robinson Ale House</span></div></div>
+            <div class="fld"><div class="flab">Address</div><div class="inp"><svg class="ic"><use href="#i-pin"/></svg><span class="fill">26 Broad Street</span></div></div>
+            <div style="display:flex;gap:8px"><div class="fld" style="flex:1.6"><div class="flab">City</div><div class="inp"><span class="fill">Red Bank</span></div></div><div class="fld" style="flex:.7"><div class="flab">State</div><div class="inp"><span class="fill">NJ</span></div></div><div class="fld" style="flex:1"><div class="flab">Zip</div><div class="inp"><span class="fill mono">07701</span></div></div></div>
+            <div class="hintt" style="margin-top:-4px"><b>We’ll reuse this</b> to find your Google reviews in setup.</div>
+          </div>
+          <div class="card g" style="display:flex;flex-direction:column;gap:10px;padding:14px">
+            <div class="fld"><div class="flab">Reward currency name</div><div class="inp"><svg class="ic"><use href="#i-star"/></svg><span class="fill">Ale Bucks</span></div><div class="hintt">What your staff earns from quizzes and shout-outs.</div></div>
+            <div class="fld"><div class="flab">Default employee password</div><div class="inp"><svg class="ic"><use href="#i-key"/></svg><span class="fill mono">welcome123</span></div><div class="hintt">New staff sign in with this once, then set their own.</div></div>
+          </div>
+          <div class="btn fill" style="flex:0 0 47px">Create Restaurant</div>
+        </div>
+      </div>
+      <p class="bcap"><b>O-3:</b> two glass cards — <em>where</em> and <em>house settings</em> — each field now says what it’s for (today the currency and default password are unexplained). The address card tells them it feeds the Google Reviews step (S-3), which prefills from these four fields.</p>
+    </div>
+
+    <div class="col">
+      <div class="concept"><b>O-4</b> You’re all set! <span class="ln"></span> the account-created state</div>
+      <div class="phone">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>9:41</span><span>●●● ᯤ ▮</span></div>
+        <div class="cnt" style="padding-top:34px">
+          <div class="hero"><div class="disc ok"><svg class="ic"><use href="#i-check"/></svg></div><h2>You’re all set!</h2><p>Your restaurant and owner account have been created! Remember your login details below.</p></div>
+          <div class="rows">
+            <div class="cred"><div class="bd"><div class="eyeb q">Your username</div><div class="v">seccles</div></div><div class="sq"><svg class="ic"><use href="#i-copy"/></svg></div></div>
+            <div class="cred"><div class="bd"><div class="eyeb q">Your password</div><div class="v dots" style="letter-spacing:4px">••••••••••</div><div class="h">Use these to sign in next time.</div></div><div class="sq"><svg class="ic"><use href="#i-eye"/></svg></div></div>
+          </div>
+          <div class="rows">
+            <div class="cred"><div class="bd"><div class="eyeb q">Your team’s join code</div><div class="v">ROBI-4K7Q</div><div class="h">Share it so staff can join your restaurant — you’ll see it again at the end of setup.</div></div><div class="sq"><svg class="ic"><use href="#i-copy"/></svg></div></div>
+          </div>
+          <div class="btn fill" style="flex:0 0 47px;margin-top:4px">Continue to Setup<svg class="ic"><use href="#i-arr"/></svg></div>
+        </div>
+      </div>
+      <p class="bcap"><b>O-4:</b> your new line, then username + <b>password behind an eye</b> in one credentials card (the password is still in memory from O-2 — nothing is stored to show it), join code below, shining Continue to Setup. Copy squares on both values.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ───────── Row 4 · Setup wizard ───────── -->
+<div class="section">
+  <div class="sh">Row 4 · Setup wizard — five steps now <span class="ln"></span><small>setup-wizard.tsx · new rail · Make it yours is step 4</small></div>
+  <div class="row">
+
+    <div class="col">
+      <div class="concept"><b>S-1 ▶</b> Job Titles <span class="ln"></span> chips toggle</div>
+      <div class="phone">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>9:41</span><span>●●● ᯤ ▮</span></div>
+        <div class="rail"><div class="top"><span class="eyeb pop">Step 1 of 5</span><span class="eyeb">Robinson Ale House</span></div>
+          <div class="segs"><div class="seg now"><i></i><span>Jobs</span></div><div class="seg"><i></i><span>Menus</span></div><div class="seg"><i></i><span>Reviews</span></div><div class="seg"><i></i><span>Theme</span></div><div class="seg"><i></i><span>Review</span></div></div></div>
+        <div class="cnt dockpad">
+          <div class="hero left"><h2>Job Titles</h2><p>Now the fun part! Select the positions held at your restaurant. These will be assigned to each of your employees. You can always add more later!</p></div>
+          <div class="card g" style="padding:14px;display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;align-items:center"><span class="eyeb q" style="flex:1">Positions</span><span class="eyeb pop" id="jobcount">5 selected</span></div>
+            <div class="jobs" id="jobs">
+              <div class="job on"><svg class="ic"><use href="#i-check"/></svg>Manager</div><div class="job on"><svg class="ic"><use href="#i-check"/></svg>Server</div><div class="job on"><svg class="ic"><use href="#i-check"/></svg>Bartender</div><div class="job on"><svg class="ic"><use href="#i-check"/></svg>Host</div><div class="job"><svg class="ic"><use href="#i-check"/></svg>Busser</div><div class="job on"><svg class="ic"><use href="#i-check"/></svg>Runner</div><div class="job"><svg class="ic"><use href="#i-check"/></svg>Chef</div><div class="job"><svg class="ic"><use href="#i-check"/></svg>Cook</div><div class="job"><svg class="ic"><use href="#i-check"/></svg>Kitchen</div><div class="job"><svg class="ic"><use href="#i-check"/></svg>Dishwasher</div>
+              <div class="job add" data-noselect><svg class="ic"><use href="#i-plus"/></svg>Custom title</div>
+            </div>
+          </div>
+        </div>
+        <div class="dock"><div class="btn fill">Next<svg class="ic"><use href="#i-arr"/></svg></div></div>
+      </div>
+      <p class="bcap"><b>S-1:</b> the new <b>rail</b> — five thin segments with mono names, the live one glowing in the highlight, done ones dimmer with a tick (see S-3). Chips are the app’s glass chips: selected = highlight ring + tick, never a solid fill; a live count; <em>Custom title</em> is a dashed chip that turns into an inline field. Footer = one pinned dock, Back + Next, same on all five.</p>
+    </div>
+
+    <div class="col">
+      <div class="concept"><b>S-2 ▶</b> Menu Configuration <span class="ln"></span> 1 | 2 · Shared | Per-menu are live</div>
+      <div class="phone" id="s2">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>9:41</span><span>●●● ᯤ ▮</span></div>
+        <div class="rail"><div class="top"><span class="eyeb pop">Step 2 of 5</span><span class="eyeb">Robinson Ale House</span></div>
+          <div class="segs"><div class="seg done"><i></i><span><svg class="ic"><use href="#i-check"/></svg>Jobs</span></div><div class="seg now"><i></i><span>Menus</span></div><div class="seg"><i></i><span>Reviews</span></div><div class="seg"><i></i><span>Theme</span></div><div class="seg"><i></i><span>Review</span></div></div></div>
+        <div class="cnt dockpad">
+          <div class="hero left"><h2>Menu Configuration</h2><p>Set up how your restaurant’s menus are organised.</p></div>
+          <div class="card g" style="padding:14px;display:flex;flex-direction:column;gap:10px">
+            <div class="numq"><span class="ct">1 menu or 2?</span><div class="cap2" id="mcount"><span data-n="1">1</span><span class="on" data-n="2">2</span></div></div>
+            <div class="hintt" style="margin-top:-4px" id="mhint">2 menus are great for seasonal menus — <b>Winter</b> and <b>Summer</b> — or by daypart — <b>Morning</b> and <b>Night</b>.</div>
+            <div class="mrow"><div class="icbtn"><svg class="ic"><use href="#i-snow"/></svg><em><svg class="ic"><use href="#i-chd"/></svg></em></div><div class="fld" style="flex:1"><div class="flab">Menu 1 name</div><div class="inp"><span class="fill">Winter</span></div></div></div>
+            <div class="mrow" data-m2><div class="icbtn"><svg class="ic"><use href="#i-sun"/></svg><em><svg class="ic"><use href="#i-chd"/></svg></em></div><div class="fld" style="flex:1"><div class="flab">Menu 2 name</div><div class="inp"><span class="fill">Summer</span></div></div></div>
+          </div>
+          <div class="card g" style="padding:14px;display:flex;flex-direction:column;gap:10px" data-m2>
+            <span class="ct">How should your categories work across your menus?</span>
+            <ul class="blt"><li>You can switch modes anytime in Settings.</li><li>Both modes let you feature menu items on the Home screen’s <b>Specials</b> tab.</li></ul>
+            <div class="cap2 txt wide" id="scope"><span class="on" data-s="shared">Shared</span><span data-s="per">Per-menu</span></div>
+            <div class="scopebd on" data-sb="shared"><ul class="blt">
+              <li><b>Both menus use the same categories</b> — e.g. your Starters, Lunch, Dinner and Beverages appear on both.</li>
+              <li>Great for <b>Winter</b> and <b>Summer</b> menus whose categories don’t change over the year, or two menus that share categories all day but carry different items.</li>
+              <li>An item can be on only <b>Winter</b>, only <b>Summer</b>, or both — e.g. Mozzarella Sticks on both, Calamari on Summer only.</li>
+            </ul></div>
+            <div class="scopebd" data-sb="per"><ul class="blt">
+              <li><b>Winter</b> and <b>Summer</b> each get their <b>own independent categories</b> that you edit separately — every item belongs to one menu or the other.</li>
+              <li>Best when your two menus are truly different — e.g. a Breakfast and a Dinner menu with completely different categories.</li>
+              <li>Also great when one menu is always available and the other is a Specials menu that changes weekly or daily.</li>
+            </ul></div>
+          </div>
+          <div class="card g" style="padding:13px"><div class="uprow"><div class="disc s" style="color:var(--pop)"><svg class="ic"><use href="#i-spark"/></svg></div><div class="bd"><b>Have your menu handy?<span class="freepill">FREE</span></b><span>Our AI reads your PDF or photos and builds your categories and items — you review everything before it goes live. Now, or later in the Menu Editor.</span></div><div class="gchip" style="background:color-mix(in srgb,var(--pop) 13%,transparent);border-color:color-mix(in srgb,var(--pop) 34%,transparent);color:var(--pop)"><svg class="ic"><use href="#i-up"/></svg>Upload</div></div></div>
+        </div>
+        <div class="dock"><div class="btn back">Back</div><div class="btn fill">Next<svg class="ic"><use href="#i-arr"/></svg></div></div>
+      </div>
+      <p class="bcap"><b>S-2:</b> “1 menu or 2?” with <b>number chips</b> (tap 1 — the second menu and the whole categories question fold away). The icon picker is now a <b>43pt square beside each name</b> that opens the icon grid in a sheet — two rows instead of four stacks. Categories: your question, your two standing bullets, then a <b>Shared | Per-menu</b> capsule — only the chosen mode’s bullets show, and they use <em>the names typed above</em> (tap Per-menu). Upload rides the top-right of its card as a chip. Scroll inside the phone to see it all.</p>
+    </div>
+
+    <div class="col">
+      <div class="concept"><b>S-3</b> Google Reviews <span class="ln"></span> prefilled from Create Your Restaurant</div>
+      <div class="phone">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>9:41</span><span>●●● ᯤ ▮</span></div>
+        <div class="rail"><div class="top"><span class="eyeb pop">Step 3 of 5</span><span class="eyeb">Robinson Ale House</span></div>
+          <div class="segs"><div class="seg done"><i></i><span><svg class="ic"><use href="#i-check"/></svg>Jobs</span></div><div class="seg done"><i></i><span><svg class="ic"><use href="#i-check"/></svg>Menus</span></div><div class="seg now"><i></i><span>Reviews</span></div><div class="seg"><i></i><span>Theme</span></div><div class="seg"><i></i><span>Review</span></div></div></div>
+        <div class="cnt dockpad">
+          <div class="hero left"><h2>Google Reviews</h2><p>Your 14-day trial includes automatic Google review importing. See your real reviews in the app right away!</p></div>
+          <div class="card g" style="padding:14px;display:flex;flex-direction:column;gap:10px">
+            <div class="fld"><div class="flab">Find your restaurant on Google Maps <span class="opt pill ok" style="height:17px"><svg class="ic"><use href="#i-check"/></svg>Auto-filled</span></div>
+              <div class="inp multi focus"><svg class="ic" style="margin-top:2px"><use href="#i-pin"/></svg><span class="fill">The Robinson Ale House, 26 Broad Street, Red Bank, NJ 07701<i class="caret"></i></span></div>
+              <div class="hintt">Make sure your organization’s name and address are entered <b>exactly as they’re listed on Google</b>.</div>
+            </div>
+            <div class="btn fill"><svg class="ic"><use href="#i-down"/></svg>Import My Reviews</div>
+          </div>
+          <div class="backlink" style="text-align:center">Skip for now — you can set this up later in Settings</div>
+        </div>
+        <div class="dock"><div class="btn back">Back</div><div class="btn fill" style="background:var(--glass);border-color:var(--glassbd);color:var(--text)">Next<svg class="ic"><use href="#i-arr"/></svg></div></div>
+      </div>
+      <p class="bcap"><b>S-3:</b> the field arrives <b>prefilled</b> as “Name, Street, City, ST Zip” from the restaurant step, in a <b>three-line box</b> so the whole address reads without scrolling, with a small “Auto-filled” tag that disappears on the first edit. Your new hint under it; <b>Import My Reviews</b> is the shining button — so on this step the dock’s Next goes quiet glass (one shine per screen).</p>
+    </div>
+
+    <div class="col">
+      <div class="concept"><b>S-4 ▶</b> Make it yours <span class="ln"></span> new step · tap a theme, the phone repaints</div>
+      <div class="phone pz" id="s4" data-mode="d">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>9:41</span><span>●●● ᯤ ▮</span></div>
+        <div class="rail"><div class="top"><span class="eyeb pop">Step 4 of 5</span><span class="eyeb">Robinson Ale House</span></div>
+          <div class="segs"><div class="seg done"><i></i><span><svg class="ic"><use href="#i-check"/></svg>Jobs</span></div><div class="seg done"><i></i><span><svg class="ic"><use href="#i-check"/></svg>Menus</span></div><div class="seg done"><i></i><span><svg class="ic"><use href="#i-check"/></svg>Reviews</span></div><div class="seg now"><i></i><span>Theme</span></div><div class="seg"><i></i><span>Review</span></div></div></div>
+        <div class="cnt dockpad">
+          <div class="hero left"><h2>Make it yours</h2><p>Personalize your account’s appearance.</p></div>
+          <div class="infob"><svg class="ic"><use href="#i-info"/></svg><span>Your theme is for <b>your own account</b> — NOT for every user. Change it anytime in <b>Profile › Settings › Appearance</b>.</span></div>
+          <div class="cap2 txt wide" data-modecap><span data-m="l"><svg class="ic" style="width:14px;height:14px;margin-right:5px"><use href="#i-sun"/></svg>Light</span><span class="on" data-m="d"><svg class="ic" style="width:14px;height:14px;margin-right:5px"><use href="#i-moon"/></svg>Dark</span><span data-m="a"><svg class="ic" style="width:14px;height:14px;margin-right:5px"><use href="#i-half"/></svg>Auto</span></div>
+          <div class="tgrid">
+            <div class="tcard on" data-t="logo"><span class="tk"><svg class="ic"><use href="#i-check"/></svg></span><div class="sws"><i style="background:#141724"></i><i style="background:#ACAFB3"></i><i style="background:#F99861"></i></div><b>Moonstone</b></div>
+            <div class="tcard" data-t="ocean"><span class="tk"><svg class="ic"><use href="#i-check"/></svg></span><div class="sws"><i style="background:#1A2332"></i><i style="background:#4A90E2"></i><i style="background:#90CAF9"></i></div><b>Ocean</b></div>
+            <div class="tcard" data-t="midnight"><span class="tk"><svg class="ic"><use href="#i-check"/></svg></span><div class="sws"><i style="background:#141628"></i><i style="background:#8C7CFF"></i><i style="background:#7FA6FF"></i></div><b>Midnight</b></div>
+            <div class="tcard" data-t="emerald"><span class="tk"><svg class="ic"><use href="#i-check"/></svg></span><div class="sws"><i style="background:#0E2220"></i><i style="background:#34D399"></i><i style="background:#5FB8D8"></i></div><b>Emerald</b></div>
+            <div class="tcard" data-t="gilded"><span class="tk"><svg class="ic"><use href="#i-check"/></svg></span><div class="sws"><i style="background:#0C0C0C"></i><i style="background:#D4AF37"></i><i style="background:#F2D67A"></i></div><b>Gilded</b></div>
+            <div class="tcard" data-t="ember"><span class="tk"><svg class="ic"><use href="#i-check"/></svg></span><div class="sws"><i style="background:#1C1512"></i><i style="background:#FF6B4A"></i><i style="background:#FFB07A"></i></div><b>Ember</b></div>
+          </div>
+          <div class="gchip" style="align-self:center"><svg class="ic"><use href="#i-pal"/></svg>Custom accent…</div>
+          <div class="prev"><span class="eyeb q">Preview · your dashboard</span><div class="greet">Good evening, <span>Steven</span></div><div class="qa"><div><svg class="ic"><use href="#i-home"/></svg></div><div><svg class="ic"><use href="#i-fork"/></svg></div><div><svg class="ic"><use href="#i-cal"/></svg></div><div><svg class="ic"><use href="#i-bolt"/></svg></div></div></div>
+        </div>
+        <div class="dock"><div class="btn back">Back</div><div class="btn fill">Next<svg class="ic"><use href="#i-arr"/></svg></div></div>
+      </div>
+      <p class="bcap"><b>S-4 — your idea, and I like it.</b> The six presets as swatch cards, Light · Dark · Auto, and the existing <b>Custom accent</b> editor behind one chip. The trick: the wizard already sits on the glow, so <b>the page itself is the preview</b> — tap a card and everything repaints (try it). Your “own account, NOT every user” note sits up top. Next saves; nothing is forced — the default is already selected.</p>
+    </div>
+
+    <div class="col">
+      <div class="concept"><b>S-5</b> Review &amp; Save <span class="ln"></span> the whole setup, at a glance</div>
+      <div class="phone">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>9:41</span><span>●●● ᯤ ▮</span></div>
+        <div class="rail"><div class="top"><span class="eyeb pop">Step 5 of 5</span><span class="eyeb">Robinson Ale House</span></div>
+          <div class="segs"><div class="seg done"><i></i><span><svg class="ic"><use href="#i-check"/></svg>Jobs</span></div><div class="seg done"><i></i><span><svg class="ic"><use href="#i-check"/></svg>Menus</span></div><div class="seg done"><i></i><span><svg class="ic"><use href="#i-check"/></svg>Reviews</span></div><div class="seg done"><i></i><span><svg class="ic"><use href="#i-check"/></svg>Theme</span></div><div class="seg now"><i></i><span>Review</span></div></div></div>
+        <div class="cnt dockpad">
+          <div class="hero left"><h2>Review &amp; Save</h2><p>Here’s everything you’ve set up. Tap any card to change it.</p></div>
+          <div class="orgcard"><div class="orgmark">RA</div><div class="bd"><b>The Robinson Ale House</b><span>26 Broad Street, Red Bank, NJ 07701</span><span class="mono" style="font-size:10.5px;margin-top:3px">OWNER · seccles</span></div></div>
+          <div class="card g rv"><div class="rvh"><svg class="ic"><use href="#i-brief"/></svg><span class="ct">Job Titles</span><span class="pill">5 positions</span><div class="gchip sm"><svg class="ic"><use href="#i-edit"/></svg>Edit</div></div><div class="mini"><span>Manager</span><span>Server</span><span>Bartender</span><span>Host</span><span>Runner</span></div></div>
+          <div class="card g rv"><div class="rvh"><svg class="ic"><use href="#i-fork"/></svg><span class="ct">Menus</span><span class="pill">Shared categories</span><div class="gchip sm"><svg class="ic"><use href="#i-edit"/></svg>Edit</div></div><div style="display:flex;gap:8px"><div class="mtile"><svg class="ic"><use href="#i-snow"/></svg>Winter</div><div class="mtile"><svg class="ic"><use href="#i-sun"/></svg>Summer</div></div><div class="kv"><span class="pill ok"><svg class="ic"><use href="#i-check"/></svg>Menu uploaded</span><span><b>42 items</b> in 6 categories</span></div></div>
+          <div class="card g rv"><div class="rvh"><svg class="ic"><use href="#i-star"/></svg><span class="ct">Google Reviews</span><span class="pill gold">Importing</span><div class="gchip sm"><svg class="ic"><use href="#i-edit"/></svg>Edit</div></div><div class="kv" style="line-height:16px"><svg class="ic" style="width:13px;height:13px"><use href="#i-pin"/></svg><span>The Robinson Ale House, 26 Broad Street, Red Bank, NJ 07701</span></div></div>
+          <div class="card g rv"><div class="rvh"><svg class="ic"><use href="#i-pal"/></svg><span class="ct">Your theme</span><div class="gchip sm"><svg class="ic"><use href="#i-edit"/></svg>Edit</div></div><div class="kv"><i class="sw" style="background:var(--bg)"></i><i class="sw" style="background:var(--quiet)"></i><i class="sw" style="background:var(--pop)"></i><span><b>Moonstone</b> · Dark · just for you</span></div></div>
+        </div>
+        <div class="dock"><div class="btn back">Back</div><div class="btn fill"><svg class="ic"><use href="#i-check"/></svg>Complete Setup</div></div>
+      </div>
+      <p class="bcap"><b>S-5:</b> no more three grey boxes. A <b>restaurant card</b> on top (monogram, name, address, owner login), then one glass card per step with its <b>own status pill</b> and an <b>Edit chip that jumps back</b> to that step: titles as chips with a count, the two menus with their icons + scope + whether a menu was uploaded (item count), the Google query with Importing / Will import / Skipped, and the chosen theme. Shining Complete Setup.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ───────── Row 5 · finish + paywall ───────── -->
+<div class="section">
+  <div class="sh">Row 5 · The finish line &amp; the paywall <span class="ln"></span><small>join-code.tsx · paywall.tsx</small></div>
+  <div class="row">
+    <div class="col">
+      <div class="concept"><b>F-1</b> You’re All Set! <span class="ln"></span> tick left · code · two bullets · trial</div>
+      <div class="phone">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>9:41</span><span>●●● ᯤ ▮</span></div>
+        <div class="cnt dockpad" style="padding-top:22px">
+          <div class="donehd"><div class="disc ok"><svg class="ic"><use href="#i-check"/></svg></div><div><h2>You’re All Set!</h2><p>The Robinson Ale House is ready to go. Share the join code below with your team.</p></div></div>
+          <div class="codecard"><div style="display:flex;align-items:center"><span class="eyeb q" style="flex:1">Your join code</span><span class="pill ok">Self-signup on</span></div><div class="code">ROBI-4K7Q</div><div class="btnrow"><div class="btn" style="height:42px;min-height:42px"><svg class="ic"><use href="#i-copy"/></svg>Copy Code</div><div class="btn" style="height:42px;min-height:42px"><svg class="ic"><use href="#i-share"/></svg>Share</div></div></div>
+          <div class="infob"><svg class="ic"><use href="#i-info"/></svg><ul>
+            <li><b>Share this code with your staff.</b> Once they download the MyResto Connect app they can use it to join and create their accounts. You can disable Self-Signup in your Organization Settings if you’d rather add them manually.</li>
+            <li>Tutorials and walk-throughs of every feature live at <span class="link">MyRestoConnect.com</span></li></ul></div>
+          <div class="trial"><div class="hd"><svg class="ic"><use href="#i-crown"/></svg><span class="ct">Your Free 14-Day Premium Trial</span></div><div class="ftr" style="margin-top:-3px">Everything’s unlocked — explore every Premium feature free for 14 days:</div>
+            <div class="feat"><div><svg class="ic"><use href="#i-check"/></svg>AI Menu &amp; Schedule Upload</div><div><svg class="ic"><use href="#i-check"/></svg>Automatic Google Reviews import</div><div><svg class="ic"><use href="#i-check"/></svg>Quizzes &amp; Exams with rewards</div><div><svg class="ic"><use href="#i-check"/></svg>Menu Memory &amp; Picture This! games</div><div><svg class="ic ok"><use href="#i-check"/></svg>Plus the essentials: menus, messaging, schedules, rewards &amp; guides</div></div>
+            <div class="ftr">Manage or activate your subscription anytime in Manage → Subscription.</div></div>
+        </div>
+        <div class="dock"><div class="btn fill">Go to Dashboard<svg class="ic"><use href="#i-arr"/></svg></div></div>
+      </div>
+      <p class="bcap"><b>F-1:</b> tick moves left of the title (saves ~90pt), so the code card, your <b>two bullets</b> and the gold trial card fit with barely a scroll. Share’s message gains the download link: <span class="mono">“Join The Robinson Ale House on MyResto Connect! Download the app: myrestoconnect.com/app — then use join code ROBI-4K7Q.”</span> One web link that forwards to the right store, so the message never needs editing per platform (a placeholder constant until the site and listings exist).</p>
+    </div>
+
+    <div class="col">
+      <div class="concept"><b>F-2</b> Paywall <span class="ln"></span> trial ended · the s84 Subscription grammar</div>
+      <div class="phone">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>9:41</span><span>●●● ᯤ ▮</span></div>
+        <div class="cnt" style="padding-top:26px">
+          <div class="donehd"><div class="disc" style="color:var(--gold)"><svg class="ic"><use href="#i-bolt"/></svg></div><div><h2 style="font-size:21px">Your free trial has ended</h2><p>Choose a plan to keep The Robinson Ale House connected.</p></div></div>
+          <div class="mx">
+            <div class="mxh"><span class="eyeb">What’s included</span><div>Base<small>$11/mo</small></div><div class="p">Premium<small>$15/mo</small></div></div>
+            <div class="mxr prem">AI Schedule Upload<span class="no">—</span><span><svg class="ic g"><use href="#i-check"/></svg></span></div>
+            <div class="mxr prem">Quizzes &amp; Exams<span class="no">—</span><span><svg class="ic g"><use href="#i-check"/></svg></span></div>
+            <div class="mxr prem">Menu Memory Tiles<span class="no">—</span><span><svg class="ic g"><use href="#i-check"/></svg></span></div>
+            <div class="mxr prem">Picture This! Game<span class="no">—</span><span><svg class="ic g"><use href="#i-check"/></svg></span></div>
+            <div class="mxr prem">Auto Google Reviews<span class="no">—</span><span><svg class="ic g"><use href="#i-check"/></svg></span></div>
+            <div class="mxr">Manual Schedule Builder<span><svg class="ic"><use href="#i-check"/></svg></span><span><svg class="ic"><use href="#i-check"/></svg></span></div>
+            <div class="mxr">Menu Editor<span><svg class="ic"><use href="#i-check"/></svg></span><span><svg class="ic"><use href="#i-check"/></svg></span></div>
+            <div class="mxr">Employee Management<span><svg class="ic"><use href="#i-check"/></svg></span><span><svg class="ic"><use href="#i-check"/></svg></span></div>
+            <div class="mxr">Messaging &amp; Notifications<span><svg class="ic"><use href="#i-check"/></svg></span><span><svg class="ic"><use href="#i-check"/></svg></span></div>
+            <div class="mxr">Rewards · Word Search · Guides<span><svg class="ic"><use href="#i-check"/></svg></span><span><svg class="ic"><use href="#i-check"/></svg></span></div>
+          </div>
+          <div class="btnrow"><div class="btn" style="flex:.8">Get Base</div><div class="btn fill" style="background:var(--gold);border-color:var(--gold);color:#1A1200">Get Premium — $15/mo</div></div>
+          <div class="backlink"><b class="link">Restore previous purchase</b> · <span style="color:var(--bad);font-weight:600">Log out</span></div>
+          <div class="ftr" style="text-align:center">Subscriptions renew monthly and can be cancelled anytime from your App Store subscription settings. <u style="text-decoration:none;border-bottom:1px solid">Terms</u> · <u style="text-decoration:none;border-bottom:1px solid">Privacy</u></div>
+        </div>
+      </div>
+      <p class="bcap"><b>F-2:</b> you didn’t list it, but it’s one of the eight. It borrows the <b>compare matrix you picked for Subscription</b> in s84 (premium rows first, gold wash, gold CTA), headed by the trial-ended line with the org’s name. Two fixes ride along: every string is <b>hardcoded English today</b> → moves to i18n, and the screen has <b>no way out</b> for someone on the wrong account → a Log out link. Terms / Privacy links here are an App Store requirement for subscription screens.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ───────── Row 6 · Employee path ───────── -->
+<div class="section">
+  <div class="sh">Row 6 · Employee — join with a code <span class="ln"></span><small>join.tsx · then the s84 password screen · then Make it yours</small></div>
+  <div class="row">
+    <div class="col">
+      <div class="concept"><b>E-1</b> Join Your Restaurant <span class="ln"></span> the code</div>
+      <div class="phone front">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>9:41</span><span>●●● ᯤ ▮</span></div>
+        <div class="tophdr"><div class="c38"><svg class="ic"><use href="#i-chl"/></svg></div><div class="mid"></div><div style="width:38px"></div></div>
+        <div class="cnt">
+          <div class="hero"><div class="disc" style="color:var(--pop)"><svg class="ic"><use href="#i-ticket"/></svg></div><h2>Join Your Restaurant</h2><p>Enter the code your manager gave you.</p></div>
+          <div class="card g" style="padding:14px;display:flex;flex-direction:column;gap:11px">
+            <div class="codein">ROBI-<span class="ph">····</span></div>
+            <div class="btn fill">Continue<svg class="ic"><use href="#i-arr"/></svg></div>
+          </div>
+          <div class="infob"><svg class="ic"><use href="#i-info"/></svg><span><b>Haven’t received a join code?</b> Please see your manager — they can share it from the app in one tap.</span></div>
+          <div class="backlink"><svg class="ic"><use href="#i-chl"/></svg><b>Back to welcome</b></div>
+          <div class="legal"><u>Terms</u>·<u>Privacy</u></div>
+        </div>
+      </div>
+      <p class="bcap"><b>E-1:</b> the code is the hero — one big mono field that upper-cases and drops the dash in for them — with the <b>“see your manager”</b> line you asked for right under it. Invalid / self-signup-off errors show as a red line in the card.</p>
+    </div>
+
+    <div class="col">
+      <div class="concept"><b>E-2</b> Create your account <span class="ln"></span> email required · phone · tagline</div>
+      <div class="phone">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>9:41</span><span>●●● ᯤ ▮</span></div>
+        <div class="tophdr"><div class="c38"><svg class="ic"><use href="#i-chl"/></svg></div><div class="mid"><span class="eyeb q">Join · 2 of 2</span></div><div style="width:38px"></div></div>
+        <div class="cnt">
+          <div class="orgbadge"><svg class="ic"><use href="#i-check"/></svg><div class="bd"><span class="eyeb" style="color:var(--ok)">Joining</span><b>The Robinson Ale House</b></div></div>
+          <div class="card g" style="display:flex;flex-direction:column;gap:10px;padding:14px">
+            <div class="two"><div class="fld"><div class="flab">First name <span class="req">*</span></div><div class="inp"><span class="fill">Employee</span></div></div><div class="fld"><div class="flab">Last name <span class="req">*</span></div><div class="inp"><span class="fill">Test</span></div></div></div>
+            <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)">Your username will be <span class="unchip">etest</span></div>
+            <div class="fld"><div class="flab">Email <span class="req">*</span></div><div class="inp"><svg class="ic"><use href="#i-mail"/></svg><span class="fill">etest@example.com</span></div></div>
+            <div class="fld"><div class="flab">Phone number</div><div class="inp"><svg class="ic"><use href="#i-phone"/></svg><span class="fill mono">(732) 555-0142</span></div>
+              <div class="hintt" style="display:flex;gap:6px"><svg class="ic" style="width:13px;height:13px;margin-top:1px;color:var(--quiet)"><use href="#i-lock"/></svg><span>Email and phone number are private and for administrative purposes only. They’re never shown to anyone except your Owner and Managers.</span></div></div>
+          </div>
+          <div class="card g" style="display:flex;flex-direction:column;gap:6px;padding:14px">
+            <div class="fld"><div class="flab">Tagline <span class="opt mono">24 / 60</span></div><div class="inp"><svg class="ic"><use href="#i-quote"/></svg><span class="fill">Ask me about the IPAs 🍺</span></div><div class="hintt">A line about you — it shows on your profile card for the team.</div></div>
+          </div>
+          <div class="infob"><svg class="ic"><use href="#i-key"/></svg><span>You’ll be signed in automatically and asked to set your own password on the next screen.</span></div>
+          <div class="btn fill" style="flex:0 0 47px">Create Account</div>
+          <div class="backlink"><svg class="ic"><use href="#i-chl"/></svg>Back &nbsp;·&nbsp; <b>Back to welcome</b></div>
+        </div>
+      </div>
+      <p class="bcap"><b>E-2:</b> “(optional)” is gone from Email; <b>Phone</b> and <b>Tagline</b> are new and write straight to the profile; the privacy line sits under the two private fields with a padlock; the key note gains “on the next screen”. After Create Account the old pop-up alert goes — they land directly on the s84 <b>Set a new password</b> screen, which now shows their username.</p>
+    </div>
+
+    <div class="col">
+      <div class="concept"><b>E-3 ▶</b> Make it yours <span class="ln"></span> after Set a new password · before the dashboard</div>
+      <div class="phone pz" id="e3" data-mode="d">
+        <div class="glow"></div><div class="glow2"></div>
+        <div class="sb"><span>9:41</span><span>●●● ᯤ ▮</span></div>
+        <div class="cnt" style="padding-top:30px">
+          <div class="hero"><div class="disc" style="color:var(--pop)"><svg class="ic"><use href="#i-pal"/></svg></div><h2>Make it yours</h2><p>Pick the look of <b style="color:var(--text)">your</b> app. Only you see it — change it anytime in Profile › Settings › Appearance.</p></div>
+          <div class="cap2 txt wide" data-modecap><span data-m="l"><svg class="ic" style="width:14px;height:14px;margin-right:5px"><use href="#i-sun"/></svg>Light</span><span class="on" data-m="d"><svg class="ic" style="width:14px;height:14px;margin-right:5px"><use href="#i-moon"/></svg>Dark</span><span data-m="a"><svg class="ic" style="width:14px;height:14px;margin-right:5px"><use href="#i-half"/></svg>Auto</span></div>
+          <div class="tgrid">
+            <div class="tcard on" data-t="logo"><span class="tk"><svg class="ic"><use href="#i-check"/></svg></span><div class="sws"><i style="background:#141724"></i><i style="background:#ACAFB3"></i><i style="background:#F99861"></i></div><b>Moonstone</b></div>
+            <div class="tcard" data-t="ocean"><span class="tk"><svg class="ic"><use href="#i-check"/></svg></span><div class="sws"><i style="background:#1A2332"></i><i style="background:#4A90E2"></i><i style="background:#90CAF9"></i></div><b>Ocean</b></div>
+            <div class="tcard" data-t="midnight"><span class="tk"><svg class="ic"><use href="#i-check"/></svg></span><div class="sws"><i style="background:#141628"></i><i style="background:#8C7CFF"></i><i style="background:#7FA6FF"></i></div><b>Midnight</b></div>
+            <div class="tcard" data-t="emerald"><span class="tk"><svg class="ic"><use href="#i-check"/></svg></span><div class="sws"><i style="background:#0E2220"></i><i style="background:#34D399"></i><i style="background:#5FB8D8"></i></div><b>Emerald</b></div>
+            <div class="tcard" data-t="gilded"><span class="tk"><svg class="ic"><use href="#i-check"/></svg></span><div class="sws"><i style="background:#0C0C0C"></i><i style="background:#D4AF37"></i><i style="background:#F2D67A"></i></div><b>Gilded</b></div>
+            <div class="tcard" data-t="ember"><span class="tk"><svg class="ic"><use href="#i-check"/></svg></span><div class="sws"><i style="background:#1C1512"></i><i style="background:#FF6B4A"></i><i style="background:#FFB07A"></i></div><b>Ember</b></div>
+          </div>
+          <div class="gchip" style="align-self:center"><svg class="ic"><use href="#i-pal"/></svg>Custom accent…</div>
+          <div class="prev"><span class="eyeb q">Preview · your dashboard</span><div class="greet">Welcome, <span>Employee</span></div><div class="qa"><div><svg class="ic"><use href="#i-home"/></svg></div><div><svg class="ic"><use href="#i-fork"/></svg></div><div><svg class="ic"><use href="#i-cal"/></svg></div><div><svg class="ic"><use href="#i-bolt"/></svg></div></div></div>
+          <div class="btn fill" style="flex:0 0 47px">Save &amp; go to my dashboard<svg class="ic"><use href="#i-arr"/></svg></div>
+          <div class="backlink">Skip for now</div>
+        </div>
+      </div>
+      <p class="bcap"><b>E-3:</b> the same picker as S-4, as its own page between the password screen and the Welcome tab. One shared component, two hosts. <b>Skip</b> keeps the default. It appears <b>once</b> — only on the first sign-in after a join (a manager-created account that’s forced to change its password gets it too, since that’s their first visit as well).</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="sh">Notes · decisions I need from you <span class="ln"></span></div>
+  <div class="notes">
+    <div class="note"><b>1 · The default palette</b>My recommendation: <em>don’t make MyResto Ocean</em> — make Moonstone match the logo. The login sits right under the logo, so they must agree, and two apps sharing Ocean costs MyResto its own face. It isn’t a seventh theme: it’s a <em>re-tune of Moonstone in place</em> — charcoal <span class="mono">#181B21</span> → logo navy, loud <span class="mono">#FF7A2F</span> → the logo’s softer <span class="mono">#F99861</span>, light-mode buttons → ring navy <span class="mono">#1F2334</span>. Flip the palette buttons and judge Logo vs Ocean vs today on the whole flow. Boathouse stays Ocean light regardless.</div>
+    <div class="note"><b>2 · Which theme does Login wear?</b>First-timers always get the app default. For a <em>returning</em> device I’d keep the theme saved on that device (themes are on-device already), so Login → dashboard is one continuous look, exactly your goal. The alternative — Login always in the default — means an Emerald user flashes Moonstone → Emerald at every sign-in.</div>
+    <div class="note"><b>3 · Where owners personalize</b>Mocked as you asked: step 4 of 5, before Review. One thought — it’s the only step about <em>them</em> rather than the restaurant; your “own account, NOT every user” line handles that well, so I’m happy with it there.</div>
+    <div class="note warn"><b>4 · The junk-signup worry — what I found</b>I checked the server (read-only): join-code lookups and employee joins are rate-limited, but <em>owner signup has no limit at all</em> today. The tick-box is a legal and a human speed-bump; it won’t stop a script. I’d add, this session, the same throttle the other two use (a handful of new restaurants per IP per hour) — additive, invisible to real owners. Your call; I won’t touch the server without your word.</div>
+    <div class="note"><b>5 · The clickwrap</b>One tick covering “I am the owner” <em>and</em> “I agree to the Terms &amp; Privacy Policy”, with both as live links and the button dead until ticked, is the form courts treat as real consent. To make it count later we should <em>record it</em>: a timestamp + terms version on the new org at signup. Small additive column — can ride this session or wait for compliance. Links point at placeholder <span class="mono">myrestoconnect.com/terms</span> · <span class="mono">/privacy</span> constants until the site exists.</div>
+    <div class="note"><b>6 · Email required + duplicates</b>Live builds 17 / vc11 still send a blank email, and the DB is shared — so the <em>server must keep accepting blank</em> until those builds retire; the new screen enforces it client-side. To actually stop duplicate accounts the join RPC gains an “email already on this team” check (new clients only feel it). Phone + tagline = two new optional params with defaults, so old builds keep working untouched.</div>
+    <div class="note"><b>7 · “Until they reach the dashboard”</b>Today the device flag flips the moment a session exists. I’ll move it to the first portal mount, per your rule — so someone who quits on the password screen sees Welcome again rather than a Login they can’t pass. (Note 6’s duplicate-email check is what keeps that from minting a second account.)</div>
+    <div class="note"><b>8 · Password managers</b>Whichever login you pick, both inputs stay mounted with proper autofill hints, so iOS Keychain / Google can fill username + password in one go — when that happens the screen skips straight to the Sign In state.</div>
+    <div class="note"><b>9 · Boathouse build</b>No Welcome screen there (no join codes, no owner setup on that variant — unchanged from today). It gets the new Login only: McLoone’s mark, Ocean light, same motion.</div>
+    <div class="note"><b>10 · Copy</b>I tidied spelling and grammar in your new lines but kept your voice — read them on the phones; anything you want worded differently, say so now, since each string is minted EN + ES.</div>
+  </div>
+</div>
+
+<script>
+// palette buttons → every phone (the two personalize phones too, until a preset is tapped)
+const THEMES=['t-logo-l','t-ocean-d','t-ocean-l','t-mono-d','t-mono-l','t-midnight-d','t-midnight-l','t-emerald-d','t-emerald-l','t-gilded-d','t-gilded-l','t-ember-d','t-ember-l'];
+function paint(p,cls){p.classList.remove(...THEMES);if(cls)p.classList.add(cls)}
+document.querySelectorAll('[data-theme]').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('[data-theme]').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+  document.querySelectorAll('.phone').forEach(p=>paint(p,b.dataset.theme));
+}));
+// W-A
+const wa=document.getElementById('wa');
+wa.querySelectorAll('.rolehd').forEach(h=>h.addEventListener('click',()=>{
+  const r=h.parentElement,was=r.classList.contains('open');
+  wa.querySelectorAll('.role').forEach(x=>x.classList.remove('open'));if(!was)r.classList.add('open');
+}));
+wa.querySelector('[data-here]').addEventListener('click',e=>{e.stopPropagation();wa.querySelectorAll('.role').forEach(x=>x.classList.toggle('open',x.dataset.role==='emp'))});
+wa.querySelector('[data-chk]').addEventListener('click',function(){this.classList.toggle('on');wa.querySelector('[data-cta]').classList.toggle('dis',!this.classList.contains('on'))});
+// L-A
+const la=document.getElementById('la'),pwt=la.querySelector('[data-pwtxt]');
+function laStep(n){la.dataset.step=n;if(n<3){pwt.textContent='Enter your password';pwt.className='fill ph'}else{pwt.innerHTML='••••••••';pwt.className='fill dots'}}
+la.querySelector('[data-go]').addEventListener('click',()=>laStep(2));
+la.querySelector('[data-back]').addEventListener('click',()=>laStep(1));
+la.querySelector('[data-pw]').addEventListener('click',()=>laStep(3));
+la.querySelector('[data-chk]').addEventListener('click',function(){this.classList.toggle('on')});
+document.getElementById('lareset').addEventListener('click',()=>laStep(1));
+document.getElementById('laplay').addEventListener('click',()=>{laStep(1);setTimeout(()=>laStep(2),900);setTimeout(()=>laStep(3),2300)});
+// S-1
+const jobs=document.getElementById('jobs');
+jobs.querySelectorAll('.job:not([data-noselect])').forEach(j=>j.addEventListener('click',()=>{j.classList.toggle('on');document.getElementById('jobcount').textContent=jobs.querySelectorAll('.job.on').length+' selected'}));
+// S-2
+const s2=document.getElementById('s2');
+s2.querySelectorAll('#mcount span').forEach(c=>c.addEventListener('click',()=>{
+  s2.querySelectorAll('#mcount span').forEach(x=>x.classList.toggle('on',x===c));const two=c.dataset.n==='2';
+  s2.querySelectorAll('[data-m2]').forEach(x=>x.style.display=two?'':'none');
+  document.getElementById('mhint').innerHTML=two?'2 menus are great for seasonal menus — <b>Winter</b> and <b>Summer</b> — or by daypart — <b>Morning</b> and <b>Night</b>.':'One menu — you can always add a second later.';
+}));
+s2.querySelectorAll('#scope span').forEach(c=>c.addEventListener('click',()=>{
+  s2.querySelectorAll('#scope span').forEach(x=>x.classList.toggle('on',x===c));
+  s2.querySelectorAll('[data-sb]').forEach(x=>x.classList.toggle('on',x.dataset.sb===c.dataset.s));
+}));
+// personalize phones
+document.querySelectorAll('.phone.pz').forEach(p=>{
+  let t='logo';
+  const apply=()=>{const m=p.dataset.mode==='l'?'l':'d';paint(p,(t==='logo'&&m==='d')?'':'t-'+t+'-'+m)};
+  p.querySelectorAll('.tcard').forEach(c=>c.addEventListener('click',()=>{p.querySelectorAll('.tcard').forEach(x=>x.classList.toggle('on',x===c));t=c.dataset.t;apply()}));
+  p.querySelectorAll('[data-modecap] span').forEach(s=>s.addEventListener('click',()=>{p.querySelectorAll('[data-modecap] span').forEach(x=>x.classList.toggle('on',x===s));p.dataset.mode=s.dataset.m;apply()}));
+});
+</script>
+</body>
+</html>

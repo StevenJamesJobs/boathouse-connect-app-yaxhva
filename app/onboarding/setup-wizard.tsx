@@ -1,25 +1,48 @@
-import React, { useState, useCallback } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Alert,
-  ActivityIndicator,
-  Switch,
-  Keyboard,
-} from 'react-native';
+/**
+ * Owner setup wizard (s86, mockups S-1 … S-5) — Jobs · Menus · Reviews · Theme · Review, on
+ * the Onboarding Kit: the five-segment rail up top, one pinned Back / Next dock, a left hero
+ * and glass cards per step. Each step body is a top-level module component (props in,
+ * callbacks out); the screen owns the state, the RPCs and the step flow.
+ *
+ * Step 4 (Theme) hosts the shared AppearanceBody — it repaints the whole app live, so the
+ * wizard page is its own preview. Step 5 sums everything up with an Edit chip per card.
+ */
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { View, Text, Pressable, StyleSheet, Alert, Keyboard } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from "expo-router/react-navigation";
 import { useTranslation } from 'react-i18next';
-import { splashColors } from '@/styles/commonStyles';
+import { hexToRgba } from '@/styles/commonStyles';
+import { fonts } from '@/constants/fonts';
 import { IconSymbol } from '@/components/IconSymbol';
+import GlassCard from '@/components/GlassCard';
 import MenuIconPicker from '@/components/MenuIconPicker';
+import { StorageImage } from '@/components/StorageImage';
+import AppearanceBody from '@/components/appearance/AppearanceBody';
+import { THEME_LABEL_KEY } from '@/components/appearance/appearanceKit';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAppTheme } from '@/contexts/ThemeContext';
+import { useThemeColors } from '@/hooks/useThemeColors';
+import { markPersonalized } from '@/utils/deviceFlags';
+import {
+  OnbScreen,
+  OnboardingRail,
+  OnboardingDock,
+  Hero,
+  Disc,
+  CtaButton,
+  IconField,
+  InfoBlurb,
+  Body,
+  B,
+  Bullet,
+  Pill,
+  ErrorLine,
+  LinkRow,
+  useOnbAccents,
+} from '@/components/onboarding/OnboardingKit';
 
 const DEFAULT_JOB_TITLES = [
   'Manager',
@@ -34,16 +57,29 @@ const DEFAULT_JOB_TITLES = [
   'Dishwasher',
 ];
 
+type CategoryScope = 'shared' | 'per_menu';
+type ImportResult = { success: boolean; count: number; error?: string } | null;
+
+/** "26 Broad Street, Red Bank, NJ 07701" — whatever parts the org has, in postal order. */
+function formatOrgAddress(org: { address: string | null; city: string | null; state: string | null; zip: string | null }): string {
+  const stateZip = [org.state, org.zip].filter(Boolean).join(' ');
+  const cityLine = [org.city, stateZip].filter(Boolean).join(', ');
+  return [org.address, cityLine].filter(Boolean).join(', ');
+}
+
 export default function SetupWizardScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const params = useLocalSearchParams<{ organizationId: string }>();
-  const { organizationId: contextOrgId, refreshOrganization } = useOrganization();
+  const { organizationId: contextOrgId, organization, isLoading: orgLoading, refreshOrganization } = useOrganization();
   const { user } = useAuth();
   const organizationId = params.organizationId || contextOrgId;
 
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
+  // Inline validation (the dock's Next has no alert): one foot-of-step line + the scope nudge.
+  const [error, setError] = useState('');
+  const [scopeMissing, setScopeMissing] = useState(false);
 
   // Step 1 state — job titles
   const [selectedTitles, setSelectedTitles] = useState<string[]>([]);
@@ -56,16 +92,27 @@ export default function SetupWizardScreen() {
   const [menu2Name, setMenu2Name] = useState(t('onboarding.default_menu_2'));
   const [menu1Icon, setMenu1Icon] = useState('snowflake');
   const [menu2Icon, setMenu2Icon] = useState('sun.max.fill');
-  const [categoryScope, setCategoryScope] = useState<'shared' | 'per_menu'>('shared');
+  // Both mode chips start closed and unselected — the owner has to pick one (2 menus only).
+  const [categoryScope, setCategoryScope] = useState<CategoryScope | null>(null);
 
   // Step 3 state — Google Reviews
   const [googleMapsQuery, setGoogleMapsQuery] = useState('');
+  // True while the query is the one we prefilled; the first manual edit drops the tag.
+  const [autoFilled, setAutoFilled] = useState(false);
+  const queryEdited = useRef(false);
   const [importingReviews, setImportingReviews] = useState(false);
-  const [importResult, setImportResult] = useState<
-    { success: boolean; count: number; error?: string } | null
-  >(null);
+  const [importResult, setImportResult] = useState<ImportResult>(null);
+  // The query the owner actually stands behind: imported, or typed / edited by hand.
+  const confirmedQuery =
+    (importResult && importResult.success) || !autoFilled ? googleMapsQuery.trim() : '';
   // True once the org has menu items (i.e. they uploaded their first menu).
   const [menuUploaded, setMenuUploaded] = useState(false);
+  const [menuItemCount, setMenuItemCount] = useState(0);
+
+  // The context holds a placeholder org until the real one lands — never show / use that.
+  const orgReady = !orgLoading && !!contextOrgId;
+  const orgName = orgReady ? organization.name : '';
+  const orgAddress = orgReady ? formatOrgAddress(organization) : '';
 
   // Re-check on focus (e.g. returning from the AI menu uploader) so step 2 can
   // swap the "upload your menu" prompt for a confirmation once a menu exists.
@@ -75,7 +122,10 @@ export default function SetupWizardScreen() {
       (async () => {
         if (!organizationId || !user?.id) return;
         const { data: menuRows } = await supabase.rpc('get_menu_items', { p_actor_id: user.id });
-        if (!cancelled) setMenuUploaded((menuRows || []).length > 0);
+        if (!cancelled) {
+          setMenuUploaded((menuRows || []).length > 0);
+          setMenuItemCount((menuRows || []).length);
+        }
       })();
       return () => {
         cancelled = true;
@@ -83,9 +133,28 @@ export default function SetupWizardScreen() {
     }, [organizationId]),
   );
 
+  // Prefill the Google Maps query from Create Your Restaurant ("Name, Street, City, ST Zip")
+  // — or the org's saved query on a revisit — once, and only while the owner hasn't typed.
+  useEffect(() => {
+    if (!orgReady || queryEdited.current || googleMapsQuery) return;
+    const saved = organization.google_maps_query?.trim();
+    const composed = orgName && orgAddress ? [orgName, orgAddress].join(', ') : '';
+    const prefill = saved || composed;
+    if (!prefill) return;
+    setGoogleMapsQuery(prefill);
+    setAutoFilled(true);
+  }, [orgReady, organization.google_maps_query, orgName, orgAddress, googleMapsQuery]);
+
+  // A new step starts clean.
+  useEffect(() => {
+    setError('');
+    setScopeMissing(false);
+  }, [step]);
+
   // ─── Step 1: Job Titles ───────────────────────────────────────────
 
   const toggleTitle = (title: string) => {
+    setError('');
     setSelectedTitles((prev) =>
       prev.includes(title) ? prev.filter((t) => t !== title) : [...prev, title],
     );
@@ -95,9 +164,10 @@ export default function SetupWizardScreen() {
     const trimmed = customTitle.trim();
     if (!trimmed) return;
     if (selectedTitles.includes(trimmed)) {
-      Alert.alert(t('onboarding.duplicate_title'), t('onboarding.duplicate_msg'));
+      setError(t('onboarding.duplicate_msg'));
       return;
     }
+    setError('');
     setSelectedTitles((prev) => [...prev, trimmed]);
     setCustomTitle('');
     setShowCustomInput(false);
@@ -115,7 +185,8 @@ export default function SetupWizardScreen() {
   const persistMenuConfig = async (): Promise<boolean> => {
     if (!organizationId || !user?.id) return false;
     const menuCount = hasSeasonalMenus ? 2 : 1;
-    const scope: 'shared' | 'per_menu' = hasSeasonalMenus ? categoryScope : 'shared';
+    // Two menus never get here without a pick (requireScope); `?? 'shared'` only narrows the type.
+    const scope: CategoryScope = hasSeasonalMenus ? (categoryScope ?? 'shared') : 'shared';
     console.log('[SetupWizard] Saving menu config:', {
       organizationId, menuCount, scope, menu1Icon, menu2Icon,
     });
@@ -159,18 +230,29 @@ export default function SetupWizardScreen() {
     return true;
   };
 
+  // Two menus need a category mode before anything is saved (Next AND the uploader).
+  const requireScope = (): boolean => {
+    if (hasSeasonalMenus && !categoryScope) {
+      setScopeMissing(true);
+      return false;
+    }
+    return true;
+  };
+
   const nextStep = async () => {
+    setError('');
     if (step === 1 && selectedTitles.length === 0) {
-      Alert.alert(t('onboarding.select_titles_title'), t('onboarding.select_titles_msg'));
+      setError(t('onboarding.select_titles_msg'));
       return;
     }
     // Leaving the Menu step: persist the menu configuration right now.
     if (step === 2) {
+      if (!requireScope()) return;
       setIsLoading(true);
       const ok = await persistMenuConfig();
       setIsLoading(false);
       if (!ok) {
-        Alert.alert(t('common.error'), t('onboarding.save_menu_failed'));
+        setError(t('onboarding.save_menu_failed'));
         return;
       }
     }
@@ -187,6 +269,11 @@ export default function SetupWizardScreen() {
         ],
       );
       return;
+    }
+    // Step 4 (Theme) has nothing to validate — walking past it settles the first-run
+    // personalize offer for this device.
+    if (step === 4) {
+      markPersonalized();
     }
     setStep((s) => s + 1);
   };
@@ -208,7 +295,20 @@ export default function SetupWizardScreen() {
     router.push({ pathname: '/menu-upload', params: { onboarding: '1' } } as any);
   };
 
+  const handleUploadPress = () => {
+    setError('');
+    if (!requireScope()) return;
+    launchMenuUpload();
+  };
+
   // ─── Step 3: Google Reviews import ────────────────────────────────
+
+  const handleQueryChange = (text: string) => {
+    queryEdited.current = true;
+    setAutoFilled(false);
+    setGoogleMapsQuery(text);
+    setImportResult(null);
+  };
 
   const handleImportReviews = async () => {
     // Drop the keyboard so the result blurb and the Back/Next bar are visible.
@@ -256,7 +356,7 @@ export default function SetupWizardScreen() {
     }
   };
 
-  // ─── Step 3: Save ─────────────────────────────────────────────────
+  // ─── Step 5: Save ─────────────────────────────────────────────────
 
   const handleComplete = async () => {
     if (!organizationId || !user?.id) {
@@ -311,11 +411,13 @@ export default function SetupWizardScreen() {
       // idempotently persist the Google Maps query, in case it was typed on
       // step 3 but never imported (the cron will then pick it up). No-op if
       // empty; non-fatal so onboarding is never blocked by it.
-      if (googleMapsQuery.trim() && organizationId && user?.id) {
+      // s86: a query that was only AUTO-FILLED from the address and never imported or edited
+      // is not the owner's word — saving it would let the cron scrape (and bill) a guess.
+      if (confirmedQuery && organizationId && user?.id) {
         const { data: queryRes, error: queryError } = await supabase.rpc('update_organization_settings', {
           p_organization_id: organizationId,
           p_user_id: user.id,
-          p_google_maps_query: googleMapsQuery.trim(),
+          p_google_maps_query: confirmedQuery,
         });
         const queryResult: any = typeof queryRes === 'string' ? JSON.parse(queryRes) : queryRes;
         if (queryError || (queryResult && queryResult.success === false)) {
@@ -339,866 +441,796 @@ export default function SetupWizardScreen() {
     }
   };
 
-  // ─── Step indicator ───────────────────────────────────────────────
-
-  const renderStepIndicator = () => (
-    <View style={styles.stepIndicator}>
-      {[1, 2, 3, 4].map((s) => (
-        <View key={s} style={styles.stepRow}>
-          <View
-            style={[
-              styles.stepDot,
-              s === step && styles.stepDotActive,
-              s < step && styles.stepDotCompleted,
-            ]}
-          >
-            {s < step ? (
-              <IconSymbol
-                ios_icon_name="checkmark"
-                android_material_icon_name="check"
-                size={14}
-                color="#FFFFFF"
-              />
-            ) : (
-              <Text
-                style={[
-                  styles.stepDotText,
-                  s === step && styles.stepDotTextActive,
-                ]}
-              >
-                {s}
-              </Text>
-            )}
-          </View>
-          {s < 4 && (
-            <View
-              style={[styles.stepLine, s < step && styles.stepLineCompleted]}
-            />
-          )}
-        </View>
-      ))}
-    </View>
-  );
-
-  // ─── Step 1 UI ────────────────────────────────────────────────────
-
-  const renderStep1 = () => (
-    <View>
-      <Text style={styles.stepTitle}>{t('onboarding.step1_title')}</Text>
-      <Text style={styles.stepSubtitle}>
-        {t('onboarding.step1_subtitle')}
-      </Text>
-
-      <View style={styles.titlesGrid}>
-        {allTitles.map((title) => {
-          const isActive = selectedTitles.includes(title);
-          return (
-            <TouchableOpacity
-              key={title}
-              style={[styles.titleChip, isActive && styles.titleChipActive]}
-              onPress={() => toggleTitle(title)}
-            >
-              <Text
-                style={[
-                  styles.titleChipText,
-                  isActive && styles.titleChipTextActive,
-                ]}
-              >
-                {title}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      {showCustomInput ? (
-        <View style={styles.customRow}>
-          <View style={[styles.inputContainer, { flex: 1, marginBottom: 0 }]}>
-            <TextInput
-              style={styles.input}
-              placeholder={t('onboarding.custom_title_ph')}
-              placeholderTextColor={splashColors.textSecondary}
-              value={customTitle}
-              onChangeText={setCustomTitle}
-              autoCapitalize="words"
-              autoFocus
-              onSubmitEditing={addCustomTitle}
-            />
-          </View>
-          <TouchableOpacity style={styles.addBtn} onPress={addCustomTitle}>
-            <IconSymbol
-              ios_icon_name="plus"
-              android_material_icon_name="add"
-              size={22}
-              color="#FFFFFF"
-            />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.cancelBtn}
-            onPress={() => {
-              setShowCustomInput(false);
-              setCustomTitle('');
-            }}
-          >
-            <IconSymbol
-              ios_icon_name="xmark"
-              android_material_icon_name="close"
-              size={20}
-              color={splashColors.textSecondary}
-            />
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <TouchableOpacity
-          style={styles.addCustomButton}
-          onPress={() => setShowCustomInput(true)}
-        >
-          <IconSymbol
-            ios_icon_name="plus.circle.fill"
-            android_material_icon_name="add-circle"
-            size={20}
-            color={splashColors.primary}
-          />
-          <Text style={styles.addCustomText}>{t('onboarding.add_custom_title')}</Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  );
-
-  // ─── Step 2 UI ────────────────────────────────────────────────────
-
-  const renderStep2 = () => (
-    <View>
-      <Text style={styles.stepTitle}>{t('onboarding.step2_title')}</Text>
-      <Text style={styles.stepSubtitle}>
-        {t('onboarding.step2_subtitle')}
-      </Text>
-
-      <View style={styles.card}>
-        <View style={styles.switchRow}>
-          <Text style={styles.switchLabel}>{t('onboarding.seasonal_q')}</Text>
-          <Switch
-            value={hasSeasonalMenus}
-            onValueChange={setHasSeasonalMenus}
-            trackColor={{ false: '#D0D0D0', true: splashColors.secondary }}
-            thumbColor={hasSeasonalMenus ? splashColors.primary : '#F5F5F5'}
-          />
-        </View>
-        <Text style={styles.switchHint}>
-          {hasSeasonalMenus
-            ? t('onboarding.seasonal_on_hint')
-            : t('onboarding.seasonal_off_hint')}
-        </Text>
-      </View>
-
-      <Text style={styles.label}>{t('onboarding.menu1_label')}</Text>
-      <View style={styles.inputContainer}>
-        <IconSymbol
-          ios_icon_name="fork.knife"
-          android_material_icon_name="restaurant"
-          size={20}
-          color={splashColors.textSecondary}
-          style={styles.inputIcon}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder={t('onboarding.default_menu_1')}
-          placeholderTextColor={splashColors.textSecondary}
-          value={menu1Name}
-          onChangeText={setMenu1Name}
-          autoCapitalize="words"
-        />
-      </View>
-
-      <MenuIconPicker label={t('onboarding.menu_icon_label', { menuName: menu1Name.trim() || t('onboarding.default_menu_1') })} value={menu1Icon} onChange={setMenu1Icon} />
-
-      {hasSeasonalMenus && (
-        <>
-          <Text style={styles.label}>{t('onboarding.menu2_label')}</Text>
-          <View style={styles.inputContainer}>
-            <IconSymbol
-              ios_icon_name="fork.knife"
-              android_material_icon_name="restaurant"
-              size={20}
-              color={splashColors.textSecondary}
-              style={styles.inputIcon}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder={t('onboarding.default_menu_2')}
-              placeholderTextColor={splashColors.textSecondary}
-              value={menu2Name}
-              onChangeText={setMenu2Name}
-              autoCapitalize="words"
-            />
-          </View>
-
-          <MenuIconPicker label={t('onboarding.menu_icon_label', { menuName: menu2Name.trim() || t('onboarding.default_menu_2') })} value={menu2Icon} onChange={setMenu2Icon} />
-
-          <Text style={styles.label}>{t('onboarding.categories_q')}</Text>
-          <TouchableOpacity
-            style={[styles.scopeOption, categoryScope === 'shared' && styles.scopeOptionActive]}
-            onPress={() => setCategoryScope('shared')}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.scopeOptionTitle}>{t('onboarding.shared_cats_title')} {categoryScope === 'shared' ? '✓' : ''}</Text>
-            <Text style={styles.scopeOptionDesc}>
-              {t('onboarding.shared_cats_desc', {
-                menu1: menu1Name.trim() || t('onboarding.default_menu_1'),
-                menu2: menu2Name.trim() || t('onboarding.default_menu_2'),
-              })}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.scopeOption, categoryScope === 'per_menu' && styles.scopeOptionActive]}
-            onPress={() => setCategoryScope('per_menu')}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.scopeOptionTitle}>{t('onboarding.per_menu_cats_title')} {categoryScope === 'per_menu' ? '✓' : ''}</Text>
-            <Text style={styles.scopeOptionDesc}>
-              {t('onboarding.per_menu_cats_desc')}
-            </Text>
-          </TouchableOpacity>
-        </>
-      )}
-
-      {menuUploaded ? (
-        <View style={styles.menuDoneNote}>
-          <IconSymbol ios_icon_name="checkmark.seal.fill" android_material_icon_name="verified" size={20} color="#34A853" />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.menuDoneTitle}>{t('onboarding.menu_done_title')}</Text>
-            <Text style={styles.menuDoneText}>
-              {t('onboarding.menu_done_text')}
-            </Text>
-          </View>
-        </View>
-      ) : (
-        <View style={styles.aiMenuNote}>
-          <IconSymbol ios_icon_name="sparkles" android_material_icon_name="auto-awesome" size={20} color={splashColors.primary} />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.aiMenuNoteTitle}>{t('onboarding.menu_handy_title')}</Text>
-            <Text style={styles.aiMenuNoteText}>
-              {t('onboarding.menu_handy_text')}
-            </Text>
-            <TouchableOpacity
-              style={styles.uploadMenuButton}
-              onPress={launchMenuUpload}
-              activeOpacity={0.85}
-              disabled={isLoading}
-            >
-              <IconSymbol ios_icon_name="arrow.up.doc.fill" android_material_icon_name="upload-file" size={18} color={splashColors.primary} />
-              <Text style={styles.uploadMenuButtonText}>{t('onboarding.upload_menu_now')}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-    </View>
-  );
-
-  // ─── Step 3 UI: Google Reviews ────────────────────────────────────
-
-  const renderStep3 = () => (
-    <View>
-      <Text style={styles.stepTitle}>{t('onboarding.step3_title')}</Text>
-      <Text style={styles.stepSubtitle}>
-        {t('onboarding.step3_subtitle')}
-      </Text>
-
-      <Text style={styles.label}>{t('onboarding.find_on_gmaps')}</Text>
-      <View style={styles.inputContainer}>
-        <IconSymbol
-          ios_icon_name="mappin.and.ellipse"
-          android_material_icon_name="place"
-          size={20}
-          color={splashColors.textSecondary}
-          style={styles.inputIcon}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder={t('onboarding.gmaps_ph')}
-          placeholderTextColor={splashColors.textSecondary}
-          value={googleMapsQuery}
-          onChangeText={(text) => {
-            setGoogleMapsQuery(text);
-            setImportResult(null);
-          }}
-          autoCapitalize="words"
-        />
-      </View>
-      <Text style={styles.googleHint}>
-        {t('onboarding.gmaps_hint')}
-      </Text>
-
-      <TouchableOpacity
-        style={[
-          styles.importButton,
-          (importingReviews || !googleMapsQuery.trim()) && styles.buttonDisabled,
-        ]}
-        onPress={handleImportReviews}
-        disabled={importingReviews || !googleMapsQuery.trim()}
-        activeOpacity={0.85}
-      >
-        {importingReviews ? (
-          <>
-            <ActivityIndicator color="#FFFFFF" />
-            <Text style={styles.importButtonText}>{t('onboarding.importing_reviews')}</Text>
-          </>
-        ) : (
-          <>
-            <IconSymbol
-              ios_icon_name="arrow.down.circle.fill"
-              android_material_icon_name="file-download"
-              size={20}
-              color="#FFFFFF"
-            />
-            <Text style={styles.importButtonText}>{t('onboarding.import_my_reviews')}</Text>
-          </>
-        )}
-      </TouchableOpacity>
-
-      {importResult && importResult.success && (
-        <View style={[styles.resultCard, styles.resultCardSuccess]}>
-          <IconSymbol
-            ios_icon_name="checkmark.circle.fill"
-            android_material_icon_name="check-circle"
-            size={20}
-            color="#34A853"
-          />
-          <Text style={styles.resultCardText}>
-            {t('onboarding.import_success_note')}
-          </Text>
-        </View>
-      )}
-      {importResult && !importResult.success && (
-        <View style={[styles.resultCard, styles.resultCardError]}>
-          <IconSymbol
-            ios_icon_name="exclamationmark.triangle.fill"
-            android_material_icon_name="error-outline"
-            size={20}
-            color="#EA4335"
-          />
-          <Text style={styles.resultCardText}>
-            {t('onboarding.import_error_note')}
-          </Text>
-        </View>
-      )}
-
-      {/* Always offer a clear skip until reviews are actually imported — e.g. if
-          they still need to look up exactly how their business appears on Google
-          Maps. The query (if any) is saved and the cron will pick it up. */}
-      {!(importResult && importResult.success) && (
-        <TouchableOpacity
-          style={styles.skipLink}
-          onPress={() => setStep((s) => s + 1)}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.skipLinkText}>{t('onboarding.skip_link')}</Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  );
-
-  // ─── Step 4 UI: Review & Save ─────────────────────────────────────
-
-  const renderStep4 = () => (
-    <View>
-      <Text style={styles.stepTitle}>{t('onboarding.step4_title')}</Text>
-      <Text style={styles.stepSubtitle}>
-        {t('onboarding.step4_subtitle')}
-      </Text>
-
-      {/* Job Titles Summary */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>{t('onboarding.step1_title')}</Text>
-        <View style={styles.titlesGrid}>
-          {selectedTitles.map((title) => (
-            <View key={title} style={[styles.titleChip, styles.titleChipActive]}>
-              <Text style={styles.titleChipTextActive}>{title}</Text>
-            </View>
-          ))}
-        </View>
-      </View>
-
-      {/* Menu Summary */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>{t('onboarding.menus_card')}</Text>
-        <Text style={styles.cardValue}>
-          {hasSeasonalMenus ? t('onboarding.menus_two') : t('onboarding.menus_one')}
-        </Text>
-        <Text style={styles.cardDetail}>
-          {menu1Name.trim() || t('onboarding.default_menu_1')}
-          {hasSeasonalMenus ? ` / ${menu2Name.trim() || t('onboarding.default_menu_2')}` : ''}
-        </Text>
-      </View>
-
-      {/* Google Reviews Summary */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>{t('onboarding.step3_title')}</Text>
-        {googleMapsQuery.trim() ? (
-          <>
-            <Text style={styles.cardValue} numberOfLines={2}>
-              {googleMapsQuery.trim()}
-            </Text>
-            <Text style={styles.cardDetail}>
-              {importResult && importResult.success
-                ? t('onboarding.importing_shortly')
-                : t('onboarding.will_import_auto')}
-            </Text>
-          </>
-        ) : (
-          <Text style={styles.cardValue}>{t('onboarding.skipped_note')}</Text>
-        )}
-      </View>
-    </View>
-  );
-
   // ─── Render ───────────────────────────────────────────────────────
 
+  const menu1Display = menu1Name.trim() || t('onboarding.default_menu_1');
+  const menu2Display = menu2Name.trim() || t('onboarding.default_menu_2');
+  const imported = !!(importResult && importResult.success);
+  const isLast = step === 5;
+
+  const railSteps = [
+    t('onboarding.rail_jobs'),
+    t('onboarding.rail_menus'),
+    t('onboarding.rail_reviews'),
+    t('onboarding.rail_theme'),
+    t('onboarding.rail_review'),
+  ];
+
   return (
-    <View style={styles.container}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        {renderStepIndicator()}
+    // Keyed by step so every step opens scrolled to its top.
+    <OnbScreen
+      key={step}
+      header={<OnboardingRail steps={railSteps} current={step} rightLabel={orgName || undefined} />}
+      dock={
+        <OnboardingDock
+          onBack={step > 1 ? prevStep : undefined}
+          nextLabel={isLast ? t('onboarding.complete_setup') : t('onboarding.next')}
+          onNext={isLast ? handleComplete : nextStep}
+          nextIosIcon={isLast ? 'checkmark' : undefined}
+          nextAndroidIcon={isLast ? 'check' : undefined}
+          nextLeading={isLast}
+          // Step 3's shining button is Import My Reviews — one shine per screen.
+          quietNext={step === 3}
+          loading={isLoading}
+        />
+      }
+    >
+      {step === 1 && (
+        <JobsStep
+          titles={allTitles}
+          selected={selectedTitles}
+          onToggle={toggleTitle}
+          adding={showCustomInput}
+          customTitle={customTitle}
+          onChangeCustom={(v) => {
+            setCustomTitle(v);
+            setError('');
+          }}
+          onOpenCustom={() => setShowCustomInput(true)}
+          onCancelCustom={() => {
+            setShowCustomInput(false);
+            setCustomTitle('');
+            setError('');
+          }}
+          onAddCustom={addCustomTitle}
+          error={error}
+        />
+      )}
 
-        {step === 1 && renderStep1()}
-        {step === 2 && renderStep2()}
-        {step === 3 && renderStep3()}
-        {step === 4 && renderStep4()}
-      </ScrollView>
+      {step === 2 && (
+        <MenusStep
+          twoMenus={hasSeasonalMenus}
+          onTwoMenus={(two) => {
+            setHasSeasonalMenus(two);
+            setError('');
+            setScopeMissing(false);
+          }}
+          menu1Name={menu1Name}
+          menu2Name={menu2Name}
+          onMenu1Name={(v) => {
+            setMenu1Name(v);
+            setError('');
+          }}
+          onMenu2Name={(v) => {
+            setMenu2Name(v);
+            setError('');
+          }}
+          menu1Display={menu1Display}
+          menu2Display={menu2Display}
+          menu1Icon={menu1Icon}
+          menu2Icon={menu2Icon}
+          onMenu1Icon={setMenu1Icon}
+          onMenu2Icon={setMenu2Icon}
+          scope={categoryScope}
+          onScope={(s) => {
+            setCategoryScope(s);
+            setScopeMissing(false);
+            setError('');
+          }}
+          scopeError={scopeMissing}
+          menuUploaded={menuUploaded}
+          onUpload={handleUploadPress}
+          busy={isLoading}
+          error={error}
+        />
+      )}
 
-      {/* Bottom nav */}
-      <View style={styles.bottomBar}>
-        {step > 1 ? (
-          <TouchableOpacity style={styles.backButton} onPress={prevStep}>
-            <Text style={styles.backButtonText}>{t('common.back')}</Text>
-          </TouchableOpacity>
-        ) : (
-          <View style={{ flex: 1 }} />
-        )}
+      {step === 3 && (
+        <ReviewsStep
+          query={googleMapsQuery}
+          onChangeQuery={handleQueryChange}
+          autoFilled={autoFilled}
+          importing={importingReviews}
+          result={importResult}
+          onImport={handleImportReviews}
+          onSkip={() => setStep((s) => s + 1)}
+        />
+      )}
 
-        {step < 4 ? (
-          <TouchableOpacity
-            style={[styles.nextButton, isLoading && styles.buttonDisabled]}
-            onPress={nextStep}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text style={styles.nextButtonText}>{t('onboarding.next')}</Text>
-            )}
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={[styles.nextButton, isLoading && styles.buttonDisabled]}
-            onPress={handleComplete}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text style={styles.nextButtonText}>{t('onboarding.complete_setup')}</Text>
-            )}
-          </TouchableOpacity>
-        )}
+      {step === 4 && <ThemeStep />}
+
+      {step === 5 && (
+        <SummaryStep
+          orgName={orgName}
+          orgLogoUrl={orgReady ? organization.logo_url : null}
+          orgAddress={orgAddress}
+          username={user?.username}
+          titles={selectedTitles}
+          menus={
+            hasSeasonalMenus
+              ? [{ name: menu1Display, icon: menu1Icon }, { name: menu2Display, icon: menu2Icon }]
+              : [{ name: menu1Display, icon: menu1Icon }]
+          }
+          scope={hasSeasonalMenus ? categoryScope : null}
+          menuUploaded={menuUploaded}
+          menuItemCount={menuItemCount}
+          query={confirmedQuery}
+          imported={imported}
+          onEdit={setStep}
+        />
+      )}
+    </OnbScreen>
+  );
+}
+
+// ── Top-level module components (a component redefined inside render remounts per keystroke
+//    and drops TextInput focus). ─────────────────────────────────────────────────────────────
+
+/** A translated string whose `<b>…</b>` runs become the kit's bold run. */
+function Rich({ text }: { text: string }) {
+  const parts = text.split(/<b>(.*?)<\/b>/g);
+  return <>{parts.map((part, i) => (i % 2 === 1 ? <B key={i}>{part}</B> : part))}</>;
+}
+
+/** ok- / bad-tinted result row: icon + optional title + text. */
+function NoteRow({ tone, iosIcon, androidIcon, title, text }: { tone: 'ok' | 'bad'; iosIcon: string; androidIcon: string; title?: string; text: string }) {
+  const colors = useThemeColors();
+  const a = useOnbAccents();
+  const hue = tone === 'ok' ? a.ok : a.bad;
+  return (
+    <View style={[styles.note, { backgroundColor: hexToRgba(hue, 0.1), borderColor: hexToRgba(hue, 0.3) }]}>
+      <IconSymbol ios_icon_name={iosIcon} android_material_icon_name={androidIcon} size={16} color={hue} style={{ marginTop: 1 }} />
+      <View style={styles.fill}>
+        {!!title && <Text style={[styles.noteTitle, { color: colors.text }]}>{title}</Text>}
+        <Text style={[styles.noteText, { color: title ? colors.textSecondary : colors.text }]}>{text}</Text>
       </View>
     </View>
   );
 }
 
+// ── Step 1 · Job Titles ───────────────────────────────────────────────────
+
+function JobChip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
+  const colors = useThemeColors();
+  const a = useOnbAccents();
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      style={[
+        styles.chip,
+        selected
+          ? { backgroundColor: hexToRgba(a.pop, 0.13), borderColor: hexToRgba(a.pop, 0.42) }
+          : { backgroundColor: colors.glass, borderColor: colors.glassBorder },
+      ]}
+    >
+      {/* Always-present slot (○ → ✓): the chip keeps its width, so picking never reflows the row. */}
+      <IconSymbol
+        ios_icon_name={selected ? 'checkmark.circle.fill' : 'circle'}
+        android_material_icon_name={selected ? 'check-circle' : 'radio-button-unchecked'}
+        size={14}
+        color={selected ? a.pop : colors.textSecondary}
+      />
+      <Text style={[styles.chipText, { color: selected ? colors.text : colors.textSecondary }]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+interface JobsStepProps {
+  titles: string[];
+  selected: string[];
+  onToggle: (title: string) => void;
+  adding: boolean;
+  customTitle: string;
+  onChangeCustom: (value: string) => void;
+  onOpenCustom: () => void;
+  onCancelCustom: () => void;
+  onAddCustom: () => void;
+  error: string;
+}
+
+function JobsStep({ titles, selected, onToggle, adding, customTitle, onChangeCustom, onOpenCustom, onCancelCustom, onAddCustom, error }: JobsStepProps) {
+  const { t } = useTranslation();
+  const colors = useThemeColors();
+  const a = useOnbAccents();
+  return (
+    <>
+      <Hero align="left" title={t('onboarding.step1_title')} subtitle={t('onboarding.step1_subtitle')} />
+
+      <GlassCard variant="glass" radius={16} style={styles.cardJobs}>
+        <View style={styles.rowCenter}>
+          <Text style={[styles.eyebrow, styles.fill, { color: a.quiet }]}>{t('onboarding.positions')}</Text>
+          <Text style={[styles.eyebrow, { color: a.pop }]}>{t('onboarding.n_selected', { count: selected.length })}</Text>
+        </View>
+
+        <View style={styles.chips}>
+          {titles.map((title) => (
+            <JobChip key={title} label={title} selected={selected.includes(title)} onPress={() => onToggle(title)} />
+          ))}
+          {!adding && (
+            <Pressable
+              onPress={onOpenCustom}
+              accessibilityRole="button"
+              style={({ pressed }) => [styles.chip, styles.chipDashed, { backgroundColor: colors.glass, borderColor: colors.glassBorder, opacity: pressed ? 0.8 : 1 }]}
+            >
+              <IconSymbol ios_icon_name="plus" android_material_icon_name="add" size={13} color={a.quiet} />
+              <Text style={[styles.chipText, { color: colors.text }]}>{t('onboarding.add_custom_title')}</Text>
+            </Pressable>
+          )}
+        </View>
+
+        {adding && (
+          <View style={styles.customRow}>
+            <IconField
+              containerStyle={styles.fill}
+              iosIcon="briefcase.fill"
+              androidIcon="work"
+              placeholder={t('onboarding.custom_title_ph')}
+              value={customTitle}
+              onChangeText={onChangeCustom}
+              autoCapitalize="words"
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={onAddCustom}
+            />
+            <Pressable
+              onPress={onAddCustom}
+              accessibilityRole="button"
+              accessibilityLabel={t('onboarding.add_custom_title')}
+              style={({ pressed }) => [styles.square, { backgroundColor: a.fill, borderColor: a.fill, opacity: pressed ? 0.85 : 1 }]}
+            >
+              <IconSymbol ios_icon_name="plus" android_material_icon_name="add" size={19} color={a.ink} />
+            </Pressable>
+            <Pressable
+              onPress={onCancelCustom}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.cancel')}
+              style={({ pressed }) => [styles.square, { backgroundColor: colors.glass, borderColor: colors.glassBorder, opacity: pressed ? 0.8 : 1 }]}
+            >
+              <IconSymbol ios_icon_name="xmark" android_material_icon_name="close" size={16} color={colors.textSecondary} />
+            </Pressable>
+          </View>
+        )}
+
+        <ErrorLine message={error} />
+      </GlassCard>
+    </>
+  );
+}
+
+// ── Step 2 · Menu Configuration ───────────────────────────────────────────
+
+/** The 1 | 2 capsule driving the menu count. */
+function CountCapsule({ two, onChange }: { two: boolean; onChange: (two: boolean) => void }) {
+  const { t } = useTranslation();
+  const colors = useThemeColors();
+  const a = useOnbAccents();
+  const cell = (n: 1 | 2, on: boolean, label: string) => (
+    <Pressable
+      onPress={() => onChange(n === 2)}
+      accessibilityRole="radio"
+      accessibilityState={{ selected: on }}
+      accessibilityLabel={label}
+      style={[styles.capCell, on && { backgroundColor: a.fill }]}
+    >
+      <Text style={[styles.capText, { color: on ? a.ink : colors.textSecondary }]}>{n}</Text>
+    </Pressable>
+  );
+  return (
+    <View style={[styles.capsule, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
+      {cell(1, !two, t('onboarding.menus_one'))}
+      {cell(2, two, t('onboarding.menus_two'))}
+    </View>
+  );
+}
+
+/** A category-mode tile chip: name + one-line gist; the pick wears the corner tick. */
+function ScopeTile({ title, gist, selected, onPress }: { title: string; gist: string; selected: boolean; onPress: () => void }) {
+  const colors = useThemeColors();
+  const a = useOnbAccents();
+  return (
+    // No overflow clip here — the tick badge hangs off the top-right corner.
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="radio"
+      accessibilityState={{ selected }}
+      style={[
+        styles.scopeTile,
+        selected
+          ? { backgroundColor: hexToRgba(a.pop, 0.11), borderColor: hexToRgba(a.pop, 0.45) }
+          : { backgroundColor: colors.glass, borderColor: colors.glassBorder },
+      ]}
+    >
+      <Text style={[styles.scopeTitle, { color: colors.text }]}>{title}</Text>
+      <Text style={[styles.scopeGist, { color: colors.textSecondary }]}>{gist}</Text>
+      {selected && (
+        <View style={[styles.tick, { backgroundColor: a.fill }]}>
+          <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={11} color={a.ink} />
+        </View>
+      )}
+    </Pressable>
+  );
+}
+
+interface MenusStepProps {
+  twoMenus: boolean;
+  onTwoMenus: (two: boolean) => void;
+  menu1Name: string;
+  menu2Name: string;
+  onMenu1Name: (value: string) => void;
+  onMenu2Name: (value: string) => void;
+  /** The typed names, falling back to the defaults — what the bullets and picker titles read. */
+  menu1Display: string;
+  menu2Display: string;
+  menu1Icon: string;
+  menu2Icon: string;
+  onMenu1Icon: (sf: string) => void;
+  onMenu2Icon: (sf: string) => void;
+  scope: CategoryScope | null;
+  onScope: (scope: CategoryScope) => void;
+  scopeError: boolean;
+  menuUploaded: boolean;
+  onUpload: () => void;
+  busy: boolean;
+  error: string;
+}
+
+function MenusStep({
+  twoMenus, onTwoMenus,
+  menu1Name, menu2Name, onMenu1Name, onMenu2Name, menu1Display, menu2Display,
+  menu1Icon, menu2Icon, onMenu1Icon, onMenu2Icon,
+  scope, onScope, scopeError,
+  menuUploaded, onUpload, busy, error,
+}: MenusStepProps) {
+  const { t } = useTranslation();
+  const colors = useThemeColors();
+  const a = useOnbAccents();
+  const names = { menu1: menu1Display, menu2: menu2Display };
+  return (
+    <>
+      <Hero align="left" title={t('onboarding.step2_title')} subtitle={t('onboarding.step2_subtitle')} />
+
+      {/* How many menus + their names and icons */}
+      <GlassCard variant="glass" radius={16} style={styles.card}>
+        <View style={styles.countRow}>
+          <Text style={[styles.countQ, { color: colors.text }]}>{t('onboarding.menu_count_q')}</Text>
+          <CountCapsule two={twoMenus} onChange={onTwoMenus} />
+        </View>
+        <Text style={[styles.hint, { color: colors.textSecondary, marginTop: -4 }]}>
+          {twoMenus ? t('onboarding.seasonal_on_hint') : t('onboarding.seasonal_off_hint')}
+        </Text>
+
+        <View style={styles.menuRow}>
+          <MenuIconPicker compact label={t('onboarding.menu_icon_label', { menuName: menu1Display })} value={menu1Icon} onChange={onMenu1Icon} />
+          <IconField
+            containerStyle={styles.fill}
+            label={t('onboarding.menu1_label')}
+            placeholder={t('onboarding.default_menu_1')}
+            value={menu1Name}
+            onChangeText={onMenu1Name}
+            autoCapitalize="words"
+          />
+        </View>
+        {twoMenus && (
+          <View style={styles.menuRow}>
+            <MenuIconPicker compact label={t('onboarding.menu_icon_label', { menuName: menu2Display })} value={menu2Icon} onChange={onMenu2Icon} />
+            <IconField
+              containerStyle={styles.fill}
+              label={t('onboarding.menu2_label')}
+              placeholder={t('onboarding.default_menu_2')}
+              value={menu2Name}
+              onChangeText={onMenu2Name}
+              autoCapitalize="words"
+            />
+          </View>
+        )}
+      </GlassCard>
+
+      {/* Category mode — two menus only; both tiles closed until the owner picks one */}
+      {twoMenus && (
+        <GlassCard variant="glass" radius={16} style={styles.card}>
+          <Text style={[styles.cardTitle, { color: colors.text }]}>{t('onboarding.categories_q2')}</Text>
+          <View style={styles.bullets}>
+            <Bullet>{t('onboarding.cat_bullet_switch')}</Bullet>
+            <Bullet><Rich text={t('onboarding.cat_bullet_specials')} /></Bullet>
+          </View>
+
+          <View style={styles.scopeRow}>
+            <ScopeTile
+              title={t('onboarding.shared_cats_title')}
+              gist={t('onboarding.shared_gist')}
+              selected={scope === 'shared'}
+              onPress={() => onScope('shared')}
+            />
+            <ScopeTile
+              title={t('onboarding.per_menu_cats_title')}
+              gist={t('onboarding.per_menu_gist')}
+              selected={scope === 'per_menu'}
+              onPress={() => onScope('per_menu')}
+            />
+          </View>
+
+          {scope === 'shared' && (
+            <View style={styles.bullets}>
+              <Bullet><Rich text={t('onboarding.shared_b1')} /></Bullet>
+              <Bullet><Rich text={t('onboarding.shared_b2', names)} /></Bullet>
+              <Bullet><Rich text={t('onboarding.shared_b3', names)} /></Bullet>
+            </View>
+          )}
+          {scope === 'per_menu' && (
+            <View style={styles.bullets}>
+              <Bullet><Rich text={t('onboarding.per_b1', names)} /></Bullet>
+              <Bullet><Rich text={t('onboarding.per_b2')} /></Bullet>
+              <Bullet><Rich text={t('onboarding.per_b3')} /></Bullet>
+            </View>
+          )}
+
+          <ErrorLine message={scopeError ? t('onboarding.pick_scope_required') : null} />
+        </GlassCard>
+      )}
+
+      {/* AI menu upload — or the done note once a menu exists */}
+      {menuUploaded ? (
+        <NoteRow
+          tone="ok"
+          iosIcon="checkmark.seal.fill"
+          androidIcon="verified"
+          title={t('onboarding.menu_done_title')}
+          text={t('onboarding.menu_done_text')}
+        />
+      ) : (
+        <GlassCard variant="glass" radius={16} style={styles.cardUpload}>
+          <Disc small tone="pop">
+            <IconSymbol ios_icon_name="sparkles" android_material_icon_name="auto-awesome" size={17} color={a.pop} />
+          </Disc>
+          <View style={styles.fill}>
+            <View style={styles.uploadTitleRow}>
+              <Text style={[styles.uploadTitle, { color: colors.text }]}>{t('onboarding.menu_handy_title')}</Text>
+              <Pill tone="ok" label={t('onboarding.free_pill')} />
+            </View>
+            <Text style={[styles.hint, { color: colors.textSecondary, marginTop: 2 }]}>{t('onboarding.menu_handy_text')}</Text>
+          </View>
+          <Pressable
+            onPress={onUpload}
+            disabled={busy}
+            accessibilityRole="button"
+            style={({ pressed }) => [
+              styles.uploadChip,
+              { backgroundColor: hexToRgba(a.pop, 0.13), borderColor: hexToRgba(a.pop, 0.34), opacity: busy ? 0.5 : pressed ? 0.8 : 1 },
+            ]}
+          >
+            <IconSymbol ios_icon_name="arrow.up.doc.fill" android_material_icon_name="upload-file" size={15} color={a.pop} />
+            <Text style={[styles.uploadChipText, { color: a.pop }]}>{t('onboarding.upload_chip')}</Text>
+          </Pressable>
+        </GlassCard>
+      )}
+
+      <ErrorLine message={error} />
+    </>
+  );
+}
+
+// ── Step 3 · Google Reviews ───────────────────────────────────────────────
+
+interface ReviewsStepProps {
+  query: string;
+  onChangeQuery: (value: string) => void;
+  autoFilled: boolean;
+  importing: boolean;
+  result: ImportResult;
+  onImport: () => void;
+  onSkip: () => void;
+}
+
+function ReviewsStep({ query, onChangeQuery, autoFilled, importing, result, onImport, onSkip }: ReviewsStepProps) {
+  const { t } = useTranslation();
+  const imported = !!(result && result.success);
+  return (
+    <>
+      <Hero align="left" title={t('onboarding.step3_title')} subtitle={t('onboarding.step3_subtitle')} />
+
+      <GlassCard variant="glass" radius={16} style={styles.card}>
+        <IconField
+          multiline
+          numberOfLines={3}
+          iosIcon="mappin.and.ellipse"
+          androidIcon="place"
+          label={t('onboarding.find_on_gmaps')}
+          labelTrailing={
+            autoFilled ? <Pill tone="ok" iosIcon="checkmark" androidIcon="check" label={t('onboarding.auto_filled')} /> : undefined
+          }
+          placeholder={t('onboarding.gmaps_ph')}
+          value={query}
+          onChangeText={onChangeQuery}
+          autoCapitalize="words"
+          returnKeyType="done"
+          submitBehavior="blurAndSubmit"
+          editable={!importing}
+          hint={t('onboarding.gmaps_hint')}
+        />
+
+        <CtaButton
+          label={t('onboarding.import_my_reviews')}
+          onPress={onImport}
+          iosIcon="arrow.down.circle.fill"
+          androidIcon="file-download"
+          leading
+          loading={importing}
+          disabled={!query.trim()}
+        />
+
+        {imported && (
+          <NoteRow tone="ok" iosIcon="checkmark.circle.fill" androidIcon="check-circle" text={t('onboarding.import_success_note')} />
+        )}
+        {!!result && !result.success && (
+          <NoteRow tone="bad" iosIcon="exclamationmark.triangle.fill" androidIcon="error-outline" text={t('onboarding.import_error_note')} />
+        )}
+      </GlassCard>
+
+      {/* Always offer a clear skip until reviews are actually imported — e.g. if
+          they still need to look up exactly how their business appears on Google
+          Maps. The query (if any) is saved and the cron will pick it up. */}
+      {!imported && <LinkRow label={t('onboarding.skip_link')} onPress={onSkip} />}
+    </>
+  );
+}
+
+// ── Step 4 · Theme ────────────────────────────────────────────────────────
+
+function ThemeStep() {
+  const { t } = useTranslation();
+  return (
+    <>
+      <Hero align="left" title={t('onboarding.theme_title')} subtitle={t('onboarding.theme_subtitle')} />
+      <InfoBlurb>
+        <Body>
+          {t('onboarding.theme_note_a')}{' '}
+          <B>{t('onboarding.theme_note_b')}</B>{' '}
+          {t('onboarding.theme_note_c')}{' '}
+          <B>{t('onboarding.theme_note_d')}</B>.
+        </Body>
+      </InfoBlurb>
+      {/* Repaints the whole app live — this page is its own preview. */}
+      <AppearanceBody showTags={false} />
+    </>
+  );
+}
+
+// ── Step 5 · Review & Save ────────────────────────────────────────────────
+
+function EditChip({ onPress }: { onPress: () => void }) {
+  const { t } = useTranslation();
+  const colors = useThemeColors();
+  return (
+    <Pressable
+      onPress={onPress}
+      hitSlop={6}
+      accessibilityRole="button"
+      style={({ pressed }) => [styles.editChip, { backgroundColor: colors.glass, borderColor: colors.glassBorder, opacity: pressed ? 0.8 : 1 }]}
+    >
+      <IconSymbol ios_icon_name="pencil" android_material_icon_name="edit" size={13} color={colors.text} />
+      <Text style={[styles.editChipText, { color: colors.text }]}>{t('onboarding.edit')}</Text>
+    </Pressable>
+  );
+}
+
+/** One glass card per step: icon + title + optional status pill + the Edit chip, then the body. */
+function SummaryCard({ iosIcon, androidIcon, title, pill, onEdit, children }: { iosIcon: string; androidIcon: string; title: string; pill?: React.ReactNode; onEdit: () => void; children?: React.ReactNode }) {
+  const colors = useThemeColors();
+  const a = useOnbAccents();
+  return (
+    <GlassCard variant="glass" radius={16} style={styles.cardSummary}>
+      <View style={styles.summaryHead}>
+        <IconSymbol ios_icon_name={iosIcon} android_material_icon_name={androidIcon} size={15} color={a.quiet} />
+        <Text style={[styles.summaryTitle, { color: colors.text }]} numberOfLines={1}>{title}</Text>
+        {pill}
+        <EditChip onPress={onEdit} />
+      </View>
+      {children}
+    </GlassCard>
+  );
+}
+
+interface SummaryStepProps {
+  orgName: string;
+  orgLogoUrl: string | null;
+  orgAddress: string;
+  username?: string;
+  titles: string[];
+  menus: { name: string; icon: string }[];
+  /** null with one menu (no mode to show). */
+  scope: CategoryScope | null;
+  menuUploaded: boolean;
+  menuItemCount: number;
+  query: string;
+  imported: boolean;
+  onEdit: (step: number) => void;
+}
+
+function SummaryStep({ orgName, orgLogoUrl, orgAddress, username, titles, menus, scope, menuUploaded, menuItemCount, query, imported, onEdit }: SummaryStepProps) {
+  const { t } = useTranslation();
+  const colors = useThemeColors();
+  const { palette, resolvedMode } = useAppTheme();
+  const initials = orgName.trim().split(/\s+/).slice(0, 2).map((w) => w.charAt(0).toUpperCase()).join('');
+  const modeLabel = resolvedMode === 'dark' ? t('appearance.dark_mode') : t('appearance.light_mode');
+  const glassSkin = { backgroundColor: colors.glass, borderColor: colors.glassBorder };
+
+  return (
+    <>
+      <Hero align="left" title={t('onboarding.step4_title')} subtitle={t('onboarding.step4_subtitle')} />
+
+      {/* The restaurant */}
+      <GlassCard variant="glass" radius={18} style={styles.orgCard}>
+        {orgLogoUrl ? (
+          <StorageImage source={{ uri: orgLogoUrl }} style={[styles.orgLogo, { borderColor: colors.glassBorder }]} resizeMode="cover" />
+        ) : (
+          <View style={[styles.orgLogo, styles.center, { borderColor: colors.glassBorder, backgroundColor: hexToRgba(colors.tint, 0.18) }]}>
+            <Text style={[styles.orgInitials, { color: colors.tint }]}>{initials}</Text>
+          </View>
+        )}
+        <View style={styles.fill}>
+          <Text style={[styles.orgName, { color: colors.text }]} numberOfLines={2}>{orgName}</Text>
+          {!!orgAddress && <Text style={[styles.orgAddress, { color: colors.textSecondary }]} numberOfLines={2}>{orgAddress}</Text>}
+          {!!username && <Text style={[styles.orgOwner, { color: colors.textSecondary }]} numberOfLines={1}>{t('onboarding.owner_line', { username })}</Text>}
+        </View>
+      </GlassCard>
+
+      {/* Job Titles */}
+      <SummaryCard
+        iosIcon="briefcase.fill"
+        androidIcon="work"
+        title={t('onboarding.step1_title')}
+        pill={<Pill label={t('onboarding.n_positions', { count: titles.length })} />}
+        onEdit={() => onEdit(1)}
+      >
+        <View style={styles.miniWrap}>
+          {titles.map((title) => (
+            <View key={title} style={[styles.mini, glassSkin]}>
+              <Text style={[styles.miniText, { color: colors.text }]} numberOfLines={1}>{title}</Text>
+            </View>
+          ))}
+        </View>
+      </SummaryCard>
+
+      {/* Menus */}
+      <SummaryCard
+        iosIcon="fork.knife"
+        androidIcon="restaurant"
+        title={t('onboarding.menus_card')}
+        pill={scope ? <Pill label={scope === 'per_menu' ? t('onboarding.scope_per_pill') : t('onboarding.scope_shared_pill')} /> : undefined}
+        onEdit={() => onEdit(2)}
+      >
+        <View style={styles.menuTiles}>
+          {menus.map((menu, i) => (
+            <View key={i} style={[styles.menuTile, glassSkin]}>
+              <IconSymbol ios_icon_name={menu.icon} android_material_icon_name={menu.icon} size={16} color={colors.tint} />
+              <Text style={[styles.menuTileText, { color: colors.text }]} numberOfLines={1}>{menu.name}</Text>
+            </View>
+          ))}
+        </View>
+        {menuUploaded ? (
+          <View style={styles.kv}>
+            <Pill tone="ok" iosIcon="checkmark" androidIcon="check" label={t('onboarding.menu_uploaded_pill')} />
+            <Text style={[styles.kvStrong, { color: colors.text }]}>{t('onboarding.n_items', { count: menuItemCount })}</Text>
+          </View>
+        ) : (
+          <Text style={[styles.kvText, { color: colors.textSecondary }]}>{t('onboarding.no_menu_yet')}</Text>
+        )}
+      </SummaryCard>
+
+      {/* Google Reviews */}
+      <SummaryCard
+        iosIcon="star.fill"
+        androidIcon="star"
+        title={t('onboarding.step3_title')}
+        pill={
+          imported ? (
+            <Pill tone="gold" label={t('onboarding.status_importing')} />
+          ) : query ? (
+            <Pill label={t('onboarding.status_will_import')} />
+          ) : (
+            <Pill label={t('onboarding.status_skipped')} />
+          )
+        }
+        onEdit={() => onEdit(3)}
+      >
+        {!!query && (
+          <View style={[styles.kv, { alignItems: 'flex-start' }]}>
+            <IconSymbol ios_icon_name="mappin.and.ellipse" android_material_icon_name="place" size={13} color={colors.textSecondary} style={{ marginTop: 2 }} />
+            <Text style={[styles.kvText, styles.fill, { color: colors.textSecondary }]}>{query}</Text>
+          </View>
+        )}
+      </SummaryCard>
+
+      {/* Your theme */}
+      <SummaryCard iosIcon="paintpalette.fill" androidIcon="palette" title={t('onboarding.your_theme')} onEdit={() => onEdit(4)}>
+        <View style={styles.kv}>
+          <View style={[styles.swatch, { backgroundColor: colors.background, borderColor: colors.glassBorder }]} />
+          <View style={[styles.swatch, { backgroundColor: colors.ember, borderColor: colors.glassBorder }]} />
+          <View style={[styles.swatch, { backgroundColor: colors.tint, borderColor: colors.glassBorder }]} />
+          <Text style={[styles.kvText, styles.fill, { color: colors.textSecondary }]}>
+            <B>{t(THEME_LABEL_KEY[palette])}</B> · {modeLabel} · {t('onboarding.just_for_you')}
+          </Text>
+        </View>
+      </SummaryCard>
+    </>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: splashColors.background,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingTop: 80,
-    paddingHorizontal: 24,
-    paddingBottom: 100,
-  },
+  fill: { flex: 1, minWidth: 0 },
+  center: { alignItems: 'center', justifyContent: 'center' },
+  rowCenter: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  eyebrow: { fontFamily: fonts.mono.semibold, fontSize: 9, letterSpacing: 1.2, textTransform: 'uppercase' },
 
-  // Step indicator
-  stepIndicator: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  stepRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  stepDot: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#E0E0E0',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepDotActive: {
-    backgroundColor: splashColors.primary,
-  },
-  stepDotCompleted: {
-    backgroundColor: splashColors.primary,
-  },
-  stepDotText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: splashColors.textSecondary,
-  },
-  stepDotTextActive: {
-    color: '#FFFFFF',
-  },
-  stepLine: {
-    width: 40,
-    height: 3,
-    backgroundColor: '#E0E0E0',
-    marginHorizontal: 4,
-  },
-  stepLineCompleted: {
-    backgroundColor: splashColors.primary,
-  },
+  card: { padding: 14, gap: 10 },
+  cardJobs: { padding: 14, gap: 12 },
+  cardTitle: { fontFamily: fonts.display.semibold, fontSize: 15, lineHeight: 20 },
+  hint: { fontFamily: fonts.body.regular, fontSize: 11.5, lineHeight: 16 },
+  bullets: { gap: 7 },
 
-  // Step content
-  stepTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: splashColors.text,
-    marginBottom: 8,
-  },
-  stepSubtitle: {
-    fontSize: 15,
-    color: splashColors.textSecondary,
-    marginBottom: 24,
-    lineHeight: 21,
-  },
+  // Step 1
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: { height: 36, borderRadius: 12, borderWidth: 1, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  chipDashed: { borderStyle: 'dashed' },
+  chipText: { fontFamily: fonts.body.semibold, fontSize: 13 },
+  customRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  square: { width: 43, height: 43, borderRadius: 13, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
 
-  // Job titles grid
-  titlesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 16,
-  },
-  titleChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: '#F0F0F0',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  titleChipActive: {
-    backgroundColor: splashColors.primary,
-    borderColor: splashColors.primary,
-  },
-  titleChipText: {
-    fontSize: 14,
-    color: splashColors.textSecondary,
-    fontWeight: '500',
-  },
-  titleChipTextActive: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
+  // Step 2
+  countRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  countQ: { flex: 1, fontFamily: fonts.display.semibold, fontSize: 17 },
+  capsule: { flexDirection: 'row', padding: 3, gap: 3, borderRadius: 13, borderWidth: 1 },
+  capCell: { width: 44, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  capText: { fontFamily: fonts.display.bold, fontSize: 16 },
+  menuRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
+  scopeRow: { flexDirection: 'row', gap: 8, marginTop: 2 },
+  scopeTile: { flex: 1, minWidth: 0, borderRadius: 14, borderWidth: 1, paddingVertical: 11, paddingHorizontal: 12, gap: 3 },
+  scopeTitle: { fontFamily: fonts.body.semibold, fontSize: 14 },
+  scopeGist: { fontFamily: fonts.body.regular, fontSize: 11, lineHeight: 15 },
+  tick: { position: 'absolute', top: -6, right: -6, width: 19, height: 19, borderRadius: 9.5, alignItems: 'center', justifyContent: 'center' },
+  cardUpload: { padding: 13, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  uploadTitleRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
+  uploadTitle: { fontFamily: fonts.body.semibold, fontSize: 14 },
+  uploadChip: { height: 38, borderRadius: 12, borderWidth: 1, paddingLeft: 9, paddingRight: 11, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  uploadChipText: { fontFamily: fonts.body.semibold, fontSize: 12.5 },
 
-  // Custom title input
-  customRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 16,
-  },
-  addBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: splashColors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cancelBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: '#F0F0F0',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addCustomButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 16,
-  },
-  addCustomText: {
-    fontSize: 15,
-    color: splashColors.primary,
-    fontWeight: '600',
-  },
+  // Result rows
+  note: { flexDirection: 'row', alignItems: 'flex-start', gap: 9, paddingVertical: 10, paddingHorizontal: 11, borderRadius: 13, borderWidth: 1 },
+  noteTitle: { fontFamily: fonts.body.semibold, fontSize: 13, marginBottom: 2 },
+  noteText: { fontFamily: fonts.body.regular, fontSize: 12, lineHeight: 17 },
 
-  // Inputs (shared with step 2)
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: splashColors.text,
-    marginBottom: 6,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    marginBottom: 16,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  inputIcon: {
-    marginRight: 12,
-  },
-  input: {
-    flex: 1,
-    height: 50,
-    fontSize: 16,
-    color: splashColors.text,
-  },
-
-  // Card
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#E8E8E8',
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: splashColors.text,
-    marginBottom: 10,
-  },
-  cardValue: {
-    fontSize: 15,
-    color: splashColors.text,
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  cardDetail: {
-    fontSize: 14,
-    color: splashColors.textSecondary,
-  },
-
-  // Switch row
-  switchRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  switchLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: splashColors.text,
-  },
-  switchHint: {
-    fontSize: 13,
-    color: splashColors.textSecondary,
-    lineHeight: 18,
-  },
-  aiMenuNote: {
-    flexDirection: 'row',
-    gap: 12,
-    alignItems: 'flex-start',
-    backgroundColor: splashColors.primary + '12',
-    borderRadius: 14,
-    padding: 14,
-    marginTop: 8,
-    marginBottom: 8,
-  },
-  aiMenuNoteTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: splashColors.primary,
-    marginBottom: 3,
-  },
-  aiMenuNoteText: {
-    fontSize: 13,
-    color: splashColors.textSecondary,
-    lineHeight: 18,
-  },
-  menuDoneNote: {
-    flexDirection: 'row',
-    gap: 12,
-    alignItems: 'flex-start',
-    backgroundColor: '#34A85312',
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: '#34A853',
-    padding: 14,
-    marginTop: 8,
-    marginBottom: 8,
-  },
-  menuDoneTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#1E7E34',
-    marginBottom: 3,
-  },
-  menuDoneText: {
-    fontSize: 13,
-    color: splashColors.textSecondary,
-    lineHeight: 18,
-  },
-  uploadMenuButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 6,
-    marginTop: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 10,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: splashColors.primary,
-  },
-  uploadMenuButtonText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: splashColors.primary,
-  },
-
-  // Step 3 — Google Reviews
-  googleHint: {
-    fontSize: 13,
-    color: splashColors.textSecondary,
-    lineHeight: 18,
-    marginTop: -8,
-    marginBottom: 18,
-  },
-  importButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    height: 52,
-    borderRadius: 12,
-    backgroundColor: '#4285F4',
-    marginBottom: 16,
-  },
-  importButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  resultCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 16,
-    borderWidth: 1,
-  },
-  resultCardSuccess: {
-    backgroundColor: '#34A85312',
-    borderColor: '#34A85340',
-  },
-  resultCardInfo: {
-    backgroundColor: splashColors.primary + '12',
-    borderColor: splashColors.primary + '40',
-  },
-  resultCardError: {
-    backgroundColor: '#EA433512',
-    borderColor: '#EA433540',
-  },
-  resultCardText: {
-    flex: 1,
-    fontSize: 14,
-    color: splashColors.text,
-    lineHeight: 19,
-  },
-  skipLink: {
-    alignItems: 'center',
-    paddingVertical: 10,
-  },
-  skipLinkText: {
-    fontSize: 14,
-    color: splashColors.textSecondary,
-    fontWeight: '600',
-    textDecorationLine: 'underline',
-  },
-
-  // Category-scope option cards
-  scopeOption: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 10,
-    borderWidth: 1.5,
-    borderColor: '#E8E8E8',
-  },
-  scopeOptionActive: {
-    borderColor: splashColors.primary,
-    backgroundColor: '#FFF8F0',
-  },
-  scopeOptionTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: splashColors.text,
-    marginBottom: 4,
-  },
-  scopeOptionDesc: {
-    fontSize: 13,
-    color: splashColors.textSecondary,
-    lineHeight: 18,
-  },
-
-  // Bottom bar
-  bottomBar: {
-    flexDirection: 'row',
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-    paddingBottom: 34,
-    borderTopWidth: 1,
-    borderTopColor: '#E8E8E8',
-    backgroundColor: splashColors.background,
-    gap: 12,
-  },
-  backButton: {
-    flex: 1,
-    height: 50,
-    borderRadius: 12,
-    backgroundColor: '#F0F0F0',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: splashColors.text,
-  },
-  nextButton: {
-    flex: 1,
-    height: 50,
-    borderRadius: 12,
-    backgroundColor: splashColors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  nextButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
+  // Step 5
+  orgCard: { padding: 13, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  orgLogo: { width: 44, height: 44, borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
+  orgInitials: { fontFamily: fonts.display.bold, fontSize: 16 },
+  orgName: { fontFamily: fonts.display.bold, fontSize: 17, letterSpacing: -0.2 },
+  orgAddress: { fontFamily: fonts.body.regular, fontSize: 11.5, lineHeight: 16, marginTop: 1 },
+  orgOwner: { fontFamily: fonts.mono.medium, fontSize: 10.5, marginTop: 3 },
+  cardSummary: { padding: 12, gap: 9 },
+  summaryHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  summaryTitle: { flex: 1, minWidth: 0, fontFamily: fonts.display.semibold, fontSize: 14 },
+  editChip: { height: 30, borderRadius: 10, borderWidth: 1, paddingHorizontal: 9, flexDirection: 'row', alignItems: 'center', gap: 5 },
+  editChipText: { fontFamily: fonts.body.semibold, fontSize: 11.5 },
+  miniWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  mini: { height: 26, borderRadius: 9, borderWidth: 1, paddingHorizontal: 9, alignItems: 'center', justifyContent: 'center' },
+  miniText: { fontFamily: fonts.body.semibold, fontSize: 11.5 },
+  menuTiles: { flexDirection: 'row', gap: 8 },
+  menuTile: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 9, paddingHorizontal: 10, borderRadius: 13, borderWidth: 1 },
+  menuTileText: { flex: 1, minWidth: 0, fontFamily: fonts.body.semibold, fontSize: 13 },
+  kv: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  kvText: { fontFamily: fonts.body.regular, fontSize: 12, lineHeight: 16 },
+  kvStrong: { fontFamily: fonts.body.semibold, fontSize: 12 },
+  swatch: { width: 22, height: 22, borderRadius: 8, borderWidth: 1 },
 });
