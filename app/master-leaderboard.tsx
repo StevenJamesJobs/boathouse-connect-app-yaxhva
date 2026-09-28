@@ -28,7 +28,6 @@ import { useMiniProfile } from '@/contexts/MiniProfileContext';
 import AmbientGlow from '@/components/AmbientGlow';
 import ScreenHeader from '@/components/ScreenHeader';
 import BottomNavBar from '@/components/BottomNavBar';
-import JoltOverlay from '@/components/JoltOverlay';
 import { fonts } from '@/constants/fonts';
 
 type LeaderboardTab = 'overall' | 'memory' | 'word_search' | 'picture_this';
@@ -250,7 +249,6 @@ export default function MasterLeaderboardScreen() {
       )}
 
       <BottomNavBar activeTab="tools" />
-      <JoltOverlay role={isManagerOrOwner(user) ? 'manager' : 'employee'} />
     </View>
   );
 }

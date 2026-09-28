@@ -17,13 +17,13 @@ import { StorageImage } from '@/components/StorageImage';
 import HeaderNavButton from '@/components/HeaderNavButton';
 import ScreenHeader from '@/components/ScreenHeader';
 import AmbientGlow from '@/components/AmbientGlow';
+import JoltDockSlot from '@/components/jolt/JoltDockSlot';
 import GlassCard from '@/components/GlassCard';
 import GlassSheet, { useSheetHandoff } from '@/components/GlassSheet';
 import CategorySheet, { CategoryOption } from '@/components/CategorySheet';
 import GlassActionSheet from '@/components/GlassActionSheet';
 import OrderPositionModal from '@/components/OrderPositionModal';
 import BottomNavBar from '@/components/BottomNavBar';
-import JoltOverlay, { setJoltDockTarget } from '@/components/JoltOverlay';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -248,63 +248,13 @@ export default function GuidesAndTrainingEditorScreen() {
     reload();
   }, []);
 
-  // ── Jolt FAB docking ───────────────────────────────────────────────────────
-  // The same contract as the staff screen and the Manage command center: hand
-  // the corner bolt this search bar's slot coords so it flies in physically.
-  // Both guides screens dock to the SAME on-screen position, which is the whole
-  // point of keeping the search row identical — the bolt stays put across a
-  // user <-> editor switch instead of flying home and back. Clearing the target
-  // on blur is mandatory, or the FAB stays pinned to these coords on whatever
-  // tab we return to.
-  const joltSlotRef = useRef<View>(null);
-  const dockActiveRef = useRef(false);
-  const focusEpochRef = useRef(0);
-  // Mirrors dockActiveRef into render so the slot drops its resting icon only
-  // once the bolt is on its way in (a ref alone never re-renders).
-  const [joltDocked, setJoltDocked] = useState(false);
-  const measureAndDock = React.useCallback(() => {
-    if (dockActiveRef.current) return; // already docked this focus
-    const node = joltSlotRef.current;
-    if (!node || typeof node.measureInWindow !== 'function') return;
-    // measureInWindow is async: without the focus check an in-flight callback
-    // can land AFTER the cleanup and re-arm the module-wide dock target with
-    // coordinates no screen owns any more, stranding the bolt there.
-    const focusedAt = focusEpochRef.current;
-    // Claimed BEFORE the async measure, not inside its callback: onLayout can
-    // fire twice before the first callback resolves, and both would dock.
-    // Released again below if this measure turns out to be too early.
-    dockActiveRef.current = true;
-    node.measureInWindow((x: number, y: number, w: number, h: number) => {
-      if (focusedAt !== focusEpochRef.current) return; // blurred mid-measure
-      if (!w && !h) {
-        dockActiveRef.current = false; // not laid out yet — let a retry through
-        return;
-      }
-      setJoltDockTarget({ x: x + w / 2, y: y + h / 2 });
-      setJoltDocked(true);
-    });
-  }, []);
+  // ── Jolt (s87): the search box carries a JoltDockSlot (same id as the user
+  // screen — same spot, so a user ⇄ editor flip never moves the bolt). ──
 
   useFocusEffect(
     React.useCallback(() => {
       reload();
-      // The slot's own onLayout fires the first attempt; these are the fallback
-      // for when onLayout lands before the window position has settled.
-      // measureAndDock is idempotent (dockActiveRef), so the extra calls are free.
-      const t1 = setTimeout(measureAndDock, 200);
-      const t2 = setTimeout(measureAndDock, 480);
-      return () => {
-        clearTimeout(t1);
-        clearTimeout(t2);
-        // Without this the stale-measure guard above is DEAD — nothing ever
-        // changes the epoch, so a callback landing after the blur still re-arms
-        // the module-wide target with coords no screen owns.
-        focusEpochRef.current += 1;
-        setJoltDockTarget(null);
-        dockActiveRef.current = false;
-        setJoltDocked(false);
-      };
-    }, [measureAndDock])
+    }, [])
   );
 
   const loadGuides = async () => {
@@ -1441,20 +1391,7 @@ export default function GuidesAndTrainingEditorScreen() {
           screen, so switching user <-> editor never moves the controls. */}
       <View style={styles.searchRow}>
         <View style={[styles.searchBox, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
-          {/* The bolt's docking slot. Plain, untransformed View — measureInWindow
-              on an Animated node would report the animated position. It rests as
-              the search icon so a failed dock leaves the bar looking normal
-              rather than blank. */}
-          <View ref={joltSlotRef} style={styles.joltSlot} onLayout={measureAndDock}>
-            {!joltDocked && (
-              <IconSymbol
-                ios_icon_name="magnifyingglass"
-                android_material_icon_name="search"
-                size={18}
-                color={colors.textSecondary}
-              />
-            )}
-          </View>
+          <JoltDockSlot id="guides" kind="field" size={30} iconSize={18} />
           <TextInput
             style={[styles.searchInput, { color: colors.text }]}
             placeholder={t('guides_training.search_placeholder')}
@@ -1655,9 +1592,6 @@ export default function GuidesAndTrainingEditorScreen() {
       )}
 
       <BottomNavBar activeTab="manage" />
-      {/* Pushed route (outside the tab layout), so the Jolt companion is rendered
-          here too — this screen is manager-only. */}
-      <JoltOverlay role="manager" />
 
       <CategorySheet
         visible={showFilterCategories}
@@ -1911,7 +1845,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginBottom: 12,
   },
-  joltSlot: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
   searchBox: {
     flex: 1,
     flexDirection: 'row',

@@ -217,7 +217,7 @@ export default function UpcomingEventsEditorScreen() {
         // The expiry sweep replaces delete_expired_upcoming_events: it deletes
         // expired specials + events server-side and hands back every pending
         // file for the org, which a manager broker-deletes (fire-and-forget).
-        if (sweep) await sweepExpiredContent(user.id, true);
+        if (sweep) await sweepExpiredContent(user.id, true, { force: true });
         const { data, error } = await supabase.rpc('get_upcoming_events', {
           p_actor_id: user.id,
           p_include_inactive: true,

@@ -160,7 +160,7 @@ export default function SpecialFeaturesEditorScreen() {
     try {
       setLoading(true);
       // The sweep deletes expired rows AND retires their storage (manager ⇒ canDelete).
-      await sweepExpiredContent(user.id, true);
+      await sweepExpiredContent(user.id, true, { force: true });
       // Manager editor mode: inactive rows included.
       const { data, error } = await supabase.rpc('get_special_features', {
         p_actor_id: user.id,

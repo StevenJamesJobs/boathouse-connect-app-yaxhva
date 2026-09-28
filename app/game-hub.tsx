@@ -32,7 +32,6 @@ import AmbientGlow from '@/components/AmbientGlow';
 import ScreenHeader from '@/components/ScreenHeader';
 import GameHubHeaderAction from '@/components/game/GameHubHeaderAction';
 import BottomNavBar from '@/components/BottomNavBar';
-import JoltOverlay from '@/components/JoltOverlay';
 import GameSquareTile from '@/components/game/GameSquareTile';
 import GameBoardCard, { GameBoardRow } from '@/components/game/GameBoardCard';
 import { GAME_VISUALS } from '@/components/game/gameVisuals';
@@ -387,7 +386,6 @@ export default function GameHubScreen() {
       </ScrollView>
 
       <BottomNavBar activeTab="tools" />
-      <JoltOverlay role={isManagerOrOwner(user) ? 'manager' : 'employee'} />
     </View>
   );
 }

@@ -34,7 +34,6 @@ import { IconSymbol } from '@/components/IconSymbol';
 import GlassCard from '@/components/GlassCard';
 import AmbientGlow from '@/components/AmbientGlow';
 import BottomNavBar from '@/components/BottomNavBar';
-import JoltOverlay from '@/components/JoltOverlay';
 import { fonts } from '@/constants/fonts';
 import { supabase } from '@/app/integrations/supabase/client';
 import { getOrgDirectory } from '@/utils/orgDirectory';
@@ -1190,7 +1189,6 @@ export default function RewardsAndReviewsEditorScreen() {
       <BottomNavBar activeTab="manage" />
       {/* This editor is a pushed route (outside the tab layout), so render the
           Jolt companion here too — the corner FAB / command palette. */}
-      <JoltOverlay role="manager" />
 
       {renderRewardModal()}
       {renderResetModal()}

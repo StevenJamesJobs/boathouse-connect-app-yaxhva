@@ -139,9 +139,11 @@ export default function EmployeeRewardsScreen() {
   const ratingCount = googleReviews.length;
   const ratingAvg = ratingCount ? googleReviews.reduce((s, r) => s + (r.review_rating || 0), 0) / ratingCount : 0;
 
-  const fetchRewardsData = useCallback(async () => {
+  // `silent` = a focus refetch: keep the page mounted (the spinner-on-solid swap
+  // was the Rewards flash on every tab switch — the only tab that did it).
+  const fetchRewardsData = useCallback(async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
 
       // Fetch current user's bucks (own row via hardened get_me RPC)
       if (user?.id) {
@@ -279,9 +281,11 @@ export default function EmployeeRewardsScreen() {
 
   // Refetch the bucks balance + leaderboard on focus so an approved/denied
   // redemption reflects right away when the employee returns to this tab.
+  const loadedOnceRef = useRef(false);
   useFocusEffect(
     useCallback(() => {
-      fetchRewardsData();
+      fetchRewardsData(loadedOnceRef.current);
+      loadedOnceRef.current = true;
     }, [fetchRewardsData])
   );
 
@@ -310,7 +314,8 @@ export default function EmployeeRewardsScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+      // Transparent: the layout-level ambient glow reads through the first load too.
+      <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );

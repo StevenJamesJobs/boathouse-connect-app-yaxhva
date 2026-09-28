@@ -15,6 +15,7 @@ import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import GlassCard from '@/components/GlassCard';
+import { IconSymbol } from '@/components/IconSymbol';
 import { useSheetHandoff } from '@/components/GlassSheet';
 import FormattedText from '@/components/FormattedText';
 import { StorageExpoImage } from '@/components/StorageImage';
@@ -83,6 +84,13 @@ export interface MenuItemDetailSheetProps {
    * handoff — never in the same commit as the close.
    */
   editAction?: { label: string; onPress: () => void } | null;
+  /**
+   * s87: "View Recipe" for recipe-fed libations, shown to viewers who may open
+   * the Bartender Assistant (MenuDisplay gates it). Rides the price row: on a
+   * photo it sits top-left over the scrim (literal white — the ember rule), on
+   * the plain sheet it sits left of the price chip. Navigates → deferred.
+   */
+  recipe?: { label: string; onPress: () => void } | null;
 }
 
 // Same normalization as MenuDisplay's card price.
@@ -129,6 +137,7 @@ export default function MenuItemDetailSheet({
   isWine,
   redeem,
   editAction,
+  recipe,
 }: MenuItemDetailSheetProps) {
   const { t } = useTranslation();
   const { language } = useLanguage();
@@ -236,6 +245,23 @@ export default function MenuItemDetailSheet({
       <Text style={styles.priceChipText}>{priceText}</Text>
     </View>
   ) : null;
+
+  const recipeChip = (onPhoto: boolean) =>
+    recipe ? (
+      <Pressable
+        onPress={() => defer(recipe.onPress)}
+        hitSlop={6}
+        style={[
+          styles.recipeChip,
+          onPhoto
+            ? { backgroundColor: 'rgba(255,255,255,0.16)', borderColor: 'rgba(255,255,255,0.32)' }
+            : { backgroundColor: colors.glass, borderColor: colors.glassBorder },
+        ]}
+      >
+        <IconSymbol ios_icon_name="wineglass.fill" android_material_icon_name="local-bar" size={13} color={onPhoto ? '#FFFFFF' : colors.tint} />
+        <Text style={[styles.recipeChipText, { color: onPhoto ? '#FFFFFF' : colors.text }]} numberOfLines={1}>{recipe.label}</Text>
+      </Pressable>
+    ) : null;
 
   // Title, description and the structured sections — shared by the hero and
   // no-hero layouts.
@@ -427,11 +453,12 @@ export default function MenuItemDetailSheet({
                         </Text>
                       )}
                       {priceChip && <View style={styles.heroPriceSlot}>{priceChip}</View>}
+                      {recipe && <View style={styles.heroRecipeSlot}>{recipeChip(true)}</View>}
                       {redeemButton && <View style={styles.heroRedeemSlot}>{redeemButton}</View>}
                     </View>
                   )}
 
-                  {!heroUrl && (!!eyebrow || !!priceChip || !!redeemButton) && (
+                  {!heroUrl && (!!eyebrow || !!priceChip || !!redeemButton || !!recipe) && (
                     // Without a hero the overlays still need a home: the same
                     // eyebrow + price-chip-or-Redeem, folded into one row.
                     <View style={styles.metaRow}>
@@ -443,6 +470,7 @@ export default function MenuItemDetailSheet({
                           {eyebrow}
                         </Text>
                       )}
+                      {recipeChip(false)}
                       {redeemButton ?? priceChip}
                     </View>
                   )}
@@ -573,6 +601,9 @@ const styles = StyleSheet.create({
   heroEyebrowCapped: { maxWidth: '52%' },
   heroEyebrowWide: { right: 14 },
   heroPriceSlot: { position: 'absolute', top: 12, right: 14, zIndex: 2 },
+  heroRecipeSlot: { position: 'absolute', top: 12, left: 14, zIndex: 2 },
+  recipeChip: { flexDirection: 'row', alignItems: 'center', gap: 5, height: 28, paddingHorizontal: 10, borderRadius: 9, borderWidth: 1 },
+  recipeChipText: { fontFamily: fonts.display.semibold, fontSize: 12 },
   heroRedeemSlot: { position: 'absolute', right: 14, bottom: 12, zIndex: 3 },
   priceChip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
   // Mockup literal: dark ink on the warm tint chip, independent of theme.

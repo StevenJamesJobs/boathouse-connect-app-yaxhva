@@ -22,7 +22,8 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { getImageUrl } from '@/utils/imageUrl';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useToolVisibility } from '@/hooks/useToolVisibility';
 import { useFocusEffect } from "expo-router/react-navigation";
 import { fonts } from '@/constants/fonts';
 import type { ThemeColorSet } from '@/styles/commonStyles';
@@ -443,6 +444,9 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     });
   }, [loading, categoryOptions]);
   const { user } = useAuth();
+  // s87: the "View Recipe" chip on recipe-fed libations — only for viewers who may
+  // open the Bartender Assistant (managers, or the assistant's job titles).
+  const { canSee: canSeeTool } = useToolVisibility();
   const { settings: redemptionSettings } = useRedemptionSettings();
   const { perms: managerPerms, reload: reloadPerms } = useManagerPermissions();
   const router = useRouter();
@@ -904,6 +908,32 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     setDetailSheetVisible(true);
   };
 
+  // s87 Jolt deep link: `?openItem=<id>&ts=<nonce>` lands on the item's page and
+  // opens its sheet (the recipe-fed ids `lr-`/`slr-` resolve the same way). The
+  // nonce lets the same item be picked twice; the ref stops a re-run on every
+  // re-render while the params are still set. Refs to the navigation helpers
+  // keep the timeouts on the CURRENT pages after a season switch.
+  const { openItem: openItemParam, ts: openItemTs } = useLocalSearchParams<{ openItem?: string; ts?: string }>();
+  const openItemDoneRef = useRef<string | null>(null);
+  const navigateToPageRef = useRef<(category: string, subcategory?: string | null) => void>(() => {});
+  useEffect(() => {
+    if (!openItemParam || !openItemTs || loading) return;
+    const key = `${openItemParam}:${openItemTs}`;
+    if (openItemDoneRef.current === key) return;
+    const item = allItems.find((i) => i.id === openItemParam) ?? menuItems.find((i) => i.id === openItemParam);
+    if (!item) return; // not in this org's corpus (or not loaded yet — a later load re-runs)
+    openItemDoneRef.current = key;
+    const wantSeason = item.season === 'summer' || item.season === 'winter' ? item.season : null;
+    const switching = !!wantSeason && wantSeason !== season && organization.menu_count === 2;
+    if (switching) setSeason(wantSeason as Season);
+    const t1 = setTimeout(() => {
+      navigateToPageRef.current(item.category, item.subcategory ?? null);
+      setTimeout(() => openDetailSheet(item), 380);
+    }, switching ? 480 : 80);
+    return () => clearTimeout(t1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openItemParam, openItemTs, loading, allItems, menuItems, season]);
+
   // Keep the item mounted through the sheet's slide-out; the next open replaces it.
   const closeDetailSheet = () => setDetailSheetVisible(false);
 
@@ -990,6 +1020,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
       pagerRef.current?.scrollToIndex({ index: targetIndex, animated: true });
     }
   };
+  navigateToPageRef.current = navigateToPage;
 
   // Handle swipe end — sync page index
   const onMomentumScrollEnd = (event: any) => {
@@ -1233,7 +1264,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
   // price, and only while the org has food redemptions switched on.
   const detailCtx = (() => {
     const item = selectedMenuItem;
-    if (!item) return { detailItem: null as MenuItemForDetail | null, menuLabel: '', isWine: false, isLibations: false, redeem: null as { label: string; onPress: () => void } | null };
+    if (!item) return { detailItem: null as MenuItemForDetail | null, menuLabel: '', isWine: false, isLibations: false, redeem: null as { label: string; onPress: () => void } | null, recipe: null as { label: string; onPress: () => void } | null };
     const isWine = isWineName(item.category);
     const isLibations = catOf(item.category)?.system_key === 'cat.libations';
     const trimmed = (item.price || '').trim();
@@ -1255,6 +1286,21 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
                 prefillItemName: item.name,
                 prefillItemPrice: item.price,
               },
+            } as any);
+          },
+        }
+      : null;
+    // Recipe-fed rows carry MenuDisplay's synthetic ids; the chip opens the
+    // recipes page with that recipe's sheet already up (the sheet defers the
+    // press through its dismissal handoff).
+    const recipeMatch = item.id.match(/^(slr|lr)-(.+)$/);
+    const recipe = recipeMatch && canSeeTool('bartender')
+      ? {
+          label: t('menu_detail.view_recipe'),
+          onPress: () => {
+            router.push({
+              pathname: recipeMatch[1] === 'slr' ? '/summer-libation-recipes' : '/libation-recipes',
+              params: { openRecipeId: recipeMatch[2], ts: String(Date.now()) },
             } as any);
           },
         }
@@ -1291,7 +1337,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
       },
     };
     const menuLabel = organization.menu_count === 2 ? menuBadgeForSeason(item.season).label : '';
-    return { detailItem, menuLabel, isWine, isLibations, redeem };
+    return { detailItem, menuLabel, isWine, isLibations, redeem, recipe };
   })();
 
   return (
@@ -1335,6 +1381,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
             placeholder={t('menu_display.search_placeholder')}
             onRightPress={() => setFilterSheetVisible(true)}
             filterCount={activeFilterCount}
+            joltDock
           />
           {(loading || categoriesLoading) ? (
             <View style={styles.loadingContainer}>
@@ -1443,6 +1490,8 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
                 placeholder={t('menu_display.search_placeholder')}
                 onRightPress={() => setFilterSheetVisible(true)}
                 filterCount={activeFilterCount}
+                joltDock
+                joltDockHidden={chromeCollapsed}
               />
             </Animated.View>
             <MenuCategoryTabs
@@ -1492,6 +1541,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
         isWine={detailCtx.isWine}
         isLibations={detailCtx.isLibations}
         redeem={detailCtx.redeem}
+        recipe={detailCtx.recipe}
       />
 
       {/* The ⚙ Menu sheet — managers/owners only (employees never see the chip) */}

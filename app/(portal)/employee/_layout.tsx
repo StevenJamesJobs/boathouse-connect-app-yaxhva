@@ -12,7 +12,6 @@ import { useUnreadAwards } from '@/hooks/useUnreadAwards';
 import { useUnreadQuizReward } from '@/hooks/useUnreadQuizReward';
 import { useUnreadLeaderboardPasses } from '@/hooks/useUnreadLeaderboardPasses';
 import PortalTabBar from '@/components/PortalTabBar';
-import JoltOverlay from '@/components/JoltOverlay';
 import AmbientGlow from '@/components/AmbientGlow';
 import { useSegments } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -145,7 +144,6 @@ export default function EmployeeLayout() {
           }}
         />
       </Tabs>
-      <JoltOverlay role="employee" />
     </View>
   );
 }

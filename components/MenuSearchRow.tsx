@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-nativ
 import { useTranslation } from 'react-i18next';
 import { IconSymbol } from '@/components/IconSymbol';
 import { fonts } from '@/constants/fonts';
+import JoltDockSlot from '@/components/jolt/JoltDockSlot';
 
 /**
  * MenuSearchRow — the glass search field + right-slot button shared by the
@@ -10,8 +11,10 @@ import { fonts } from '@/constants/fonts';
  * and, in s69, the menu editor (right slot = ＋). The geometry is identical on
  * both sides by design; only the right slot's content differs.
  *
- * The 30×30 `joltSlot` holding the magnifier is an INERT dock target for the
- * later Jolt session — no setJoltDockTarget wiring here yet.
+ * The 30×30 leading slot holds the magnifier. Hosts that hold the Jolt bolt
+ * (the Menu tab + the menu editor — s87) pass `joltDock`; the ten other hosts
+ * of this row keep the plain magnifier. `joltDockHidden` follows the host's
+ * collapse so nothing is flown from a faded band.
  *
  * MenuDisplay mounts this row inside its scroll-collapsing wrapper; the row
  * itself is a fixed 46pt field + 11pt bottom margin (57pt total).
@@ -30,6 +33,10 @@ export interface MenuSearchRowProps {
    * before, so the menu editor is untouched.
    */
   onReorderPress?: () => void;
+  /** s87: mount the Jolt dock slot in the leading position (Menu + Menu Editor only). */
+  joltDock?: boolean;
+  /** The host's collapsing band is faded/parked. */
+  joltDockHidden?: boolean;
 }
 
 export default function MenuSearchRow({
@@ -41,6 +48,8 @@ export default function MenuSearchRow({
   onRightPress,
   filterCount,
   onReorderPress,
+  joltDock = false,
+  joltDockHidden = false,
 }: MenuSearchRowProps) {
   const { t } = useTranslation();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -49,15 +58,18 @@ export default function MenuSearchRow({
   return (
     <View style={styles.row}>
       <View style={styles.searchField}>
-        {/* Inert Jolt dock slot — holds the magnifier until the FAB docks (later session). */}
-        <View style={styles.joltSlot}>
-          <IconSymbol
-            ios_icon_name="magnifyingglass"
-            android_material_icon_name="search"
-            size={20}
-            color={colors.textSecondary}
-          />
-        </View>
+        {joltDock ? (
+          <JoltDockSlot id="menu" kind="field" size={30} iconSize={20} hidden={joltDockHidden} />
+        ) : (
+          <View style={styles.joltSlot}>
+            <IconSymbol
+              ios_icon_name="magnifyingglass"
+              android_material_icon_name="search"
+              size={20}
+              color={colors.textSecondary}
+            />
+          </View>
+        )}
         <TextInput
           style={styles.input}
           placeholder={placeholder}

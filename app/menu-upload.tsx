@@ -31,7 +31,6 @@ import ScreenHeader from '@/components/ScreenHeader';
 import GlassSheet from '@/components/GlassSheet';
 import MenuSheet from '@/components/MenuSheet';
 import BottomNavBar from '@/components/BottomNavBar';
-import JoltOverlay from '@/components/JoltOverlay';
 import ScanQuip from '@/components/MenuScanQuips';
 import { fonts } from '@/constants/fonts';
 
@@ -741,7 +740,6 @@ export default function MenuUploadScreen() {
         <>
           <BottomNavBar activeTab="menus" />
           <View style={styles.joltLayer} pointerEvents="box-none">
-            <JoltOverlay role="manager" />
           </View>
         </>
       )}
