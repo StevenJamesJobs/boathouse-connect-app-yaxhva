@@ -175,26 +175,50 @@ export async function retireContentStorage(
  * manager-only), so employees just refresh and the rows wait. Returns true when
  * the sweep ran (callers refetch regardless).
  */
+// s87: ONE sweep at a time, at most every few minutes. The Welcome page fires its
+// loader from three mount effects and the view-all pages sweep on focus, so the
+// parallel calls used to queue behind each other's row locks and trip the anon
+// role's 3s statement_timeout (57014). Concurrent callers now share the in-flight
+// promise; a recent sweep is skipped (callers refetch regardless). Editors pass
+// `force` after a save so their list reflects the change immediately.
+const SWEEP_MIN_INTERVAL_MS = 5 * 60 * 1000;
+let sweepInFlight: Promise<boolean> | null = null;
+let sweepLastAt = 0;
+let sweepLastActor: string | null = null;
+
 export async function sweepExpiredContent(
   actorId: string | undefined | null,
-  canDelete: boolean
+  canDelete: boolean,
+  opts: { force?: boolean } = {}
 ): Promise<boolean> {
   if (!actorId) return false;
-  try {
-    const { data, error } = await supabase.rpc('sweep_expired_content', { p_actor_id: actorId });
-    if (error) {
-      console.error('sweep_expired_content failed:', error);
+  if (sweepInFlight) return sweepInFlight;
+  const fresh = sweepLastActor === actorId && Date.now() - sweepLastAt < SWEEP_MIN_INTERVAL_MS;
+  if (fresh && !opts.force) return true;
+  sweepInFlight = (async () => {
+    try {
+      const { data, error } = await supabase.rpc('sweep_expired_content', { p_actor_id: actorId });
+      if (error) {
+        // A timeout on a background sweep is noise, not a fault — the next load retries.
+        if ((error as any).code === '57014') console.warn('sweep_expired_content timed out (will retry next load)');
+        else console.error('sweep_expired_content failed:', error);
+        return false;
+      }
+      sweepLastAt = Date.now();
+      sweepLastActor = actorId;
+      if (canDelete && data && data.length > 0) {
+        // Fire-and-forget: the list refresh must not wait on storage.
+        void brokerRetire(actorId, data.map((r) => ({ bucket: r.bucket, file_url: r.file_url })));
+      }
+      return true;
+    } catch (err) {
+      console.error('sweep_expired_content error:', err);
       return false;
+    } finally {
+      sweepInFlight = null;
     }
-    if (canDelete && data && data.length > 0) {
-      // Fire-and-forget: the list refresh must not wait on storage.
-      void brokerRetire(actorId, data.map((r) => ({ bucket: r.bucket, file_url: r.file_url })));
-    }
-    return true;
-  } catch (err) {
-    console.error('sweep_expired_content error:', err);
-    return false;
-  }
+  })();
+  return sweepInFlight;
 }
 
 function bucketFor(kind: ContentKind): string {

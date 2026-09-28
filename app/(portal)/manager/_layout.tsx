@@ -11,7 +11,6 @@ import { useUnreadQuizzes } from '@/hooks/useUnreadQuizzes';
 import { useUnreadLeaderboardPasses } from '@/hooks/useUnreadLeaderboardPasses';
 import { usePendingApprovals } from '@/hooks/usePendingApprovals';
 import PortalTabBar from '@/components/PortalTabBar';
-import JoltOverlay from '@/components/JoltOverlay';
 import AmbientGlow from '@/components/AmbientGlow';
 import { useSegments } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -136,7 +135,6 @@ export default function ManagerLayout() {
           }}
         />
       </Tabs>
-      <JoltOverlay role="manager" />
     </View>
   );
 }

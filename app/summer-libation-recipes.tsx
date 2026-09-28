@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   TextInput,
   ActivityIndicator,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -102,6 +102,22 @@ export default function SummerLibationRecipesScreen() {
     setSelectedRecipe(recipe);
     setShowDetailModal(true);
   };
+
+  // s87 Jolt / "View Recipe" deep link: `?openRecipeId=<id>&ts=<nonce>` opens
+  // that recipe's sheet once the list has loaded (the nonce allows a repeat).
+  const { openRecipeId, ts: openRecipeTs } = useLocalSearchParams<{ openRecipeId?: string; ts?: string }>();
+  const openRecipeDoneRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!openRecipeId || !openRecipeTs || loading) return;
+    const key = `${openRecipeId}:${openRecipeTs}`;
+    if (openRecipeDoneRef.current === key) return;
+    const r = recipes.find((x) => x.id === openRecipeId);
+    if (!r) return;
+    openRecipeDoneRef.current = key;
+    const t1 = setTimeout(() => openDetailModal(r), 260);
+    return () => clearTimeout(t1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openRecipeId, openRecipeTs, loading, recipes]);
 
   const closeDetailModal = () => {
     setShowDetailModal(false);

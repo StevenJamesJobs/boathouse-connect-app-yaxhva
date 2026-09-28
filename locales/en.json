@@ -711,7 +711,8 @@
     "member_bottle": "Member bottle",
     "tasting_notes": "Tasting notes",
     "selling_points": "Selling points",
-    "allergen_note": "Always double check with your management and kitchen about allergens & prep."
+    "allergen_note": "Always double check with your management and kitchen about allergens & prep.",
+    "view_recipe": "View Recipe"
   },
   "dietary": {
     "gf_abbrev": "GF",
@@ -893,7 +894,21 @@
     "type_dish": "dish",
     "type_event": "event",
     "type_announcement": "post",
-    "type_feature": "feature"
+    "type_feature": "feature",
+    "bar": "Search or jump to anything…",
+    "recent": "Recent",
+    "clear": "Clear",
+    "kind_all": "All",
+    "kind_people": "People",
+    "kind_menu": "Menu",
+    "kind_tools": "Tools",
+    "kind_posts": "Posts",
+    "kind_settings": "Settings",
+    "type_setting": "setting",
+    "type_drink": "drink",
+    "approvals": "Redemption Approvals",
+    "employees": "Employees",
+    "settings_path": "Profile › Settings"
   },
   "manager_home": {
     "good_morning": "Good Morning",
@@ -954,7 +969,6 @@
     "assistant_editors_title": "Assistant Editors",
     "tab_today_glance": "Command Center",
     "tab_all_tools": "All Tools",
-    "jolt_bar": "Search or jump to anything…",
     "tile_live_posts": "Live Posts",
     "set_up": "Set up →",
     "back_open_editor": "Open editor",

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -28,11 +28,11 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import ContentDetailModal from '@/components/ContentDetailModal';
 import AmbientGlow from '@/components/AmbientGlow';
+import JoltDockSlot from '@/components/jolt/JoltDockSlot';
 import ScreenHeader from '@/components/ScreenHeader';
 import GlassCard from '@/components/GlassCard';
 import CategorySheet, { CategoryOption } from '@/components/CategorySheet';
 import BottomNavBar from '@/components/BottomNavBar';
-import JoltOverlay, { setJoltDockTarget } from '@/components/JoltOverlay';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getLocalizedField } from '@/utils/translateContent';
 import { useAuth } from '@/contexts/AuthContext';
@@ -136,55 +136,7 @@ export default function GuidesAndTrainingScreen() {
     }
   };
 
-  // ── Jolt FAB docking ───────────────────────────────────────────────────────
-  // Hand the corner bolt this search bar's slot coords so it flies in physically
-  // (same contract as the Manage command center). Clearing the target on blur is
-  // mandatory: otherwise the FAB stays pinned to this screen's coordinates on
-  // whatever tab we return to.
-  const joltSlotRef = useRef<View>(null);
-  const dockActiveRef = useRef(false);
-  const focusEpochRef = useRef(0);
-  // Mirrors dockActiveRef into render so the slot can drop its resting icon only
-  // once the bolt is actually on its way in (a ref alone never re-renders).
-  const [joltDocked, setJoltDocked] = useState(false);
-  const measureAndDock = useCallback(() => {
-    if (dockActiveRef.current) return; // already docked this focus
-    const node = joltSlotRef.current;
-    if (!node || typeof node.measureInWindow !== 'function') return;
-    // measureInWindow is async: without the focus check an in-flight callback
-    // can land AFTER the cleanup and re-arm the module-wide dock target with
-    // coordinates no screen owns any more, stranding the bolt there.
-    const focusedAt = focusEpochRef.current;
-    // Claimed BEFORE the async measure, not inside its callback: onLayout can
-    // fire twice before the first callback resolves, and both would dock.
-    // Released again below if this measure turns out to be too early.
-    dockActiveRef.current = true;
-    node.measureInWindow((x: number, y: number, w: number, h: number) => {
-      if (focusedAt !== focusEpochRef.current) return; // blurred mid-measure
-      if (!w && !h) {
-        dockActiveRef.current = false; // not laid out yet — let a retry through
-        return;
-      }
-      setJoltDockTarget({ x: x + w / 2, y: y + h / 2 });
-      setJoltDocked(true);
-    });
-  }, []);
-
-  useFocusEffect(useCallback(() => {
-    // The slot's own onLayout fires the first attempt; these are the fallback
-    // for when onLayout lands before the window position has settled.
-    // measureAndDock is idempotent (dockActiveRef), so the extra calls are free.
-    const t1 = setTimeout(measureAndDock, 200);
-    const t2 = setTimeout(measureAndDock, 480);
-    return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-      focusEpochRef.current += 1;
-      setJoltDockTarget(null);
-      dockActiveRef.current = false;
-      setJoltDocked(false);
-    };
-  }, [measureAndDock]));
+  // ── Jolt (s87): the search field carries a JoltDockSlot; the root bolt flies in. ──
 
   const openImageModal = (imageUrl: string) => {
     setSelectedImage(imageUrl);
@@ -543,21 +495,7 @@ export default function GuidesAndTrainingScreen() {
 
       <View style={styles.searchRow}>
         <View style={[styles.searchField, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
-          {/* Static slot the Jolt FAB measures and docks into — no transform, or
-              measureInWindow would report the animated position. The magnifier
-              is the slot's RESTING content: if measureInWindow never lands (cold
-              start, slow layout) the bar still reads as a search field instead of
-              a blank indent, and the bolt simply stays in its corner. */}
-          <View ref={joltSlotRef} style={styles.joltSlot} onLayout={measureAndDock}>
-            {!joltDocked && (
-              <IconSymbol
-                ios_icon_name="magnifyingglass"
-                android_material_icon_name="search"
-                size={20}
-                color={colors.textSecondary}
-              />
-            )}
-          </View>
+          <JoltDockSlot id="guides" kind="field" size={30} iconSize={20} />
           <TextInput
             style={[styles.searchInput, { color: colors.text }]}
             placeholder={t('guides_training.search_placeholder')}
@@ -663,7 +601,6 @@ export default function GuidesAndTrainingScreen() {
       )}
 
       <BottomNavBar activeTab="tools" />
-      <JoltOverlay role={isManager ? 'manager' : 'employee'} />
 
       <CategorySheet
         visible={categorySheetVisible}
@@ -749,7 +686,6 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth + 0.5,
     paddingHorizontal: 13,
   },
-  joltSlot: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
   searchInput: {
     flex: 1,
     fontSize: 15,

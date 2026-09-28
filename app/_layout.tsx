@@ -27,6 +27,7 @@ import { LanguageProvider } from "@/contexts/LanguageContext";
 import { ThemeProvider as AppThemeProvider, useAppTheme } from "@/contexts/ThemeContext";
 import { SubscriptionProvider, useSubscription } from "@/contexts/SubscriptionContext";
 import { MiniProfileProvider } from "@/contexts/MiniProfileContext";
+import JoltRoot from "@/components/jolt/JoltRoot";
 import { REVENUECAT_ENABLED, REVENUECAT_API_KEY } from "@/config/revenueCat";
 import { fontAssets } from "@/constants/fonts";
 import { flushPendingSubmits } from "@/utils/exam/pendingSubmits";
@@ -311,6 +312,8 @@ function RootLayoutNav() {
                   <Stack.Screen name="subscription-management" />
                   <Stack.Screen name="paywall" options={{ gestureEnabled: false }} />
                 </Stack>
+                {/* s87: the ONE Jolt bolt, above every screen (see components/jolt/JoltRoot). */}
+                <JoltRoot />
               </MiniProfileProvider>
               <SystemBarsSafe style={resolvedMode === 'dark' ? 'light' : 'dark'} />
             </GestureHandlerRootView>

@@ -27,7 +27,6 @@ import PremiumGate from '@/components/PremiumGate';
 import AmbientGlow from '@/components/AmbientGlow';
 import ScreenHeader from '@/components/ScreenHeader';
 import BottomNavBar from '@/components/BottomNavBar';
-import JoltOverlay from '@/components/JoltOverlay';
 import GameSquareTile from '@/components/game/GameSquareTile';
 import GameBoardCard, { GameBoardRow } from '@/components/game/GameBoardCard';
 import GameHubHeaderAction from '@/components/game/GameHubHeaderAction';
@@ -364,7 +363,6 @@ export default function PictureThisGameScreen() {
       </ScrollView>
 
       <BottomNavBar activeTab="tools" />
-      <JoltOverlay role={isManagerOrOwner(user) ? 'manager' : 'employee'} />
 
       {/* Difficulty → play mode */}
       <GamePickerSheet

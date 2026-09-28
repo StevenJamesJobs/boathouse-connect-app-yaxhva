@@ -56,7 +56,8 @@ export default function ProfileTabs({ value, onChange }: { value: ProfileTab; on
   }, [value]);
 
   return (
-    <GlassCard variant="surface" radius={14} intensity={16} style={styles.wrap}>
+    // s87: the Manage segmented control's form (glass · r13 · 4/4 · 9pt tabs), 11pt under the Jolt bar.
+    <GlassCard variant="glass" radius={13} style={styles.wrap}>
       {measured && (
         <Animated.View
           pointerEvents="none"
@@ -68,7 +69,7 @@ export default function ProfileTabs({ value, onChange }: { value: ProfileTab; on
         const meta = TAB_META[tab];
         return (
           <TouchableOpacity key={tab} style={styles.tab} onLayout={onTabLayout(tab)} onPress={() => onChange(tab)} activeOpacity={0.8}>
-            <IconSymbol ios_icon_name={meta.ios} android_material_icon_name={meta.android} size={16} color={on ? colors.fireText : colors.textSecondary} />
+            <IconSymbol ios_icon_name={meta.ios} android_material_icon_name={meta.android} size={14} color={on ? colors.fireText : colors.textSecondary} />
             <Text style={[styles.label, { color: on ? colors.fireText : colors.textSecondary }]} numberOfLines={1}>
               {t(meta.key)}
             </Text>
@@ -80,8 +81,8 @@ export default function ProfileTabs({ value, onChange }: { value: ProfileTab; on
 }
 
 const styles = StyleSheet.create({
-  wrap: { flexDirection: 'row', padding: 4, gap: 6, marginBottom: 4, position: 'relative' },
-  pill: { position: 'absolute', top: 4, bottom: 4, left: 0, borderRadius: 10 },
-  tab: { flex: 1, height: 34, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, zIndex: 1 },
-  label: { fontFamily: fonts.display.semibold, fontSize: 13 },
+  wrap: { flexDirection: 'row', padding: 4, gap: 4, marginTop: 11, position: 'relative' },
+  pill: { position: 'absolute', top: 4, bottom: 4, left: 0, borderRadius: 9 },
+  tab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 9, paddingHorizontal: 4, borderRadius: 9, zIndex: 1 },
+  label: { fontFamily: fonts.display.semibold, fontSize: 11.5, flexShrink: 1 },
 });

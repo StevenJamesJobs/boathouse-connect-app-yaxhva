@@ -711,7 +711,8 @@
     "member_bottle": "Botella de socio",
     "tasting_notes": "Notas de cata",
     "selling_points": "Puntos de venta",
-    "allergen_note": "Confirma siempre con tu gerencia y cocina los alérgenos y la preparación."
+    "allergen_note": "Confirma siempre con tu gerencia y cocina los alérgenos y la preparación.",
+    "view_recipe": "Ver receta"
   },
   "dietary": {
     "gf_abbrev": "SG",
@@ -893,7 +894,21 @@
     "type_dish": "plato",
     "type_event": "evento",
     "type_announcement": "anuncio",
-    "type_feature": "especial"
+    "type_feature": "especial",
+    "bar": "Busca o ve a cualquier cosa…",
+    "recent": "Recientes",
+    "clear": "Borrar",
+    "kind_all": "Todo",
+    "kind_people": "Personas",
+    "kind_menu": "Menú",
+    "kind_tools": "Herramientas",
+    "kind_posts": "Publicaciones",
+    "kind_settings": "Ajustes",
+    "type_setting": "ajuste",
+    "type_drink": "bebida",
+    "approvals": "Aprobaciones de canje",
+    "employees": "Empleados",
+    "settings_path": "Perfil › Ajustes"
   },
   "manager_home": {
     "good_morning": "Buenos Días",
@@ -954,7 +969,6 @@
     "assistant_editors_title": "Editores de Asistentes",
     "tab_today_glance": "Centro de mando",
     "tab_all_tools": "Herramientas",
-    "jolt_bar": "Busca o ve a cualquier cosa…",
     "tile_live_posts": "Publicaciones activas",
     "set_up": "Configurar →",
     "back_open_editor": "Abrir editor",

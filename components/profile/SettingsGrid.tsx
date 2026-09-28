@@ -28,7 +28,12 @@ import { SETTINGS_TILE_HEIGHT, SETTINGS_SLIDE_MS, SETTINGS_OPEN_DELAY_MS, SETTIN
 
 type Expander = 'notifications' | 'password';
 
-export default function SettingsGrid() {
+/** s87 Jolt deep link: open a fold (`notifications` | `password`) or the language sheet on arrival. */
+export interface SettingsGridProps {
+  openRequest?: { key: string; ts: string };
+}
+
+export default function SettingsGrid({ openRequest }: SettingsGridProps = {}) {
   const colors = useThemeColors();
   const { palette, activePalette, resolvedMode, customAccent } = useAppTheme();
   const { language } = useLanguage();
@@ -92,6 +97,26 @@ export default function SettingsGrid() {
     setOpen(next);
     animate(next);
   };
+
+  // Keyed on the PRIMITIVES: the request object is rebuilt every ProfileHub
+  // render, and an object dep would cancel the timer on any re-render inside
+  // the delay while the done-guard blocked the retry.
+  const openReqKey = openRequest?.key;
+  const openReqTs = openRequest?.ts;
+  const openReqDoneRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!openReqKey || openReqTs === undefined) return;
+    const k = `${openReqKey}:${openReqTs}`;
+    if (openReqDoneRef.current === k) return;
+    openReqDoneRef.current = k;
+    // Let the pager land on the Settings pane first (ProfileHub jumps on `tab`).
+    const t1 = setTimeout(() => {
+      if (openReqKey === 'language') setLangOpen(true);
+      else if ((openReqKey === 'notifications' || openReqKey === 'password') && open !== openReqKey) toggle(openReqKey);
+    }, 420);
+    return () => clearTimeout(t1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openReqKey, openReqTs]);
 
   const themeLabel = palette === 'custom' && customAccent ? t('appearance.theme_custom') : t(`appearance.theme_${palette}`);
   const modeLabel = resolvedMode === 'dark' ? t('appearance.dark_mode') : t('appearance.light_mode');

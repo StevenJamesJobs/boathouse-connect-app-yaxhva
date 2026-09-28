@@ -39,7 +39,6 @@ import ScreenHeader from '@/components/ScreenHeader';
 import GlassSheet, { useSheetHandoff } from '@/components/GlassSheet';
 import MenuSheet from '@/components/MenuSheet';
 import BottomNavBar from '@/components/BottomNavBar';
-import JoltOverlay from '@/components/JoltOverlay';
 import { MenuSeasonTabs } from '@/components/MenuTopArea';
 import { fonts } from '@/constants/fonts';
 
@@ -1357,7 +1356,6 @@ export default function ManageMenuCategoriesScreen() {
       {/* The pushed-editor family chrome: floating nav + Jolt, portal layering. */}
       <BottomNavBar activeTab="menus" />
       <View style={styles.joltLayer} pointerEvents="box-none">
-        <JoltOverlay role="manager" />
       </View>
     </GestureHandlerRootView>
   );

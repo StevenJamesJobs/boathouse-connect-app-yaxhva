@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Jolt Motion Study</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600;700&display=swap">
+<style>
+/* ── page chrome tokens (the studio around the phone) ── */
+:root{
+  --pg-bg:#F2F3F6; --pg-panel:#FFFFFF; --pg-bd:rgba(31,35,52,0.10); --pg-text:#1F2334; --pg-muted:#6B7084;
+  --pg-on:#1F2334; --pg-on-ink:#FFFFFF; --pg-accent:#DC6A2E; --pg-hi:rgba(31,35,52,0.05);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --pg-bg:#0C0D11; --pg-panel:rgba(255,255,255,0.04); --pg-bd:rgba(255,255,255,0.09); --pg-text:#D6D9DE; --pg-muted:#7A818C;
+    --pg-on:#F4F6F8; --pg-on-ink:#15171C; --pg-accent:#F99861; --pg-hi:rgba(255,255,255,0.07); color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --pg-bg:#0C0D11; --pg-panel:rgba(255,255,255,0.04); --pg-bd:rgba(255,255,255,0.09); --pg-text:#D6D9DE; --pg-muted:#7A818C;
+  --pg-on:#F4F6F8; --pg-on-ink:#15171C; --pg-accent:#F99861; --pg-hi:rgba(255,255,255,0.07); color-scheme:dark;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--pg-bg);color:var(--pg-text);font-family:'Inter',system-ui,sans-serif;padding-inline:16px;padding-block:18px 40px;display:flex;flex-direction:column;align-items:center;gap:14px}
+.ttl{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:20px;letter-spacing:-.3px;text-wrap:balance;text-align:center}
+.ttl small{display:block;font-family:'JetBrains Mono',monospace;font-weight:500;font-size:10.5px;letter-spacing:1.2px;text-transform:uppercase;color:var(--pg-muted);margin-top:4px}
+.stage{display:flex;flex-wrap:wrap;gap:18px 26px;justify-content:center;align-items:flex-start;width:100%;max-width:1040px}
+.controls{flex:1 1 300px;max-width:420px;display:flex;flex-direction:column;gap:10px}
+.grp{background:var(--pg-panel);border:1px solid var(--pg-bd);border-radius:16px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.gl{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:1.4px;text-transform:uppercase;color:var(--pg-muted);display:flex;align-items:center;gap:8px}
+.gl .ln{flex:1;height:1px;background:var(--pg-bd)}
+.row{display:flex;flex-wrap:wrap;gap:6px}
+.tb{background:var(--pg-hi);color:var(--pg-text);border:1px solid var(--pg-bd);border-radius:11px;padding:7px 11px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .18s,color .18s;display:inline-flex;align-items:center;gap:6px;line-height:1}
+.tb:hover{background:var(--pg-bd)}
+.tb:focus-visible{outline:2px solid var(--pg-accent);outline-offset:2px}
+.tb.on{background:var(--pg-on);color:var(--pg-on-ink);border-color:var(--pg-on)}
+.tb.go{background:var(--pg-accent);color:#1F2334;border-color:var(--pg-accent)}
+.tb svg{width:14px;height:14px}
+.note{font-size:12px;line-height:1.55;color:var(--pg-muted)}
+.note b{color:var(--pg-text);font-weight:600}
+.readout{font-family:'JetBrains Mono',monospace;font-size:11.5px;line-height:1.6;color:var(--pg-text);background:var(--pg-panel);border:1px solid var(--pg-bd);border-radius:12px;padding:9px 12px;min-height:44px}
+.readout .k{color:var(--pg-accent);font-weight:700}
+.readout .d{color:var(--pg-muted)}
+.rules{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:11.5px;line-height:1.45}
+.rules .c{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--pg-muted);white-space:nowrap}
+.phonewrap{flex:0 0 auto;width:402px;max-width:100%;position:relative}
+.scaler{transform-origin:top left}
+
+/* ── the phone: Moonstone dark, the MyResto default. Single dark world by design. ── */
+.phone{
+  --bg:#141724;--text:#FCFCFC;--muted:#A3A8B8;--primary:#E8EAF0;--fireText:#1F2334;--tint:#F99861;--ember:#B9BDC6;--blue:#8F98B0;--bluetext:#D3D8E6;
+  --glass:rgba(255,255,255,0.07);--glassbd:rgba(255,255,255,0.12);--surf:rgba(255,255,255,0.05);--surfbd:rgba(255,255,255,0.09);--hair:rgba(255,255,255,0.07);
+  --nav:rgba(20,23,36,0.55);--sheen:rgba(255,255,255,0.13);--card:#1E2233;--glowA:rgba(92,106,178,0.36);--glowB:rgba(249,152,97,0.11);
+  --azure:#3B82F6;--violet:#7C5CE0;--emerald:#10A56F;--gold:#F59E0B;--slate:#4A5568;--red:#EF4444;
+  position:relative;width:402px;height:874px;background:var(--bg);color:var(--text);border-radius:52px;border:1px solid #2A2E3E;overflow:hidden;
+  box-shadow:0 40px 90px -30px rgba(0,0,0,0.75);font-family:'Inter',system-ui,sans-serif;user-select:none
+}
+.glow{position:absolute;top:-120px;right:-80px;width:360px;height:320px;border-radius:50%;background:radial-gradient(circle,var(--glowA),rgba(92,106,178,0) 66%);z-index:0;pointer-events:none}
+.glow2{position:absolute;top:-70px;left:-90px;width:300px;height:280px;border-radius:50%;background:radial-gradient(circle,var(--glowB),rgba(249,152,97,0) 68%);z-index:0;pointer-events:none}
+.glow3{position:absolute;bottom:30px;right:-70px;width:240px;height:240px;border-radius:50%;background:radial-gradient(circle,var(--glowB),rgba(249,152,97,0) 70%);z-index:0;pointer-events:none;opacity:.7}
+.sb{position:absolute;left:0;right:0;top:0;height:59px;z-index:8;display:flex;justify-content:space-between;align-items:flex-end;padding:0 34px 8px;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;pointer-events:none}
+.sb .ri{display:flex;gap:6px;align-items:center}
+.sb .ri i{display:block;width:16px;height:9px;border:1.5px solid var(--text);border-radius:3px;position:relative}
+.sb .ri i::after{content:"";position:absolute;left:1px;top:1px;bottom:1px;width:9px;background:var(--text);border-radius:1px}
+
+/* pages: all laid out (so slots can be measured any time), only one shown */
+.pages{position:absolute;inset:0;z-index:2}
+.page{position:absolute;inset:0;padding-top:59px;display:flex;flex-direction:column;opacity:0;visibility:hidden;transition:opacity .16s ease,transform .35s cubic-bezier(.2,.8,.2,1),visibility 0s linear .35s}
+.page.show{opacity:1;visibility:visible;transition:opacity .16s ease,transform .35s cubic-bezier(.2,.8,.2,1),visibility 0s}
+.page.pushin{transform:translateX(100%)}
+.page.pushin.show{transform:none}
+.scroll{flex:1;overflow-y:auto;overflow-x:hidden;padding:0 16px 150px;scrollbar-width:none}
+.scroll::-webkit-scrollbar{display:none}
+
+/* Welcome header (Welcome · Manage · Profile) */
+.head{margin:6px 16px 0;padding:13px 14px;border-radius:20px;background:var(--glass);border:1px solid var(--glassbd);backdrop-filter:blur(18px) saturate(1.4);-webkit-backdrop-filter:blur(18px) saturate(1.4);box-shadow:inset 0 1px 0 var(--sheen)}
+.greet{font-family:'Bricolage Grotesque',sans-serif;font-size:19px;font-weight:700;letter-spacing:-.4px;margin-bottom:11px;padding-left:2px}
+.greet b{color:var(--tint)}
+.hrow{display:flex;align-items:center;gap:9px}
+.av{width:42px;height:42px;border-radius:50%;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;font-family:'Bricolage Grotesque',sans-serif;color:var(--tint);flex-shrink:0}
+.who{flex:1;min-width:0}
+.who .nm{font-family:'Bricolage Grotesque',sans-serif;font-size:14px;font-weight:700}
+.who .jt{font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.5px;margin-top:1px}
+.gb{position:relative;width:38px;height:36px;border-radius:12px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;justify-content:center;color:var(--text);cursor:pointer;flex-shrink:0}
+.gb svg{width:17px;height:17px}
+.dot{position:absolute;top:-5px;right:-5px;min-width:16px;height:16px;border-radius:8px;background:var(--blue);color:var(--bg);font-size:9px;font-weight:700;font-family:'JetBrains Mono',monospace;display:flex;align-items:center;justify-content:center;padding:0 4px}
+
+/* ScreenHeader (pushed screens) */
+.sh{display:flex;align-items:center;gap:10px;padding:10px 16px 12px;min-height:60px}
+.sh .back{width:36px;height:36px;border-radius:12px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
+.sh .back svg{width:16px;height:16px}
+.sh h2{flex:1;min-width:0;font-family:'Bricolage Grotesque',sans-serif;font-size:21px;font-weight:700;letter-spacing:-.4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px;border-radius:12px;background:color-mix(in srgb,var(--tint) 18%,transparent);border:1px solid color-mix(in srgb,var(--tint) 42%,transparent);color:var(--text);font-family:'Bricolage Grotesque',sans-serif;font-weight:600;font-size:12.5px;cursor:pointer;white-space:nowrap}
+.chip svg{width:14px;height:14px;color:var(--tint)}
+
+/* search rows (Guides · Editor · Menu) and the Jolt bar (Manage · Profile) */
+.srow{display:flex;align-items:center;gap:10px;margin:0 16px 12px}
+.field{flex:1;display:flex;align-items:center;gap:11px;height:46px;border-radius:16px;padding:0 13px;background:var(--glass);border:1px solid var(--glassbd)}
+.field span{flex:1;font-size:14px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rbtn{display:flex;align-items:center;justify-content:center;gap:6px;height:46px;padding:0 14px;border-radius:13px;background:var(--glass);border:1px solid var(--glassbd);font-family:'Inter',sans-serif;font-weight:600;font-size:14px;white-space:nowrap}
+.rbtn svg{width:18px;height:18px}
+.rbtn.sq{width:46px;padding:0}
+.joltbar{margin:11px 16px 0;display:flex;align-items:center;gap:11px;background:var(--glass);border:1px solid var(--glassbd);border-radius:15px;padding:11px 14px;backdrop-filter:blur(16px) saturate(1.3);-webkit-backdrop-filter:blur(16px) saturate(1.3);cursor:pointer}
+.joltbar span{font-size:13.5px;color:var(--muted);flex:1}
+/* the dock slot: 30/32pt, resting magnifier + the mini bolt that shows while docked */
+.slot{position:relative;width:32px;height:32px;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.field .slot{width:30px;height:30px}
+.slot .mag{position:absolute;width:20px;height:20px;color:var(--muted);transition:opacity .22s ease}
+.slot .mini{position:absolute;inset:0;border-radius:10px;background:color-mix(in srgb,var(--tint) 17%,transparent);display:flex;align-items:center;justify-content:center;color:var(--tint);opacity:0;transform:scale(.6);transition:opacity .12s ease,transform .12s ease;cursor:pointer}
+.slot .mini svg{width:18px;height:18px}
+.slot.docked .mag{opacity:0}
+.slot.docked .mini{opacity:1;transform:none}
+.slot.docked .mini.landed{animation:landed .7s cubic-bezier(.2,.9,.3,1.2) 1}
+.slot .mini.lift{animation:lift .14s ease-out 1 forwards}
+@keyframes landed{0%{transform:scale(1.14);box-shadow:0 0 20px 4px color-mix(in srgb,var(--tint) 55%,transparent)}100%{transform:none;box-shadow:0 0 0 0 transparent}}
+@keyframes lift{to{transform:scale(1.16);opacity:0}}
+
+/* category / seg tabs */
+.tabs{display:flex;gap:8px;margin:0 16px 12px;overflow:hidden}
+.tabs div{padding:8px 12px;border-radius:11px;background:var(--glass);border:1px solid var(--glassbd);font-family:'Bricolage Grotesque',sans-serif;font-weight:600;font-size:12.5px;color:var(--muted);white-space:nowrap}
+.tabs div.on{color:var(--text);border-bottom:2px solid var(--tint)}
+.seg{margin:12px 16px 0;display:flex;gap:4px;background:var(--glass);border:1px solid var(--glassbd);border-radius:13px;padding:4px}
+.seg div{flex:1;text-align:center;padding:9px 6px;border-radius:9px;font-size:12px;font-weight:600;font-family:'Bricolage Grotesque',sans-serif;color:var(--muted);display:flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap}
+.seg div.on{background:var(--primary);color:var(--fireText)}
+.seg svg{width:14px;height:14px}
+.season{margin:8px 16px 12px;display:flex;gap:6px;background:var(--glass);border:1px solid var(--glassbd);border-radius:13px;padding:4px}
+.season div{flex:1;text-align:center;padding:8px;border-radius:9px;font-family:'Bricolage Grotesque',sans-serif;font-weight:600;font-size:12.5px;color:var(--muted)}
+.season div.on{background:var(--primary);color:var(--fireText)}
+
+/* content bits */
+.zl{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px;margin:16px 2px 11px}
+.zl .ln{flex:1;height:1px;background:var(--hair)}
+.card{background:var(--surf);border:1px solid var(--surfbd);border-radius:16px;padding:13px 14px;backdrop-filter:blur(14px) saturate(1.3);-webkit-backdrop-filter:blur(14px) saturate(1.3);display:flex;flex-direction:column;gap:6px}
+.card h4{font-family:'Bricolage Grotesque',sans-serif;font-size:14.5px;font-weight:700}
+.card p{font-size:12px;color:var(--muted);line-height:1.45}
+.stack{display:flex;flex-direction:column;gap:10px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tile{height:112px;border-radius:16px;border:1px solid var(--surfbd);background:var(--surf);padding:12px;display:flex;flex-direction:column;gap:6px;cursor:pointer;position:relative}
+.tile.t{background:color-mix(in srgb,var(--tint) 11%,transparent);border-color:color-mix(in srgb,var(--tint) 28%,transparent)}
+.tile.a{background:color-mix(in srgb,var(--azure) 11%,transparent);border-color:color-mix(in srgb,var(--azure) 28%,transparent)}
+.tile.v{background:color-mix(in srgb,var(--violet) 11%,transparent);border-color:color-mix(in srgb,var(--violet) 28%,transparent)}
+.tile.e{background:color-mix(in srgb,var(--emerald) 11%,transparent);border-color:color-mix(in srgb,var(--emerald) 28%,transparent)}
+.tile.g{background:color-mix(in srgb,var(--gold) 11%,transparent);border-color:color-mix(in srgb,var(--gold) 28%,transparent)}
+.tile .ic{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;background:var(--glass);border:1px solid var(--glassbd)}
+.tile .ic svg{width:16px;height:16px}
+.tile.t .ic svg{color:var(--tint)}.tile.a .ic svg{color:var(--azure)}.tile.v .ic svg{color:var(--violet)}.tile.e .ic svg{color:var(--emerald)}.tile.g .ic svg{color:var(--gold)}
+.tile h5{font-family:'Bricolage Grotesque',sans-serif;font-size:14px;font-weight:700;margin-top:auto}
+.tile small{font-size:10.5px;color:var(--muted)}
+.tile .chev{position:absolute;right:11px;top:11px;width:14px;height:14px;color:var(--muted)}
+.hero{border-radius:18px;padding:16px;background:linear-gradient(135deg,#7C2D12,#F97316);color:#fff;display:flex;flex-direction:column;gap:6px;min-height:118px}
+.hero .eb{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:1.2px;text-transform:uppercase;color:#FFB07A}
+.hero h3{font-family:'Bricolage Grotesque',sans-serif;font-size:19px;font-weight:700;letter-spacing:-.3px;text-wrap:balance}
+.hero p{font-size:12px;opacity:.85}
+.item{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:14px;background:var(--surf);border:1px solid var(--surfbd)}
+.item .th{width:44px;height:44px;border-radius:11px;background:#232840;flex-shrink:0}
+.item .b{flex:1;min-width:0}
+.item .b b{display:block;font-family:'Bricolage Grotesque',sans-serif;font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .b span{font-size:11px;color:var(--muted)}
+.item .pr{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:var(--tint)}
+.grow{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:var(--surf);border:1px solid var(--surfbd)}
+.grow .gr{width:10px;height:18px;border-left:2px dotted var(--muted);border-right:2px dotted var(--muted);opacity:.6}
+.grow .th{width:53px;height:53px;border-radius:11px;background:#232840;flex-shrink:0}
+.grow .b{flex:1;min-width:0}
+.grow .pill{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.8px;text-transform:uppercase;color:var(--tint);background:color-mix(in srgb,var(--tint) 16%,transparent);border-radius:7px;padding:2px 6px;margin-bottom:3px}
+.grow .b b{display:block;font-family:'Bricolage Grotesque',sans-serif;font-size:13.5px;font-weight:700}
+.grow .b span{font-size:10.5px;color:var(--muted);font-family:'JetBrains Mono',monospace}
+.msg{display:flex;gap:11px;padding:12px;border-radius:14px;background:var(--surf);border:1px solid var(--surfbd)}
+.msg .av{width:38px;height:38px;font-size:12px}
+.msg .b b{display:block;font-size:13.5px;font-family:'Bricolage Grotesque',sans-serif}
+.msg .b span{font-size:12px;color:var(--muted);line-height:1.4}
+
+/* BottomNavBar — floating glass pill, bottom 20 */
+.nav{position:absolute;left:16px;right:16px;bottom:20px;height:70px;z-index:20;border-radius:24px;background:var(--nav);border:1px solid var(--glassbd);backdrop-filter:blur(22px) saturate(1.4);-webkit-backdrop-filter:blur(22px) saturate(1.4);box-shadow:inset 0 1px 0 var(--sheen),0 18px 40px -22px rgba(0,0,0,.8);display:flex;align-items:center;padding:0 8px;transition:opacity .2s ease,transform .3s ease}
+.nav.hide{opacity:0;transform:translateY(24px);pointer-events:none}
+.nav div{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;font-family:'Inter',sans-serif;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;padding:8px 0;border-radius:16px;transition:.18s}
+.nav div svg{width:21px;height:21px}
+.nav div.on{color:var(--fireText);background:var(--primary)}
+.nav div.on svg{color:var(--fireText)}
+
+/* the ONE bolt (root overlay). Home: right 18 · bottom 118 · 56pt. Transforms only. */
+.bolt{position:absolute;right:18px;bottom:118px;width:56px;height:56px;z-index:30;cursor:pointer;will-change:transform,opacity}
+.bolt .fabface,.bolt .minface{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.bolt .fabface{border-radius:50%;background:var(--primary);border:1px solid var(--ember);box-shadow:0 0 18px 2px color-mix(in srgb,var(--tint) 62%,transparent),0 10px 24px -10px rgba(0,0,0,.8);color:var(--fireText)}
+.bolt .fabface svg{width:27px;height:27px}
+.bolt .minface{border-radius:18px;background:color-mix(in srgb,var(--tint) 17%,var(--bg));color:var(--tint);opacity:0}
+.bolt .minface svg{width:31px;height:31px}
+.bolt.hidden{opacity:0;pointer-events:none}
+
+/* palette: scrim + glass box */
+.pal{position:absolute;inset:0;z-index:40;opacity:0;visibility:hidden;transition:opacity .24s ease,visibility 0s linear .24s}
+.pal.open{opacity:1;visibility:visible;transition:opacity .28s ease,visibility 0s}
+.pal .scrim{position:absolute;inset:0;background:rgba(10,9,8,.55)}
+.palbox{position:absolute;left:16px;right:16px;top:115px;border-radius:20px;border:1px solid var(--glassbd);background:color-mix(in srgb,var(--card) 88%,transparent);backdrop-filter:blur(26px) saturate(1.5);-webkit-backdrop-filter:blur(26px) saturate(1.5);box-shadow:inset 0 1px 0 var(--sheen),0 24px 50px rgba(0,0,0,.5);padding:7px;transform:translateY(18px);transition:transform .32s cubic-bezier(.2,.8,.2,1),top .32s cubic-bezier(.2,.8,.2,1),max-height .32s cubic-bezier(.2,.8,.2,1);overflow:hidden;max-height:560px;display:flex;flex-direction:column}
+.pal.open .palbox{transform:none}
+.pal.anchored .palbox{transform:none}
+.palin{display:flex;align-items:center;height:48px;padding-left:46px;padding-right:8px;border-bottom:1px solid var(--hair);gap:8px}
+.palin input{flex:1;min-width:0;background:none;border:0;outline:0;font:15px 'Inter',sans-serif;color:var(--text)}
+.palin input::placeholder{color:var(--muted)}
+.palin .x{width:22px;height:22px;border-radius:11px;background:var(--glass);display:flex;align-items:center;justify-content:center;color:var(--muted);cursor:pointer}
+.palin .x svg{width:11px;height:11px}
+.kinds{display:flex;gap:6px;padding:9px 7px 4px;overflow-x:auto;scrollbar-width:none}
+.kinds::-webkit-scrollbar{display:none}
+.kinds div{flex-shrink:0;font-family:'Bricolage Grotesque',sans-serif;font-weight:600;font-size:11.5px;padding:6px 11px;border-radius:11px;border:1px solid var(--glassbd);background:var(--glass);color:var(--muted);cursor:pointer;white-space:nowrap}
+.kinds div.on{color:var(--tint);background:color-mix(in srgb,var(--tint) 12%,transparent);border-color:color-mix(in srgb,var(--tint) 24%,transparent)}
+.palscroll{overflow-y:auto;scrollbar-width:none;flex:1;min-height:0}
+.palscroll::-webkit-scrollbar{display:none}
+.eb{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);padding:10px 12px 3px;display:flex;align-items:center;gap:8px}
+.eb .ln{flex:1;height:1px;background:var(--hair)}
+.eb .act{color:var(--tint);letter-spacing:.4px;cursor:pointer}
+.res{display:flex;align-items:center;gap:11px;padding:8px 10px;border-radius:12px;cursor:pointer}
+.res:hover{background:var(--glass)}
+.res .disc{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:color-mix(in srgb,var(--h) 16%,transparent);color:var(--h)}
+.res .disc svg{width:16px;height:16px}
+.res .rb{flex:1;min-width:0}
+.res .rb b{display:block;font-family:'Inter',sans-serif;font-weight:500;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.res .rb b mark{background:none;color:var(--tint);font-weight:600}
+.res .rb span{display:block;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.res .ty{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);flex-shrink:0}
+.empty{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted);text-align:center;padding:26px 0}
+@media (prefers-reduced-motion: reduce){
+  .page,.palbox,.nav,.slot .mini,.slot .mag{transition:none!important;animation:none!important}
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+ <defs>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2 4 14h6l-1 8 9-12h-6z" fill="currentColor"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.6-4.6"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 5-7 7 7 7"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m3 7 9 6 9-6"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3 3 11h2.5v9h5v-6h3v6h5v-9H21z"/></symbol>
+  <symbol id="i-fork" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M7 3v7a2.5 2.5 0 0 0 5 0V3M9.5 3v18M17 3c-1.7 1.6-2.5 4-2.5 7 0 1.5.5 2.3 1.5 3v8"/></symbol>
+  <symbol id="i-wrench" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4.5a4.5 4.5 0 0 0 5.2 6.2L13 17.4 6.6 11l6.7-6.7z"/><path d="m4 20 3-3"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="2" fill="var(--bg)"/><circle cx="15" cy="12" r="2" fill="var(--bg)"/><circle cx="8" cy="17" r="2" fill="var(--bg)"/></symbol>
+  <symbol id="i-person" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7z"/></symbol>
+  <symbol id="i-people" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="8" r="3.5"/><circle cx="17" cy="9" r="2.8"/><path d="M2 20c0-3.6 3.1-6 7-6s7 2.4 7 6zM16 20c0-2.3-.9-4.1-2.3-5.4A5.5 5.5 0 0 1 22 19v1z"/></symbol>
+  <symbol id="i-pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="m4 20 4-1L19 8l-3-3L5 16z"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19a2 2 0 0 1 2-2h13"/></symbol>
+  <symbol id="i-game" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="11" rx="5"/><path d="M8 11v3M6.5 12.5h3M16 12h.01M18 14h.01"/></symbol>
+  <symbol id="i-quiz" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M9 9a3 3 0 1 1 4.5 2.6c-1 .6-1.5 1.2-1.5 2.4"/><path d="M12 17.5h.01"/><circle cx="12" cy="12" r="9.5"/></symbol>
+  <symbol id="i-cash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="6" width="18" height="12" rx="2.5"/><circle cx="12" cy="12" r="2.6"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24" fill="currentColor"><path d="m12 2.5 2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4 6.1 20.5l1.2-6.5L2.5 9.4l6.6-.9z"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></symbol>
+  <symbol id="i-filter" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M4 6h16M7 12h10M10 18h4"/></symbol>
+  <symbol id="i-cal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></symbol>
+  <symbol id="i-mega" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4h3l7 4V6l-7 4z"/><path d="M17 9a4 4 0 0 1 0 6"/></symbol>
+  <symbol id="i-key" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="14" r="4"/><path d="m11 11 9-9M17 5l2 2M14.5 7.5 17 10"/></symbol>
+  <symbol id="i-paint" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 0 0 0 18c1.4 0 2-.9 2-2 0-.6-.3-1-.6-1.4-.4-.5-.4-1.6.6-1.6H16a5 5 0 0 0 5-5c0-4.4-4-8-9-8z"/><circle cx="8" cy="10" r="1.2" fill="currentColor"/><circle cx="12" cy="7" r="1.2" fill="currentColor"/><circle cx="16" cy="10" r="1.2" fill="currentColor"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2-3 14.8 0 18"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-glass" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l-1 8a5 5 0 0 1-10 0z"/><path d="M12 16v5M8 21h8"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l13-8z"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></symbol>
+ </defs>
+</svg>
+
+<div class="ttl">Jolt Motion Study<small>s87 · the relay · one bolt, many bars</small></div>
+
+<div class="stage">
+ <div class="controls">
+  <div class="grp">
+   <div class="gl">Bar → bar policy<span class="ln"></span></div>
+   <div class="row">
+    <button class="tb on" id="polB" type="button">Planted &amp; glide</button>
+    <button class="tb" id="polA" type="button">Fly home &amp; back</button>
+   </div>
+   <div class="note"><b>Planted</b>: same spot → nothing moves; different spot → one direct glide. <b>Home &amp; back</b>: the bolt always returns to its corner first, then flies up.</div>
+  </div>
+  <div class="grp">
+   <div class="gl">Palette opens<span class="ln"></span></div>
+   <div class="row">
+    <button class="tb on" id="ancTop" type="button">At the top</button>
+    <button class="tb" id="ancBar" type="button">Anchored on the bar</button>
+   </div>
+   <div class="note"><b>Top</b>: today's box under the header; a docked bolt flies into it. <b>Anchored</b>: the bar itself grows into the palette and the bolt never moves.</div>
+  </div>
+  <div class="grp">
+   <div class="gl">Speed &amp; motion<span class="ln"></span></div>
+   <div class="row">
+    <button class="tb on" data-speed="1" type="button">1×</button>
+    <button class="tb" data-speed="2" type="button">½×</button>
+    <button class="tb" data-speed="4" type="button">¼×</button>
+    <button class="tb" id="rm" type="button">Reduce Motion</button>
+   </div>
+   <div class="row">
+    <button class="tb go" id="tour" type="button"><svg><use href="#i-play"/></svg>Play the tour</button>
+    <button class="tb" id="reset" type="button">Reset</button>
+   </div>
+   <div class="note">The tour walks Welcome → Tools → Guides → Editor → Manage → Menus → Profile → Messages → Welcome. Tap around the phone yourself, too: tabs, the Guides tile, To Editor, the mail icon, any bolt.</div>
+  </div>
+  <div class="readout" id="readout"><span class="k">Ready.</span> <span class="d">Tap a tab or press Play.</span></div>
+  <div class="grp">
+   <div class="gl">The rules on screen<span class="ln"></span></div>
+   <div class="rules">
+    <span class="c">no bar → bar</span><span>fly up from home once the bar measures, settle</span>
+    <span class="c">bar → no bar</span><span>lift out of the slot, fly home, magnifier fades back</span>
+    <span class="c">bar → bar</span><span>per the policy above</span>
+    <span class="c">→ no Jolt</span><span>fade out in place (Messages); fade back in on return</span>
+    <span class="c">reduce motion</span><span>cross-fade instead of flight</span>
+   </div>
+  </div>
+ </div>
+
+ <div class="phonewrap" id="phonewrap">
+ <div class="scaler" id="scaler">
+ <div class="phone" id="phone">
+  <div class="glow"></div><div class="glow2"></div><div class="glow3"></div>
+  <div class="sb"><span>9:41</span><span class="ri"><span>●●●</span><i></i></span></div>
+  <div class="pages" id="pages">
+   <!-- WELCOME (tab) -->
+   <div class="page show" data-page="welcome">
+    <div class="head">
+     <div class="greet">Good evening, <b>Steve</b></div>
+     <div class="hrow"><div class="av">SE</div><div class="who"><div class="nm">Steven Eccles</div><div class="jt">Owner · Robinson Ale House</div></div>
+      <div class="gb" data-go="messages"><svg><use href="#i-mail"/></svg><span class="dot">3</span></div><div class="gb"><svg><use href="#i-bell"/></svg></div></div>
+    </div>
+    <div class="scroll">
+     <div class="zl">Today <span class="ln"></span></div>
+     <div class="stack">
+      <div class="card"><h4>Your next shift</h4><p>Tomorrow · 4:00 PM – 11:00 PM · Bartender · Main bar</p></div>
+      <div class="hero"><div class="eb">Announcement · New</div><h3>Oktoberfest on the deck</h3><p>Saturday. Steins, brats, and the pretzel cart. Read the run-of-show before your shift.</p></div>
+      <div class="card"><h4>Pick up a shift</h4><p>2 open shifts this week · Sat patio · Sun brunch</p></div>
+      <div class="card"><h4>Quiz waiting</h4><p>Fall cocktails · 8 questions · $1 per correct</p></div>
+     </div>
+    </div>
+   </div>
+
+   <!-- MENUS (tab) — MenuSearchRow docks the bolt -->
+   <div class="page" data-page="menus">
+    <div class="season"><div class="on">Winter</div><div>Summer</div></div>
+    <div class="srow"><div class="field"><div class="slot" data-slot="menu"><svg class="mag"><use href="#i-search"/></svg><div class="mini" data-bolt><svg><use href="#i-bolt"/></svg></div></div><span>Search the menu…</span></div><div class="rbtn"><svg><use href="#i-filter"/></svg>Filter</div></div>
+    <div class="tabs"><div class="on">Starters</div><div>Mains</div><div>Libations</div><div>Desserts</div><div>Wine</div></div>
+    <div class="scroll">
+     <div class="stack">
+      <div class="item"><div class="th"></div><div class="b"><b>Crab Cakes</b><span>Jumbo lump, remoulade, slaw</span></div><div class="pr">$19</div></div>
+      <div class="item"><div class="th"></div><div class="b"><b>Clam Chowder</b><span>New England, oyster crackers</span></div><div class="pr">$11</div></div>
+      <div class="item"><div class="th"></div><div class="b"><b>Tropical Old Fashioned</b><span>Libations › Cocktails</span></div><div class="pr">$15</div></div>
+      <div class="item"><div class="th"></div><div class="b"><b>Lobster Roll</b><span>Warm butter, brioche, fries</span></div><div class="pr">$32</div></div>
+      <div class="item"><div class="th"></div><div class="b"><b>Wagyu Burger</b><span>Aged cheddar, onion jam</span></div><div class="pr">$24</div></div>
+     </div>
+    </div>
+   </div>
+
+   <!-- TOOLS (tab) — no bar; bolt at home -->
+   <div class="page" data-page="tools">
+    <div class="sh" style="padding-left:18px"><h2>Tools</h2></div>
+    <div class="scroll">
+     <div class="hero"><div class="eb">Guides · 2 new</div><h3>Fall cocktail specs are live</h3><p>Tropical Old Fashioned and the Peach Spritz build sheets.</p></div>
+     <div class="zl">Learn &amp; play <span class="ln"></span></div>
+     <div class="grid">
+      <div class="tile t" data-go="guides"><div class="ic"><svg><use href="#i-book"/></svg></div><svg class="chev"><use href="#i-chev"/></svg><h5>Guides &amp; Training</h5><small>50 guides · 2 new</small></div>
+      <div class="tile a"><div class="ic"><svg><use href="#i-game"/></svg></div><svg class="chev"><use href="#i-chev"/></svg><h5>Game Hub</h5><small>Rank #4 this week</small></div>
+      <div class="tile v"><div class="ic"><svg><use href="#i-quiz"/></svg></div><svg class="chev"><use href="#i-chev"/></svg><h5>Quizzes &amp; Exams</h5><small>1 waiting</small></div>
+      <div class="tile e"><div class="ic"><svg><use href="#i-cash"/></svg></div><svg class="chev"><use href="#i-chev"/></svg><h5>Tips &amp; Checkouts</h5><small>$1,240 this week</small></div>
+     </div>
+    </div>
+   </div>
+
+   <!-- MANAGE (tab) — the Jolt bar docks the bolt; whole bar opens the palette -->
+   <div class="page" data-page="manage">
+    <div class="head">
+     <div class="greet">Command <b>Center</b></div>
+     <div class="hrow"><div class="av">SE</div><div class="who"><div class="nm">Steven Eccles</div><div class="jt">Owner · Robinson Ale House</div></div><div class="gb" data-go="messages"><svg><use href="#i-mail"/></svg><span class="dot">3</span></div><div class="gb"><svg><use href="#i-bell"/></svg></div></div>
+    </div>
+    <div class="joltbar" data-openpal><div class="slot" data-slot="manage"><svg class="mag"><use href="#i-search"/></svg><div class="mini" data-bolt><svg><use href="#i-bolt"/></svg></div></div><span>Search or jump to anything…</span></div>
+    <div class="seg"><div class="on"><svg><use href="#i-grid"/></svg>Command Center</div><div><svg><use href="#i-wrench"/></svg>All Tools</div><div><svg><use href="#i-people"/></svg>Employees</div></div>
+    <div class="scroll">
+     <div class="grid" style="margin-top:12px">
+      <div class="tile g"><div class="ic"><svg><use href="#i-star"/></svg></div><h5>Approvals</h5><small>2 redemptions waiting</small></div>
+      <div class="tile t"><div class="ic"><svg><use href="#i-cal"/></svg></div><h5>Today's roster</h5><small>AM 6 · PM 11</small></div>
+      <div class="tile a"><div class="ic"><svg><use href="#i-people"/></svg></div><h5>Employees</h5><small>34 active</small></div>
+      <div class="tile v"><div class="ic"><svg><use href="#i-mega"/></svg></div><h5>Announcements</h5><small>1 live · 1 scheduled</small></div>
+     </div>
+    </div>
+   </div>
+
+   <!-- PROFILE (tab) — NEW Jolt bar above the capsule -->
+   <div class="page" data-page="profile">
+    <div class="head">
+     <div class="greet">Good evening, <b>Steve</b></div>
+     <div class="hrow"><div class="av">SE</div><div class="who"><div class="nm">Steven Eccles</div><div class="jt">Owner · Robinson Ale House</div></div><div class="gb" data-go="messages"><svg><use href="#i-mail"/></svg><span class="dot">3</span></div><div class="gb"><svg><use href="#i-bell"/></svg></div></div>
+    </div>
+    <div class="joltbar" data-openpal><div class="slot" data-slot="profile"><svg class="mag"><use href="#i-search"/></svg><div class="mini" data-bolt><svg><use href="#i-bolt"/></svg></div></div><span>Search or jump to anything…</span></div>
+    <div class="seg"><div class="on"><svg><use href="#i-grid"/></svg>My Hub</div><div><svg><use href="#i-person"/></svg>My Info</div><div><svg><use href="#i-gear"/></svg>Settings</div></div>
+    <div class="scroll">
+     <div class="grid" style="margin-top:12px">
+      <div class="tile e"><div class="ic"><svg><use href="#i-cash"/></svg></div><h5>Tips</h5><small>This week $1,240</small></div>
+      <div class="tile t"><div class="ic"><svg><use href="#i-cal"/></svg></div><h5>My Schedule</h5><small>Next · Tomorrow 4 PM</small></div>
+      <div class="tile a"><div class="ic"><svg><use href="#i-game"/></svg></div><h5>Game Hub</h5><small>Rank #4</small></div>
+      <div class="tile g"><div class="ic"><svg><use href="#i-star"/></svg></div><h5>Rewards</h5><small>$42 Bucks</small></div>
+     </div>
+    </div>
+   </div>
+
+   <!-- GUIDES & TRAINING (pushed, tab=tools) -->
+   <div class="page pushin" data-page="guides">
+    <div class="sh"><div class="back" data-go="pop"><svg><use href="#i-back"/></svg></div><h2>Guides &amp; Training</h2><div class="chip" data-go="editor"><svg><use href="#i-pencil"/></svg>To Editor</div></div>
+    <div class="srow"><div class="field"><div class="slot" data-slot="guides"><svg class="mag"><use href="#i-search"/></svg><div class="mini" data-bolt><svg><use href="#i-bolt"/></svg></div></div><span>Search guides…</span></div><div class="rbtn"><svg><use href="#i-filter"/></svg>All</div></div>
+    <div class="tabs"><div class="on">All</div><div>Cocktails</div><div>Service</div><div>Kitchen</div><div>Safety</div></div>
+    <div class="scroll">
+     <div class="stack">
+      <div class="grow"><div class="th"></div><div class="b"><span class="pill">Cocktails</span><b>Tropical Old Fashioned build</b><span>PDF · updated today</span></div></div>
+      <div class="grow"><div class="th"></div><div class="b"><span class="pill">Service</span><b>Steps of service</b><span>Video · 6 min</span></div></div>
+      <div class="grow"><div class="th"></div><div class="b"><span class="pill">Safety</span><b>Allergen matrix</b><span>PDF · 4 pages</span></div></div>
+      <div class="grow"><div class="th"></div><div class="b"><span class="pill">Kitchen</span><b>Line setup, PM</b><span>Photo guide</span></div></div>
+     </div>
+    </div>
+   </div>
+
+   <!-- GUIDES EDITOR (pushed, tab=manage) — same bar geometry as the user page -->
+   <div class="page pushin" data-page="editor">
+    <div class="sh"><div class="back" data-go="pop"><svg><use href="#i-back"/></svg></div><h2>Guides Editor</h2><div class="chip" data-go="guides"><svg><use href="#i-person"/></svg>To User</div></div>
+    <div class="srow"><div class="field"><div class="slot" data-slot="guides"><svg class="mag"><use href="#i-search"/></svg><div class="mini" data-bolt><svg><use href="#i-bolt"/></svg></div></div><span>Search guides…</span></div><div class="rbtn sq"><svg><use href="#i-filter"/></svg></div></div>
+    <div class="tabs"><div class="on">All</div><div>Cocktails</div><div>Service</div><div>Kitchen</div><div>Safety</div></div>
+    <div class="scroll">
+     <div class="stack">
+      <div class="grow"><div class="gr"></div><div class="th"></div><div class="b"><span class="pill">Cocktails</span><b>Tropical Old Fashioned build</b><span>PDF · visible</span></div></div>
+      <div class="grow"><div class="gr"></div><div class="th"></div><div class="b"><span class="pill">Service</span><b>Steps of service</b><span>Video · visible</span></div></div>
+      <div class="grow"><div class="gr"></div><div class="th"></div><div class="b"><span class="pill">Safety</span><b>Allergen matrix</b><span>PDF · hidden</span></div></div>
+      <div class="grow"><div class="gr"></div><div class="th"></div><div class="b"><span class="pill">Kitchen</span><b>Line setup, PM</b><span>Photo · visible</span></div></div>
+     </div>
+    </div>
+   </div>
+
+   <!-- MESSAGES (pushed, no nav bar, no Jolt) -->
+   <div class="page pushin" data-page="messages">
+    <div class="sh"><div class="back" data-go="pop"><svg><use href="#i-back"/></svg></div><h2>Messages</h2></div>
+    <div class="scroll">
+     <div class="stack">
+      <div class="msg"><div class="av">DD</div><div class="b"><b>Daisy Dukes</b><span>Can I swap Saturday patio for Sunday brunch?</span></div></div>
+      <div class="msg"><div class="av">NZ</div><div class="b"><b>Nina Zebra</b><span>Oktoberfest run-of-show is in Guides now.</span></div></div>
+      <div class="msg"><div class="av">SF</div><div class="b"><b>Sam Fields</b><span>Peach Spritz spec — is it 1.5 or 2 oz?</span></div></div>
+     </div>
+    </div>
+   </div>
+  </div><!-- /pages -->
+
+  <div class="nav" id="nav">
+   <div data-tab="welcome" class="on"><svg><use href="#i-home"/></svg>Welcome</div>
+   <div data-tab="menus"><svg><use href="#i-fork"/></svg>Menus</div>
+   <div data-tab="tools"><svg><use href="#i-wrench"/></svg>Tools</div>
+   <div data-tab="manage"><svg><use href="#i-sliders"/></svg>Manage</div>
+   <div data-tab="profile"><svg><use href="#i-person"/></svg>Profile</div>
+  </div>
+
+  <div class="bolt" id="bolt"><div class="fabface"><svg><use href="#i-bolt"/></svg></div><div class="minface"><svg><use href="#i-bolt"/></svg></div></div>
+
+  <div class="pal" id="pal">
+   <div class="scrim" id="scrim"></div>
+   <div class="palbox" id="palbox">
+    <div class="palin"><input id="q" type="text" placeholder="Search anything — people, menu, tools." autocomplete="off"><div class="x" id="qx"><svg><use href="#i-x"/></svg></div></div>
+    <div class="kinds" id="kinds"><div class="on" data-kind="all">All</div><div data-kind="person">People</div><div data-kind="menu">Menu</div><div data-kind="tool">Tools</div><div data-kind="post">Posts</div><div data-kind="setting">Settings</div></div>
+    <div class="palscroll" id="palscroll"></div>
+   </div>
+  </div>
+ </div><!-- /phone -->
+ </div>
+ </div>
+</div>
+<style>.page.still{transform:none!important}</style>
+<script>
+(function(){
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const phone=$('#phone'), pages=$('#pages'), bolt=$('#bolt'), fabf=bolt.querySelector('.fabface'), minf=bolt.querySelector('.minface');
+const nav=$('#nav'), pal=$('#pal'), palbox=$('#palbox'), q=$('#q'), palscroll=$('#palscroll'), readout=$('#readout');
+const W=402,H=874, HOME={x:W-18-28,y:H-118-28}, MINI=32/56, BOX_TOP=115, PAL_ICON={x:46,y:BOX_TOP+7+24};
+const PAGE_SLOT={menus:'menu',manage:'manage',profile:'profile',guides:'guides',editor:'guides'};
+const TAB_OF={guides:'tools',editor:'manage',messages:null};
+const NO_JOLT=new Set(['messages']);
+let policy='B', anchor='top', speedMul=1, reduce=false, scale=1;
+let cur='welcome', tab='welcome';
+const spd=()=>speedMul;
+
+/* ── scaling ── */
+function fit(){const wrap=$('#phonewrap');scale=Math.min(1,wrap.clientWidth/W);$('#scaler').style.transform=`scale(${scale})`;wrap.style.height=(H*scale)+'px';}
+window.addEventListener('resize',fit);fit();
+
+/* ── readout ── */
+function log(k,d){readout.innerHTML=`<span class="k">${k}</span> <span class="d">${d||''}</span>`;}
+
+/* ── geometry ── */
+function center(el){const r=el.getBoundingClientRect(),p=phone.getBoundingClientRect();return{x:(r.left-p.left)/scale+r.width/scale/2,y:(r.top-p.top)/scale+r.height/scale/2};}
+const pageEl=k=>pages.querySelector(`[data-page="${k}"]`);
+const slotEl=k=>pageEl(k)&&pageEl(k).querySelector('[data-slot]');
+const slotCenter=k=>center(slotEl(k));
+const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+
+/* ── the flyer (root bolt) ── */
+let pos={x:HOME.x,y:HOME.y,s:1,m:0}, raf=null, flightDone=null;
+function place(p){pos=p;bolt.style.transform=`translate(${p.x-HOME.x}px,${p.y-HOME.y}px) scale(${p.s})`;fabf.style.opacity=1-p.m;minf.style.opacity=p.m;}
+function showFlyer(on){bolt.classList.toggle('hidden',!on);}
+function fadeFlyer(on,ms){bolt.style.transition=`opacity ${ms}ms ease`;bolt.classList.toggle('hidden',!on);setTimeout(()=>bolt.style.transition='',ms+20);}
+const easeOut=t=>1-Math.pow(1-t,3);
+function fly(to,ms,arc,cb){
+  if(raf){cancelAnimationFrame(raf);raf=null;}
+  const from={...pos}, dur=ms*spd();
+  if(reduce){ // cross-fade instead of flight
+    fadeFlyer(false,120*spd());
+    later(()=>{place({...to});fadeFlyer(true,120*spd());later(()=>{flightDone=null;cb&&cb();},130*spd());},130*spd());
+    return;
+  }
+  const d=dist(from,to), mx=(from.x+to.x)/2, my=(from.y+to.y)/2;
+  let nx=(to.y-from.y)/(d||1), ny=-(to.x-from.x)/(d||1); // perpendicular
+  if(ny>0){nx=-nx;ny=-ny;} // arc rises above the straight line
+  const cx=mx+nx*arc*d, cy=my+ny*arc*d, t0=performance.now();
+  flightDone=cb;
+  const step=now=>{
+    const t=Math.min(1,(now-t0)/dur), e=easeOut(t), u=1-e;
+    const x=u*u*from.x+2*u*e*cx+e*e*to.x, y=u*u*from.y+2*u*e*cy+e*e*to.y;
+    place({x,y,s:from.s+(to.s-from.s)*e,m:from.m+(to.m-from.m)*e});
+    if(t<1) raf=requestAnimationFrame(step); else {raf=null;flightDone=null;cb&&cb();}
+  };
+  raf=requestAnimationFrame(step);
+}
+
+/* ── slots ── */
+function dockInto(k,{quiet}={}){const s=slotEl(k);if(!s)return;s.classList.add('docked');const m=s.querySelector('.mini');m.classList.remove('lift');if(!quiet&&!reduce){m.classList.add('landed');setTimeout(()=>m.classList.remove('landed'),720);}showFlyer(false);}
+function undock(k,{lift}={}){const s=slotEl(k);if(!s)return;const m=s.querySelector('.mini');if(lift&&!reduce){m.classList.add('lift');setTimeout(()=>{s.classList.remove('docked');m.classList.remove('lift');},150*spd());}else{s.classList.remove('docked');}}
+
+/* ── the engine ── */
+// dockedPage = the page whose slot currently shows the mini bolt (the bolt "rests" there).
+// Every navigation cancels the previous plan (timers + flight) and re-plans from wherever
+// the flyer is right now — a thumb never has to wait for a flight to finish.
+let dockedPage=null, vis=true, plan=null, navTimers=[], homeFlight=false, pendingUp=null;
+const later=(f,ms)=>{const t=setTimeout(f,ms);navTimers.push(t);return t;};
+function cancelPlan(){navTimers.forEach(clearTimeout);navTimers=[];if(raf){cancelAnimationFrame(raf);raf=null;}flightDone=null;plan=null;pendingUp=null;homeFlight=false;}
+function goHome(){homeFlight=true;fly({x:HOME.x,y:HOME.y,s:1,m:0},440,0.16,()=>{homeFlight=false;if(pendingUp){const to=pendingUp;pendingUp=null;later(()=>flyUp(to,380),120*spd());}});}
+function flyUp(to,ms){const b=slotCenter(to);fly({x:b.x,y:b.y,s:MINI,m:1},ms,ms===380?0.18:0.12,()=>{if(cur===to){dockInto(to);dockedPage=to;}});}
+function onLeave(from,to,dur){
+  cancelPlan();
+  const toSlot=!!PAGE_SLOT[to], toJolt=!NO_JOLT.has(to), title=`${name(from)} → ${name(to)}`;
+  if(!toJolt){ if(dockedPage){showFlyer(false);dockedPage=null;} else fadeFlyer(false,160*spd()); vis=false; log(title,'no Jolt here · fade out in place, 160 ms'); return; }
+  if(!vis){ plan='fadein'; return; }
+  if(dockedPage){
+    const a=slotCenter(dockedPage);
+    if(toSlot&&policy==='B'&&dist(a,slotCenter(to))<4){ undock(dockedPage,{}); dockInto(to,{quiet:true}); dockedPage=to; log(title,'same spot · nothing moves'); return; }
+    const lift=!toSlot||policy==='A';
+    undock(dockedPage,{lift}); place({x:a.x,y:a.y,s:MINI,m:1}); showFlyer(true); dockedPage=null;
+    if(lift){ later(goHome,120*spd()); plan=toSlot?'A':null; log(title,toSlot?'home & back · fly home 440 ms, pause, fly up 380 ms':'bar → no bar · lift, fly home 440 ms'); return; }
+    plan='glide'; log(title,'bar → bar · one glide, 360 ms, once the bar measures'); return;
+  }
+  // mid-air (interrupted flight) or at home
+  if(toSlot){ plan='up'; log(title,'no bar → bar · fly up 380 ms once the bar measures'); return; }
+  if(dist(pos,HOME)>1){ goHome(); log(title,'interrupted · back home'); return; }
+  log(title,'no bar → no bar · the bolt stays home');
+}
+function onArrive(to){
+  if(cur!==to) return;
+  const toSlot=!!PAGE_SLOT[to];
+  if(plan==='fadein'){ vis=true; plan=null; if(toSlot){dockInto(to,{quiet:true});dockedPage=to;log(name(to),'back from Messages · fades in, docked');} else {place({x:HOME.x,y:HOME.y,s:1,m:0});fadeFlyer(true,160*spd());log(name(to),'back from Messages · fades in at home');} return; }
+  if(plan==='A'){ plan=null; if(homeFlight) pendingUp=to; else later(()=>flyUp(to,380),120*spd()); return; }
+  if(plan==='up'){ plan=null; flyUp(to,380); return; }
+  if(plan==='glide'){ plan=null; flyUp(to,360); return; }
+}
+const NAMES={welcome:'Welcome',menus:'Menus',tools:'Tools',manage:'Manage',profile:'Profile',guides:'Guides',editor:'Editor',messages:'Messages'};
+const name=k=>NAMES[k]||k;
+
+/* ── navigation ── */
+function navigate(target,kind){
+  if(target===cur) return;
+  if(pal.classList.contains('open')) closePal(true);
+  const from=cur, fromEl=pageEl(from), toEl=pageEl(target);
+  const pushed=k=>TAB_OF[k]!==undefined;
+  const dur=(kind==='tab'&&!pushed(from))?160:350;
+  fromEl.classList.remove('still');
+  if(kind==='pop'||(kind==='tab'&&pushed(from))){ // old slides out over the new
+    toEl.classList.add('show'); fromEl.classList.remove('show');
+  } else if(kind==='replace'){ fromEl.classList.add('still'); toEl.classList.add('show'); setTimeout(()=>fromEl.classList.remove('show'),40);
+  } else { toEl.classList.add('show'); setTimeout(()=>{if(cur!==from)fromEl.classList.remove('show');},dur+20); }
+  cur=target; tab=pushed(target)?(TAB_OF[target]||tab):target;
+  $$('#nav div').forEach(d=>d.classList.toggle('on',d.dataset.tab===tab));
+  nav.classList.toggle('hide',NO_JOLT.has(target));
+  onLeave(from,target,dur);
+  later(()=>onArrive(target),(dur+200)*spd());
+}
+$$('#nav div').forEach(d=>d.addEventListener('click',()=>navigate(d.dataset.tab,'tab')));
+pages.addEventListener('click',e=>{const g=e.target.closest('[data-go]');if(!g)return;const to=g.dataset.go;
+  if(to==='pop') navigate(tab,'pop'); else if(to==='messages') navigate('messages','push'); else if(cur==='guides'||cur==='editor') navigate(to,'replace'); else navigate(to,'push');});
+
+/* ── palette ── */
+let palFrom=null; // where the bolt came from: 'home' | slot page key
+function openPal(){
+  if(pal.classList.contains('open')) return;
+  const docked=!!dockedPage, anchored=anchor==='bar'&&docked;
+  pal.classList.toggle('anchored',anchored);
+  if(anchored){ const a=slotCenter(cur); palbox.style.transition='none'; palbox.style.top=(a.y-31)+'px'; palbox.style.maxHeight='62px';
+    undock(cur,{}); place({x:a.x,y:a.y,s:MINI,m:1}); showFlyer(true); palFrom=cur;
+    requestAnimationFrame(()=>{palbox.style.transition='';palbox.style.maxHeight='560px';});
+    log('Palette · anchored on the bar','the bar grows into the palette; the bolt never moves');
+  } else { palbox.style.top=BOX_TOP+'px'; palbox.style.maxHeight='560px';
+    if(docked){ const a=slotCenter(cur); undock(cur,{}); place({x:a.x,y:a.y,s:MINI,m:1}); showFlyer(true); palFrom=cur; }
+    else palFrom='home';
+    fly({x:PAL_ICON.x,y:PAL_ICON.y,s:MINI,m:1},320,0.14,null);
+    log('Palette · at the top',docked?'the docked bolt flies into the palette box':'the bolt flies up into the palette box');
+  }
+  pal.classList.add('open'); q.value=''; renderPal(); setTimeout(()=>q.focus(),340);
+}
+function closePal(instant){
+  pal.classList.remove('open'); q.blur();
+  const back=palFrom; palFrom=null;
+  if(back==='home'){ if(instant) place({x:HOME.x,y:HOME.y,s:1,m:0}); else fly({x:HOME.x,y:HOME.y,s:1,m:0},240,0.14,null); }
+  else if(back){ if(instant||pal.classList.contains('anchored')){ showFlyer(false); if(cur===back) dockInto(back,{quiet:true}); }
+    else { const a=slotCenter(back); fly({x:a.x,y:a.y,s:MINI,m:1},240,0.14,()=>{ if(cur===back) dockInto(back,{quiet:true}); }); } }
+}
+bolt.addEventListener('click',()=>{ if(!pal.classList.contains('open')) openPal(); });
+pages.addEventListener('click',e=>{ if(e.target.closest('[data-bolt]')||e.target.closest('[data-openpal]')){ e.stopPropagation(); openPal(); } },true);
+$('#scrim').addEventListener('click',()=>closePal(false));
+$('#qx').addEventListener('click',()=>{ if(q.value){q.value='';renderPal();q.focus();} else closePal(false); });
+
+const INDEX=[
+ {k:'person',l:'Daisy Dukes',s:'Server',h:'var(--azure)',i:'i-person',keys:'staff'},
+ {k:'person',l:'Nina Zebra',s:'Manager',h:'var(--azure)',i:'i-person',keys:'staff'},
+ {k:'person',l:'Sam Fields',s:'Bartender',h:'var(--azure)',i:'i-person',keys:'staff'},
+ {k:'person',l:'Alex Robinson',s:'Bar Manager',h:'var(--azure)',i:'i-person',keys:'staff'},
+ {k:'menu',l:'Tropical Old Fashioned',s:'Menu › Libations › Cocktails',h:'var(--tint)',i:'i-glass',keys:'drink cocktail libation bourbon',go:'menus'},
+ {k:'menu',l:'Summer Peach Spritz',s:'Summer menu › Libations › Cocktails',h:'var(--tint)',i:'i-glass',keys:'drink cocktail libation',go:'menus'},
+ {k:'menu',l:'Crab Cakes',s:'Menu › Dinner › Starters',h:'var(--tint)',i:'i-fork',keys:'dish appetizer',go:'menus'},
+ {k:'menu',l:'Lobster Roll',s:'Menu › Lunch › Sandwiches',h:'var(--tint)',i:'i-fork',keys:'dish',go:'menus'},
+ {k:'menu',l:'Wagyu Burger',s:'Menu › Dinner › Mains',h:'var(--tint)',i:'i-fork',keys:'dish',go:'menus'},
+ {k:'tool',l:'Guides & Training',s:'50 guides · 2 new',h:'var(--tint)',i:'i-book',keys:'docs training learn',go:'guides'},
+ {k:'tool',l:'Game Hub',s:'Rank #4 this week',h:'var(--azure)',i:'i-game',keys:'games play leaderboard'},
+ {k:'tool',l:'Quizzes & Exams',s:'1 waiting',h:'var(--violet)',i:'i-quiz',keys:'quiz exam test'},
+ {k:'tool',l:'Tips & Checkouts',s:'$1,240 this week',h:'var(--emerald)',i:'i-cash',keys:'checkout money tipout'},
+ {k:'tool',l:'Employees',s:'Manage › Employees',h:'var(--azure)',i:'i-people',keys:'staff team people roster crew',go:'manage'},
+ {k:'tool',l:'Redemption Approvals',s:'2 waiting',h:'var(--gold)',i:'i-star',keys:'bucks rewards approve'},
+ {k:'tool',l:'AI Menu Upload',s:'3 credits left',h:'var(--tint)',i:'i-upload',keys:'scan pdf photo import'},
+ {k:'tool',l:'Schedule Upload',s:'Last scan Sep 22',h:'var(--tint)',i:'i-upload',keys:'scan roster import'},
+ {k:'tool',l:'Messages',s:'3 unread',h:'var(--tint)',i:'i-mail',keys:'chat inbox dm',go:'messages'},
+ {k:'post',l:'Oktoberfest on the deck',s:'Event · Saturday',h:'var(--azure)',i:'i-cal',keys:'party'},
+ {k:'post',l:'New tip pool policy',s:'Announcement · Important',h:'var(--tint)',i:'i-mega',keys:'news'},
+ {k:'post',l:'Lobster night',s:'Special · Thursday',h:'var(--tint)',i:'i-star',keys:'feature'},
+ {k:'setting',l:'Appearance',s:'Settings › Themes & mode',h:'var(--slate)',i:'i-paint',keys:'theme dark light mode color',go:'profile'},
+ {k:'setting',l:'Notifications',s:'Profile › Settings',h:'var(--slate)',i:'i-bell',keys:'push alerts',go:'profile'},
+ {k:'setting',l:'Password',s:'Profile › Settings',h:'var(--slate)',i:'i-key',keys:'pin login change',go:'profile'},
+ {k:'setting',l:'Language',s:'English · Español',h:'var(--slate)',i:'i-globe',keys:'spanish español idioma',go:'profile'},
+];
+const KIND={person:['People','person'],menu:['Menu','dish'],tool:['Tools','tool'],post:['Posts','post'],setting:['Settings','setting']};
+let recent=[INDEX[4],INDEX[9],INDEX[13],INDEX[21]], kind='all';
+const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function hi(l,qq){if(!qq)return esc(l);const i=l.toLowerCase().indexOf(qq);return i<0?esc(l):esc(l.slice(0,i))+'<mark>'+esc(l.slice(i,i+qq.length))+'</mark>'+esc(l.slice(i+qq.length));}
+function row(r,qq){return `<div class="res" style="--h:${r.h}" data-ix="${INDEX.indexOf(r)}"><div class="disc"><svg><use href="#${r.i}"/></svg></div><div class="rb"><b>${hi(r.l,qq)}</b><span>${esc(r.s)}</span></div><span class="ty">${KIND[r.k][1]}</span></div>`;}
+function renderPal(){
+  const qq=q.value.trim().toLowerCase(); let html='';
+  if(!qq){ if(recent.length){ html+=`<div class="eb">Recent<span class="ln"></span><span class="act" data-clear>Clear</span></div>`+recent.map(r=>row(r,'')).join(''); }
+    else { html+=`<div class="eb">Suggested<span class="ln"></span></div>`+[INDEX[9],INDEX[10],INDEX[0],INDEX[1]].map(r=>row(r,'')).join(''); } }
+  else { const hits=INDEX.filter(r=>(kind==='all'||r.k===kind)&&(r.l.toLowerCase().includes(qq)||r.s.toLowerCase().includes(qq)||(r.keys||'').includes(qq)));
+    if(!hits.length) html='<div class="empty">No matches</div>';
+    for(const k of Object.keys(KIND)){ const g=hits.filter(r=>r.k===k); if(!g.length) continue; html+=`<div class="eb">${KIND[k][0]}<span class="ln"></span></div>`+g.map(r=>row(r,qq)).join(''); } }
+  palscroll.innerHTML=html;
+}
+q.addEventListener('input',renderPal);
+$('#kinds').addEventListener('click',e=>{const d=e.target.closest('[data-kind]');if(!d)return;kind=d.dataset.kind;$$('#kinds div').forEach(x=>x.classList.toggle('on',x===d));renderPal();});
+palscroll.addEventListener('click',e=>{ if(e.target.closest('[data-clear]')){recent=[];renderPal();return;}
+  const r=e.target.closest('.res'); if(!r) return; const it=INDEX[+r.dataset.ix]; recent=[it,...recent.filter(x=>x!==it)].slice(0,6);
+  closePal(false); const where=it.k==='person'?'opens the mini-profile card':it.k==='menu'?'lands on Menu, pages to the category, opens the item sheet':it.k==='setting'?'lands on Profile › Settings with that fold open':it.k==='post'?'opens the post':'navigates';
+  log(`Pick · ${it.l}`,where); if(it.go) setTimeout(()=>navigate(it.go,it.go==='guides'||it.go==='messages'?'push':'tab'),(260)*spd()); });
+
+/* ── controls ── */
+const setOn=(id,on)=>$(id).classList.toggle('on',on);
+$('#polA').onclick=()=>{policy='A';setOn('#polA',true);setOn('#polB',false);log('Policy · fly home & back','');};
+$('#polB').onclick=()=>{policy='B';setOn('#polB',true);setOn('#polA',false);log('Policy · planted & glide','');};
+$('#ancTop').onclick=()=>{anchor='top';setOn('#ancTop',true);setOn('#ancBar',false);};
+$('#ancBar').onclick=()=>{anchor='bar';setOn('#ancBar',true);setOn('#ancTop',false);};
+$$('[data-speed]').forEach(b=>b.onclick=()=>{speedMul=+b.dataset.speed;$$('[data-speed]').forEach(x=>x.classList.toggle('on',x===b));});
+$('#rm').onclick=()=>{reduce=!reduce;setOn('#rm',reduce);};
+function reset(){cancelPlan();$$('.slot').forEach(s=>s.classList.remove('docked'));dockedPage=null;vis=true;showFlyer(true);place({x:HOME.x,y:HOME.y,s:1,m:0});
+  $$('.page').forEach(p=>{p.classList.remove('show','still');});pageEl('welcome').classList.add('show');cur='welcome';tab='welcome';$$('#nav div').forEach(d=>d.classList.toggle('on',d.dataset.tab==='welcome'));nav.classList.remove('hide');pal.classList.remove('open');log('Reset.','Welcome · bolt at home');}
+$('#reset').onclick=()=>{stopTour();reset();};
+/* tour */
+const TOUR=[['tools','tab'],['guides','push'],['editor','replace'],['manage','tab'],['menus','tab'],['profile','tab'],['messages','push'],['welcome','pop']];
+let tourT=null, tourI=0;
+function stopTour(){if(tourT){clearTimeout(tourT);tourT=null;}$('#tour').innerHTML='<svg><use href="#i-play"/></svg>Play the tour';$('#tour').classList.add('go');}
+function stepTour(){ if(tourI>=TOUR.length){stopTour();return;} const [t,k]=TOUR[tourI++]; navigate(t,k==='pop'?'pop':k); tourT=setTimeout(stepTour,1700*spd()); }
+$('#tour').onclick=()=>{ if(tourT){stopTour();return;} reset(); tourI=0; $('#tour').innerHTML='<svg><use href="#i-stop"/></svg>Stop'; $('#tour').classList.remove('go'); tourT=setTimeout(stepTour,600); };
+place(pos);
+})();
+</script>
+</body>
+</html>

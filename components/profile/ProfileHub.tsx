@@ -9,14 +9,17 @@
  */
 import React, { ComponentProps, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, FlatList, ScrollView, Alert, Dimensions,
-  NativeSyntheticEvent, NativeScrollEvent,
+  View, Text, TouchableOpacity, Pressable, StyleSheet, FlatList, Alert, Dimensions,
+  NativeSyntheticEvent, NativeScrollEvent, Animated, LayoutChangeEvent,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as ImagePicker from 'expo-image-picker';
 import WelcomeHeader from '@/components/WelcomeHeader';
+import GlassCard from '@/components/GlassCard';
+import JoltDockSlot from '@/components/jolt/JoltDockSlot';
+import { openJolt } from '@/components/jolt/joltStore';
 import NotificationDropdown from '@/components/NotificationDropdown';
 import ContentDetailModal from '@/components/ContentDetailModal';
 import WeatherDetailModal from '@/components/WeatherDetailModal';
@@ -53,6 +56,7 @@ import { useFavoriteData } from './useFavoriteData';
 import { GOLD_HUE, TEAM_HUE, RED_HUE, PROFILE_TABS, ProfileTab } from './profileVisuals';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
+const SCREEN_HEIGHT = Dimensions.get('window').height;
 type ShadeItem = Parameters<ComponentProps<typeof NotificationDropdown>['onItemPress']>[0];
 
 export default function ProfileHub() {
@@ -77,9 +81,66 @@ export default function ProfileHub() {
   const onPagerScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
     const next = PROFILE_TABS[Math.max(0, Math.min(PROFILE_TABS.length - 1, idx))];
+    activeLeafRef.current = Math.max(0, Math.min(PROFILE_TABS.length - 1, idx));
     setTab((cur) => (cur === next ? cur : next));
   }, []);
-  const { tab: tabParam } = useLocalSearchParams<{ tab?: string }>();
+
+  const hubScrollRef = useRef<any>(null);
+  // ── collapsing header (s87, Manage's mechanism): one shared scroll value drives
+  // the overlay — the Jolt bar slides up behind the locked WelcomeHeader (clipped),
+  // the capsule pins under it. Every pane writes the same offset so the collapsed
+  // state carries across a horizontal swipe; the docked bolt rides the bar.
+  const profileScrollY = useRef(new Animated.Value(0)).current;
+  const infoScrollRef = useRef<any>(null);
+  const settingsScrollRef = useRef<any>(null);
+  const leafRefs = [hubScrollRef, infoScrollRef, settingsScrollRef];
+  const activeLeafRef = useRef(0);
+  const [headerAreaHeight, setHeaderAreaHeight] = useState(0);
+  const [joltBarHeight, setJoltBarHeight] = useState(64);
+  const [tabsHeight, setTabsHeight] = useState(54);
+  const [pagerHeight, setPagerHeight] = useState(SCREEN_HEIGHT);
+  const headerHeight = joltBarHeight + tabsHeight;
+  const collapsible = joltBarHeight;
+  const overlayTranslate = profileScrollY.interpolate({
+    inputRange: [0, Math.max(1, collapsible)],
+    outputRange: [0, -collapsible],
+    extrapolate: 'clamp',
+  });
+  const [joltCollapsed, setJoltCollapsed] = useState(false);
+  const joltCollapsedRef = useRef(false);
+  useEffect(() => {
+    const id = profileScrollY.addListener(({ value }) => {
+      const collapsed = value > collapsible * 0.45;
+      if (collapsed !== joltCollapsedRef.current) {
+        joltCollapsedRef.current = collapsed;
+        setJoltCollapsed(collapsed);
+      }
+    });
+    return () => profileScrollY.removeListener(id);
+  }, [collapsible, profileScrollY]);
+  const makeLeafScroll = (leafIndex: number) =>
+    Animated.event([{ nativeEvent: { contentOffset: { y: profileScrollY } } }], {
+      useNativeDriver: true,
+      listener: (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+        if (activeLeafRef.current !== leafIndex) return;
+        const y = e.nativeEvent.contentOffset.y;
+        leafRefs.forEach((ref, i) => {
+          if (i !== leafIndex) ref.current?.scrollTo?.({ y, animated: false });
+        });
+      },
+    });
+  // Back to the top on every focus so the bar (and the docked bolt) is expanded on a return visit.
+  useFocusEffect(
+    useCallback(() => {
+      profileScrollY.setValue(0);
+      leafRefs.forEach((ref) => ref.current?.scrollTo?.({ y: 0, animated: false }));
+      joltCollapsedRef.current = false;
+      setJoltCollapsed(false);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+  );
+  const leafContent = [styles.paneContent, { paddingTop: headerHeight + 10, minHeight: pagerHeight > 0 ? pagerHeight + joltBarHeight : undefined }];
+  const { tab: tabParam, open: openParam, ts: openTs } = useLocalSearchParams<{ tab?: string; open?: string; ts?: string }>();
   useEffect(() => {
     if (tabParam && (PROFILE_TABS as string[]).includes(tabParam)) {
       const id = setTimeout(() => goTab(tabParam as ProfileTab), 60);
@@ -159,7 +220,6 @@ export default function ProfileHub() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [teamOpen, setTeamOpen] = useState(false);
-  const hubScrollRef = useRef<ScrollView>(null);
   const [tagline, setTagline] = useState<string | null | undefined>(undefined);
   useEffect(() => {
     if (stats.tagline !== undefined) setTagline(stats.tagline);
@@ -235,7 +295,7 @@ export default function ProfileHub() {
 
   // ── panes ──
   const renderHub = () => (
-    <ScrollView ref={hubScrollRef} style={styles.pane} contentContainerStyle={styles.paneContent} showsVerticalScrollIndicator={false}>
+    <Animated.ScrollView ref={hubScrollRef} style={styles.pane} contentContainerStyle={leafContent} showsVerticalScrollIndicator={false} scrollEventThrottle={16} bounces={false} overScrollMode="never" nestedScrollEnabled onScroll={makeLeafScroll(0)}>
       <StatStrip>
         {isManager ? (
           <StatCell
@@ -296,19 +356,19 @@ export default function ProfileHub() {
           <Text style={[styles.logoutText, { color: RED_HUE[resolvedMode] }]}>{t('profile.log_out')}</Text>
         </TouchableOpacity>
       </View>
-    </ScrollView>
+    </Animated.ScrollView>
   );
 
   const renderInfo = () => (
-    <ScrollView style={styles.pane} contentContainerStyle={styles.paneContent} showsVerticalScrollIndicator={false}>
+    <Animated.ScrollView ref={infoScrollRef} style={styles.pane} contentContainerStyle={leafContent} showsVerticalScrollIndicator={false} scrollEventThrottle={16} bounces={false} overScrollMode="never" nestedScrollEnabled onScroll={makeLeafScroll(1)}>
       <IdentityCard user={user} tagline={tagline} uploading={uploading} onPhoto={pickPhoto} onEdit={() => setProfileOpen(true)} />
-    </ScrollView>
+    </Animated.ScrollView>
   );
 
   const renderSettings = () => (
-    <ScrollView style={styles.pane} contentContainerStyle={styles.paneContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-      <SettingsGrid />
-    </ScrollView>
+    <Animated.ScrollView ref={settingsScrollRef} style={styles.pane} contentContainerStyle={leafContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" scrollEventThrottle={16} bounces={false} overScrollMode="never" nestedScrollEnabled onScroll={makeLeafScroll(2)}>
+      <SettingsGrid openRequest={openParam ? { key: openParam, ts: openTs ?? '' } : undefined} />
+    </Animated.ScrollView>
   );
 
   const renderPane = ({ item }: { item: ProfileTab }) => (
@@ -317,7 +377,7 @@ export default function ProfileHub() {
 
   return (
     <GestureHandlerRootView style={styles.container}>
-      <View style={styles.headerArea}>
+      <View style={styles.headerArea} onLayout={(e: LayoutChangeEvent) => setHeaderAreaHeight(e.nativeEvent.layout.height)}>
         <View style={styles.headerPadding}>
           <WelcomeHeader
             onWeatherPress={() => setWeatherVisible(true)}
@@ -329,9 +389,29 @@ export default function ProfileHub() {
             newContentCount={newContentCount}
             onProfilePress={() => goTab('info')}
           />
-          <ProfileTabs value={tab} onChange={goTab} />
         </View>
       </View>
+
+      {/* Collapsing overlay: the Jolt bar slides up behind the header, the capsule pins (Manage's, byte for byte). */}
+      {headerAreaHeight > 0 && (
+        <View style={[styles.overlayClip, { top: headerAreaHeight, height: headerHeight }]} pointerEvents="box-none">
+          <Animated.View style={{ transform: [{ translateY: overlayTranslate }] }} pointerEvents="box-none">
+            <View onLayout={(e: LayoutChangeEvent) => setJoltBarHeight(e.nativeEvent.layout.height)} style={styles.joltWrap}>
+              <GlassCard variant="glass" radius={15} style={styles.joltBar}>
+                <Pressable style={styles.joltPress} onPress={openJolt}>
+                  <JoltDockSlot id="profile" kind="bar" size={32} iconSize={20} hidden={joltCollapsed} />
+                  <Text style={[styles.joltText, { color: colors.textSecondary }]} numberOfLines={1}>
+                    {t('jolt.bar', 'Search or jump to anything…')}
+                  </Text>
+                </Pressable>
+              </GlassCard>
+            </View>
+            <View onLayout={(e: LayoutChangeEvent) => setTabsHeight(e.nativeEvent.layout.height)} style={styles.tabsWrap}>
+              <ProfileTabs value={tab} onChange={goTab} />
+            </View>
+          </Animated.View>
+        </View>
+      )}
 
       <FlatList
         ref={pagerRef}
@@ -345,6 +425,7 @@ export default function ProfileHub() {
         onScroll={onPagerScroll}
         onMomentumScrollEnd={onPagerScroll}
         scrollEventThrottle={16}
+        onLayout={(e: LayoutChangeEvent) => setPagerHeight(e.nativeEvent.layout.height)}
         initialScrollIndex={0}
         getItemLayout={(_, index) => ({ length: SCREEN_WIDTH, offset: SCREEN_WIDTH * index, index })}
         keyboardShouldPersistTaps="handled"
@@ -402,8 +483,15 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent' },
   headerArea: { zIndex: 10 },
   headerPadding: { paddingTop: 12, paddingHorizontal: 16 },
+  // Manage's bar, byte for byte: the WelcomeHeader's own marginBottom is the only gap above it.
+  overlayClip: { position: 'absolute', left: 0, right: 0, overflow: 'hidden', zIndex: 5 },
+  joltWrap: { paddingHorizontal: 16, paddingTop: 0 },
+  tabsWrap: { paddingHorizontal: 16 },
+  joltBar: { paddingHorizontal: 14, paddingVertical: 11 },
+  joltPress: { flexDirection: 'row', alignItems: 'center', gap: 11 },
+  joltText: { flex: 1, fontFamily: fonts.body.regular, fontSize: 13.5 },
   pane: { flex: 1 },
-  paneContent: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 150, gap: 12 },
+  paneContent: { paddingHorizontal: 16, paddingBottom: 150, gap: 12 },
   rule: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 2 },
   ruleLabel: { fontFamily: fonts.mono.semibold, fontSize: 9, letterSpacing: 1.2, textTransform: 'uppercase' },
   ruleLine: { flex: 1, height: 1 },

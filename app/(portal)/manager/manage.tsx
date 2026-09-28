@@ -8,7 +8,6 @@ import {
   FlatList,
   Dimensions,
   Animated,
-  Easing,
   Alert,
   Modal,
   TextInput,
@@ -32,7 +31,8 @@ import GlassCard from '@/components/GlassCard';
 import NotificationDropdown from '@/components/NotificationDropdown';
 import ContentDetailModal from '@/components/ContentDetailModal';
 import WeatherDetailModal from '@/components/WeatherDetailModal';
-import { triggerJolt, setJoltDockTarget, setJoltDockHidden } from '@/components/JoltOverlay';
+import { openJolt } from '@/components/jolt/joltStore';
+import JoltDockSlot from '@/components/jolt/JoltDockSlot';
 import ManageEmployeesPane from '@/components/ManageEmployeesPane';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/app/integrations/supabase/client';
@@ -488,39 +488,14 @@ export default function ManagerManageScreen() {
     [organizationId, router]
   );
 
-  // Jolt bolt "fly-in" — the bolt flies up from the nav-corner direction and
-  // settles into the search bar each time the manager lands on Manage (the
-  // mockup's @keyframes landed). Start at 0 (off-screen/invisible) so there's no
-  // first-frame pop at the landed position before the focus effect runs.
-  const boltAnim = useRef(new Animated.Value(0)).current;
-  const playBoltLand = useCallback(() => {
-    boltAnim.setValue(0);
-    Animated.timing(boltAnim, { toValue: 1, duration: 620, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
-  }, [boltAnim]);
-
-  // Jolt FAB docking: hand the real corner bolt this bar's slot coords so it flies
-  // in physically. dockActive hides the static boltAnim placeholder (the FAB sits
-  // there instead). If measurement ever fails, dockActive stays false and the
-  // boltAnim fly-in remains the safe fallback — the app-wide launcher is untouched.
-  const joltIconRef = useRef<any>(null);
-  const [dockActive, setDockActive] = useState(false);
-  const dockActiveRef = useRef(false);
-  const dockHiddenRef = useRef(false);
-  // Resets the pager to the top (expanded header) on focus, so the bolt always
-  // measures the search bar's EXPANDED slot — never a collapsed/translated-up
-  // position from a prior visit. Assigned below where the leaf refs exist.
+  // Jolt (s87): the bar carries a JoltDockSlot; the root bolt flies in on focus
+  // and rests there. `joltCollapsed` mirrors the header collapse so the slot can
+  // tell the root its bar is faded (nothing flies from an invisible bar).
+  const [joltCollapsed, setJoltCollapsed] = useState(false);
+  const joltCollapsedRef = useRef(false);
+  // Resets the pager to the top (expanded header) on focus so a return visit
+  // shows the bar. Assigned below where the leaf refs exist.
   const resetCollapseRef = useRef<(() => void) | null>(null);
-  const measureAndDock = useCallback(() => {
-    if (dockActiveRef.current) return; // already docked this focus
-    const node = joltIconRef.current;
-    if (!node || typeof node.measureInWindow !== 'function') return;
-    node.measureInWindow((x: number, y: number, w: number, h: number) => {
-      if (!w && !h) return; // not laid out yet
-      setJoltDockTarget({ x: x + w / 2, y: y + h / 2 });
-      dockActiveRef.current = true;
-      setDockActive(true);
-    });
-  }, []);
 
   useFocusEffect(useCallback(() => {
     loadTileData();
@@ -530,27 +505,14 @@ export default function ManagerManageScreen() {
     // owner can flip a grant while a manager sits here, so refresh per focus
     // (the s70 staleness lesson from the Menus tab).
     reloadPerms();
-    // Return to the top so the header is expanded before we measure the slot
-    // (prevents docking to a collapsed/translated-up position on return visits).
+    // Return to the top so the header (and the docked bolt) is expanded on a
+    // return visit.
     resetCollapseRef.current?.();
-    // Try to dock the real FAB into the bar slot (a couple of attempts as layout
-    // settles). If docking never takes, fall back to the safe static fly-in so
-    // the bar still shows a bolt — the app-wide launcher is never left bare.
-    const t1 = setTimeout(measureAndDock, 200);
-    const t2 = setTimeout(measureAndDock, 480);
-    const tFallback = setTimeout(() => { if (!dockActiveRef.current) playBoltLand(); }, 540);
     return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-      clearTimeout(tFallback);
-      // FAB flies back to its corner ONLY on navigation away.
-      setJoltDockTarget(null);
-      setJoltDockHidden(false);
-      dockActiveRef.current = false;
-      dockHiddenRef.current = false;
-      setDockActive(false);
+      joltCollapsedRef.current = false;
+      setJoltCollapsed(false);
     };
-  }, [loadTileData, loadActivity, loadSeen, playBoltLand, measureAndDock, reloadPerms]));
+  }, [loadTileData, loadActivity, loadSeen, reloadPerms]));
 
   // Manual Google-review refresh (premium-gated; honors the same path as the
   // Reviews editor). Consume one manual refresh (owner or review-refresh-
@@ -765,19 +727,14 @@ export default function ManagerManageScreen() {
     extrapolate: 'clamp',
   });
 
-  // While docked, FADE the bolt out with the search bar when the header collapses
-  // and back in when it reappears — it stays put (no fly-to-corner). The bolt only
-  // returns to the corner on navigation away (cleared in the focus cleanup above).
+  // The docked bolt rides the bar's collapse (it lives inside the slot), so all
+  // the root needs is the flag: collapsed → nothing flies from here.
   useEffect(() => {
     const id = manageScrollY.addListener(({ value }) => {
-      if (!dockActiveRef.current) return;
       const collapsed = value > collapsible * 0.45;
-      if (collapsed && !dockHiddenRef.current) {
-        setJoltDockHidden(true);
-        dockHiddenRef.current = true;
-      } else if (!collapsed && dockHiddenRef.current) {
-        setJoltDockHidden(false);
-        dockHiddenRef.current = false;
+      if (collapsed !== joltCollapsedRef.current) {
+        joltCollapsedRef.current = collapsed;
+        setJoltCollapsed(collapsed);
       }
     });
     return () => manageScrollY.removeListener(id);
@@ -1228,35 +1185,10 @@ export default function ManagerManageScreen() {
           {/* Jolt search bar (collapses) */}
           <View onLayout={(e: LayoutChangeEvent) => setJoltBarHeight(e.nativeEvent.layout.height)} style={styles.joltWrap}>
             <GlassCard variant="glass" radius={15} style={styles.joltBar}>
-              <Pressable style={styles.joltPress} onPress={triggerJolt}>
-                {/* Static slot wrapper — the ref the FAB measures (no transform,
-                    so measureInWindow returns the true slot position). The
-                    animated bolt inside is the fallback fly-in / placeholder. */}
-                <View ref={joltIconRef} style={styles.joltIcon}>
-                  <Animated.View
-                    style={[
-                      StyleSheet.absoluteFill,
-                      styles.joltIconFill,
-                      { backgroundColor: colors.tint + '2B' },
-                      {
-                        // Hidden while the real FAB is docked here (it sits in this
-                        // slot instead); otherwise plays the safe fly-in fallback.
-                        opacity: dockActive
-                          ? 0
-                          : boltAnim.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0, 1, 1] }),
-                        transform: [
-                          { translateX: boltAnim.interpolate({ inputRange: [0, 1], outputRange: [70, 0] }) },
-                          { translateY: boltAnim.interpolate({ inputRange: [0, 1], outputRange: [36, 0] }) },
-                          { scale: boltAnim.interpolate({ inputRange: [0, 1], outputRange: [1.5, 1] }) },
-                        ],
-                      },
-                    ]}
-                  >
-                    <IconSymbol ios_icon_name="bolt.fill" android_material_icon_name="bolt" size={18} color={colors.tint} />
-                  </Animated.View>
-                </View>
+              <Pressable style={styles.joltPress} onPress={openJolt}>
+                <JoltDockSlot id="manage" kind="bar" size={32} iconSize={20} hidden={joltCollapsed} />
                 <Text style={[styles.joltText, { color: colors.textSecondary }]} numberOfLines={1}>
-                  {t('manager_manage.jolt_bar', 'Search or jump to anything…')}
+                  {t('jolt.bar', 'Search or jump to anything…')}
                 </Text>
               </Pressable>
             </GlassCard>
@@ -1439,8 +1371,6 @@ const styles = StyleSheet.create({
   joltWrap: { paddingHorizontal: 16, paddingTop: 0 },
   joltBar: { paddingHorizontal: 14, paddingVertical: 11 },
   joltPress: { flexDirection: 'row', alignItems: 'center', gap: 11 },
-  joltIcon: { width: 32, height: 32 },
-  joltIconFill: { borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   joltText: { flex: 1, fontFamily: fonts.body.regular, fontSize: 13.5 },
   segWrap: { paddingHorizontal: 16, paddingTop: 11 },
   seg: { flexDirection: 'row', padding: 4, gap: 4 },

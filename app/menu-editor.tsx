@@ -38,7 +38,6 @@ import { fonts } from '@/constants/fonts';
 import type { ThemeColorSet } from '@/styles/commonStyles';
 import AmbientGlow from '@/components/AmbientGlow';
 import BottomNavBar from '@/components/BottomNavBar';
-import JoltOverlay from '@/components/JoltOverlay';
 import MenuTopArea, { MenuSeasonTabs } from '@/components/MenuTopArea';
 import MenuSearchRow from '@/components/MenuSearchRow';
 import MenuCategoryTabs from '@/components/MenuCategoryTabs';
@@ -1123,6 +1122,7 @@ export default function MenuEditorScreen() {
             onChangeText={setSearchQuery}
             placeholder={t('menu_editor:search_placeholder')}
             onRightPress={openAdd}
+            joltDock
           />
           {(loading || categoriesLoading) ? (
             <View style={styles.loadingContainer}>
@@ -1240,6 +1240,8 @@ export default function MenuEditorScreen() {
                 onChangeText={setSearchQuery}
                 placeholder={t('menu_editor:search_placeholder')}
                 onRightPress={openAdd}
+                joltDock
+                joltDockHidden={chromeCollapsed}
               />
             </Animated.View>
             <MenuCategoryTabs
@@ -1339,7 +1341,6 @@ export default function MenuEditorScreen() {
           reproduces the portal's stacking; box-none so it never eats touches
           meant for the screen. */}
       <View style={styles.joltLayer} pointerEvents="box-none">
-        <JoltOverlay role="manager" />
       </View>
     </GestureHandlerRootView>
   );

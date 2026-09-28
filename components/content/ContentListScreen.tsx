@@ -10,7 +10,6 @@ import GlassActionSheet from '@/components/GlassActionSheet';
 import OrderPositionModal from '@/components/OrderPositionModal';
 import MenuSearchRow from '@/components/MenuSearchRow';
 import BottomNavBar from '@/components/BottomNavBar';
-import JoltOverlay from '@/components/JoltOverlay';
 import { IconSymbol } from '@/components/IconSymbol';
 import { StorageImage } from '@/components/StorageImage';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -238,7 +237,6 @@ export default function ContentListScreen({
       )}
 
       <BottomNavBar activeTab="manage" />
-      <JoltOverlay role="manager" />
 
       <GlassActionSheet
         visible={!!action}
