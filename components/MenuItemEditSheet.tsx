@@ -281,6 +281,34 @@ export default function MenuItemEditSheet({
       selectedFormCat?.filter_behavior === 'dinner' ||
       selectedFormCat?.filter_behavior === 'weekly_specials');
 
+  // Shared mode: an item filed under Lunch/Dinner is served at that meal by
+  // definition (its page filters on the flag), so its own chip stays ticked
+  // and the other meal is the optional "also show it there". s88: rows saved
+  // with neither ticked matched no page at all.
+  const ownMeal: 'lunch' | 'dinner' | null =
+    !perMenu && (selectedFormCat?.filter_behavior === 'lunch' || selectedFormCat?.filter_behavior === 'dinner')
+      ? selectedFormCat.filter_behavior
+      : null;
+  const lunchOn = formData.available_for_lunch || ownMeal === 'lunch';
+  const dinnerOn = formData.available_for_dinner || ownMeal === 'dinner';
+
+  // Subcategory tree for the currently-selected form category, kept visible
+  // if hidden but currently assigned (legacy items keep their placement
+  // editable) — same rule as the category picker, catKey-safe throughout.
+  // Cocktail-fed subs are ALSO withheld (except as a legacy row's current
+  // value): those mirror the Bartender recipe editors, and a manual item
+  // filed into one would be hidden by the user side's dedup anyway.
+  const formVisibleSubs = selectedFormCat
+    ? selectedFormCat.subcategories.filter((s) => {
+        const isCurrent = catKey(s.display_name) === catKey(formData.subcategory);
+        return (!s.is_hidden || isCurrent) && (!s.is_cocktail_fed || isCurrent);
+      })
+    : [];
+  const showSubcategory = !!selectedFormCat && formVisibleSubs.length > 0;
+  // What actually gets stored: a name from the offered list, or nothing when
+  // the category has no subcategories (a stale name would make a stray).
+  const subToSave = showSubcategory ? formData.subcategory : '';
+
   const showWeeklySpecialFeature = formHasWeeklySpecialsCat && selectedFormCat?.system_key !== 'cat.weekly_specials';
 
   const photoUri = selectedImageUri || (removedPhoto ? null : editingItem?.thumbnail_url || null);
@@ -566,6 +594,12 @@ export default function MenuItemEditSheet({
       Alert.alert(t('common:error'), t('menu_editor:error_fill_fields'));
       return;
     }
+    // A category with subcategories needs one of them picked — an item filed
+    // under none matches no page tab (s88: moved items were saved into the void).
+    if (showSubcategory && !formVisibleSubs.some((sub) => catKey(sub.display_name) === catKey(formData.subcategory))) {
+      Alert.alert(t('common:error'), t('menu_editor:error_pick_subcategory'));
+      return;
+    }
     if (!user?.id) {
       Alert.alert(t('common:error'), t('menu_editor:error_not_authenticated'));
       return;
@@ -598,9 +632,9 @@ export default function MenuItemEditSheet({
           p_description: (resolved.description.en || null) as string,
           p_price: formData.price,
           p_category: formData.category,
-          p_subcategory: (formData.subcategory || null) as string,
-          p_available_for_lunch: formData.available_for_lunch,
-          p_available_for_dinner: formData.available_for_dinner,
+          p_subcategory: (subToSave || null) as string,
+          p_available_for_lunch: lunchOn,
+          p_available_for_dinner: dinnerOn,
           p_is_gluten_free: formData.is_gluten_free,
           p_is_gluten_free_available: formData.is_gluten_free_available,
           p_is_vegetarian: formData.is_vegetarian,
@@ -656,7 +690,7 @@ export default function MenuItemEditSheet({
         );
       } else {
         // Host-computed — it owns allItems (this sheet never fetches items).
-        const nextOrder = computeNextOrder(formData.category, formData.subcategory, formData.item_season);
+        const nextOrder = computeNextOrder(formData.category, subToSave, formData.item_season);
         const { data, error } = await supabase.rpc('create_menu_item', {
           p_user_id: user.id,
           p_organization_id: organizationId ?? undefined,
@@ -664,9 +698,9 @@ export default function MenuItemEditSheet({
           p_description: (resolved.description.en || null) as string,
           p_price: formData.price,
           p_category: formData.category,
-          p_subcategory: (formData.subcategory || null) as string,
-          p_available_for_lunch: formData.available_for_lunch,
-          p_available_for_dinner: formData.available_for_dinner,
+          p_subcategory: (subToSave || null) as string,
+          p_available_for_lunch: lunchOn,
+          p_available_for_dinner: dinnerOn,
           p_is_gluten_free: formData.is_gluten_free,
           p_is_gluten_free_available: formData.is_gluten_free_available,
           p_is_vegetarian: formData.is_vegetarian,
@@ -737,20 +771,6 @@ export default function MenuItemEditSheet({
       </Text>
     </Pressable>
   );
-
-  // Subcategory tree for the currently-selected form category, kept visible
-  // if hidden but currently assigned (legacy items keep their placement
-  // editable) — same rule as the category picker, catKey-safe throughout.
-  // Cocktail-fed subs are ALSO withheld (except as a legacy row's current
-  // value): those mirror the Bartender recipe editors, and a manual item
-  // filed into one would be hidden by the user side's dedup anyway.
-  const formVisibleSubs = selectedFormCat
-    ? selectedFormCat.subcategories.filter((s) => {
-        const isCurrent = catKey(s.display_name) === catKey(formData.subcategory);
-        return (!s.is_hidden || isCurrent) && (!s.is_cocktail_fed || isCurrent);
-      })
-    : [];
-  const showSubcategory = !!selectedFormCat && formVisibleSubs.length > 0;
 
   const footer = (
     <View style={styles.footerRow}>
@@ -833,7 +853,21 @@ export default function MenuItemEditSheet({
               <Pressable
                 key={cat.id}
                 style={styles.catChip}
-                onPress={() => setFormData((prev) => ({ ...prev, category: cat.display_name, subcategory: '' }))}
+                onPress={() =>
+                  setFormData((prev) =>
+                    catKey(prev.category) === catKey(cat.display_name)
+                      ? prev
+                      : {
+                          ...prev,
+                          category: cat.display_name,
+                          subcategory: '',
+                          // Re-filing resets the meal tags to the new home's own
+                          // (a stale tick would ghost the item onto the old meal).
+                          available_for_lunch: cat.filter_behavior === 'lunch',
+                          available_for_dinner: cat.filter_behavior === 'dinner',
+                        },
+                  )
+                }
               >
                 <View style={styles.catChipInner}>
                   <Text style={[styles.catChipLabel, active && styles.catChipLabelActive]} numberOfLines={1}>
@@ -845,7 +879,6 @@ export default function MenuItemEditSheet({
             );
           })}
         </ScrollView>
-        {showWineLibNote && <Text style={styles.hint}>{t('menu_editor:wine_libations_note')}</Text>}
       </View>
 
       {/* 3. Subcategory */}
@@ -882,25 +915,43 @@ export default function MenuItemEditSheet({
       {showAvailability && (
         <View>
           <Text style={styles.formLabel}>{t('menu_editor:available_for_label')}</Text>
-          <Text style={styles.hint}>{t('menu_editor:available_for_hint')}</Text>
+          <Text style={styles.hint}>
+            {ownMeal
+              ? t('menu_editor:available_for_hint_own', {
+                  own: ownMeal === 'lunch' ? formLunchName : formDinnerName,
+                  other: ownMeal === 'lunch' ? formDinnerName : formLunchName,
+                })
+              : t('menu_editor:available_for_hint')}
+          </Text>
           <View style={styles.chipsWrap}>
             {formHasLunchCat &&
               chip({
                 key: 'lunch',
                 label: formLunchName,
-                selected: formData.available_for_lunch,
-                onPress: () => setFormData((prev) => ({ ...prev, available_for_lunch: !prev.available_for_lunch })),
+                selected: lunchOn,
+                onPress: () =>
+                  ownMeal === 'lunch'
+                    ? undefined
+                    : setFormData((prev) => ({ ...prev, available_for_lunch: !prev.available_for_lunch })),
               })}
             {formHasDinnerCat &&
               chip({
                 key: 'dinner',
                 label: formDinnerName,
-                selected: formData.available_for_dinner,
-                onPress: () => setFormData((prev) => ({ ...prev, available_for_dinner: !prev.available_for_dinner })),
+                selected: dinnerOn,
+                onPress: () =>
+                  ownMeal === 'dinner'
+                    ? undefined
+                    : setFormData((prev) => ({ ...prev, available_for_dinner: !prev.available_for_dinner })),
               })}
           </View>
         </View>
       )}
+
+      {/* The Libations / Wine note sits BELOW the pickers (s88, Steve): the
+          category and subcategory rows read as one block, then the meal
+          chips, then this. The section gap already spaces it. */}
+      {showWineLibNote && <Text style={[styles.hint, { marginTop: 0 }]}>{t('menu_editor:wine_libations_note')}</Text>}
 
       {/* 4. Photo + Name */}
       <View>

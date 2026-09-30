@@ -1,0 +1,824 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Menu Categories Deck</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap">
+<style>
+/* Layout: one phone shell on a fixed-dark studio ground; the toolbar jumps the phone to a state, notes sit under it. */
+:root{
+  color-scheme:dark;
+  --ground:#0C0D11; --ground-ink:#D6D9DE; --ground-muted:#7B8290; --ground-line:rgba(255,255,255,0.09);
+  --ground-panel:rgba(255,255,255,0.04); --ground-accent:#F99861;
+  --f-display:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;
+  --f-body:'Inter','SF Pro Text',system-ui,sans-serif;
+  --f-mono:'JetBrains Mono',ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{min-height:100%;display:flex;flex-direction:column;align-items:center;gap:14px;padding-block:24px 60px;padding-inline:16px;
+  background:var(--ground);color:var(--ground-ink);font-family:var(--f-body)}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+/* ---------- toolbar ---------- */
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center;max-width:820px}
+.grp{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:center;background:var(--ground-panel);border:1px solid var(--ground-line);padding:6px;border-radius:16px}
+.gl2{font-family:var(--f-mono);font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:var(--ground-muted);margin:0 4px 0 6px}
+.tb{background:rgba(255,255,255,0.06);color:var(--ground-ink);border:1px solid rgba(255,255,255,0.10);border-radius:11px;padding:7px 11px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:.18s}
+.tb:hover{background:rgba(255,255,255,0.12)}
+.tb.on{background:#F4F6F8;color:#15171C;border-color:#F4F6F8}
+.tb:focus-visible{outline:2px solid var(--ground-accent);outline-offset:2px}
+.hint{color:var(--ground-muted);font-size:12px;text-align:center;max-width:620px;line-height:1.6;min-height:58px}
+.hint b{color:var(--ground-ink);font-weight:600}
+
+/* ---------- notes under the phone ---------- */
+.notes{width:100%;max-width:620px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:620px){.notes{grid-template-columns:1fr}}
+.note{background:var(--ground-panel);border:1px solid var(--ground-line);border-radius:14px;padding:12px 13px;min-width:0}
+.note h3{font-family:var(--f-mono);font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:var(--ground-muted);font-weight:600;margin-bottom:6px}
+.note p,.note li{font-size:12px;line-height:1.55;color:var(--ground-ink)}
+.note ul{list-style:none;display:flex;flex-direction:column;gap:5px}
+.note li{padding-left:13px;position:relative}
+.note li::before{content:"";position:absolute;left:0;top:.62em;width:5px;height:5px;border-radius:50%;background:var(--ground-accent)}
+.note b{font-weight:600}
+
+/* ---------- phone shell + palettes (tokens copied from styles/commonStyles.ts) ---------- */
+.phone{
+  --bg:#141724; --text:#FCFCFC; --muted:#A3A8B8; --ember:#B9BDC6; --blue:#8F98B0; --bluetext:#D3D8E6; --tint:#F99861;
+  --cta:#F99861; --ctaink:#1F2334;
+  --glass:rgba(255,255,255,0.07); --glassbd:rgba(255,255,255,0.12); --surf:rgba(255,255,255,0.05); --surfbd:rgba(255,255,255,0.09); --hair:rgba(255,255,255,0.07);
+  --thumbbg:#232840; --glowA:rgba(92,106,178,0.36); --glowB:rgba(249,152,97,0.11);
+  --danger:#E8604C; --gold:#F5B942; --scrim:rgba(6,8,16,0.58); --lift:#1E2233;
+  position:relative;width:min(392px,100%);height:840px;background:var(--bg);border-radius:46px;border:1px solid #2A2E36;overflow:hidden;
+  box-shadow:0 40px 90px -30px rgba(0,0,0,0.8);transition:background .3s;display:flex;flex-direction:column;color:var(--text)}
+.phone.t-moon-l{--bg:#F2F3F6;--text:#1F2334;--muted:#6B7084;--ember:#3A4158;--blue:#7E879C;--bluetext:#1F2334;--tint:#DC6A2E;--cta:#1F2334;--ctaink:#FFFFFF;
+  --glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.90);--surf:rgba(255,255,255,0.66);--surfbd:rgba(31,35,52,0.08);--hair:rgba(31,35,52,0.08);
+  --thumbbg:#DDDFE6;--glowA:rgba(31,35,52,0.14);--glowB:rgba(249,152,97,0.20);--danger:#C0392B;--gold:#B7791F;--scrim:rgba(6,10,18,0.35);--lift:#FFFFFF}
+.phone.t-ocean-d{--bg:#1A2332;--text:#FFFFFF;--muted:#A8B8D8;--ember:#6BADE8;--blue:#5DADE2;--bluetext:#BFE3F7;--tint:#5DA0E5;--cta:#5DA0E5;--ctaink:#0A1422;
+  --glass:rgba(255,255,255,0.07);--glassbd:rgba(255,255,255,0.13);--surf:rgba(255,255,255,0.05);--surfbd:rgba(255,255,255,0.10);--hair:rgba(255,255,255,0.08);
+  --thumbbg:#2C3E50;--glowA:rgba(74,144,226,0.30);--glowB:rgba(93,173,226,0.15);--lift:#2C3E50}
+.phone.t-ocean-l{--bg:#E8F4F8;--text:#1A3A52;--muted:#4A6B7C;--ember:#1565C0;--blue:#42A5F5;--bluetext:#0D47A1;--tint:#1976D2;--cta:#1976D2;--ctaink:#FFFFFF;
+  --glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.90);--surf:rgba(255,255,255,0.70);--surfbd:rgba(13,71,161,0.10);--hair:rgba(13,71,161,0.08);
+  --thumbbg:#CFE4EC;--glowA:rgba(25,118,210,0.16);--glowB:rgba(66,165,245,0.12);--danger:#C0392B;--gold:#B7791F;--scrim:rgba(6,10,18,0.35);--lift:#FFFFFF}
+
+.glow{position:absolute;top:-120px;right:-80px;width:360px;height:320px;border-radius:50%;background:radial-gradient(circle,var(--glowA),transparent 66%);z-index:0;pointer-events:none}
+.glow2{position:absolute;top:-70px;left:-90px;width:300px;height:280px;border-radius:50%;background:radial-gradient(circle,var(--glowB),transparent 68%);z-index:0;pointer-events:none}
+.sb{position:relative;z-index:3;display:flex;justify-content:space-between;align-items:center;padding:16px 30px 4px;font-size:13px;font-weight:600;font-family:var(--f-mono);color:var(--text)}
+.screen{position:relative;z-index:2;flex:1;overflow-y:auto;overflow-x:hidden;padding:0 0 40px;scrollbar-width:none}
+.screen::-webkit-scrollbar{display:none}
+.screen.noscroll{overflow-y:hidden}
+.design{display:none;padding:6px 16px 0;animation:fade .35s ease}
+.design.on{display:block}
+@keyframes fade{from{opacity:.4;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ---------- shared glass pieces ---------- */
+.ic{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+.ic.fill{fill:currentColor;stroke:none}
+.gcard{background:var(--glass);border:1px solid var(--glassbd)}
+.scard{background:var(--surf);border:1px solid var(--surfbd)}
+.c38{width:38px;height:38px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;background:var(--glass);border:1px solid var(--glassbd);color:var(--text);cursor:pointer}
+.mpill{height:38px;border-radius:12px;display:inline-flex;align-items:center;gap:6px;padding:0 11px;flex:0 0 auto;background:var(--glass);border:1px solid var(--glassbd);color:var(--text);font-size:12.5px;font-weight:600;cursor:pointer}
+.hdr{display:flex;align-items:center;gap:8px;margin:2px 0 12px}
+.hmid{flex:1;min-width:0;padding-left:2px}
+.eyebrow{font-family:var(--f-mono);font-size:8.5px;letter-spacing:1.6px;text-transform:uppercase;color:var(--tint);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.htitle{font-family:var(--f-display);font-weight:700;font-size:19px;letter-spacing:-0.3px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.zlabel{font-family:var(--f-mono);font-size:9.5px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px;margin:16px 2px 10px}
+.zlabel .ln{flex:1;height:1px;background:var(--hair)}
+.zlabel em{font-style:normal;letter-spacing:.3px;text-transform:none;opacity:.8}
+.dot{border-radius:50%;flex:0 0 auto;border:1px solid rgba(0,0,0,0.18)}
+.grabc{color:var(--muted);opacity:.8;cursor:grab;flex:0 0 auto;display:inline-flex}
+.abtn{width:30px;height:30px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;color:var(--muted);cursor:pointer;flex:0 0 auto}
+.abtn.linked{background:color-mix(in srgb,var(--tint) 16%,transparent);color:var(--tint)}
+.abtn.more{background:var(--glass);border:1px solid var(--glassbd);color:var(--text)}
+.abtn:focus-visible,.mchip:focus-visible,.c38:focus-visible,.mpill:focus-visible,.dtile:focus-visible{outline:2px solid var(--tint);outline-offset:2px}
+.bpill{display:inline-flex;align-items:center;gap:4px;font-family:var(--f-mono);font-size:8.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--bluetext);background:color-mix(in srgb,var(--blue) 20%,transparent);padding:2.5px 7px;border-radius:6px;white-space:nowrap;flex:0 0 auto}
+.bpill.tint{color:var(--tint);background:color-mix(in srgb,var(--tint) 15%,transparent)}
+.cpill{font-family:var(--f-mono);font-size:10px;font-weight:600;color:var(--muted);white-space:nowrap;flex:0 0 auto;font-variant-numeric:tabular-nums}
+.ghost{display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;margin-top:9px;border-radius:13px;border:1.5px dashed color-mix(in srgb,var(--tint) 55%,transparent);color:var(--tint);font-size:13px;font-weight:600;cursor:pointer}
+.ghost.sm{padding:9px;font-size:12px;border-radius:11px;margin-top:2px}
+.statline{font-family:var(--f-mono);font-size:10px;color:var(--muted);text-align:center;margin:0 0 12px;letter-spacing:.4px}
+.statline b{color:var(--tint);font-weight:600}
+.fade{position:absolute;top:0;left:0;right:0;height:2.5px;background:linear-gradient(90deg,var(--catc),color-mix(in srgb,var(--catc) 30%,transparent) 55%,transparent);pointer-events:none}
+.railacts{display:flex;gap:8px;margin:0 0 12px}
+.ract{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;padding:10px;border-radius:12px;font-size:12.5px;font-weight:600;color:var(--tint);border:1.5px dashed color-mix(in srgb,var(--tint) 55%,transparent);cursor:pointer}
+.ract.solid{border-style:solid;background:color-mix(in srgb,var(--tint) 14%,transparent)}
+.jighint{font-family:var(--f-mono);font-size:10px;color:var(--muted);text-align:center;margin:-4px 0 10px;letter-spacing:.3px}
+
+.cap{border-radius:13px;padding:10px 12px;margin:0 0 10px;font-size:11.5px;line-height:1.5;color:var(--muted)}
+.cap p+p{margin-top:5px}
+.cap b{color:var(--text);font-weight:600}
+.cap a{color:var(--tint);font-weight:600;text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+
+.mstrip{display:flex;gap:6px;flex-wrap:wrap}
+.mchip{display:inline-flex;align-items:center;gap:4px;padding:6px 10px;border-radius:9px;font-size:11.5px;font-weight:600;color:var(--text);background:var(--surf);border:1px solid var(--surfbd);cursor:pointer}
+.mchip .ic{color:var(--tint)}
+.mchip.red{color:var(--danger)}.mchip.red .ic{color:var(--danger)}
+.mchip.dim{opacity:.6;cursor:default}
+.mchip.dim .ic{color:var(--muted)}
+
+.srow{display:flex;align-items:center;gap:6px;padding:8px 9px;border-radius:12px;margin-bottom:6px;min-height:48px}
+.srow .nm{font-size:13px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.srow .nm small{display:flex;align-items:center;gap:4px;font-family:var(--f-mono);font-size:8.5px;font-weight:600;letter-spacing:.4px;color:var(--tint);margin-top:2px;text-transform:uppercase}
+.srow.hid{opacity:.5}
+.emptyline{font-size:11.5px;color:var(--muted);text-align:center;padding:12px 8px;line-height:1.5}
+
+/* ---------- the deck ---------- */
+.deck{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.dtile{min-width:0;position:relative;border-radius:16px;cursor:pointer;transition:transform .22s cubic-bezier(.2,.8,.2,1);-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.dt-in{border-radius:16px;padding:12px 12px 11px;position:relative;overflow:hidden;min-height:112px;height:100%;transition:box-shadow .2s,border-color .2s}
+.dtile:active .dt-in{filter:brightness(1.08)}
+.dtile .nm{font-family:var(--f-display);font-size:14px;font-weight:700;letter-spacing:-0.2px;line-height:1.15;display:flex;align-items:center;gap:5px;padding-right:24px}
+.dtile .nm span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dtile .nm .ic{color:var(--muted)}
+.dtile .cnt{font-family:var(--f-mono);font-size:21px;font-weight:700;color:var(--tint);margin-top:8px;line-height:1;font-variant-numeric:tabular-nums}
+.dtile .cnt small{font-size:8px;font-weight:600;letter-spacing:.8px;color:var(--muted);margin-left:4px;text-transform:uppercase}
+.dtile .sec{font-size:10.5px;color:var(--muted);margin-top:7px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.opill{position:absolute;top:9px;right:9px;min-width:18px;height:18px;border-radius:7px;background:var(--glass);border:1px solid var(--glassbd);
+  font-family:var(--f-mono);font-size:9px;font-weight:700;color:var(--muted);display:flex;align-items:center;justify-content:center;padding:0 4px}
+.deck.jig .dtile{touch-action:none;cursor:grab}
+.deck.jig .dt-in{animation:jig .34s ease-in-out infinite alternate}
+.deck.jig .dtile:nth-child(even) .dt-in{animation-delay:.12s}
+.deck.jig .opill{color:var(--tint);border-color:color-mix(in srgb,var(--tint) 45%,transparent)}
+@keyframes jig{from{transform:rotate(-.9deg)}to{transform:rotate(.9deg)}}
+.dtile.dragging{z-index:30;transition:none;cursor:grabbing}
+.dtile.dragging .dt-in{animation:none;background:var(--lift);border-color:var(--tint);box-shadow:0 18px 34px -10px rgba(0,0,0,.55)}
+.dtile.settling{z-index:30}
+.deck.shelfgrid .dt-in{min-height:0}
+.deck.shelfgrid .dtile{opacity:.72}
+.deck.shelfgrid.dimmed .dtile{opacity:.35}
+
+/* ---------- review (upload) ---------- */
+.intro{font-size:12px;line-height:1.55;color:var(--muted);margin:0 2px 12px}
+.rcard{border-radius:16px;padding:12px;margin-bottom:9px;position:relative;overflow:hidden}
+.rcard .rh{display:flex;align-items:center;gap:8px}
+.rcard .rh .nm{font-family:var(--f-display);font-size:15.5px;font-weight:700;letter-spacing:-0.2px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rcard .found{font-family:var(--f-mono);font-size:8.5px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+.dest{display:flex;align-items:center;gap:9px;margin-top:10px;padding:9px 10px;border-radius:12px;cursor:pointer}
+.dest .lb,.avail .lb{font-family:var(--f-mono);font-size:8.5px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted)}
+.dest .to{font-size:13px;font-weight:600;margin-top:1px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.dest .to .dot{width:10px;height:10px}
+.dest .bd{flex:1;min-width:0}
+.dest .chg{font-size:11.5px;font-weight:700;color:var(--tint);flex:0 0 auto}
+.avail{display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap}
+.tog{display:inline-flex;align-items:center;gap:5px;padding:6px 10px;border-radius:10px;font-size:11.5px;font-weight:600;border:1px solid var(--surfbd);background:var(--surf);color:var(--muted);cursor:pointer}
+.tog .bx{width:13px;height:13px;border-radius:50%;border:1.5px solid var(--muted);display:inline-flex;align-items:center;justify-content:center}
+.tog .bx .ic{opacity:0;stroke-width:3}
+.tog.on{color:var(--text);border-color:color-mix(in srgb,var(--tint) 60%,transparent)}
+.tog.on .bx{border-color:var(--tint);background:var(--tint);color:var(--ctaink)}
+.tog.on .bx .ic{opacity:1}
+.ritems{margin-top:9px;border-top:1px solid var(--hair);padding-top:8px;display:none}
+.rcard.open .ritems{display:block}
+.rit{display:flex;gap:9px;align-items:flex-start;padding:6px 0}
+.rit .ck{width:18px;height:18px;border-radius:5px;background:var(--tint);color:var(--ctaink);display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;margin-top:1px}
+.rit .ck .ic{stroke-width:3}
+.rit .n1{font-size:12.5px;font-weight:600;display:flex;gap:8px}
+.rit .n1 span{flex:1;min-width:0}
+.rit .n1 b{font-family:var(--f-mono);font-weight:600;font-size:11.5px;color:var(--tint);white-space:nowrap}
+.rit .n2{font-size:11px;color:var(--muted);line-height:1.4;margin-top:1px}
+.rit .bd{flex:1;min-width:0}
+.showit{display:flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;color:var(--muted);margin-top:9px;cursor:pointer}
+.showit .ic{transition:transform .2s}
+.rcard.open .showit .ic{transform:rotate(180deg)}
+.dock{position:absolute;left:0;right:0;bottom:0;z-index:20;padding:46px 16px 20px;background:linear-gradient(180deg,transparent 0,var(--bg) 36px);display:none}
+.dock.show{display:block}
+.dock .sum{font-family:var(--f-mono);font-size:9.5px;color:var(--muted);text-align:center;margin-bottom:8px}
+.dock .sum b{color:var(--tint);font-weight:600}
+.cta{display:flex;align-items:center;justify-content:center;gap:8px;height:50px;border-radius:16px;background:var(--cta);color:var(--ctaink);font-family:var(--f-display);font-weight:700;font-size:15.5px;cursor:pointer}
+.cta.red{background:var(--danger);color:#fff}
+.cta.off{opacity:.4;cursor:default}
+.cockt{border-radius:14px;padding:11px 12px;margin-bottom:9px;font-size:11.5px;line-height:1.5;color:var(--muted);background:color-mix(in srgb,var(--blue) 12%,transparent);border:1px solid color-mix(in srgb,var(--blue) 30%,transparent)}
+.cockt b{color:var(--text);font-weight:600}
+.cockt .names{color:var(--text);margin-top:5px}
+.cockt a{display:inline-block;margin-top:7px;color:var(--tint);font-weight:700;cursor:pointer}
+
+/* ---------- menu cards (special chip) ---------- */
+.mcard{border-radius:16px;padding:11px;position:relative;overflow:hidden;display:flex;gap:11px;margin-bottom:9px}
+.mcard .th{width:76px;height:76px;border-radius:12px;flex:0 0 auto;background:var(--thumbbg);position:relative;overflow:hidden}
+.mcard .th i{position:absolute;inset:0;background:radial-gradient(circle at 30% 30%,color-mix(in srgb,var(--catc) 55%,transparent),transparent 62%),radial-gradient(circle at 75% 75%,color-mix(in srgb,var(--tint) 40%,transparent),transparent 58%)}
+.mcard .bd{flex:1;min-width:0}
+.mcard .t1{display:flex;gap:8px;align-items:baseline}
+.mcard .t1 .nm{font-family:var(--f-display);font-size:15px;font-weight:700;letter-spacing:-0.2px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mcard .t1 .pr{font-family:var(--f-mono);font-size:12.5px;font-weight:600;color:var(--tint)}
+.mcard .ds{font-size:11.5px;color:var(--muted);line-height:1.45;margin-top:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.mcard .tags{display:flex;gap:5px;margin-top:7px;flex-wrap:wrap}
+.tag{font-family:var(--f-mono);font-size:9px;font-weight:700;letter-spacing:.4px;padding:2.5px 6px;border-radius:6px;color:var(--bluetext);background:color-mix(in srgb,var(--blue) 20%,transparent)}
+.tag.sp{color:var(--gold);background:color-mix(in srgb,var(--gold) 16%,transparent);display:inline-flex;align-items:center;gap:3px}
+.bcardp{height:152px;border-radius:18px;overflow:hidden;margin-bottom:9px;position:relative;background:#2A2320}
+.bcardp .ph{position:absolute;inset:0;background:radial-gradient(circle at 28% 34%,#C9772F,transparent 46%),radial-gradient(circle at 72% 30%,#7A3B1E,transparent 52%),radial-gradient(circle at 55% 78%,#3E5A2A,transparent 50%),#2A2320}
+.bcardp .scrim{position:absolute;inset:0;background:linear-gradient(0deg,rgba(14,11,9,0.94) 8%,rgba(14,11,9,0.05) 64%)}
+.bcardp .top{position:absolute;top:9px;left:9px;right:70px;display:flex;gap:5px;align-items:center}
+.bcardp .eb{font-family:var(--f-mono);font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#FFB07A;background:rgba(20,16,14,0.55);padding:3px 7px;border-radius:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.bcardp .eb.sp{color:#F5B942;display:inline-flex;align-items:center;gap:3px;flex:0 0 auto}
+.bcardp .price{position:absolute;top:9px;right:9px;font-family:var(--f-mono);font-size:11.5px;font-weight:600;padding:4px 8px;border-radius:8px;background:var(--tint);color:var(--ctaink)}
+.bcardp .body{position:absolute;left:12px;right:12px;bottom:10px}
+.bcardp .bt{font-family:var(--f-display);font-weight:700;font-size:19px;color:#FFFFFF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bcardp .bd2{font-size:11.5px;line-height:15px;margin-top:2px;color:#D7D0C6}
+.tabsrow{display:flex;gap:16px;overflow:hidden;margin:0 0 4px;padding:0 2px}
+.tabsrow span{font-size:13px;color:var(--muted);padding:6px 0 7px;white-space:nowrap;box-shadow:inset 0 -2.5px 0 transparent}
+.tabsrow span.on{color:var(--text);font-weight:600;box-shadow:inset 0 -2.5px 0 var(--catc)}
+.tabsrow.sub span{font-size:12px;padding:4px 0 6px}
+.countrow{font-family:var(--f-mono);font-size:10px;color:var(--muted);text-align:right;margin:8px 2px 8px}
+
+/* ---------- overlays ---------- */
+.ovl{position:absolute;inset:0;z-index:50;display:none;flex-direction:column;justify-content:flex-end}
+.ovl.show{display:flex}
+.ovl .scr{position:absolute;inset:0;background:var(--scrim)}
+.sheet{position:relative;z-index:2;border-radius:26px 26px 0 0;padding:10px 18px 26px;max-height:86%;overflow-y:auto;animation:up .32s cubic-bezier(.32,.72,.28,1);scrollbar-width:none;
+  background:color-mix(in srgb,var(--bg) 90%,var(--text) 10%);box-shadow:0 -18px 44px rgba(0,0,0,0.25)}
+.sheet.still{animation:none}
+.sheet::-webkit-scrollbar{display:none}
+@keyframes up{from{transform:translateY(60px);opacity:.3}to{transform:none;opacity:1}}
+.grab{width:40px;height:4px;border-radius:2px;background:var(--hair);margin:2px auto 12px}
+.shead{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px}
+.shead .t{font-family:var(--f-display);font-weight:700;font-size:19px;letter-spacing:-0.3px;flex:1;min-width:0;line-height:1.2;display:flex;align-items:center;gap:9px}
+.shead .t span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.shead .t2{font-family:var(--f-display);font-weight:700;font-size:17px;flex:1;min-width:0;line-height:1.2}
+.shead .t2 small{display:block;font-family:var(--f-mono);font-weight:400;font-size:10px;color:var(--muted);margin-top:3px;letter-spacing:.2px}
+.xbtn{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text);flex:0 0 auto}
+.shchips{display:flex;align-items:center;gap:8px;margin:0 0 12px;flex-wrap:wrap}
+.shchips .meta{font-family:var(--f-mono);font-size:10px;color:var(--muted);margin-left:auto;white-space:nowrap}
+.shchips .meta b{color:var(--tint);font-weight:600}
+.frow{display:flex;align-items:center;gap:11px;padding:11px 12px;border-radius:13px;margin-bottom:8px;cursor:pointer;min-height:50px}
+.frow>.ic{color:var(--tint)}
+.frow .bd{flex:1;min-width:0}
+.frow .l1{font-size:13.5px;font-weight:600}
+.frow .l2{font-size:11px;color:var(--muted);margin-top:1px;line-height:1.4}
+.frow.del .l1,.frow.del>.ic{color:var(--danger)}
+.frow.dis{opacity:.45;cursor:default}
+.frow.pick{border-color:var(--tint);background:color-mix(in srgb,var(--tint) 10%,transparent)}
+.frow.pick.redpick{border-color:var(--danger);background:color-mix(in srgb,var(--danger) 10%,transparent)}
+.frow .chv{color:var(--muted);display:inline-flex}
+.frow .rad{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--muted);flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center}
+.frow.pick .rad{border-color:var(--tint)}
+.frow.pick .rad::after{content:"";width:9px;height:9px;border-radius:50%;background:var(--tint)}
+.frow.pick.redpick .rad{border-color:var(--danger)}
+.frow.pick.redpick .rad::after{background:var(--danger)}
+.sw{width:44px;height:26px;border-radius:13px;background:var(--tint);position:relative;flex:0 0 auto;cursor:pointer}
+.sw::after{content:"";position:absolute;top:3px;right:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.3)}
+.sw.off{background:var(--thumbbg)}
+.sw.off::after{right:auto;left:3px}
+.subpick{display:flex;flex-wrap:wrap;gap:6px;margin:-2px 0 10px 4px;align-items:center}
+.tipfoot{font-size:11px;color:var(--muted);line-height:1.5;padding:6px 4px 0;text-align:center}
+.tipfoot.warn{color:var(--danger)}
+.backlink{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;color:var(--tint);cursor:pointer;margin:-2px 0 10px}
+.sheet .cta{margin-top:10px}
+.toast{position:absolute;left:16px;right:16px;margin-inline:auto;width:fit-content;max-width:calc(100% - 32px);bottom:34px;transform:translateY(20px);z-index:60;opacity:0;pointer-events:none;transition:.3s;
+  background:color-mix(in srgb,var(--bg) 82%,var(--text) 18%);border:1px solid var(--glassbd);color:var(--text);border-radius:14px;padding:10px 14px;font-size:12px;font-weight:600;line-height:1.4;display:flex;gap:8px;align-items:center}
+.toast .ic{color:var(--tint)}
+.toast.show{opacity:1;transform:none}
+</style>
+</head>
+<body>
+
+<svg style="display:none" aria-hidden="true"><defs>
+<symbol id="i-back" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
+<symbol id="i-chevr" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+<symbol id="i-chevd" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
+<symbol id="i-grab" viewBox="0 0 24 24"><path d="M4 8h16M4 16h16"/></symbol>
+<symbol id="i-pencil" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-eyeoff" viewBox="0 0 24 24"><path d="M17.9 17.9A10.6 10.6 0 0112 19c-7 0-11-7-11-7a19.4 19.4 0 015.1-5.9M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 7 11 7a19.3 19.3 0 01-2.9 3.9M1 1l22 22"/><path d="M9.9 9.9a3 3 0 104.2 4.2"/></symbol>
+<symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M7 7l1 13h8l1-13M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></symbol>
+<symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 007.5.5l3-3a5 5 0 00-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 00-7.5-.5l-3 3a5 5 0 007 7l1.7-1.7"/></symbol>
+<symbol id="i-swap" viewBox="0 0 24 24"><path d="M7 4v16M7 20l-3-3M7 20l3-3M17 20V4M17 4l-3 3M17 4l3 3"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+<symbol id="i-palette" viewBox="0 0 24 24"><path d="M12 21a9 9 0 110-18 9 8 0 019 8 4.5 4.5 0 01-4.5 4.5H14a2 2 0 00-1.5 3.3c.3.4.5.7.5 1.2a1 1 0 01-1 1z"/><circle cx="7.5" cy="11.5" r=".8"/><circle cx="11" cy="7.5" r=".8"/><circle cx="16" cy="9" r=".8"/></symbol>
+<symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.34 1.87l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.7 1.7 0 00-1.87-.34 1.7 1.7 0 00-1 1.55V21a2 2 0 11-4 0v-.09a1.7 1.7 0 00-1-1.55 1.7 1.7 0 00-1.87.34l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.7 1.7 0 00.34-1.87 1.7 1.7 0 00-1.55-1H3a2 2 0 110-4h.09a1.7 1.7 0 001.55-1 1.7 1.7 0 00-.34-1.87l-.06-.06a2 2 0 112.83-2.83l.06.06a1.7 1.7 0 001.87.34h0a1.7 1.7 0 001-1.55V3a2 2 0 114 0v.09a1.7 1.7 0 001 1.55h0a1.7 1.7 0 001.87-.34l.06-.06a2 2 0 112.83 2.83l-.06.06a1.7 1.7 0 00-.34 1.87v0a1.7 1.7 0 001.55 1H21a2 2 0 110 4h-.09a1.7 1.7 0 00-1.55 1z"/></symbol>
+<symbol id="i-star" viewBox="0 0 24 24"><path d="M12 2l3 6.6 7 .9-5.2 4.8 1.4 7-6.2-3.6L5.8 21l1.4-7L2 9.5l7-.9z"/></symbol>
+<symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></symbol>
+<symbol id="i-move" viewBox="0 0 24 24"><path d="M3 7a2 2 0 012-2h4l2 2.5h8a2 2 0 012 2V17a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><path d="M9 13h6M13 10.5l2.5 2.5-2.5 2.5"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+<symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/></symbol>
+</defs></svg>
+
+<div class="toolbar">
+  <div class="grp"><span class="gl2">Deck</span>
+    <button class="tb on" data-s="grid">Grid</button>
+    <button class="tb" data-s="reorder">Reorder</button>
+    <button class="tb" data-s="lunch">Lunch sheet</button>
+    <button class="tb" data-s="lib">Libations sheet</button>
+    <button class="tb" data-s="delete">Delete flow</button>
+    <button class="tb" data-s="wine">Set up Wine</button>
+  </div>
+  <div class="grp"><span class="gl2">Locked in</span>
+    <button class="tb" data-s="rv">Upload Review</button>
+    <button class="tb" data-s="sp">Special chip</button>
+  </div>
+  <div class="grp"><span class="gl2">Palette</span>
+    <button class="tb on" data-t="">Moonstone·D</button>
+    <button class="tb" data-t="t-moon-l">Moonstone·L</button>
+    <button class="tb" data-t="t-ocean-d">Ocean·D</button>
+    <button class="tb" data-t="t-ocean-l">Ocean·L</button>
+  </div>
+</div>
+<p class="hint" id="hint"></p>
+
+<div class="phone" id="phone">
+  <div class="glow"></div><div class="glow2"></div>
+  <div class="sb"><span>9:41</span><span>▦ ⌁ ▮</span></div>
+  <div class="screen" id="screen">
+    <div class="design on" id="dk"></div>
+    <div class="design" id="rv"></div>
+    <div class="design" id="sp"></div>
+  </div>
+  <div class="dock" id="dock"></div>
+  <div class="ovl" id="ovl"><div class="scr" data-act="close"></div><div class="sheet" id="sheet"></div></div>
+  <div class="toast" id="toast"><svg class="ic" style="width:14px;height:14px"><use href="#i-check"/></svg><span id="toasttxt"></span></div>
+</div>
+
+<div class="notes">
+  <div class="note"><h3>Changed since round 1</h3><ul>
+    <li><b>Long-press a tile</b> starts the wiggle and picks that tile up in one motion. The Reorder button stays for anyone who doesn't find the press.</li>
+    <li><b>Category sheet:</b> Rename, Colour and Built-in (or Delete) sit right under the name. Built-in shows once.</li>
+    <li><b>Libations rows</b> carry the link icon beside the eye and the ⋯.</li>
+    <li><b>Delete</b> asks where the items go before anything is removed.</li>
+  </ul></div>
+  <div class="note"><h3>How it behaves</h3><ul>
+    <li>Reorder saves when you let go of a tile. <b>Done</b> only stops the wiggle.</li>
+    <li>Hiding a category sends it to <b>Not in use</b>; showing one adds it to the end of the grid.</li>
+    <li>Built-in cocktail subcategories stay linked to recipes. Your own Libations subcategories can be linked or unlinked.</li>
+    <li>The tile drag is built on the gesture and animation libraries already in the app, so nothing new gets installed.</li>
+  </ul></div>
+</div>
+
+<script>
+(function(){
+  function el(id){return document.getElementById(id)}
+  function all(s,fn,root){[].slice.call((root||document).querySelectorAll(s)).forEach(fn)}
+  function I(name,sz,cls){return '<svg class="ic'+(cls?' '+cls:'')+'" style="width:'+sz+'px;height:'+sz+'px"><use href="#i-'+name+'"/></svg>'}
+  function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;')}
+
+  /* ---------- fixture: a one-menu org after an upload (Robinson-flavoured) ---------- */
+  var CATS=[
+    {id:'ws',name:'Featured Specials',color:'#F44336',builtin:true,kind:'ws',direct:3,subs:[]},
+    {id:'lu',name:'Lunch',color:'#4CAF50',builtin:true,kind:'meal',subs:[{n:'Starters',c:16},{n:'Soups',c:3},{n:'Salads',c:5},{n:'Handhelds',c:5}]},
+    {id:'di',name:'Dinner',color:'#1976D2',builtin:true,kind:'meal',subs:[{n:'Starters',c:9},{n:'Entrees',c:8},{n:'Sides',c:5}]},
+    {id:'gc',name:'Grilled Cheese Bar',color:'#F39C12',direct:6,subs:[]},
+    {id:'de',name:'Desserts',color:'#D81B60',subs:[{n:'Baked',c:3},{n:'Frozen',c:2}]},
+    {id:'li',name:'Libations',color:'#9C27B0',builtin:true,kind:'lib',subs:[{n:'Signature Cocktails',c:8,linked:true,builtin:true},{n:'Martinis',c:4,linked:true,builtin:true},{n:'Draft Beer',c:6},{n:'Bottles & Cans',c:5}]},
+    {id:'hh',name:'Happy Hour',color:'#FF9800',builtin:true,kind:'hh',hidden:true,subs:[{n:'Appetizers',c:0},{n:'Drinks',c:0},{n:'Spirits',c:0}]},
+    {id:'wi',name:'Wine',color:'#E91E63',builtin:true,kind:'wine',hidden:true,subs:[{n:'Sparkling',c:0},{n:'Rosé',c:0},{n:'Chardonnay',c:0},{n:'Pinot Noir',c:0},{n:'Cabernet Sauvignon',c:0}]}
+  ];
+  function byId(id){return CATS.filter(function(x){return x.id===id})[0]}
+  function total(c){return (c.direct||0)+c.subs.reduce(function(n,s){return n+s.c},0)}
+  function live(){return CATS.filter(function(c){return !c.hidden})}
+  function shelf(){return CATS.filter(function(c){return c.hidden})}
+  function subLine(c){
+    if(c.kind==='ws') return 'no subcategories';
+    if(!c.subs.length) return 'items sit directly here';
+    var n=c.subs.length, s=n+' subcategor'+(n===1?'y':'ies');
+    var l=c.subs.filter(function(x){return x.linked}).length;
+    return l?s+' · '+l+' recipe-fed':s;
+  }
+  function subNames(c){
+    if(!c.subs.length) return c.kind==='ws'?'Shows on the Welcome Specials tab too':'Items sit directly in this category';
+    var names=c.subs.map(function(s){return s.n});
+    return names.length>3?names.slice(0,3).join(' · ')+'  +'+(names.length-3):names.join(' · ');
+  }
+  var WHAT={
+    meal:'Add an item once, then tag it for Lunch, Dinner or both.',
+    wine:'Wines with separate Glass, Bottle and Member prices.',
+    hh:'A home for happy-hour food and drink.',
+    lib:'Cocktails flow in from the Bartender Assistant recipes.',
+    ws:'Also appears on the Welcome Specials tab.'
+  };
+  function capCard(c){
+    if(!c.builtin) return '';
+    var a='<p>Move it anywhere in your menu, or hide it if you don’t need it.</p>', b='';
+    if(c.kind==='meal') b='<p>Items here can show on <b>Lunch</b>, <b>Dinner</b> or <b>both</b> — add an item once and pick where it’s served.</p>';
+    if(c.kind==='wine') b='<p>Wine items carry separate <b>Glass / Bottle / Member</b> prices. Add them in the Menu Editor, or scan a wine list and send it here.</p>';
+    if(c.kind==='lib') b='<p>Cocktails come from the Bartender Assistant recipes. <a data-act="toast" data-msg="Opens the Bartender Assistant Recipes Editor">Open the Recipes Editor ›</a></p><p>Each recipe feeds the linked subcategory below and shows on the menu by itself.</p>';
+    if(c.kind==='ws') a='<p>Also appears on the <b>Welcome Specials</b> tab. Feature any item from its edit sheet — it keeps its home category too.</p>';
+    return '<div class="cap scard">'+a+b+'</div>';
+  }
+  function hdr(title,right){
+    return '<div class="hdr"><span class="c38" tabindex="0">'+I('back',18)+'</span>'
+      +'<div class="hmid"><div class="eyebrow">The Robinson Ale House</div><div class="htitle">'+title+'</div></div>'
+      +(right===false?'':'<span class="mpill" tabindex="0" data-act="toast" data-msg="Opens the Menu sheet — Edit Menu · Categories · Upload · Configuration">'+I('gear',15)+'Menu</span>'
+      +'<span class="c38" tabindex="0" data-act="toast" data-msg="Opens the Editing Guide">'+I('info',18)+'</span>')+'</div>';
+  }
+
+  /* ================= THE DECK ================= */
+  var jig=false;
+  function tileHTML(c,i,inShelf){
+    return '<div class="dtile" tabindex="0" data-cid="'+c.id+'" style="--catc:'+c.color+'"><div class="dt-in gcard"><span class="fade"></span>'
+      +(inShelf?'':'<span class="opill">'+(i+1)+'</span>')
+      +'<div class="nm"><span>'+esc(c.name)+'</span>'+(c.builtin?I('lock',10):'')+'</div>'
+      +(inShelf?'<div class="sec">'+WHAT[c.kind]+'</div>':'<div class="cnt">'+total(c)+'<small>items</small></div><div class="sec">'+subNames(c)+'</div>')+'</div></div>';
+  }
+  function renderDeck(){
+    var h=hdr('Menu Categories');
+    h+=jig
+      ?'<div class="railacts"><span class="ract solid" data-act="jigoff">'+I('check',14)+'Done</span></div><div class="jighint">Drag a tile to its new spot · saved when you let go</div>'
+      :'<div class="railacts"><span class="ract" data-act="toast" data-msg="Add a category">'+I('plus',14)+'Add Category</span><span class="ract" data-act="jigon">'+I('swap',14)+'Reorder</span></div>';
+    h+='<div class="deck'+(jig?' jig':'')+'" id="deck">'+live().map(function(c,i){return tileHTML(c,i,false)}).join('')+'</div>';
+    if(!jig) h+='<div class="ghost" data-act="toast" data-msg="Add a category">'+I('plus',15)+'Add Category</div>';
+    if(shelf().length){
+      h+='<div class="zlabel">Not in use <em>· tap to set up</em><span class="ln"></span></div>';
+      h+='<div class="deck shelfgrid'+(jig?' dimmed':'')+'" id="shelf">'+shelf().map(function(c,i){return tileHTML(c,i,true)}).join('')+'</div>';
+    }
+    el('dk').innerHTML=h;
+  }
+  function setJig(on,keepDom){
+    jig=on;
+    if(!keepDom){renderDeck();return}
+    // entered from a long-press: keep the pressed tile's node alive, swap the chrome around it
+    var d=el('deck'); d.classList.toggle('jig',on);
+    var acts=document.querySelector('#dk .railacts');
+    acts.innerHTML='<span class="ract solid" data-act="jigoff">'+I('check',14)+'Done</span>';
+    var hint=document.createElement('div'); hint.className='jighint'; hint.textContent='Drag a tile to its new spot · saved when you let go';
+    acts.parentNode.insertBefore(hint,acts.nextSibling);
+    var g=document.querySelector('#dk .ghost'); if(g) g.remove();
+    var s=el('shelf'); if(s) s.classList.add('dimmed');
+  }
+
+  /* drag: pointer-driven, DOM-order swaps with a FLIP slide for the neighbours */
+  var drag=null, press=null, suppressTap=false, cool=0;
+  function layoutRect(n){var t=n.style.transform;n.style.transform='none';var r=n.getBoundingClientRect();n.style.transform=t;return r}
+  function renumber(){all('#deck .dtile',function(t,i){var p=t.querySelector('.opill');if(p)p.textContent=i+1})}
+  function startDrag(t,x,y){
+    var r=t.getBoundingClientRect();
+    drag={el:t,dx:x-r.left,dy:y-r.top,w:r.width,h:r.height,moved:false};
+    t.classList.add('dragging'); el('screen').classList.add('noscroll');
+    moveDrag(x,y);
+  }
+  function moveDrag(x,y){
+    var t=drag.el, o=layoutRect(t);
+    t.style.transform='translate('+(x-drag.dx-o.left)+'px,'+(y-drag.dy-o.top)+'px) scale(1.05)';
+    if(Date.now()<cool) return;
+    var cx=x-drag.dx+drag.w/2, cy=y-drag.dy+drag.h/2, hit=null;
+    all('#deck .dtile',function(n){
+      if(n===t||hit) return;
+      var r=n.getBoundingClientRect();
+      if(cx>r.left&&cx<r.right&&cy>r.top&&cy<r.bottom) hit=n;
+    });
+    if(!hit) return;
+    var kids=[].slice.call(el('deck').children), from=kids.indexOf(t), to=kids.indexOf(hit);
+    var first=kids.map(function(n){return n===t?null:n.getBoundingClientRect()});
+    if(from<to) el('deck').insertBefore(t,hit.nextSibling); else el('deck').insertBefore(t,hit);
+    kids.forEach(function(n,i){
+      if(n===t) return;
+      var last=layoutRect(n), f=first[i];
+      if(Math.abs(f.left-last.left)<1&&Math.abs(f.top-last.top)<1) return;
+      n.style.transition='none';
+      n.style.transform='translate('+(f.left-last.left)+'px,'+(f.top-last.top)+'px)';
+      void n.offsetWidth;
+      n.style.transition=''; n.style.transform='';
+    });
+    var o2=layoutRect(t);
+    t.style.transform='translate('+(x-drag.dx-o2.left)+'px,'+(y-drag.dy-o2.top)+'px) scale(1.05)';
+    drag.moved=true; cool=Date.now()+200; renumber();
+  }
+  function endDrag(){
+    var t=drag.el, moved=drag.moved; drag=null;
+    t.classList.remove('dragging'); t.classList.add('settling'); t.style.transform='';
+    setTimeout(function(){t.classList.remove('settling')},240);
+    el('screen').classList.remove('noscroll');
+    var order=[].slice.call(el('deck').children).map(function(n){return n.dataset.cid});
+    CATS=order.map(byId).concat(shelf());
+    if(moved) toast('Order saved — '+byId(t.dataset.cid).name+' is now #'+(order.indexOf(t.dataset.cid)+1));
+  }
+  el('phone').addEventListener('pointerdown',function(e){
+    var t=e.target.closest('#deck .dtile'); if(!t) return;
+    if(jig){e.preventDefault();startDrag(t,e.clientX,e.clientY);return}
+    press={t:t,x0:e.clientX,y0:e.clientY,x:e.clientX,y:e.clientY,fired:false,timer:setTimeout(function(){
+      if(!press) return;
+      press.fired=true; suppressTap=true;
+      setJig(true,true); startDrag(press.t,press.x,press.y);
+    },430)};
+  });
+  window.addEventListener('pointermove',function(e){
+    if(press&&!press.fired){
+      // a finger that travels before the hold lands is a scroll, not a press
+      if(Math.abs(e.clientX-press.x0)>8||Math.abs(e.clientY-press.y0)>8){clearTimeout(press.timer);press=null}
+      else{press.x=e.clientX;press.y=e.clientY}
+    }
+    if(drag){e.preventDefault();moveDrag(e.clientX,e.clientY)}
+  },{passive:false});
+  el('screen').addEventListener('scroll',function(){ if(press&&!press.fired){clearTimeout(press.timer);press=null} },{passive:true});
+  function release(){
+    if(press){clearTimeout(press.timer);press=null}
+    if(drag) endDrag();
+    setTimeout(function(){suppressTap=false},0);
+  }
+  window.addEventListener('pointerup',release);
+  window.addEventListener('pointercancel',release);
+
+  /* ================= SHEETS ================= */
+  function openSheet(html,still){var s=el('sheet');s.classList.toggle('still',!!still);s.innerHTML=html;s.scrollTop=still?s.scrollTop:0;el('ovl').classList.add('show')}
+  function closeSheet(){el('ovl').classList.remove('show');movePick=null;delPick=null;destPick=null}
+
+  function subRow(c,s,i){
+    var h='<div class="srow scard'+(s.hidden?' hid':'')+'"><span class="grabc">'+I('grab',14)+'</span>';
+    h+='<span class="nm">'+esc(s.n)+(s.linked?'<small>'+I('link',9)+'Linked to recipes</small>':'')+'</span><span class="cpill">'+s.c+'</span>';
+    if(c.kind==='lib') h+='<span class="abtn'+(s.linked?' linked':'')+'" tabindex="0" title="Link to recipes" data-act="link" data-cid="'+c.id+'" data-i="'+i+'">'+I('link',14)+'</span>';
+    h+='<span class="abtn" tabindex="0" data-act="hidesub" data-cid="'+c.id+'" data-i="'+i+'">'+I(s.hidden?'eyeoff':'eye',14)+'</span>';
+    h+='<span class="abtn more" tabindex="0" data-act="subsheet" data-cid="'+c.id+'" data-i="'+i+'">'+I('more',15,'fill')+'</span>';
+    return h+'</div>';
+  }
+  function catSheet(cid,still){
+    var c=byId(cid);
+    var h='<div class="grab"></div>';
+    h+='<div class="shead"><div class="t"><span class="dot" style="width:18px;height:18px;background:'+c.color+'"></span><span>'+esc(c.name)+'</span></div>'
+      +'<span class="xbtn scard" tabindex="0" data-act="close">'+I('x',14)+'</span></div>';
+    h+='<div class="shchips"><span class="mchip" tabindex="0" data-act="toast" data-msg="Rename — English + Spanish together">'+I('pencil',12)+'Rename</span>'
+      +'<span class="mchip" tabindex="0" data-act="toast" data-msg="Colour picker">'+I('palette',12)+'Colour</span>'
+      +(c.builtin?'<span class="mchip dim">'+I('lock',12)+'Built-in</span>':'<span class="mchip red" tabindex="0" data-act="toast" data-msg="Delete asks where its items go first">'+I('trash',12)+'Delete</span>')
+      +'<span class="meta"><b>'+total(c)+'</b> items</span></div>';
+    h+=capCard(c);
+    h+='<div class="frow scard" data-act="hidecat" data-cid="'+cid+'">'+I(c.hidden?'eyeoff':'eye',16)+'<div class="bd"><div class="l1">Show on the menu</div><div class="l2">'+(c.hidden?'Off — staff don’t see this category':'Items stay put while hidden')+'</div></div><span class="sw'+(c.hidden?' off':'')+'"></span></div>';
+    if(c.kind!=='ws'){
+      h+='<div class="zlabel">Subcategories <em>· hold and drag to reorder</em><span class="ln"></span></div>';
+      h+=c.subs.length?c.subs.map(function(s,i){return subRow(c,s,i)}).join(''):'<div class="emptyline">No subcategories — items sit directly in this category.</div>';
+      h+='<div class="ghost sm" data-act="toast" data-msg="Add a subcategory to '+esc(c.name)+'">'+I('plus',13)+'Add Subcategory</div>';
+    }
+    openSheet(h,still);
+  }
+  function subSheet(cid,i){
+    var c=byId(cid), s=c.subs[i];
+    var h='<div class="grab"></div><div class="shead"><div class="t2">'+esc(s.n)+'<small>in '+esc(c.name)+' · '+s.c+' items</small></div><span class="xbtn scard" tabindex="0" data-act="close">'+I('x',14)+'</span></div>';
+    h+='<span class="backlink" data-act="backcat" data-cid="'+cid+'">'+I('back',12)+'Back to '+esc(c.name)+'</span>';
+    h+='<div class="frow scard" data-act="toast" data-msg="Rename — English + Spanish together">'+I('pencil',16)+'<div class="bd"><div class="l1">Rename</div><div class="l2">English and Spanish together</div></div></div>';
+    if(s.linked) h+='<div class="frow scard dis">'+I('move',16)+'<div class="bd"><div class="l1">Move to another category</div><div class="l2">Recipe-linked subcategories stay in Libations</div></div>'+I('lock',13)+'</div>';
+    else h+='<div class="frow scard" data-act="move" data-cid="'+cid+'" data-i="'+i+'">'+I('move',16)+'<div class="bd"><div class="l1">Move to another category</div><div class="l2">Its '+s.c+' items move with it</div></div><span class="chv">'+I('chevr',14)+'</span></div>';
+    if(c.kind==='lib') h+='<div class="frow scard'+(s.builtin?' dis':'')+'" data-act="link" data-cid="'+cid+'" data-i="'+i+'" data-keep="1">'+I('link',16)+'<div class="bd"><div class="l1">Linked to recipes</div><div class="l2">'+(s.builtin?'Built-in cocktail subcategories always stay linked':'Cocktails flow in from the Bartender Assistant')+'</div></div><span class="sw'+(s.linked?'':' off')+'"></span></div>';
+    h+='<div class="frow scard" data-act="hidesub" data-cid="'+cid+'" data-i="'+i+'" data-keep="1">'+I('eye',16)+'<div class="bd"><div class="l1">Show on the menu</div><div class="l2">Items stay put while hidden</div></div><span class="sw'+(s.hidden?' off':'')+'"></span></div>';
+    if(s.linked) h+='<div class="tipfoot">Recipe-linked subcategories can’t be deleted — rename or hide them instead.</div>';
+    else h+='<div class="frow scard del" data-act="delsub" data-cid="'+cid+'" data-i="'+i+'">'+I('trash',16)+'<div class="bd"><div class="l1">Delete subcategory</div><div class="l2">'+(s.c?'Asks where its '+s.c+' items should go first':'Empty — nothing else is removed')+'</div></div></div>';
+    openSheet(h);
+  }
+  var movePick=null;
+  function moveSheet(cid,i,still){
+    var c=byId(cid), s=c.subs[i];
+    if(!movePick||movePick.cid!==cid||movePick.i!==i) movePick={cid:cid,i:i,target:null,lunch:true,dinner:false};
+    var h='<div class="grab"></div><div class="shead"><div class="t2">Move “'+esc(s.n)+'”<small>from '+esc(c.name)+' · '+s.c+' items move with it</small></div><span class="xbtn scard" tabindex="0" data-act="close">'+I('x',14)+'</span></div>';
+    CATS.forEach(function(t){
+      if(t.id===cid||t.kind==='ws') return;
+      var same=t.subs.filter(function(x){return x.n.toLowerCase()===s.n.toLowerCase()})[0];
+      var note=same?'Already has “'+esc(same.n)+'” — the two merge ('+same.c+' + '+s.c+' items)':(t.hidden?'Not in use yet — moving here switches it on':(t.builtin?WHAT[t.kind]:subLine(t)));
+      var pick=movePick.target===t.id;
+      h+='<div class="frow scard'+(pick?' pick':'')+'" data-act="movepick" data-cid="'+t.id+'"><span class="rad"></span><div class="bd"><div class="l1" style="display:flex;align-items:center;gap:6px"><span class="dot" style="width:10px;height:10px;background:'+t.color+'"></span>'+esc(t.name)+(t.builtin?I('lock',10):'')+'</div><div class="l2">'+note+'</div></div></div>';
+      if(pick&&t.kind==='meal'){
+        h+='<div class="subpick"><span class="avail" style="margin:0"><span class="lb">Serve at</span></span>'
+          +'<span class="tog'+(movePick.lunch?' on':'')+'" data-act="moveavail" data-k="lunch"><span class="bx">'+I('check',9)+'</span>Lunch</span>'
+          +'<span class="tog'+(movePick.dinner?' on':'')+'" data-act="moveavail" data-k="dinner"><span class="bx">'+I('check',9)+'</span>Dinner</span></div>';
+      }
+    });
+    var t=movePick.target?byId(movePick.target):null;
+    h+='<div class="cta'+(t?'':' off')+'" data-act="moveapply">'+(t?'Move '+s.c+' items to '+esc(t.name):'Pick a category')+'</div>';
+    openSheet(h,still);
+  }
+  function doMove(cid,i,targetId){
+    var c=byId(cid), t=byId(targetId), s=c.subs[i];
+    var same=t.subs.filter(function(x){return x.n.toLowerCase()===s.n.toLowerCase()})[0];
+    c.subs.splice(i,1);
+    if(same) same.c+=s.c; else t.subs.push(s);
+    var woke=t.hidden; t.hidden=false;
+    if(woke) CATS=live().concat(shelf());
+    renderDeck(); catSheet(targetId);
+    toast((same?'Merged into ':'Moved to ')+t.name+' · '+s.c+' items'+(woke?' · '+t.name+' switched on':''));
+  }
+  var delPick=null;
+  function delSheet(cid,i,still){
+    var c=byId(cid), s=c.subs[i];
+    if(!delPick||delPick.cid!==cid||delPick.i!==i) delPick={cid:cid,i:i,to:null};
+    var h='<div class="grab"></div><div class="shead"><div class="t2">Delete “'+esc(s.n)+'”?<small>'+(s.c?s.c+' items are filed here · pick where they go':'Empty — nothing else is removed')+'</small></div><span class="xbtn scard" tabindex="0" data-act="close">'+I('x',14)+'</span></div>';
+    if(s.c){
+      h+='<div class="zlabel" style="margin-top:2px">Keep the items · move them to<span class="ln"></span></div>';
+      c.subs.forEach(function(x,j){
+        if(j===i||x.linked) return;
+        h+='<div class="frow scard'+(delPick.to==='s'+j?' pick':'')+'" data-act="delpick" data-to="s'+j+'"><span class="rad"></span><div class="bd"><div class="l1">'+esc(c.name)+' › '+esc(x.n)+'</div><div class="l2">'+x.c+' items there now</div></div></div>';
+      });
+      h+='<div class="frow scard'+(delPick.to==='other'?' pick':'')+'" data-act="delpick" data-to="other"><span class="rad"></span><div class="bd"><div class="l1">Another category…</div><div class="l2">Opens the same list as Move</div></div><span class="chv">'+I('chevr',14)+'</span></div>';
+      h+='<div class="zlabel">Or<span class="ln"></span></div>';
+      h+='<div class="frow scard del'+(delPick.to==='gone'?' pick redpick':'')+'" data-act="delpick" data-to="gone"><span class="rad"></span><div class="bd"><div class="l1">Delete the '+s.c+' items too</div><div class="l2">Removes them from the menu for good</div></div></div>';
+    }
+    var ready=!s.c||delPick.to, gone=delPick.to==='gone';
+    var label=!s.c?'Delete subcategory':!delPick.to?'Pick where the items go':gone?'Delete subcategory and '+s.c+' items':delPick.to==='other'?'Choose the category…':'Move '+s.c+' items, then delete';
+    h+='<div class="cta'+(ready?'':' off')+(gone||!s.c?' red':'')+'" data-act="delapply">'+label+'</div>';
+    openSheet(h,still);
+  }
+
+  /* ================= UPLOAD REVIEW (approved in round 1) ================= */
+  var SCAN=[
+    {id:'s1',name:'Starters',n:16,dest:{cid:'lu',sub:'Starters',match:true},lunch:true,dinner:true,
+      items:[['Ale House Wings','$16','Buffalo, honey-sriracha or dry rub'],['Crispy Calamari','$17','Cherry peppers, lemon aioli'],['Spinach & Artichoke Dip','$14','Tortilla chips, grilled pita']]},
+    {id:'s2',name:'Soups',n:3,dest:{cid:'lu',sub:'Soups',match:true},lunch:true,dinner:false,
+      items:[['French Onion','$9','Gruyère crouton'],['New England Clam Chowder','$10','']]},
+    {id:'s3',name:'Grilled Cheese Bar',n:6,dest:{own:true},
+      items:[['The Classic','$13','Cheddar, American, sourdough'],['Short Rib Melt','$18','Braised short rib, fontina, caramelized onion']]},
+    {id:'s4',name:'Handhelds & Burgers',n:12,dest:{cid:'lu',sub:'Handhelds & Burgers',isNew:true},lunch:true,dinner:true,
+      items:[['Turkey Club','$16','Applewood bacon, avocado, toasted sourdough'],['Ale House Burger','$18','Aged cheddar, house pickles, brioche']]},
+    {id:'s5',name:'Wine',n:14,dest:{cid:'wi',sub:'by grape',match:true,wine:true},
+      items:[['La Marca Prosecco','Gl $12 · Btl $44','Sparkling · Veneto'],['Meiomi Pinot Noir','Gl $14 · Btl $52','Pinot Noir · California']]}
+  ];
+  var rvOpen=null;
+  function destText(s){
+    var d=s.dest;
+    if(d.own) return '<span class="dot" style="background:#607D8B"></span>New category “'+esc(s.name)+'”';
+    var c=byId(d.cid);
+    return '<span class="dot" style="background:'+c.color+'"></span>'+esc(c.name)+' › '+(d.wine?'sorted by grape':esc(d.sub))
+      +(d.match?'<span class="bpill tint">'+I('spark',10)+'Matched</span>':'')+(d.isNew?'<span class="bpill">New subcategory</span>':'');
+  }
+  function renderRV(){
+    var h=hdr('Review Menu',false);
+    h+='<p class="intro">We matched what we could to categories you already have. Check where each section goes, change anything, then add it all at once.</p>';
+    h+='<div class="statline"><b>51</b> items found · <b>5</b> sections · <b>4</b> cocktails spotted</div>';
+    h+=SCAN.map(function(s){
+      var c=s.dest.own?null:byId(s.dest.cid);
+      var b='<div class="rcard gcard'+(rvOpen===s.id?' open':'')+'" style="--catc:'+(c?c.color:'#607D8B')+'"><span class="fade"></span>';
+      b+='<div class="found">Found on your menu</div><div class="rh"><span class="nm">'+esc(s.name)+'</span><span class="cpill">'+s.n+' items</span></div>';
+      b+='<div class="dest scard" data-act="destsheet" data-sid="'+s.id+'"><div class="bd"><div class="lb">Goes to</div><div class="to">'+destText(s)+'</div></div><span class="chg">Change</span></div>';
+      if(c&&c.kind==='meal'){
+        b+='<div class="avail"><span class="lb">Serve at</span>'
+          +'<span class="tog'+(s.lunch?' on':'')+'" data-act="avail" data-sid="'+s.id+'" data-k="lunch"><span class="bx">'+I('check',9)+'</span>Lunch</span>'
+          +'<span class="tog'+(s.dinner?' on':'')+'" data-act="avail" data-sid="'+s.id+'" data-k="dinner"><span class="bx">'+I('check',9)+'</span>Dinner</span></div>';
+      }
+      b+='<div class="showit" data-act="rvtoggle" data-sid="'+s.id+'">'+I('chevd',12)+(rvOpen===s.id?'Hide items':'Check the '+s.n+' items')+'</div>';
+      b+='<div class="ritems">'+s.items.map(function(it){
+        return '<div class="rit"><span class="ck">'+I('check',11)+'</span><div class="bd"><div class="n1"><span>'+esc(it[0])+'</span><b>'+esc(it[1])+'</b></div>'+(it[2]?'<div class="n2">'+esc(it[2])+'</div>':'')+'</div></div>';
+      }).join('')+'<div class="n2" style="font-size:11px;color:var(--muted);padding:4px 0 0 27px">… and '+(s.n-s.items.length)+' more, each editable like today.</div></div>';
+      return b+'</div>';
+    }).join('');
+    h+='<div class="cockt"><b>4 cocktails spotted — not added.</b> A menu prints the name and price, but a recipe needs amounts, glassware, garnish and a method. Add these in the Bartender Assistant and they appear under Libations by themselves.'
+      +'<div class="names">Robinson Mule · Spicy Marg · Espresso Martini · Aperol Spritz</div>'
+      +'<a data-act="toast" data-msg="Opens the Bartender Assistant Recipes Editor">Open the Recipes Editor ›</a></div>';
+    h+='<div style="height:112px"></div>';
+    el('rv').innerHTML=h;
+    var builtins=SCAN.filter(function(s){return !s.dest.own}).length, own=SCAN.length-builtins;
+    el('dock').innerHTML='<div class="sum"><b>'+builtins+'</b> sections into categories you have · <b>'+own+'</b> new categor'+(own===1?'y':'ies')+'</div><div class="cta" data-act="toast" data-msg="Added 51 items — Lunch and Wine switched on, unused built-ins moved to the end">Add 51 items to Menu</div>';
+  }
+  var destPick=null;
+  function destSheet(sid,still){
+    var s=SCAN.filter(function(x){return x.id===sid})[0];
+    if(!destPick||destPick.sid!==sid) destPick={sid:sid,own:!!s.dest.own,cid:s.dest.cid||null,sub:s.dest.sub||null};
+    var h='<div class="grab"></div><div class="shead"><div class="t2">Where should “'+esc(s.name)+'” go?<small>'+s.n+' items move together</small></div><span class="xbtn scard" tabindex="0" data-act="close">'+I('x',14)+'</span></div>';
+    h+='<div class="frow scard'+(destPick.own?' pick':'')+'" data-act="destpick" data-own="1"><span class="rad"></span><div class="bd"><div class="l1">Its own new category</div><div class="l2">Creates “'+esc(s.name)+'” at the front of your menu</div></div></div>';
+    h+='<div class="zlabel" style="margin-top:10px">Or inside a category you have<span class="ln"></span></div>';
+    CATS.filter(function(c){return c.kind!=='ws'&&c.kind!=='lib'}).forEach(function(c){
+      var pick=!destPick.own&&destPick.cid===c.id;
+      h+='<div class="frow scard'+(pick?' pick':'')+'" data-act="destpick" data-cid="'+c.id+'"><span class="rad"></span><div class="bd"><div class="l1" style="display:flex;align-items:center;gap:6px"><span class="dot" style="width:10px;height:10px;background:'+c.color+'"></span>'+esc(c.name)+(c.hidden?' <span class="bpill">Switches on</span>':'')+'</div>'
+        +'<div class="l2">'+(c.builtin?WHAT[c.kind]:subLine(c))+'</div></div></div>';
+      if(pick){
+        var names=c.subs.map(function(x){return x.n});
+        var hasOwn=names.map(function(n){return n.toLowerCase()}).indexOf(s.name.toLowerCase())>-1;
+        h+='<div class="subpick">'+names.map(function(n){
+          return '<span class="tog'+(destPick.sub===n?' on':'')+'" data-act="destsub" data-sub="'+esc(n)+'"><span class="bx">'+I('check',9)+'</span>'+esc(n)+'</span>';
+        }).join('')+(hasOwn?'':'<span class="tog'+(destPick.sub===s.name?' on':'')+'" data-act="destsub" data-sub="'+esc(s.name)+'"><span class="bx">'+I('check',9)+'</span>New: '+esc(s.name)+'</span>')+'</div>';
+      }
+    });
+    h+='<div class="cta" data-act="destapply">Use this</div>';
+    h+='<div class="tipfoot">Libations isn’t listed — cocktails come from the Bartender Assistant recipes.</div>';
+    openSheet(h,still);
+  }
+
+  /* ================= SPECIAL CHIP (option B, in context) ================= */
+  function renderSP(){
+    function card(nm,pr,ds,tags,special){
+      return '<div class="mcard gcard" style="--catc:#4CAF50"><span class="fade"></span><div class="th"><i></i></div><div class="bd">'
+        +'<div class="t1"><div class="nm">'+nm+'</div><span class="pr">'+pr+'</span></div><div class="ds">'+ds+'</div>'
+        +'<div class="tags">'+(special?'<span class="tag sp">'+I('star',9,'fill')+'SPECIAL</span>':'')+tags.map(function(t){return '<span class="tag">'+t+'</span>'}).join('')+'</div></div></div>';
+    }
+    var h='<div class="hdr"><div class="hmid" style="padding-left:4px"><div class="eyebrow">The Robinson Ale House</div><div class="htitle">Menu</div></div><span class="mpill">'+I('gear',15)+'Menu</span></div>';
+    h+='<div class="tabsrow" style="--catc:#4CAF50"><span>Featured Specials</span><span class="on">Lunch</span><span>Dinner</span><span>Grilled Ch…</span></div>';
+    h+='<div class="tabsrow sub" style="--catc:#4CAF50"><span class="on">Starters</span><span>Soups</span><span>Salads</span><span>Handhelds</span></div>';
+    h+='<div class="countrow">16 items · Starters</div>';
+    h+=card('Ale House Wings','$16','Buffalo, honey-sriracha or dry rub. Blue cheese, celery.',['GF','NF'],true);
+    h+=card('Crispy Calamari','$17','Cherry peppers, lemon aioli.',['NF'],false);
+    // photo-banner card: no tag row, so the chip rides beside the eyebrow
+    h+='<div class="bcardp"><div class="ph"></div><div class="scrim"></div><span class="fade" style="--catc:#4CAF50"></span>'
+      +'<div class="top"><span class="eb">Lunch</span><span class="eb sp">'+I('star',9,'fill')+'Special</span></div><span class="price">$14</span>'
+      +'<div class="body"><div class="bt">Spinach &amp; Artichoke Dip</div><div class="bd2">Tortilla chips, grilled pita.</div></div></div>';
+    h+=card('Deviled Eggs','$9','Smoked paprika, chive.',['GF','V'],false);
+    el('sp').innerHTML=h;
+  }
+
+  /* ================= plumbing ================= */
+  var toastT=null;
+  function toast(msg){el('toasttxt').textContent=msg;el('toast').classList.add('show');clearTimeout(toastT);toastT=setTimeout(function(){el('toast').classList.remove('show')},2400)}
+
+  el('phone').addEventListener('click',function(e){
+    var tile=e.target.closest('#deck .dtile, #shelf .dtile');
+    if(tile){ if(jig||suppressTap) return; catSheet(tile.dataset.cid); return }
+    var n=e.target.closest('[data-act]'); if(!n) return;
+    var a=n.dataset.act, cid=n.dataset.cid, i=n.dataset.i!==undefined?+n.dataset.i:null;
+    if(a==='close'){closeSheet();return}
+    if(a==='toast'){toast(n.dataset.msg);return}
+    if(a==='jigon'){setJig(true);toast('Drag a tile to its new spot');return}
+    if(a==='jigoff'){setJig(false);return}
+    if(a==='backcat'){movePick=null;delPick=null;catSheet(cid);return}
+    if(a==='hidecat'){
+      var c=byId(cid); c.hidden=!c.hidden; CATS=live().concat(shelf());
+      renderDeck(); catSheet(cid,true);
+      toast(c.hidden?c.name+' hidden — moved to Not in use':c.name+' is on the menu — added at the end'); return;
+    }
+    if(a==='hidesub'){ var s=byId(cid).subs[i]; s.hidden=!s.hidden; renderDeck(); if(n.dataset.keep) subSheet(cid,i); else catSheet(cid,true); toast(s.hidden?s.n+' hidden from the menu':s.n+' is showing again'); return }
+    if(a==='link'){
+      var ls=byId(cid).subs[i];
+      if(ls.builtin){toast('Built-in cocktail subcategories always stay linked');return}
+      ls.linked=!ls.linked; renderDeck();
+      if(n.dataset.keep) subSheet(cid,i); else catSheet(cid,true);
+      toast(ls.linked?ls.n+' now fills from the recipes':ls.n+' is back to items you add by hand'); return;
+    }
+    if(a==='subsheet'){subSheet(cid,i);return}
+    if(a==='move'){movePick=null;moveSheet(cid,i);return}
+    if(a==='movepick'){movePick.target=cid; var t=byId(cid); movePick.lunch=t.name==='Lunch'; movePick.dinner=t.name==='Dinner'; moveSheet(movePick.cid,movePick.i,true);return}
+    if(a==='moveavail'){
+      var tg=byId(movePick.target), k=n.dataset.k;
+      if((k==='lunch'&&tg.name==='Lunch')||(k==='dinner'&&tg.name==='Dinner')){toast('Always on '+tg.name+' — that’s its category');return}
+      movePick[k]=!movePick[k];moveSheet(movePick.cid,movePick.i,true);return;
+    }
+    if(a==='moveapply'){ if(!movePick||!movePick.target) return; var m=movePick; movePick=null; doMove(m.cid,m.i,m.target); return }
+    if(a==='delsub'){delPick=null;delSheet(cid,i);return}
+    if(a==='delpick'){delPick.to=n.dataset.to;delSheet(delPick.cid,delPick.i,true);return}
+    if(a==='delapply'){
+      if(!delPick) return;
+      var dc=byId(delPick.cid), ds=dc.subs[delPick.i];
+      if(ds.c&&!delPick.to) return;
+      if(delPick.to==='other'){var d0=delPick;delPick=null;movePick=null;moveSheet(d0.cid,d0.i);toast('Pick the category — the subcategory moves there with its items');return}
+      var msg;
+      if(ds.c&&delPick.to!=='gone'){var dest=dc.subs[+delPick.to.slice(1)];dest.c+=ds.c;msg=ds.n+' deleted · '+ds.c+' items moved to '+dest.n}
+      else msg=ds.n+' deleted'+(ds.c?' with its '+ds.c+' items':'');
+      dc.subs.splice(delPick.i,1); var back=delPick.cid; delPick=null;
+      renderDeck(); catSheet(back); toast(msg); return;
+    }
+    if(a==='rvtoggle'){rvOpen=rvOpen===n.dataset.sid?null:n.dataset.sid;renderRV();return}
+    if(a==='avail'){
+      var sc=SCAN.filter(function(x){return x.id===n.dataset.sid})[0], k2=n.dataset.k, other=k2==='lunch'?'dinner':'lunch';
+      if(sc[k2]&&!sc[other]){toast('Keep at least one — or the items wouldn’t show anywhere');return}
+      sc[k2]=!sc[k2]; renderRV(); return;
+    }
+    if(a==='destsheet'){destPick=null;destSheet(n.dataset.sid);return}
+    if(a==='destpick'){
+      if(n.dataset.own){destPick.own=true;destPick.cid=null;destPick.sub=null}
+      else{
+        var sc2=SCAN.filter(function(x){return x.id===destPick.sid})[0], dcat=byId(cid);
+        destPick.own=false;destPick.cid=cid;
+        var hit=dcat.subs.filter(function(x){return x.n.toLowerCase()===sc2.name.toLowerCase()})[0];
+        destPick.sub=hit?hit.n:sc2.name;
+      }
+      destSheet(destPick.sid,true);return;
+    }
+    if(a==='destsub'){destPick.sub=n.dataset.sub;destSheet(destPick.sid,true);return}
+    if(a==='destapply'){
+      var sc3=SCAN.filter(function(x){return x.id===destPick.sid})[0];
+      if(destPick.own) sc3.dest={own:true};
+      else{
+        var d=byId(destPick.cid), ex=d.subs.filter(function(x){return x.n===destPick.sub})[0];
+        sc3.dest={cid:destPick.cid,sub:destPick.sub,isNew:!ex,wine:false,match:false};
+        if(d.kind==='meal'&&!sc3.lunch&&!sc3.dinner){sc3.lunch=d.name==='Lunch';sc3.dinner=d.name==='Dinner'}
+      }
+      closeSheet();renderRV();toast('“'+sc3.name+'” → '+(sc3.dest.own?'its own category':byId(sc3.dest.cid).name+' › '+sc3.dest.sub));return;
+    }
+  });
+  el('phone').addEventListener('keydown',function(e){
+    if((e.key==='Enter'||e.key===' ')&&e.target.closest('[data-act],.dtile')){e.preventDefault();e.target.click()}
+  });
+
+  var HINTS={
+    grid:'<b>The Deck.</b> Every category is a tile; tap one to open its sheet. <b>Press and hold</b> any tile to start the wiggle and pick it up. Unused built-ins wait in <b>Not in use</b> at the bottom.',
+    reorder:'<b>Reorder.</b> The tiles wiggle; drag one over another and the rest slide out of the way. The number in the corner follows along. Letting go saves the order.',
+    lunch:'<b>Category sheet.</b> Name on top, then Rename · Colour · Built-in in one row under it. Then what the category is for, the menu toggle, and its subcategories with count, eye and ⋯.',
+    lib:'<b>Libations sheet.</b> Each row carries the <b>link</b> icon next to the eye and the ⋯. Tinted means recipes feed it. Tap the link on Draft Beer to see it switch.',
+    delete:'<b>Delete flow.</b> A subcategory with items asks where they go first: a neighbour in the same category, another category, or deleted along with it.',
+    wine:'<b>Setting up a built-in.</b> Tapping a Not in use tile opens the same sheet, switched off. Flip <b>Show on the menu</b> and it joins the end of the grid.',
+    rv:'<b>Upload Review</b>, as approved. The cocktails card now says plainly what happens to them.',
+    sp:'<b>Special chip</b>, option B, on a real page: a gold star chip sits first in the tag row, ahead of the dietary chips. Photo-banner cards have no tag row, so there the chip sits beside the category label on the photo.'
+  };
+  function show(sid){
+    all('[data-s]',function(b){b.classList.toggle('on',b.dataset.s===sid)});
+    el('hint').innerHTML=HINTS[sid];
+    closeSheet(); if(drag) endDrag();
+    var scr=sid==='rv'?'rv':sid==='sp'?'sp':'dk';
+    all('.design',function(d){d.classList.toggle('on',d.id===scr)});
+    el('dock').classList.toggle('show',sid==='rv');
+    el('screen').scrollTop=0;
+    if(scr==='dk'){
+      jig=sid==='reorder'; renderDeck();
+      if(sid==='lunch') catSheet('lu');
+      if(sid==='lib') catSheet('li');
+      if(sid==='wine') catSheet('wi');
+      if(sid==='delete'){
+        var lu=byId('lu'), idx=-1; lu.subs.forEach(function(s,i){if(s.n==='Handhelds')idx=i});
+        if(idx<0) idx=lu.subs.length-1;
+        delPick=null; delSheet('lu',idx);
+      }
+    }
+    try{history.replaceState(null,'','#'+sid)}catch(err){}
+  }
+  all('[data-s]',function(b){b.addEventListener('click',function(){show(b.dataset.s)})});
+  all('[data-t]',function(b){b.addEventListener('click',function(){
+    all('[data-t]',function(x){x.classList.remove('on')}); b.classList.add('on');
+    el('phone').className='phone '+b.dataset.t;
+  })});
+
+  renderDeck();renderRV();renderSP();
+  var start=(location.hash||'').replace('#','');
+  show(HINTS[start]?start:'grid');
+})();
+</script>
+</body>
+</html>

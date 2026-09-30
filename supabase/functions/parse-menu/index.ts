@@ -7,7 +7,8 @@
 //     org holds the premium.ai_menu_upload grant (custom auth — never trust the
 //     Authorization header; load users by user_id with the service role key);
 //   * uses claude-opus-4-8 (latest vision) and feeds the org's EXISTING category
-//     tree into the prompt so the AI reuses real category names;
+//     tree into the prompt so the AI reuses real category names (v8, s88: wines
+//     are filed under the existing Wine subcategories by grape/style);
 //   * does NOT write to menu_items — it stores parsed_result on menu_uploads and
 //     sets status='ready_for_review'. The owner reviews/edits, then the client
 //     calls apply_parsed_menu to write. Credits are consumed after a successful
@@ -69,7 +70,7 @@ ${existingTree || '(none yet — create sensible category names from the menu)'}
 
 RULES:
 - Extract FOOD and WINE only.
-- WINE: place wines under a "Wine" category (reuse it if listed above). If a wine shows a by-the-glass and/or by-the-bottle price, put those in glass_price / bottle_price and leave "price" as "". A single-price wine uses "price".
+- WINE: place wines under a "Wine" category (reuse it if listed above). File EACH wine under the existing Wine subcategory that matches its grape or style (for example Chardonnay, Pinot Grigio, Sauvignon Blanc, Cabernet Sauvignon, Pinot Noir, Merlot, Sparkling, Rose; other whites → "Interesting Whites", other reds → "Interesting Reds", Italian reds → "Italian Reds") — use the EXACT existing subcategory name. When the menu's own wine heading is one of those, use it; when it is a grape not listed (e.g. Malbec), file the wine under the closest existing style subcategory rather than inventing a new one. If a wine shows a by-the-glass and/or by-the-bottle price, put those in glass_price / bottle_price and leave "price" as "". A single-price wine uses "price".
 - COCKTAILS / mixed drinks / signature cocktails / martinis / sangria / spirits / draft or bottled beer: do NOT add these as items. List any cocktail names you see in "flagged_cocktails". (They are managed separately in the app's Bartender Recipe editors.)
 - Set is_gluten_free or is_vegetarian to true ONLY when the menu explicitly marks it (GF, V, "gluten-free", "vegetarian", a legend symbol). Otherwise false.
 - Preserve prices exactly as printed (keep $, "MP", "Market Price", etc.). Never invent a price.

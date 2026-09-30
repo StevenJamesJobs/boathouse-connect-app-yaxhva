@@ -1808,6 +1808,7 @@ export type Database = {
           menu_2_icon: string
           menu_2_name: string
           menu_category_scope: string
+          menu2_recipes_visible: boolean
           menu_count: number
           name: string
           owner_id: string | null
@@ -1837,6 +1838,7 @@ export type Database = {
           menu_2_icon?: string
           menu_2_name?: string
           menu_category_scope?: string
+          menu2_recipes_visible?: boolean
           menu_count?: number
           name: string
           owner_id?: string | null
@@ -1866,6 +1868,7 @@ export type Database = {
           menu_2_icon?: string
           menu_2_name?: string
           menu_category_scope?: string
+          menu2_recipes_visible?: boolean
           menu_count?: number
           name?: string
           owner_id?: string | null
@@ -3142,6 +3145,16 @@ export type Database = {
         Args: { p_actor_id: string; p_exam_id: string; p_questions: Json }
         Returns: undefined
       }
+      retire_menu2: {
+        Args: {
+          p_delete_custom_categories?: boolean
+          p_items_action?: string
+          p_organization_id: string
+          p_recipes_action?: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       update_exam_question: {
         Args: { p_actor_id: string; p_fields: Json; p_question_id: string }
         Returns: undefined
@@ -3624,6 +3637,7 @@ export type Database = {
           menu_2_icon: string
           menu_2_name: string
           menu_category_scope: string
+          menu2_recipes_visible: boolean
           menu_count: number
           name: string
           owner_id: string
@@ -5317,6 +5331,39 @@ export type Database = {
         }
         Returns: Json
       }
+      manage_menu_category_move_into: {
+        Args: {
+          p_available_for_dinner?: boolean
+          p_available_for_lunch?: boolean
+          p_category_id: string
+          p_organization_id: string
+          p_target_category_id: string
+          p_target_subcategory_id?: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      manage_menu_subcategory_move: {
+        Args: {
+          p_available_for_dinner?: boolean
+          p_available_for_lunch?: boolean
+          p_organization_id: string
+          p_subcategory_id: string
+          p_target_category_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      manage_menu_subcategory_remove: {
+        Args: {
+          p_items_action?: string
+          p_organization_id: string
+          p_subcategory_id: string
+          p_target_subcategory_id?: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       manage_menu_subcategory_rename: {
         Args: {
           p_new_name: string
@@ -5394,6 +5441,17 @@ export type Database = {
         Returns: Json
       }
       apply_parsed_menu: {
+        Args: {
+          p_mode: string
+          p_organization_id: string
+          p_payload: Json
+          p_target_slot: number
+          p_upload_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      apply_parsed_menu_v2: {
         Args: {
           p_mode: string
           p_organization_id: string

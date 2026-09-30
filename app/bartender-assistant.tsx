@@ -81,6 +81,11 @@ export default function BartenderAssistantScreen() {
   const [featuredDetail, setFeaturedDetail] = useState<FeaturedSip | null>(null);
   const [showFeaturedDetail, setShowFeaturedDetail] = useState(false);
 
+  // A one-menu restaurant has no Menu 2 libations — its recipes tile and
+  // featured sips stay out (any saved Menu 2 recipes are kept, just unlisted)
+  // unless the owner chose to keep them visible when going to one menu (s88).
+  const twoMenus = organization?.menu_count === 2 || organization?.menu2_recipes_visible === true;
+
   const loadHub = useCallback(async () => {
     if (!user?.id) return;
     try {
@@ -107,7 +112,7 @@ export default function BartenderAssistantScreen() {
         (items || []).filter((i) => doneIds.has(i.id)).length;
 
       setHub({
-        featured: [...m1Feat, ...m2Feat].map((r: any) => ({
+        featured: [...m1Feat, ...(twoMenus ? m2Feat : [])].map((r: any) => ({
           id: r.id, name: r.name, price: r.price, thumbnail_url: r.thumbnail_url,
           glassware: r.glassware ?? null, garnish: r.garnish ?? null,
           ingredients: r.ingredients ?? [], procedure: r.procedure ?? null, procedure_es: r.procedure_es ?? null,
@@ -129,7 +134,7 @@ export default function BartenderAssistantScreen() {
         opening: { done: 0, total: 0 }, closing: { done: 0, total: 0 },
       });
     }
-  }, [user?.id]);
+  }, [user?.id, twoMenus]);
 
   useFocusEffect(
     useCallback(() => {
@@ -353,7 +358,7 @@ export default function BartenderAssistantScreen() {
               count: hub.m1.count, feat: hub.m1.feat, thumbs: hub.m1.thumbs,
               route: '/libation-recipes',
             })}
-            {gridTile({
+            {twoMenus && gridTile({
               iconIos: organization?.menu_2_icon || 'sun.max.fill',
               iconAndroid: menuIconAndroid(organization?.menu_2_icon || 'sun.max.fill'),
               name: `${organization?.menu_2_name || 'Summer'} ${t('bartender_assistant.libation_recipes_suffix')}`,

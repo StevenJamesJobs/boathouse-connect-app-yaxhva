@@ -39,6 +39,10 @@
 // v15 (session 83): schedule_upload_file gains grantKey 'premium.ai_schedule_upload'
 // (the AI Schedule Uploads manager permission goes live) and 'schedules' joins
 // DELETE_BUCKETS (the schedule Recent Uploads delete).
+//
+// v16 (session 88): 'libation-recipe-images' + 'summer-libation-recipe-images'
+// join DELETE_BUCKETS — recipe deletes are real deletes now (the editors and
+// the two-menus → one retirement purge the photo after the row).
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -206,9 +210,10 @@ const GATES: Record<string, Gate> = {
 // Only buckets with real client delete flows accept broker deletes.
 // v14 (s82b): + 'menu-uploads' — Recent Uploads can delete a saved/failed scan
 // (delete_menu_upload returns the file_url; the client broker-deletes it after).
+// v16 (s88): + the two libation recipe image buckets (hard recipe deletes).
 const DELETE_BUCKETS = new Set([
   'guides-and-training', 'announcements', 'special-features', 'upcoming-events', 'menu-items',
-  'menu-uploads', 'schedules',
+  'menu-uploads', 'schedules', 'libation-recipe-images', 'summer-libation-recipe-images',
 ]);
 
 // The 15 real buckets sign-read will mint READ URLs for (excludes the inert,

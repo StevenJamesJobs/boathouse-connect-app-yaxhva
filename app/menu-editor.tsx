@@ -13,7 +13,7 @@ import {
   Animated,
   Easing,
 } from 'react-native';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
@@ -101,6 +101,10 @@ interface PageConfig {
 // normalizes; display always prints the stored/translated name.
 const catKey = (name: string | null | undefined) => (name || '').toLowerCase();
 
+// s88: the trailing virtual page that gathers a category's strays (same key as
+// the user side's 'Other' page; never persisted) — see strayItemsOf.
+const UNSORTED_PAGE_KEY = '__other__';
+
 // Search-collapse geometry — identical to the user side (MenuDisplay): the
 // search row is 46pt + 11pt margin; the chrome band glides up by its measured
 // height when collapsed.
@@ -115,6 +119,16 @@ export default function MenuEditorScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { organizationId, organization } = useOrganization();
+  // The eye chip / "Back to Menu" row always land on the user-side Menu. Only
+  // the Menu tab's own pushes carry from=menu (a plain pop IS the menu there);
+  // every other entry (Manage, the recipe editors, upload, categories) would
+  // pop back to where it came from, so those replace to the tab instead —
+  // the BottomNavBar's own route for a pushed screen.
+  const { from } = useLocalSearchParams<{ from?: string }>();
+  const goToMenu = useCallback(() => {
+    if (from === 'menu' && router.canGoBack()) router.back();
+    else router.replace('/(portal)/manager/menus' as any);
+  }, [from, router]);
   const { language } = useLanguage();
   const { perms: managerPerms, reload: reloadPerms } = useManagerPermissions();
 
@@ -155,19 +169,42 @@ export default function MenuEditorScreen() {
     (item: MenuItem, categoryName: string): boolean => {
       const fb = catOf(categoryName)?.filter_behavior;
       // Per-menu treats Lunch/Dinner as normal categories (placement by
-      // assignment); shared mode keeps the meal-availability overlay.
-      if (!perMenu && fb === 'lunch') return item.available_for_lunch;
-      if (!perMenu && fb === 'dinner') return item.available_for_dinner;
+      // assignment); shared mode keeps the meal-availability overlay. An item
+      // filed under this very category with NEITHER meal ticked still shows
+      // here (s88 — the user side's rule, kept identical).
+      const ownNoMeal =
+        !item.available_for_lunch && !item.available_for_dinner && catKey(item.category) === catKey(categoryName);
+      if (!perMenu && fb === 'lunch') return item.available_for_lunch || ownNoMeal;
+      if (!perMenu && fb === 'dinner') return item.available_for_dinner || ownNoMeal;
       if (fb === 'weekly_specials') return catKey(item.category) === catKey(categoryName) || !!item.is_weekly_special;
       return catKey(item.category) === catKey(categoryName);
     },
     [catOf, perMenu],
   );
 
+  // A category's strays: its OWN items filed under no subcategory, or under a
+  // name that is none of its subcategories. They match no sub-page (s88: that
+  // is where re-categorized items vanished to), so the editor gathers them on
+  // a trailing "Unsorted" page where each can be opened and re-filed. Items in
+  // a HIDDEN subcategory are not strays — hidden stays parked.
+  const strayItemsOf = useCallback(
+    (categoryName: string): MenuItem[] => {
+      const cat = catOf(categoryName);
+      if (!cat || cat.filter_behavior === 'weekly_specials') return [];
+      if (!cat.subcategories.some((sub) => !sub.is_hidden)) return []; // one unfiltered page already shows them
+      const known = new Set(cat.subcategories.map((sub) => catKey(sub.display_name)));
+      return menuItems.filter(
+        (item) => catKey(item.category) === catKey(cat.display_name) && !known.has(catKey(item.subcategory)),
+      );
+    },
+    [catOf, menuItems],
+  );
+
   // Page sequence from the loaded tree: one page per visible subcategory, or a
-  // single page for a category with no subcategories. Empty pages stay — the
-  // editor must be able to reach them to add the first item. No 'All' pages,
-  // no Welcome bridge: real pages start at index 0.
+  // single page for a category with no subcategories — plus the trailing
+  // "Unsorted" page while a category has strays. Empty pages stay — the
+  // editor must be able to reach them to add the first item. No Welcome
+  // bridge: real pages start at index 0.
   const pages = useMemo<PageConfig[]>(() => {
     const out: PageConfig[] = [];
     for (const cat of menuCats) {
@@ -179,10 +216,13 @@ export default function MenuEditorScreen() {
         for (const sub of visibleSubs) {
           out.push({ category: cat.display_name, subcategory: sub.display_name });
         }
+        if (strayItemsOf(cat.display_name).length > 0) {
+          out.push({ category: cat.display_name, subcategory: UNSORTED_PAGE_KEY });
+        }
       }
     }
     return out;
-  }, [menuCats]);
+  }, [menuCats, strayItemsOf]);
 
   const currentPage = pages[currentPageIndex] || pages[0] || { category: '', subcategory: null };
   const selectedCategory = currentPage.category;
@@ -392,6 +432,7 @@ export default function MenuEditorScreen() {
   // Items for one pager page. Featured Specials combines flagged items from
   // BOTH menus (allItems) so the tab shows the same set on Menu 1 and Menu 2.
   const getItemsForPage = useCallback((page: PageConfig): MenuItem[] => {
+    if (page.subcategory === UNSORTED_PAGE_KEY) return strayItemsOf(page.category);
     const isSpecials = catOf(page.category)?.filter_behavior === 'weekly_specials';
     let filtered = (isSpecials ? allItems : menuItems).filter(item => categoryMatches(item, page.category));
     if (page.subcategory) {
@@ -399,13 +440,15 @@ export default function MenuEditorScreen() {
     }
     if (isSpecials) filtered = [...filtered].sort(compareBySectionThenOrder);
     return filtered;
-  }, [menuItems, allItems, categoryMatches, catOf]);
+  }, [menuItems, allItems, categoryMatches, catOf, strayItemsOf]);
 
   // Reordering is only coherent on a page that is ONE category/subcategory's
   // complete season-scoped set — never the cross-menu Featured Specials
-  // combination, and never search results. Structural guard (plan §7.3).
+  // combination, never the Unsorted gathering, and never search results.
+  // Structural guard (plan §7.3).
   const canReorderPage = useCallback(
-    (page: PageConfig) => catOf(page.category)?.filter_behavior !== 'weekly_specials',
+    (page: PageConfig) =>
+      page.subcategory !== UNSORTED_PAGE_KEY && catOf(page.category)?.filter_behavior !== 'weekly_specials',
     [catOf],
   );
 
@@ -456,7 +499,8 @@ export default function MenuEditorScreen() {
     menuBadgeForSeasonUtil(s, organization, t);
 
   const getCategoryLabel = (category: string) => labelForCategoryName(category, t, menuCats, language);
-  const getSubcategoryLabel = (subcategory: string) => labelForSubcategoryName(subcategory, t, menuCats, language);
+  const getSubcategoryLabel = (subcategory: string) =>
+    subcategory === UNSORTED_PAGE_KEY ? t('menu_editor:unsorted') : labelForSubcategoryName(subcategory, t, menuCats, language);
 
   // Card dietary abbreviations — literal t() calls so the harvester sees keys.
   const cardDietAbbrevs = (item: MenuItem): string[] => {
@@ -860,6 +904,8 @@ export default function MenuEditorScreen() {
     router.push({ pathname: '/organization-settings', params } as any);
   };
 
+  const hasSpecialsCat = menuCats.some((c) => !c.is_hidden && c.filter_behavior === 'weekly_specials');
+
   // ── Cards ──────────────────────────────────────────────────────────────────
   const renderCard = (
     item: MenuItem,
@@ -871,9 +917,14 @@ export default function MenuEditorScreen() {
       // Only recipe-fed (display-only) cards carry a tap — it opens the
       // user-side detail sheet; editable cards keep grab/meatball only.
       onPress?: () => void;
+      /** The specials page itself — every card there is one, so no chip. */
+      specialsPage?: boolean;
     },
   ) => {
     const isWine = isWineName(item.category);
+    // s88: the Special chip, exactly as the user side draws it.
+    const special =
+      !opts.specialsPage && item.is_weekly_special && hasSpecialsCat ? t('menu_display.special') : null;
     const title = getLocalizedField(item, 'name', language);
     const rawDesc = item.description
       ? stripFormattingTags(getLocalizedField(item, 'description', language) || item.description)
@@ -889,6 +940,7 @@ export default function MenuEditorScreen() {
           thumbnailUrl={getImageUrl(item.thumbnail_url!, item.updated_at)!}
           eyebrow={bannerEyebrowText(item)}
           priceLabel={formatPrice(item.price)}
+          special={special}
           catColor={categoryColor}
           editor={opts.editor}
           onPress={opts.onPress}
@@ -917,6 +969,7 @@ export default function MenuEditorScreen() {
         dietaryAbbrevs={cardDietAbbrevs(item)}
         metaTags={opts.metaTags}
         menuBadge={opts.menuBadge ?? null}
+        special={special}
         catColor={categoryColor}
         editor={opts.editor}
         onPress={opts.onPress}
@@ -934,6 +987,7 @@ export default function MenuEditorScreen() {
     );
     // Recipe-fed pages are display-only (see isRecipeFedItem).
     const isCocktailFed = !!pageSub?.is_cocktail_fed;
+    const isUnsorted = page.subcategory === UNSORTED_PAGE_KEY;
     const reorderable = canReorderPage(page) && !isCocktailFed;
     const showDragHint = reorderable && pageItems.length > 1;
 
@@ -950,6 +1004,12 @@ export default function MenuEditorScreen() {
             {page.subcategory ? getSubcategoryLabel(page.subcategory) : getCategoryLabel(page.category)}
           </Text>
         </View>
+        {isUnsorted && (
+          <View style={styles.libationBanner}>
+            <IconSymbol ios_icon_name="tray.full.fill" android_material_icon_name="inbox" size={20} color={colors.primary} />
+            <Text style={styles.libationBannerText}>{t('menu_editor:unsorted_hint')}</Text>
+          </View>
+        )}
         {isCocktailFed && (
           <TouchableOpacity
             style={styles.libationBanner}
@@ -1048,6 +1108,7 @@ export default function MenuEditorScreen() {
                         showGrabber: showDragHint,
                       },
                   onPress: readOnly ? () => openRecipeDetail(item) : undefined,
+                  specialsPage: isSpecialsPage,
                   metaTags: isSpecialsPage
                     ? [
                         ...(organization.menu_count === 2 ? [menuBadgeForSeason(item.season).label] : []),
@@ -1076,10 +1137,15 @@ export default function MenuEditorScreen() {
   const subTabs = useMemo(() => {
     const cat = catOf(selectedCategory);
     if (!cat) return [];
-    return cat.subcategories
+    const tabs = cat.subcategories
       .filter((s) => !s.is_hidden)
       .map((s) => ({ name: s.display_name, label: labelForSubcategoryName(s.display_name, t, menuCats, language) }));
-  }, [catOf, selectedCategory, menuCats, t, language]);
+    // Tab order IS page order — Unsorted closes the row while its page exists.
+    const hasUnsorted = pages.some(
+      (p) => p.subcategory === UNSORTED_PAGE_KEY && catKey(p.category) === catKey(selectedCategory),
+    );
+    return hasUnsorted ? [...tabs, { name: UNSORTED_PAGE_KEY, label: t('menu_editor:unsorted') }] : tabs;
+  }, [catOf, selectedCategory, menuCats, pages, t, language]);
   const activeCategoryColor = catOf(selectedCategory)?.color || colors.primary;
 
   return (
@@ -1100,7 +1166,7 @@ export default function MenuEditorScreen() {
           mode="editor"
           showActionChips
           onOpenMenuSheet={() => setMenuSheetVisible(true)}
-          onFlipSide={() => router.back()}
+          onFlipSide={goToMenu}
           season={season}
           onSeasonChange={setSeason}
           showMenuTabs={isSearchMode && organization.menu_count === 2}
@@ -1306,12 +1372,12 @@ export default function MenuEditorScreen() {
         editingItem={editSheet.item}
         initialSeason={season}
         initialCategory={!isSearchMode ? selectedCategory || null : null}
-        initialSubcategory={!isSearchMode ? selectedSubcategory : null}
+        initialSubcategory={!isSearchMode && selectedSubcategory !== UNSORTED_PAGE_KEY ? selectedSubcategory : null}
         computeNextOrder={computeNextOrder}
       />
 
-      {/* The ⚙ Menu sheet — same sheet as the user side; Edit Menu is a no-op
-          here (we are already in the editor, the row just closes the sheet). */}
+      {/* The ⚙ Menu sheet — same sheet as the user side; in editor mode its
+          first row reads "Back to Menu" and lands on the user-side Menu. */}
       {user && (
         <MenuSheet
           visible={menuSheetVisible}
@@ -1320,7 +1386,7 @@ export default function MenuEditorScreen() {
           role={user.role === 'owner' ? 'owner' : 'manager'}
           mode="editor"
           perms={managerPerms}
-          onEditMenu={() => router.back()}
+          onEditMenu={goToMenu}
           onEditCategories={() => router.push('/manage-menu-categories' as any)}
           onMenuConfiguration={handleMenuConfiguration}
           quota={uploadQuota}

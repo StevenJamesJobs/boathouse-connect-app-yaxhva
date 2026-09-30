@@ -19,6 +19,8 @@ export interface Organization {
   allow_self_signup: boolean;
   menu_count: 1 | 2;
   menu_category_scope: 'shared' | 'per_menu';
+  /** One-menu orgs only: Menu 2's cocktail recipes stay open in the Bar Assistant (s88). */
+  menu2_recipes_visible: boolean;
   menu_1_name: string;
   menu_2_name: string;
   menu_1_icon: string;
@@ -63,6 +65,7 @@ const DEFAULT_ORG: Organization = {
   allow_self_signup: true,
   menu_count: 2,
   menu_category_scope: 'shared',
+  menu2_recipes_visible: false,
   menu_1_name: 'Winter',
   menu_2_name: 'Summer',
   menu_1_icon: 'snowflake',
@@ -117,6 +120,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
         allow_self_signup: orgData.allow_self_signup ?? true,
         menu_count: (orgData.menu_count as 1 | 2) || DEFAULT_ORG.menu_count,
         menu_category_scope: orgData.menu_category_scope === 'per_menu' ? 'per_menu' : 'shared',
+        menu2_recipes_visible: orgData.menu2_recipes_visible === true,
         menu_1_name: orgData.menu_1_name || DEFAULT_ORG.menu_1_name,
         menu_2_name: orgData.menu_2_name || DEFAULT_ORG.menu_2_name,
         menu_1_icon: orgData.menu_1_icon || DEFAULT_ORG.menu_1_icon,

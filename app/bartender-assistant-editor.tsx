@@ -67,6 +67,11 @@ export default function BartenderAssistantEditorScreen() {
   const { perms } = useManagerPermissions();
   const [hub, setHub] = useState<HubData | null>(null);
 
+  // A one-menu restaurant has no Menu 2 libations — its recipes editor tile
+  // and featured rows stay out (any saved Menu 2 recipes are kept, unlisted)
+  // unless the owner chose to keep them visible when going to one menu (s88).
+  const twoMenus = organization?.menu_count === 2 || organization?.menu2_recipes_visible === true;
+
   const loadHub = useCallback(async () => {
     if (!user?.id) return;
     try {
@@ -89,7 +94,7 @@ export default function BartenderAssistantEditorScreen() {
       setHub({
         featured: [
           ...m1Feat.map((r: any) => ({ id: r.id, name: r.name, price: r.price, thumbnail_url: r.thumbnail_url, route: '/libation-recipes-editor' as const })),
-          ...m2Feat.map((r: any) => ({ id: r.id, name: r.name, price: r.price, thumbnail_url: r.thumbnail_url, route: '/summer-libation-recipes-editor' as const })),
+          ...(twoMenus ? m2Feat : []).map((r: any) => ({ id: r.id, name: r.name, price: r.price, thumbnail_url: r.thumbnail_url, route: '/summer-libation-recipes-editor' as const })),
         ],
         m1: { count: m1.length, feat: m1Feat.length, thumbs: firstThumbs(m1) },
         m2: { count: m2.length, feat: m2Feat.length, thumbs: firstThumbs(m2) },
@@ -108,7 +113,7 @@ export default function BartenderAssistantEditorScreen() {
         opening: { items: 0, cats: 0 }, closing: { items: 0, cats: 0 },
       });
     }
-  }, [user?.id]);
+  }, [user?.id, twoMenus]);
 
   useFocusEffect(
     useCallback(() => {
@@ -310,7 +315,7 @@ export default function BartenderAssistantEditorScreen() {
               count: hub.m1.count, feat: hub.m1.feat, thumbs: hub.m1.thumbs,
               route: '/libation-recipes-editor',
             })}
-            {gridTile({
+            {twoMenus && gridTile({
               iconIos: organization?.menu_2_icon || 'sun.max.fill',
               iconAndroid: menuIconAndroid(organization?.menu_2_icon || 'sun.max.fill'),
               name: `${organization?.menu_2_name || 'Summer'} ${t('bartender_assistant_editor.libation_recipes_editor_suffix')}`,

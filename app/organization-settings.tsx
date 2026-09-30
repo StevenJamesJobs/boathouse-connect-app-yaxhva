@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -29,12 +29,14 @@ import AmbientGlow from '@/components/AmbientGlow';
 import ScreenHeader from '@/components/ScreenHeader';
 import HeaderNavButton from '@/components/HeaderNavButton';
 import GlassCard from '@/components/GlassCard';
+import GlassSheet, { useSheetHandoff } from '@/components/GlassSheet';
 import { NestableScrollContainer } from 'react-native-draggable-flatlist';
 import MenuIconPicker from '@/components/MenuIconPicker';
+import MenuSheet from '@/components/MenuSheet';
 import JobTitlesManager from '@/components/JobTitlesManager';
 import AssistantsManager from '@/components/AssistantsManager';
 import { supabase } from '@/app/integrations/supabase/client';
-import { brokerUploadImage } from '@/utils/storageBroker';
+import { brokerUploadImage, brokerDelete } from '@/utils/storageBroker';
 import { translateServerError } from '@/utils/serverErrors';
 import { fonts } from '@/constants/fonts';
 
@@ -220,6 +222,50 @@ export default function OrganizationSettingsScreen() {
   const [rewardCurrencyName, setRewardCurrencyName] = useState('');
   const [allowSelfSignup, setAllowSelfSignup] = useState(true);
   const [menuCount, setMenuCount] = useState<1 | 2>(2);
+  // ── ⚙ Menu sheet (s88): the Menu family's chip, on the Menu Configuration
+  // card, so this page is one tap from the editor / categories / upload —
+  // the same wiring as the menu editor and the categories page.
+  const [menuSheetVisible, setMenuSheetVisible] = useState(false);
+  const [uploadQuota, setUploadQuota] = useState<{ remaining: number; max: number; freeAvailable: boolean } | null>(null);
+  const fetchQuota = useCallback(async () => {
+    if (!user?.id || !organizationId) return;
+    try {
+      const { data } = await supabase.rpc('get_menu_upload_quota', {
+        p_user_id: user.id,
+        p_organization_id: organizationId,
+      });
+      const result = data as any;
+      if (result?.success) {
+        setUploadQuota({
+          remaining: result.credits_remaining ?? 0,
+          max: result.monthly_allowance ?? 0,
+          freeAvailable: result.free_available === true,
+        });
+      }
+    } catch (e) {
+      console.error('Error loading menu upload quota:', e);
+    }
+  }, [user?.id, organizationId]);
+  useEffect(() => {
+    if (menuSheetVisible) fetchQuota();
+  }, [menuSheetVisible, fetchQuota]);
+
+  // ── Going from two menus to one (s88): Menu 2 leaves the guest menu, so its
+  // items and its cocktail recipes need a decision. Ask ONCE, at Save, in one
+  // sheet: items keep (hidden) | delete (owner only) · recipes keep (hidden) |
+  // visible (the Bar Assistant keeps listing them) | delete. Deletes are real
+  // deletes (retire_menu2), run only AFTER the switch to one menu is saved.
+  // The answer rides a REF: Save is re-entered in the same tick, before any
+  // state written here could land.
+  const [menu2Prompt, setMenu2Prompt] = useState<{ items: number; recipes: number } | null>(null);
+  const [m2ItemsChoice, setM2ItemsChoice] = useState<'keep' | 'delete'>('keep');
+  const [m2RecipesChoice, setM2RecipesChoice] = useState<'keep' | 'visible' | 'delete'>('keep');
+  const menu2Decision = useRef<{ items: 'keep' | 'delete'; recipes: 'keep' | 'visible' | 'delete' } | null>(null);
+  // Points at the CURRENT handleSave (assigned right after its definition).
+  // Declared up here: hooks must sit above the owner/grant early returns.
+  const handleSaveRef = useRef<() => void>(() => {});
+  const closeMenu2Prompt = useCallback(() => setMenu2Prompt(null), []);
+  const { defer: deferMenu2, onDismiss: onMenu2Dismiss } = useSheetHandoff(closeMenu2Prompt);
   const [menu1Name, setMenu1Name] = useState('');
   const [menu2Name, setMenu2Name] = useState('');
   const [menu1Icon, setMenu1Icon] = useState('snowflake');
@@ -530,6 +576,26 @@ export default function OrganizationSettingsScreen() {
     }
     if (!organizationId || !user?.id) return;
 
+    // Two menus → one: settle what happens to Menu 2's items + recipes first (above).
+    const savesMenu = !scopedEntry || perms.menuConfig;
+    const retiringMenu2 = savesMenu && organization.menu_count === 2 && menuCount === 1;
+    if (retiringMenu2 && menu2Decision.current === null) {
+      const [{ data: m2Items }, { data: m2Recipes }] = await Promise.all([
+        supabase.rpc('get_menu_items', { p_actor_id: user.id, p_season: 'summer' }),
+        supabase.rpc('get_summer_libation_recipes', { p_actor_id: user.id }),
+      ]);
+      const items = (m2Items || []).filter((r) => r.season === 'summer').length;
+      const recipes = (m2Recipes || []).length;
+      if (items > 0 || recipes > 0) {
+        setM2ItemsChoice('keep');
+        setM2RecipesChoice('keep');
+        setMenu2Prompt({ items, recipes });
+        return;
+      }
+    }
+    const menu2Plan = retiringMenu2 ? menu2Decision.current : null;
+    menu2Decision.current = null;
+
     // Detect a newly added / changed Google Maps query so we can auto-import
     // reviews after saving (only when it actually changed — avoids a needless
     // Outscraper call on unrelated saves). Only when this save writes branding,
@@ -605,6 +671,31 @@ export default function OrganizationSettingsScreen() {
         return;
       }
 
+      // Menu 2's fate — only now that the switch to one menu is saved. A
+      // failure here leaves everything saved (hidden), never half-deleted.
+      if (menu2Plan) {
+        const { data: rData, error: rErr } = await supabase.rpc('retire_menu2', {
+          p_user_id: user.id,
+          p_organization_id: organizationId,
+          p_items_action: menu2Plan.items,
+          p_recipes_action: menu2Plan.recipes,
+          // Deleting the menu leaves no loose ends: its own custom categories
+          // (per-menu scope) go with it, like the AI-upload page's delete.
+          p_delete_custom_categories: menu2Plan.items === 'delete',
+        });
+        const rRes: any = typeof rData === 'string' ? JSON.parse(rData) : rData;
+        if (rErr || !rRes?.success) {
+          console.error('[OrgSettings] retire_menu2 failed:', rErr ?? rRes?.error);
+          Alert.alert(t('common:error'), translateServerError(rErr ?? { message: rRes?.error }, t('org_settings.menu2_retire_failed')));
+        } else {
+          // The rows are gone — now the files (best effort, 10 per broker call).
+          const itemUrls: string[] = Array.isArray(rRes.item_thumbnail_urls) ? rRes.item_thumbnail_urls : [];
+          const recipeUrls: string[] = Array.isArray(rRes.recipe_thumbnail_urls) ? rRes.recipe_thumbnail_urls : [];
+          for (let i = 0; i < itemUrls.length; i += 10) brokerDelete('menu-items', itemUrls.slice(i, i + 10), user.id);
+          for (let i = 0; i < recipeUrls.length; i += 10) brokerDelete('summer-libation-recipe-images', recipeUrls.slice(i, i + 10), user.id);
+        }
+      }
+
       await refreshOrganization();
 
       // If the Google Maps query was just added or changed, import reviews — but
@@ -630,6 +721,41 @@ export default function OrganizationSettingsScreen() {
     } finally {
       setSaving(false);
     }
+  };
+
+  // The delete confirmation's button fires a render later — it must call the
+  // CURRENT handleSave (assigned after the definition, never inside it).
+  handleSaveRef.current = handleSave;
+
+  // One radio row of the two-menus → one sheet.
+  const menu2Choice = (o: {
+    picked: boolean;
+    onPress: () => void;
+    icon: { ios: string; android: string };
+    label: string;
+    sub: string;
+    danger?: boolean;
+    disabled?: boolean;
+  }) => {
+    const tint = o.danger ? '#E53935' : colors.primary;
+    return (
+      <TouchableOpacity
+        key={o.label}
+        style={[styles.choiceRow, o.picked && { borderColor: tint }, o.disabled && styles.choiceRowOff]}
+        activeOpacity={0.7}
+        disabled={o.disabled}
+        onPress={o.onPress}
+      >
+        <View style={[styles.choiceRadio, { borderColor: o.picked ? tint : colors.textSecondary }]}>
+          {o.picked && <View style={[styles.choiceRadioDot, { backgroundColor: tint }]} />}
+        </View>
+        <IconSymbol ios_icon_name={o.icon.ios} android_material_icon_name={o.icon.android} size={17} color={tint} />
+        <View style={styles.choiceBody}>
+          <Text style={[styles.choiceLabel, o.danger && { color: '#E53935' }]}>{o.label}</Text>
+          <Text style={styles.choiceSub}>{o.sub}</Text>
+        </View>
+      </TouchableOpacity>
+    );
   };
 
   // Save ONLY the Google Maps location + re-import reviews, without a full
@@ -1037,7 +1163,16 @@ export default function OrganizationSettingsScreen() {
           <View style={{ width: SCREEN_WIDTH }}>
             <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" nestedScrollEnabled showsVerticalScrollIndicator={false}>
             <GlassCard variant="surface" radius={17} style={styles.sectionCard}>
-              <Text style={styles.sectionTitle}>{t('onboarding:step2_title', 'Menu Configuration')}</Text>
+              <View style={styles.sectionTitleRow}>
+                <Text style={[styles.sectionTitle, styles.sectionTitleInRow]} numberOfLines={1}>
+                  {t('onboarding:step2_title', 'Menu Configuration')}
+                </Text>
+                {/* The ⚙ "Menu" chip — same pill as the Menus page / editor. */}
+                <TouchableOpacity style={styles.menuChip} onPress={() => setMenuSheetVisible(true)} activeOpacity={0.7}>
+                  <IconSymbol ios_icon_name="gearshape.fill" android_material_icon_name="settings" size={15} color={colors.text} />
+                  <Text style={styles.menuChipLabel}>{t('menu_sheet.title')}</Text>
+                </TouchableOpacity>
+              </View>
 
               {/* Number of menus */}
               <View style={styles.fieldContainer}>
@@ -1149,6 +1284,15 @@ export default function OrganizationSettingsScreen() {
                 </View>
               )}
             </GlassCard>
+            {/* Heads-up before the 2 → 1 questions land (the sheet only opens on Save). */}
+            {organization.menu_count === 2 && menuCount === 1 && (
+              <View style={styles.menu2HeadsUp}>
+                <IconSymbol ios_icon_name="info.circle" android_material_icon_name="info" size={15} color={colors.primary} />
+                <Text style={styles.menu2HeadsUpText}>
+                  {t('org_settings.menu2_heads_up', { menu: menu2Name.trim() || 'Menu 2' })}
+                </Text>
+              </View>
+            )}
             {saveButtonNode}
             <View style={{ height: 60 }} />
             </ScrollView>
@@ -1350,6 +1494,122 @@ export default function OrganizationSettingsScreen() {
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Two menus → one: what happens to Menu 2's items and cocktail recipes. */}
+      <GlassSheet
+        visible={menu2Prompt !== null}
+        onClose={closeMenu2Prompt}
+        onDismiss={onMenu2Dismiss}
+        title={t('org_settings.menu2_title', { menu: menu2Name.trim() || 'Menu 2' })}
+        subtitle={t('org_settings.menu2_sub', { menu: menu2Name.trim() || 'Menu 2' })}
+      >
+        {(menu2Prompt?.items ?? 0) > 0 && (
+          <View style={styles.choiceGroup}>
+            <Text style={styles.choiceGroupLabel}>
+              {t('org_settings.menu2_items_label', { count: menu2Prompt?.items ?? 0 })}
+            </Text>
+            {menu2Choice({
+              picked: m2ItemsChoice === 'keep',
+              onPress: () => setM2ItemsChoice('keep'),
+              icon: { ios: 'archivebox.fill', android: 'inventory-2' },
+              label: t('org_settings.menu2_items_keep'),
+              sub: t('org_settings.menu2_items_keep_sub'),
+            })}
+            {menu2Choice({
+              picked: m2ItemsChoice === 'delete',
+              onPress: () => setM2ItemsChoice('delete'),
+              icon: { ios: 'trash', android: 'delete' },
+              label: t('org_settings.menu2_items_delete'),
+              sub: user?.role === 'owner'
+                ? t('org_settings.menu2_items_delete_sub', { count: menu2Prompt?.items ?? 0 })
+                : t('org_settings.menu2_items_delete_owner_only'),
+              danger: true,
+              disabled: user?.role !== 'owner',
+            })}
+          </View>
+        )}
+        {(menu2Prompt?.recipes ?? 0) > 0 && (
+          <View style={styles.choiceGroup}>
+            <Text style={styles.choiceGroupLabel}>
+              {t('org_settings.menu2_recipes_label', { count: menu2Prompt?.recipes ?? 0 })}
+            </Text>
+            {menu2Choice({
+              picked: m2RecipesChoice === 'visible',
+              onPress: () => setM2RecipesChoice('visible'),
+              icon: { ios: 'eye.fill', android: 'visibility' },
+              label: t('org_settings.menu2_recipes_visible'),
+              sub: t('org_settings.menu2_recipes_visible_sub'),
+            })}
+            {menu2Choice({
+              picked: m2RecipesChoice === 'keep',
+              onPress: () => setM2RecipesChoice('keep'),
+              icon: { ios: 'archivebox.fill', android: 'inventory-2' },
+              label: t('org_settings.menu2_recipes_keep'),
+              sub: t('org_settings.menu2_recipes_keep_sub'),
+            })}
+            {menu2Choice({
+              picked: m2RecipesChoice === 'delete',
+              onPress: () => setM2RecipesChoice('delete'),
+              icon: { ios: 'trash', android: 'delete' },
+              label: t('org_settings.menu2_recipes_delete'),
+              sub: t('org_settings.menu2_recipes_delete_sub', { count: menu2Prompt?.recipes ?? 0 }),
+              danger: true,
+            })}
+          </View>
+        )}
+        <TouchableOpacity
+          style={styles.menu2Cta}
+          activeOpacity={0.85}
+          onPress={() => {
+            const plan = {
+              items: (menu2Prompt?.items ?? 0) > 0 ? m2ItemsChoice : ('keep' as const),
+              recipes: (menu2Prompt?.recipes ?? 0) > 0 ? m2RecipesChoice : ('keep' as const),
+            };
+            const go = () => {
+              menu2Decision.current = plan;
+              handleSaveRef.current();
+            };
+            if (plan.items === 'delete' || plan.recipes === 'delete') {
+              const what = [
+                plan.items === 'delete' ? t('org_settings.menu2_confirm_items', { count: menu2Prompt?.items ?? 0 }) : null,
+                plan.recipes === 'delete' ? t('org_settings.menu2_confirm_recipes', { count: menu2Prompt?.recipes ?? 0 }) : null,
+              ].filter(Boolean).join(t('org_settings.menu2_confirm_join'));
+              deferMenu2(() =>
+                Alert.alert(
+                  t('org_settings.menu2_confirm_title'),
+                  t('org_settings.menu2_confirm_msg', { what, menu: menu2Name.trim() || 'Menu 2' }),
+                  [
+                    { text: t('common:cancel'), style: 'cancel' },
+                    { text: t('common:delete'), style: 'destructive', onPress: go },
+                  ],
+                ),
+              );
+            } else {
+              deferMenu2(go);
+            }
+          }}
+        >
+          <Text style={styles.menu2CtaText}>{t('org_settings.menu2_cta')}</Text>
+        </TouchableOpacity>
+      </GlassSheet>
+
+      {/* The ⚙ Menu sheet — same sheet as the Menus page; Menu Configuration
+          is a no-op here (we are already on it, the row just closes the sheet). */}
+      {user && (
+        <MenuSheet
+          visible={menuSheetVisible}
+          onClose={() => setMenuSheetVisible(false)}
+          colors={colors}
+          role={user.role === 'owner' ? 'owner' : 'manager'}
+          mode="user"
+          perms={perms}
+          onEditMenu={() => router.push('/menu-editor' as any)}
+          onEditCategories={() => router.push('/manage-menu-categories' as any)}
+          onMenuConfiguration={() => {}}
+          quota={uploadQuota}
+          refreshQuota={fetchQuota}
+        />
+      )}
     </View>
   );
 }
@@ -1405,6 +1665,74 @@ function createStyles(colors: any) {
       color: colors.text,
       marginBottom: 12,
     },
+    sectionTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      marginBottom: 12,
+    },
+    sectionTitleInRow: { flex: 1, marginBottom: 0 },
+    menuChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      height: 38,
+      paddingHorizontal: 12,
+      borderRadius: 12,
+      backgroundColor: colors.glass,
+      borderWidth: StyleSheet.hairlineWidth + 0.5,
+      borderColor: colors.glassBorder,
+    },
+    menuChipLabel: { fontFamily: fonts.body.semibold, fontSize: 13, color: colors.text },
+    choiceRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      minHeight: 56,
+      borderRadius: 13,
+      backgroundColor: colors.surface,
+      borderWidth: StyleSheet.hairlineWidth + 0.5,
+      borderColor: colors.surfaceBorder,
+    },
+    choiceRowOff: { opacity: 0.45 },
+    choiceRadio: { width: 18, height: 18, borderRadius: 9, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+    choiceRadioDot: { width: 9, height: 9, borderRadius: 4.5 },
+    choiceGroup: { gap: 8, marginBottom: 14 },
+    choiceGroupLabel: {
+      fontFamily: fonts.mono.medium,
+      fontSize: 10.5,
+      letterSpacing: 1.4,
+      textTransform: 'uppercase',
+      color: colors.textSecondary,
+      marginBottom: 2,
+    },
+    choiceBody: { flex: 1, minWidth: 0 },
+    choiceLabel: { fontFamily: fonts.display.semibold, fontSize: 15, color: colors.text },
+    choiceSub: { fontFamily: fonts.body.regular, fontSize: 11.5, lineHeight: 16, marginTop: 2, color: colors.textSecondary },
+    menu2HeadsUp: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 9,
+      paddingHorizontal: 13,
+      paddingVertical: 11,
+      borderRadius: 13,
+      backgroundColor: colors.primary + '14',
+      borderWidth: StyleSheet.hairlineWidth + 0.5,
+      borderColor: colors.primary + '55',
+      marginBottom: 12,
+    },
+    menu2HeadsUpText: { flex: 1, fontFamily: fonts.body.semibold, fontSize: 12.5, lineHeight: 17, color: colors.text },
+    menu2Cta: {
+      height: 50,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.primary,
+      marginTop: 4,
+    },
+    menu2CtaText: { fontFamily: fonts.display.bold, fontSize: 15.5, color: colors.fireText },
     fieldContainer: {
       marginBottom: 16,
     },
