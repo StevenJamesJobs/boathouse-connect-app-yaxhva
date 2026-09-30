@@ -90,12 +90,16 @@ type Season = 'winter' | 'summer';
 
 // The category tree (and each category's accent color) is loaded per-org from
 // the DB via useMenuCategories. The swipe-pager page sequence — one page per
-// subcategory plus a virtual 'All' page per category — is derived per-render in
-// the component. 'All' is never persisted; it stays a display-only affordance.
-const ALL_PAGE_KEY = 'All';
+// subcategory — is derived per-render in the component. s88: the virtual 'All'
+// page is gone (its tab sat FIRST while its page sat LAST, so swipes and tabs
+// disagreed). A category's stray items — its own items that match none of its
+// subcategories — get a trailing 'Other' page instead, present only while such
+// items exist; tab and page both sit at the END. Never persisted.
+const OTHER_PAGE_KEY = '__other__';
 
-// The subcategory-tab row's virtual 'All' entry (rendered FIRST, never persisted).
-const SUB_ALL_TAB = '__all__';
+// Cocktail recipes injected into Libations carry these id prefixes (see
+// fetchSeasonItems) — they are placed by the recipe editors, never strays.
+const isInjectedRecipe = (id: string) => id.startsWith('lr-') || id.startsWith('slr-');
 
 interface PageConfig {
   category: string;
@@ -140,9 +144,30 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
   // Default to Menu 1 (winter slot) for everyone — the more natural landing menu.
   const [season, setSeason] = useState<Season>('winter');
   // In per-menu scope the active season selects which menu's category tree to render.
-  const { categories: menuCats, loading: categoriesLoading } = useMenuCategories({
+  // Loaded WITH hidden rows: the pager renders the visible tree (menuCats), but
+  // the 'Other' page must tell "in a hidden subcategory" (stays hidden) from
+  // "in no subcategory at all" (a stray) — hiddenSubKeys below.
+  const { categories: menuCatsAll, loading: categoriesLoading } = useMenuCategories({
+    includeHidden: true,
     menuSlot: season === 'winter' ? 1 : 2,
   });
+  const menuCats = useMemo(
+    () =>
+      menuCatsAll
+        .filter((c) => !c.is_hidden)
+        .map((c) => ({ ...c, subcategories: c.subcategories.filter((sub) => !sub.is_hidden) })),
+    [menuCatsAll],
+  );
+  const hiddenSubKeys = useMemo(() => {
+    const out = new Map<string, Set<string>>();
+    for (const c of menuCatsAll) {
+      out.set(
+        catKey(c.display_name),
+        new Set(c.subcategories.filter((sub) => sub.is_hidden).map((sub) => catKey(sub.display_name))),
+      );
+    }
+    return out;
+  }, [menuCatsAll]);
   // Filter-sheet Categories needs BOTH menus' trees regardless of which one
   // the pager is showing (menuCats above tracks the PAGER's season only) —
   // two slot-pinned calls, always mounted (hooks can't be conditional). In
@@ -173,9 +198,13 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     (item: MenuItem, categoryName: string): boolean => {
       const fb = catOf(categoryName)?.filter_behavior;
       // Per-menu treats Lunch/Dinner as normal categories (placement by assignment);
-      // shared mode keeps the meal-availability overlay.
-      if (!perMenu && fb === 'lunch') return item.available_for_lunch;
-      if (!perMenu && fb === 'dinner') return item.available_for_dinner;
+      // shared mode keeps the meal-availability overlay. An item filed under
+      // this very category with NEITHER meal ticked still shows here (s88: such
+      // rows matched no page at all; the edit sheet no longer saves them).
+      const ownNoMeal =
+        !item.available_for_lunch && !item.available_for_dinner && catKey(item.category) === catKey(categoryName);
+      if (!perMenu && fb === 'lunch') return item.available_for_lunch || ownNoMeal;
+      if (!perMenu && fb === 'dinner') return item.available_for_dinner || ownNoMeal;
       // Weekly Specials is an overlay: items flagged is_weekly_special surface
       // here too, on top of items actually categorized as Weekly Specials.
       if (fb === 'weekly_specials') return catKey(item.category) === catKey(categoryName) || !!item.is_weekly_special;
@@ -218,8 +247,10 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
   const filterCatMatches = useCallback(
     (item: MenuItem, categoryName: string): boolean => {
       const fb = unionCatOf(categoryName)?.filter_behavior;
-      if (!perMenu && fb === 'lunch') return item.available_for_lunch;
-      if (!perMenu && fb === 'dinner') return item.available_for_dinner;
+      const ownNoMeal =
+        !item.available_for_lunch && !item.available_for_dinner && catKey(item.category) === catKey(categoryName);
+      if (!perMenu && fb === 'lunch') return item.available_for_lunch || ownNoMeal;
+      if (!perMenu && fb === 'dinner') return item.available_for_dinner || ownNoMeal;
       if (fb === 'weekly_specials') return catKey(item.category) === catKey(categoryName) || !!item.is_weekly_special;
       return catKey(item.category) === catKey(categoryName);
     },
@@ -271,8 +302,20 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     const isSpecials = catOf(page.category)?.filter_behavior === 'weekly_specials';
     let filtered = (isSpecials ? allItems : menuItems).filter(item => categoryMatches(item, page.category));
 
-    // Filter by subcategory if not null and not the virtual "All" page
-    if (page.subcategory && page.subcategory !== ALL_PAGE_KEY) {
+    if (page.subcategory === OTHER_PAGE_KEY) {
+      // The category's strays: its OWN items (never another category's meal
+      // overlay) whose subcategory is none of the visible ones — and not a
+      // hidden one either, hidden stays hidden.
+      const visible = new Set((catOf(page.category)?.subcategories || []).map((sub) => catKey(sub.display_name)));
+      const hidden = hiddenSubKeys.get(catKey(page.category));
+      filtered = filtered.filter(
+        (item) =>
+          catKey(item.category) === catKey(page.category) &&
+          !isInjectedRecipe(item.id) &&
+          !visible.has(catKey(item.subcategory)) &&
+          !hidden?.has(catKey(item.subcategory)),
+      );
+    } else if (page.subcategory) {
       filtered = filtered.filter(item => catKey(item.subcategory) === catKey(page.subcategory));
     }
 
@@ -281,11 +324,11 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     if (isSpecials) filtered = [...filtered].sort(compareBySectionThenOrder);
 
     return filtered;
-  }, [menuItems, allItems, categoryMatches, catOf]);
+  }, [menuItems, allItems, categoryMatches, catOf, hiddenSubKeys]);
 
-  // Build pages from the loaded category tree — one page per subcategory plus a
-  // virtual 'All' page per category — minus pages that would render empty for
-  // the active menu. Emptiness is computed AFTER cocktail-recipe injection
+  // Build pages from the loaded category tree — one page per subcategory, plus
+  // the trailing 'Other' page while a category has strays — minus pages that
+  // would render empty for the active menu. Emptiness is computed AFTER cocktail-recipe injection
   // (counts read menuItems/allItems); while items are loading the unfiltered
   // build is returned — the pager is unmounted behind the spinner, so nothing
   // flashes. The bridge page is prepended in PAGES below.
@@ -298,7 +341,6 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
           out.push({ category: cat.display_name, subcategory: null });
         } else {
           for (const sub of subs) out.push({ category: cat.display_name, subcategory: sub.display_name });
-          out.push({ category: cat.display_name, subcategory: ALL_PAGE_KEY });
         }
       }
       return out;
@@ -312,20 +354,19 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
         if (count({ category: name, subcategory: null }) > 0) out.push({ category: name, subcategory: null });
         continue;
       }
-      const allPage: PageConfig = { category: name, subcategory: ALL_PAGE_KEY };
-      const allCount = count(allPage);
-      if (allCount === 0) continue; // whole category empty for this menu
+      // A null-subcategory page applies no sub filter — the whole category.
+      if (count({ category: name, subcategory: null }) === 0) continue; // empty for this menu
+      const otherPage: PageConfig = { category: name, subcategory: OTHER_PAGE_KEY };
       const survivors = cat.subcategories
         .map((s): PageConfig => ({ category: name, subcategory: s.display_name }))
         .filter((p) => count(p) > 0);
       if (survivors.length === 0) {
         // Items exist but none match a visible subcategory — collapse to one
-        // page (a null-subcategory page applies no sub filter, same set as 'All').
+        // unfiltered page rather than a lone 'Other' tab.
         out.push({ category: name, subcategory: null });
-      } else if (survivors.length === 1 && count(survivors[0]) === allCount) {
-        out.push(survivors[0]); // 'All' would duplicate the only surviving sub-page
       } else {
-        out.push(...survivors, allPage); // 'All' keeps null-/stale-subcategory items reachable
+        out.push(...survivors);
+        if (count(otherPage) > 0) out.push(otherPage); // strays stay reachable
       }
     }
     if (out.length === 0) {
@@ -592,15 +633,16 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
   const currentPage = PAGES[currentPageIndex];
   const selectedCategory = currentPage?.category || '';
   const selectedSubcategory = currentPage?.subcategory || null;
-  // Surviving sub-page names for the selected category ('All' included only
-  // when it survived the empty-page filter; empty => no sub row).
+  // Surviving sub-page names for the selected category, in page order ('Other'
+  // last, only while it has strays; empty => no sub row).
   const visibleSubNames = useMemo(
     () => menuPages.filter((p) => catKey(p.category) === catKey(selectedCategory) && p.subcategory !== null).map((p) => p.subcategory as string),
     [menuPages, selectedCategory],
   );
 
   const getCategoryLabel = (category: string) => labelForCategoryName(category, t, menuCats, language);
-  const getSubcategoryLabel = (subcategory: string) => labelForSubcategoryName(subcategory, t, menuCats, language);
+  const getSubcategoryLabel = (subcategory: string) =>
+    subcategory === OTHER_PAGE_KEY ? t('menu_display.other') : labelForSubcategoryName(subcategory, t, menuCats, language);
 
   // Full dietary labels (filter sheet) + card abbreviations, via literal t()
   // calls so the i18n harvester sees every key.
@@ -927,7 +969,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     const switching = !!wantSeason && wantSeason !== season && organization.menu_count === 2;
     if (switching) setSeason(wantSeason as Season);
     const t1 = setTimeout(() => {
-      navigateToPageRef.current(item.category, item.subcategory ?? null);
+      navigateToPageRef.current(item.category, item.subcategory ?? OTHER_PAGE_KEY);
       setTimeout(() => openDetailSheet(item), 380);
     }, switching ? 480 : 80);
     return () => clearTimeout(t1);
@@ -1012,6 +1054,11 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     const target = catKey(category);
     if (subcategory) {
       targetIndex = PAGES.findIndex(p => catKey(p.category) === target && catKey(p.subcategory) === catKey(subcategory));
+      // A stray's own subcategory has no page — land on the category's 'Other'.
+      if (targetIndex < 0) {
+        targetIndex = PAGES.findIndex(p => catKey(p.category) === target && p.subcategory === OTHER_PAGE_KEY);
+      }
+      if (targetIndex < 0) targetIndex = PAGES.findIndex(p => catKey(p.category) === target);
     } else {
       targetIndex = PAGES.findIndex(p => catKey(p.category) === target);
     }
@@ -1057,6 +1104,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     if (organization.menu_count === 2) return `${menuBadgeForSeason(item.season).label} · ${cat}`;
     return cat;
   };
+  const hasSpecialsCat = menuCats.some((c) => c.filter_behavior === 'weekly_specials');
 
   // ── Cards ──────────────────────────────────────────────────────────────────
   // Compute the shared display props once and dispatch to the presentational
@@ -1075,6 +1123,11 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     // don't crop into a 152pt band) but DOES carry the left thumb like every
     // other row — Steve's smoke call reversed the mockup's hidden wine thumb.
     const isBanner = !isWine && item.thumbnail_shape === 'banner' && !!item.thumbnail_url;
+    // s88: a featured item wears the Special chip everywhere BUT the specials
+    // page itself (every card there is one) — and only while the org shows a
+    // specials category for it to be on.
+    const special =
+      !specialsContext && item.is_weekly_special && hasSpecialsCat ? t('menu_display.special') : null;
 
     if (isBanner) {
       return (
@@ -1086,6 +1139,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
           thumbnailUrl={thumbnailUrl!}
           eyebrow={bannerEyebrowText(item)}
           priceLabel={formatPrice(item.price)}
+          special={special}
           catColor={categoryColor}
           onPress={() => openDetailSheet(item)}
         />
@@ -1122,6 +1176,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
         dietaryAbbrevs={dietaryAbbrevs}
         metaTags={metaTags}
         menuBadge={specialsContext ? undefined : menuBadge}
+        special={special}
         catColor={categoryColor}
         onPress={() => openDetailSheet(item)}
       />
@@ -1172,7 +1227,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
               <Text style={styles.countRowText} numberOfLines={1}>
                 {t('menu_editor:items_count', { count: pageItems.length })}
                 {' · '}
-                {page.subcategory && page.subcategory !== ALL_PAGE_KEY
+                {page.subcategory
                   ? getSubcategoryLabel(page.subcategory)
                   : getCategoryLabel(page.category)}
               </Text>
@@ -1194,7 +1249,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
                   </Text>
                   <TouchableOpacity
                     style={styles.setupMenuButton}
-                    onPress={() => router.push('/menu-editor' as any)}
+                    onPress={() => router.push({ pathname: '/menu-editor', params: { from: 'menu' } } as any)}
                     activeOpacity={0.85}
                   >
                     <IconSymbol ios_icon_name="sparkles" android_material_icon_name="auto-awesome" size={18} color={colors.fireText} />
@@ -1230,19 +1285,19 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     })),
     [visibleCats, menuCats, t, language],
   );
-  const subTabs = useMemo(() => {
-    const hasAll = visibleSubNames.includes(ALL_PAGE_KEY);
-    const subs = visibleSubNames
-      .filter((s) => s !== ALL_PAGE_KEY)
-      .map((s) => ({ name: s, label: labelForSubcategoryName(s, t, menuCats, language) }));
-    // The virtual 'All' entry renders FIRST in the row (the All PAGE stays at
-    // the end of the category's page run — row order is display-only).
-    return hasAll ? [{ name: SUB_ALL_TAB, label: t('menu_display.all') }, ...subs] : subs;
-  }, [visibleSubNames, menuCats, t, language]);
-  const activeSubTab = selectedSubcategory === ALL_PAGE_KEY ? SUB_ALL_TAB : (selectedSubcategory || '');
+  // Tab order IS page order — a swipe and a tap always agree.
+  const subTabs = useMemo(
+    () =>
+      visibleSubNames.map((s) => ({
+        name: s,
+        label: s === OTHER_PAGE_KEY ? t('menu_display.other') : labelForSubcategoryName(s, t, menuCats, language),
+      })),
+    [visibleSubNames, menuCats, t, language],
+  );
+  const activeSubTab = selectedSubcategory || '';
   const activeCategoryColor = catOf(selectedCategory)?.color || colors.primary;
   const handleSelectSubcategory = (name: string) => {
-    navigateToPage(selectedCategory, name === SUB_ALL_TAB ? ALL_PAGE_KEY : name);
+    navigateToPage(selectedCategory, name);
   };
 
   const activeFilterCount =
@@ -1355,7 +1410,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
           mode="user"
           showActionChips={showActionChips}
           onOpenMenuSheet={() => setMenuSheetVisible(true)}
-          onFlipSide={() => router.push('/menu-editor' as any)}
+          onFlipSide={() => router.push({ pathname: '/menu-editor', params: { from: 'menu' } } as any)}
           season={season}
           onSeasonChange={setSeason}
           // Normal browse mode carries the Menu 1/2 tabs in the COLLAPSING band
@@ -1552,7 +1607,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
           colors={colors}
           role={user.role === 'owner' ? 'owner' : 'manager'}
           perms={managerPerms}
-          onEditMenu={() => router.push('/menu-editor' as any)}
+          onEditMenu={() => router.push({ pathname: '/menu-editor', params: { from: 'menu' } } as any)}
           onEditCategories={() => router.push('/manage-menu-categories' as any)}
           onMenuConfiguration={handleMenuConfiguration}
           quota={uploadQuota}

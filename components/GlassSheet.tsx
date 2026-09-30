@@ -84,6 +84,17 @@ interface GlassSheetProps {
    */
   subtitle?: React.ReactNode;
   /**
+   * Optional mark in the title row, LEFT of the title — e.g. the menu category
+   * sheet's colour dot (s88). Sized by the caller; the row centres it.
+   */
+  titleLeading?: React.ReactNode;
+  /**
+   * Pinned under the title (and subtitle), above the scroll body — a row of
+   * controls that belongs to the title and must not scroll away (s88: the
+   * category sheet's Rename · Colour · Built-in chips).
+   */
+  pinnedHeader?: React.ReactNode;
+  /**
    * Optional control in the title row, left of the ✕ — e.g. the category
    * sheet's Edit / Done toggle. Keeps a sheet-level mode switch out of the body,
    * so it stays put while the body scrolls or turns into a drag list.
@@ -128,6 +139,8 @@ export default function GlassSheet({
   title,
   children,
   subtitle,
+  titleLeading,
+  pinnedHeader,
   headerAction,
   scroll = true,
   footer,
@@ -166,6 +179,7 @@ export default function GlassSheet({
         >
           <View style={[styles.grab, { backgroundColor: colors.glassBorder }]} />
           <View style={[styles.titleRow, !!subtitle && styles.titleRowTight]}>
+            {titleLeading}
             <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
               {title}
             </Text>
@@ -183,6 +197,8 @@ export default function GlassSheet({
           {!!subtitle && (
             <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{subtitle}</Text>
           )}
+
+          {pinnedHeader}
 
           {scroll ? (
             <ScrollView

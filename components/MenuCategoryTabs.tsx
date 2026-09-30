@@ -22,8 +22,8 @@ import { fonts } from '@/constants/fonts';
  * Category chips are squarer glass chips; the ACTIVE chip underlines in that
  * category's OWN colour (category colours are underline + card-fade only, never
  * text colours). Subcategories drop the chip for plain text with a moving
- * underline in the active category's colour; the virtual 'All' entry comes
- * first (name '__all__', never persisted).
+ * underline in the active category's colour. Row order is the caller's page
+ * order (s88: no virtual 'All'; a trailing 'Other' entry may close the row).
  *
  * The backdrop (blur + background wash + hairline bottom rule) fades in over
  * 150ms once the active page is scrolled (`showBackdrop` = scrollY > 6) and is
@@ -37,8 +37,8 @@ export interface MenuCategoryTabsProps {
   categories: { name: string; label: string; color: string }[];
   activeCategory: string;           // raw name (catKey-matched by caller)
   onSelectCategory: (name: string) => void;
-  subcategories: { name: string; label: string }[];  // for the active category, incl. virtual All entry with name '__all__'
-  activeSubcategory: string;        // '__all__' or raw name
+  subcategories: { name: string; label: string }[];  // for the active category, in page order
+  activeSubcategory: string;        // raw name (or the caller's virtual key)
   onSelectSubcategory: (name: string) => void;
   activeColor: string;              // active category's colour (underlines)
   showBackdrop: boolean;            // scrollY > 6

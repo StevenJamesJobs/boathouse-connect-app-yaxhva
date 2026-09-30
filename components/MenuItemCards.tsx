@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { StorageExpoImage } from '@/components/StorageImage';
 import { IconSymbol } from '@/components/IconSymbol';
 import { menuIconAndroid } from '@/constants/menuIcons';
+import { useAppTheme } from '@/contexts/ThemeContext';
 import { fonts } from '@/constants/fonts';
 import type { ThemeColorSet } from '@/styles/commonStyles';
 
@@ -17,6 +18,12 @@ import type { ThemeColorSet } from '@/styles/commonStyles';
  * Wine items always use the square card; the caller decides isBanner
  * (!isWine && banner shape && has photo) before choosing which to render.
  */
+
+// s88 — the "Special" chip: a featured item wears it in its HOME category, so
+// staff paging the menu can tell it is on the specials list too. Gold, one
+// step deeper on light themes; the banner's pill sits on the photo (fixed
+// dark), so it takes the dark-theme gold as a literal.
+const SPECIAL_GOLD = { dark: '#F5B942', light: '#B7791F' } as const;
 
 /** Editor-mode affordances, present only when a card renders inside the
  *  manager editor's DraggableFlatList. `onMeatball` opens the action sheet;
@@ -42,6 +49,8 @@ export interface MenuItemSquareCardProps {
   dietaryAbbrevs: string[];
   metaTags?: string[];
   menuBadge?: { icon: string; label: string } | null;
+  /** The Special chip's label — leads the tag row, ahead of the dietary chips. */
+  special?: string | null;
   catColor: string | null;
   onPress?: () => void;
   editor?: MenuCardEditor;
@@ -55,6 +64,8 @@ export interface MenuItemBannerCardProps {
   updatedAt?: string;
   eyebrow: string;
   priceLabel: string | null;
+  /** The Special chip's label — a photo card has no tag row, so it rides beside the eyebrow. */
+  special?: string | null;
   catColor: string | null;
   onPress?: () => void;
   editor?: MenuCardEditor;
@@ -87,12 +98,15 @@ export function MenuItemSquareCard({
   dietaryAbbrevs,
   metaTags,
   menuBadge,
+  special,
   catColor,
   onPress,
   editor,
 }: MenuItemSquareCardProps) {
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const hasTags = (metaTags && metaTags.length > 0) || dietaryAbbrevs.length > 0;
+  const { mode } = useAppTheme();
+  const gold = mode === 'dark' ? SPECIAL_GOLD.dark : SPECIAL_GOLD.light;
+  const hasTags = !!special || (metaTags && metaTags.length > 0) || dietaryAbbrevs.length > 0;
 
   return (
     <TouchableOpacity
@@ -150,6 +164,12 @@ export function MenuItemSquareCard({
           {/* Chips sit BELOW the description — the mockup's card stack. */}
           {hasTags ? (
             <View style={styles.tagsRow}>
+              {special ? (
+                <View style={[styles.specialChip, { backgroundColor: gold + '29', borderColor: gold + '66' }]}>
+                  <IconSymbol ios_icon_name="star.fill" android_material_icon_name="star" size={9} color={gold} />
+                  <Text style={[styles.specialChipText, { color: gold }]}>{special}</Text>
+                </View>
+              ) : null}
               {metaTags?.map((tag, i) => (
                 <View key={`meta-${i}`} style={styles.metaTag}>
                   <Text style={styles.metaTagText}>{tag}</Text>
@@ -186,6 +206,7 @@ export function MenuItemBannerCard({
   thumbnailUrl,
   eyebrow,
   priceLabel,
+  special,
   catColor,
   onPress,
   editor,
@@ -223,8 +244,16 @@ export function MenuItemBannerCard({
         </Pressable>
       ) : null}
 
-      <View style={[styles.bannerEyebrow, editor && styles.bannerEyebrowEditor]}>
-        <Text style={styles.bannerEyebrowText} numberOfLines={1}>{eyebrow}</Text>
+      <View style={[styles.bannerTopRow, editor && styles.bannerTopRowEditor]}>
+        <View style={styles.bannerEyebrow}>
+          <Text style={styles.bannerEyebrowText} numberOfLines={1}>{eyebrow}</Text>
+        </View>
+        {special ? (
+          <View style={[styles.bannerEyebrow, styles.bannerSpecial]}>
+            <IconSymbol ios_icon_name="star.fill" android_material_icon_name="star" size={9} color={SPECIAL_GOLD.dark} />
+            <Text style={[styles.bannerEyebrowText, { color: SPECIAL_GOLD.dark }]} numberOfLines={1}>{special}</Text>
+          </View>
+        ) : null}
       </View>
       {priceLabel ? (
         <View style={[styles.bannerPriceChip, editor && styles.bannerPriceChipEditor]}>
@@ -390,6 +419,22 @@ const createStyles = (colors: ThemeColorSet) =>
       letterSpacing: 0.4,
       color: colors.primary,
     },
+    // The Special chip — the dietary chip's geometry, in gold, star first.
+    specialChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 3,
+      paddingHorizontal: 7,
+      paddingVertical: 2,
+      borderRadius: 7,
+      borderWidth: StyleSheet.hairlineWidth + 0.5,
+    },
+    specialChipText: {
+      fontFamily: fonts.mono.semibold,
+      fontSize: 9,
+      letterSpacing: 0.4,
+      textTransform: 'uppercase',
+    },
     dietChip: {
       paddingHorizontal: 7,
       paddingVertical: 2,
@@ -426,19 +471,34 @@ const createStyles = (colors: ThemeColorSet) =>
       overflow: 'hidden',
       zIndex: 2,
     },
-    bannerEyebrow: {
+    // The photo's top-left row: the eyebrow pill, then (s88) the Special pill.
+    bannerTopRow: {
       position: 'absolute',
       top: 9,
       left: 9,
-      maxWidth: '62%',
+      maxWidth: '68%',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+    },
+    // Editor mode clears the 34pt grab strip + a 6pt gap.
+    bannerTopRowEditor: {
+      left: 40,
+      maxWidth: '56%',
+    },
+    bannerEyebrow: {
+      flexShrink: 1,
       paddingHorizontal: 7,
       paddingVertical: 3,
       borderRadius: 7,
       backgroundColor: 'rgba(20,16,14,0.55)',
     },
-    // Editor mode clears the 34pt grab strip + a 6pt gap.
-    bannerEyebrowEditor: {
-      left: 40,
+    // Never shrinks — the category label gives way first.
+    bannerSpecial: {
+      flexShrink: 0,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 3,
     },
     bannerEyebrowText: {
       fontFamily: fonts.mono.semibold,

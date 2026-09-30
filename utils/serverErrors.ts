@@ -117,6 +117,21 @@ const EXACT_MAP: Record<string, string> = {
   'Invalid bucks amount': 'server_errors.invalid_bucks_amount',
   // s77: set_exam_default_bucks_value rejects negatives (UI clamps first).
   'Invalid value': 'server_errors.invalid_value',
+  // s88 menu rethink (manage_menu_subcategory_move / _remove, apply_parsed_menu_v2)
+  'Recipe-linked subcategories cannot be moved': 'server_errors.s88_linked_sub_no_move',
+  'That subcategory is already in this category': 'server_errors.s88_sub_already_there',
+  'Pick a category on the same menu': 'server_errors.s88_move_same_menu',
+  'That category has a recipe-linked subcategory with this name': 'server_errors.s88_linked_name_clash',
+  'Recipe-linked subcategories cannot be deleted; hide them instead': 'server_errors.s88_linked_sub_undeletable',
+  'Pick a subcategory in the same category for the items': 'server_errors.s88_items_target_same_category',
+  'Choose where the items go first': 'server_errors.s88_items_destination_required',
+  // s88 round 2 — fold a category into another, the two-menus → one retirement
+  'Built-in categories cannot be moved into another category': 'server_errors.s88_builtin_cat_no_fold',
+  'Only a category with no subcategories can be moved into another': 'server_errors.s88_cat_has_subs_no_fold',
+  'Pick a different category': 'server_errors.s88_pick_different_category',
+  'Recipe-linked subcategories cannot receive menu items': 'server_errors.s88_linked_sub_no_items',
+  'Only the organization owner can configure menus': 'server_errors.s88_owner_configure_menus',
+  'Invalid choice': 'server_errors.s88_invalid_choice',
   // manage_menu_* json 'error' values (surfaced via callRpc data.error)
   'Category name is required': 'server_errors.category_name_required',
   'Subcategory name is required': 'server_errors.subcategory_name_required',

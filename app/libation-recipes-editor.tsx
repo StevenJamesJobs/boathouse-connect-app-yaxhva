@@ -25,7 +25,7 @@ import { useTranslation } from 'react-i18next';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { saveTranslations } from '@/utils/translateContent';
 import { useTranslationSection } from '@/components/TranslationSection';
-import { brokerUploadImage } from '@/utils/storageBroker';
+import { brokerUploadImage, brokerDelete } from '@/utils/storageBroker';
 import { toPublicUrl } from '@/utils/storageResolver';
 import RichTextToolbar from '@/components/RichTextToolbar';
 import ProcedureResizeHandle from '@/components/ProcedureResizeHandle';
@@ -374,6 +374,8 @@ export default function LibationRecipesEditorScreen() {
               console.error('Error deleting libation recipe:', error);
               throw error;
             }
+            // The row is gone for good (s88: a real delete) — drop its image too.
+            if (recipe.thumbnail_url) brokerDelete('libation-recipe-images', [recipe.thumbnail_url], user.id);
             Alert.alert(t('common.success'), t('libation_editor.recipe_deleted'));
             loadRecipes();
           } catch (error: any) {

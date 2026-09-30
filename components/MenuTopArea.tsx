@@ -21,7 +21,7 @@ export interface MenuTopAreaProps {
   mode: 'user' | 'editor';
   showActionChips: boolean;         // manager/owner only
   onOpenMenuSheet: () => void;
-  onFlipSide: () => void;           // user: push('/menu-editor'); (editor s69: back)
+  onFlipSide: () => void;           // user: push('/menu-editor'); editor: the user-side Menu
   season: 'winter' | 'summer';
   onSeasonChange: (s: 'winter' | 'summer') => void;
   showMenuTabs: boolean;            // organization.menu_count === 2
