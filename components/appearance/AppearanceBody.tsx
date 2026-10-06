@@ -3,7 +3,7 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
 import { IconSymbol } from '@/components/IconSymbol';
-import { SegControl, type SegOption } from '@/components/content/FormKit';
+import { SegControl, GlassToggle, type SegOption } from '@/components/content/FormKit';
 import ThemeTile from '@/components/appearance/ThemeTile';
 import ThemePreview from '@/components/appearance/ThemePreview';
 import AccentEditorSheet from '@/components/appearance/AccentEditorSheet';
@@ -41,11 +41,6 @@ const BASE_LABEL_KEY = {
 } as const;
 
 /** Pairs of preset ids — one grid row each (flex halves + a 10pt gap). */
-function pairs<T>(items: T[]): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < items.length; i += 2) out.push(items.slice(i, i + 2));
-  return out;
-}
 
 /**
  * The theme picker (mockup AP1): Light / Dark / Auto, the six-theme gallery, the wide
@@ -53,12 +48,32 @@ function pairs<T>(items: T[]): T[][] {
  * Everything is a device preference held by ThemeContext, so a tap repaints the whole
  * app — the hosting page is its own preview. ONE body, four hosts (s86): the Appearance
  * screen, the owner wizard's Theme step, the join flow's Theme step and /personalize.
- * The first-run hosts pass `showTags={false}`: REVIVED / NEW mean nothing to a newcomer.
+ * The first-run hosts pass `showTags={false}`: REVIVED / NEW mean nothing to a newcomer,
+ * and the same flag hides the s89 app-wide tile palette row (and the preview's mini
+ * tiles that prove it) — that row belongs to the Settings screen only.
  */
+// Gallery rows — three across since s89 (Steve: the mockup's 3 × 2 grid, shorter
+// tiles, saves a row of screen). The six presets fill two rows exactly.
+function rowsOf<T>(ids: readonly T[], n: number): T[][] {
+  const rows: T[][] = [];
+  for (let i = 0; i < ids.length; i += n) rows.push(ids.slice(i, i + n));
+  return rows;
+}
+
 export default function AppearanceBody({ showTags = true }: { showTags?: boolean } = {}) {
   const { t } = useTranslation();
   const colors = useThemeColors();
-  const { palette, mode, resolvedMode, activePalette, customAccent, setPalette, setMode } = useAppTheme();
+  const {
+    palette,
+    mode,
+    resolvedMode,
+    activePalette,
+    customAccent,
+    setPalette,
+    setMode,
+    tilePalette,
+    setTilePalette,
+  } = useAppTheme();
   const [editorOpen, setEditorOpen] = useState(false);
 
   const modeOptions = useMemo<SegOption<ThemeMode>[]>(
@@ -116,7 +131,7 @@ export default function AppearanceBody({ showTags = true }: { showTags?: boolean
           <View style={[styles.ln, { backgroundColor: colors.hairline }]} />
         </View>
         <View style={styles.grid}>
-          {pairs(THEME_PALETTE_IDS).map((row) => (
+          {rowsOf(THEME_PALETTE_IDS, 3).map((row) => (
             <View key={row.join('-')} style={styles.gridRow}>
               {row.map((id) => (
                 <ThemeTile
@@ -196,6 +211,36 @@ export default function AppearanceBody({ showTags = true }: { showTags?: boolean
             </Pressable>
             {customSelected && <View pointerEvents="none" style={[styles.ring1, { borderColor: colors.tint }]} />}
           </View>
+
+          {/* App-wide tile palette (s89): ON = every tile takes the theme accent instead of
+              the MyResto family hues. A device preference on ThemeContext, like the mode. */}
+          {showTags && (
+            <View style={[styles.tilesRow, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
+              <View
+                style={[
+                  styles.tilesSquare,
+                  { backgroundColor: alpha(colors.tint, 0.14), borderColor: alpha(colors.tint, 0.3) },
+                ]}
+              >
+                <IconSymbol
+                  ios_icon_name="paintpalette.fill"
+                  android_material_icon_name="palette"
+                  size={18}
+                  color={colors.tint}
+                />
+              </View>
+              <View style={styles.tilesBody}>
+                <Text style={[styles.tilesTitle, { color: colors.text }]} numberOfLines={1}>
+                  {t('appearance.tiles_title')}
+                </Text>
+                <Text style={[styles.tilesSub, { color: colors.textSecondary }]}>{t('appearance.tiles_sub')}</Text>
+              </View>
+              <GlassToggle
+                value={tilePalette === 'theme'}
+                onValueChange={(on) => setTilePalette(on ? 'theme' : 'myresto')}
+              />
+            </View>
+          )}
         </View>
 
         {/* Preview rule + the honest preview */}
@@ -206,7 +251,7 @@ export default function AppearanceBody({ showTags = true }: { showTags?: boolean
             {previewLabel}
           </Text>
         </View>
-        <ThemePreview palette={activePalette[resolvedMode]} label={previewLabel} />
+        <ThemePreview palette={activePalette[resolvedMode]} label={previewLabel} showTiles={showTags} />
 
       <AccentEditorSheet visible={editorOpen} onClose={() => setEditorOpen(false)} initial={customAccent} />
     </View>
@@ -225,7 +270,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   grid: { gap: 10 },
-  gridRow: { flexDirection: 'row', gap: 10 },
+  gridRow: { flexDirection: 'row', gap: 8 },
   customWrap: {},
   custom: {
     borderRadius: 14,
@@ -263,4 +308,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   editChipText: { fontFamily: fonts.body.semibold, fontSize: 12 },
+  tilesRow: {
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 13,
+  },
+  tilesSquare: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tilesBody: { flex: 1, minWidth: 0 },
+  tilesTitle: { fontFamily: fonts.display.semibold, fontSize: 14 },
+  tilesSub: { fontFamily: fonts.body.regular, fontSize: 11, lineHeight: 15, marginTop: 2 },
 });

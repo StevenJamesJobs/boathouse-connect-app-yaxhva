@@ -19,6 +19,7 @@
     "@expo/vector-icons": "^15.0.2",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-native-community/datetimepicker": "9.1.0",
+    "@react-native-masked-view/masked-view": "0.3.2",
     "@sentry/react-native": "~7.11.0",
     "@supabase/supabase-js": "^2.89.0",
     "expo": "~57.0.23",

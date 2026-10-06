@@ -27,7 +27,7 @@ import PriorityHero, { PriorityCard } from '@/components/tools/PriorityHero';
 import CommandTile from '@/components/tools/CommandTile';
 import AssistantRail, { AssistantRailItem } from '@/components/tools/AssistantRail';
 import { SectionRule } from '@/components/tools/ToolsBits';
-import { FAMILY_ACCENTS } from '@/components/tools/toolsVisuals';
+import { toolsFamilyAccent } from '@/components/tools/toolsVisuals';
 import { IconSymbol } from '@/components/IconSymbol';
 import { fonts } from '@/constants/fonts';
 
@@ -40,8 +40,9 @@ export default function ManagerToolsScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
-  const { mode } = useAppTheme();
-  const scheme = mode === 'dark' ? 'dark' : 'light';
+  // resolvedMode, never mode: under Auto `mode` is 'auto' and the raw check fell to
+  // the light hues on a dark phone.
+  const { resolvedMode: scheme, tilePalette } = useAppTheme();
   const { user } = useAuth();
   const { organization } = useOrganization();
   const { hasPremium } = useSubscription();
@@ -54,7 +55,7 @@ export default function ManagerToolsScreen() {
 
   const firstName = (user?.name || '').trim().split(/\s+/)[0];
   const quizLocked = !hasPremium;
-  const goldAccent = FAMILY_ACCENTS.rewards[scheme];
+  const goldAccent = toolsFamilyAccent('rewards', scheme, colors, tilePalette);
 
   // ---- Priority Hero ladder (approvals live on the pulsing tile, never here) ----
   const heroCards = useMemo<PriorityCard[]>(() => {
@@ -168,7 +169,7 @@ export default function ManagerToolsScreen() {
         <SectionRule label={t('tools_page.your_tools')} />
         <View style={styles.grid}>
           <CommandTile
-            accent={colors.tint}
+            accent={toolsFamilyAccent('guides', scheme, colors, tilePalette)}
             iosIcon="book.fill"
             androidIcon="menu-book"
             title={t('manager_tools.guides_training')}
@@ -178,7 +179,7 @@ export default function ManagerToolsScreen() {
             onPress={() => router.push('/guides-and-training')}
           />
           <CommandTile
-            accent={FAMILY_ACCENTS.game[scheme]}
+            accent={toolsFamilyAccent('game', scheme, colors, tilePalette)}
             iosIcon="gamecontroller.fill"
             androidIcon="sports-esports"
             title={t('employee_tools.game_hub')}
@@ -200,7 +201,7 @@ export default function ManagerToolsScreen() {
             onPress={() => router.push('/game-hub')}
           />
           <CommandTile
-            accent={FAMILY_ACCENTS.quiz[scheme]}
+            accent={toolsFamilyAccent('quiz', scheme, colors, tilePalette)}
             iosIcon="graduationcap.fill"
             androidIcon="school"
             title={t('quick_tools.weekly_quizzes')}
@@ -213,7 +214,7 @@ export default function ManagerToolsScreen() {
           />
           {canSeeTips && (
             <CommandTile
-              accent={FAMILY_ACCENTS.tips[scheme]}
+              accent={toolsFamilyAccent('tips', scheme, colors, tilePalette)}
               iosIcon="dollarsign.circle.fill"
               androidIcon="calculate"
               title={t('tips_checkouts.title')}

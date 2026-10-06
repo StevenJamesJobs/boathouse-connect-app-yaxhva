@@ -2,7 +2,8 @@
  * A Favorites tile. Square = the CommandTile grammar (icon · title · one live line · badge or
  * chevron); wide = head (icon · eyebrow · ···) + body (big number · facts column · chip).
  * The whole face navigates; only the chip and the ··· do something else. Colours come from
- * the tile's family accent through the tinted-glass alphas.
+ * the tile's family accent through the tinted-glass alphas (the theme tint instead, under
+ * the app-wide tile palette — favoriteAccent applies the rule).
  */
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, StyleProp, ViewStyle } from 'react-native';
@@ -28,9 +29,9 @@ interface Props {
 
 export default function LiveTile({ def, tile, data, onPress, onOptions, style, inert }: Props) {
   const colors = useThemeColors();
-  const { resolvedMode } = useAppTheme();
+  const { resolvedMode, tilePalette } = useAppTheme();
   const { t } = useTranslation();
-  const acc = favoriteAccent(def.accent, colors, resolvedMode);
+  const acc = favoriteAccent(def.accent, colors, resolvedMode, tilePalette);
   const bg = hexToRgba(acc, TILE_BG_ALPHA[resolvedMode]);
   const bd = hexToRgba(acc, TILE_BORDER_ALPHA[resolvedMode]);
   const att = def.attention?.(data) ?? null;

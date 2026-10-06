@@ -507,7 +507,6 @@
   },
   "notification_center": {
     "title": "Notification Center",
-    "description": "This notification will be sent to all staff members who have notifications enabled.",
     "title_label": "Title",
     "message_label": "Message",
     "opens_to": "Opens To",
@@ -583,20 +582,46 @@
     "audience_required": "Audience Required",
     "audience_required_message": "Please select at least one job title.",
     "send_error": "Failed to send notification. Please try again.",
-    "card_title": "Send Notification",
-    "send_to": "Send To",
     "all_staff": "All Staff",
     "select_job_titles": "Select job titles...",
     "n_job_titles_selected": "{{count}} job titles selected",
     "by_job_title": "By Job Title",
     "to_label": "To:",
     "optional": "Optional",
-    "done": "Done",
     "hours_ago": "{{count}}h ago",
     "one_day_ago": "1d ago",
     "days_ago": "{{count}}d ago",
     "send_to_groups_one": "Send to 1 Group",
-    "send_to_groups_other": "Send to {{count}} Groups"
+    "send_to_groups_other": "Send to {{count}} Groups",
+    "type_notification": "Notification",
+    "photo_label": "Photo (optional)",
+    "photo_hint": "Shows in the app's notification shade and detail. Without one, your restaurant logo is shown.",
+    "photo_remove": "Remove photo",
+    "photo_upload_error": "The photo couldn't be uploaded, so nothing was sent. Check your connection and try again.",
+    "step_audience": "Audience",
+    "step_message": "Message",
+    "step_extras": "Extras",
+    "step_review": "Review",
+    "audience_heading": "Who gets it?",
+    "audience_sub": "Everyone, or pick job titles. You can change this on Review.",
+    "message_heading": "What does it say?",
+    "message_sub": "A short title and the message. The other language can fill itself in when you send.",
+    "extras_heading": "Anything extra?",
+    "extras_sub": "A photo, where it opens, and whether phones buzz — all optional.",
+    "review_heading": "Ready to send?",
+    "review_sub": "This is what staff will see. Tap a line to change it.",
+    "all_staff_sub": "Everyone with notifications on",
+    "search_job_titles": "Search job titles",
+    "titles_selected": "{{count}} of {{total}} titles selected",
+    "no_titles_match": "No titles match",
+    "editing_draft": "Editing a draft",
+    "review_audience": "Sending to",
+    "review_photo": "Photo",
+    "review_photo_none": "No photo — your logo stands in",
+    "review_push_on": "Phone alert on",
+    "review_push_off": "Silent — shade and badge only",
+    "review_translation_ready": "Both languages ready",
+    "review_translation_auto": "The other language fills in when you send"
   },
   "employee_home": {
     "good_morning": "Good Morning",
@@ -1179,12 +1204,7 @@
     "search_placeholder": "Search by name, ingredient, or alcohol type...",
     "all": "All",
     "no_results": "No cocktails found",
-    "no_results_hint": "Try adjusting your search or filter",
-    "alcohol_type": "Alcohol Type",
-    "ingredients": "Ingredients",
-    "procedure": "Procedure",
-    "glassware": "Glassware",
-    "garnish": "Garnish"
+    "no_results_hint": "Try adjusting your search or filter"
   },
   "summer_libation_recipes": {
     "search_placeholder": "Search recipes...",
@@ -1197,13 +1217,7 @@
     "sangrias": "Sangrias",
     "low_abv": "Low ABV",
     "no_abv": "No ABV",
-    "price": "Price",
-    "category": "Category",
-    "glassware": "Glassware",
-    "garnish": "Garnish",
-    "ingredients": "Ingredients",
-    "procedure": "Procedure",
-    "no_ingredients": "No ingredients listed"
+    "category": "Category"
   },
   "libation_recipes": {
     "search_placeholder": "Search recipes...",
@@ -1216,13 +1230,13 @@
     "sangrias": "Sangrias",
     "low_abv": "Low ABV",
     "no_abv": "No ABV",
-    "price": "Price",
     "category": "Category",
     "glassware": "Glassware",
     "garnish": "Garnish",
     "ingredients": "Ingredients",
     "procedure": "Procedure",
-    "no_ingredients": "No ingredients listed"
+    "no_ingredients": "No ingredients listed",
+    "yield": "Yield"
   },
   "purees_syrups": {
     "search_placeholder": "Search recipes...",
@@ -1231,10 +1245,7 @@
     "check_back": "Check back later for new puree and syrup recipes!",
     "purees": "Purees",
     "simple_syrups": "Simple Syrups",
-    "category": "Category",
-    "ingredients": "Ingredients",
-    "procedure": "Procedure",
-    "no_ingredients": "No ingredients listed"
+    "category": "Category"
   },
   "guides_training": {
     "title": "Guides and Training",
@@ -1872,7 +1883,7 @@
     "theme_custom": "Custom",
     "tag_revived": "Revived",
     "tag_new": "New",
-    "custom_tile_sub": "Pick your own accent on any base",
+    "custom_tile_sub": "Choose your own color palette and base",
     "custom_edit": "Edit",
     "custom_title": "Your accent",
     "custom_subtitle": "Start from a preset, then slide",
@@ -1897,7 +1908,9 @@
     "custom_base_onyx": "Onyx",
     "custom_base_slate": "Slate",
     "custom_base_ivory": "Ivory",
-    "custom_base_hint": "Choose your neutral base and watch it change in the preview below. Ivory keeps the app light in both modes."
+    "custom_base_hint": "Choose your neutral base and watch it change in the preview below. Ivory keeps the app light in both modes.",
+    "tiles_title": "App-wide tile palette",
+    "tiles_sub": "When on, every tile across the app uses your theme's colour palette instead of the MyResto colour set."
   },
   "rewards_reviews_editor": {
     "gr_premium_screen_title": "Google Reviews",
@@ -3778,7 +3791,6 @@
     "tracker_empty": "Log your first shift and this page starts working for you — totals, per-hour, tip %, best nights.",
     "journal_day_double": "{{date}} — a double",
     "journal_day_total": "{{total}} · {{hours}} hrs",
-    "journal_add_shift": "Add a shift for {{date}}",
     "journal_empty_title": "Nothing logged for {{date}}",
     "journal_empty_sub": "Worked that day? It takes about 20 seconds.",
     "sub_hours": "{{n}}h",
@@ -3912,7 +3924,18 @@
     "house_save": "Save house defaults",
     "house_error_declare": "Declare % must be between 0 and 100",
     "house_error_positions": "Every position needs a name",
-    "house_error_generic": "Could not save — please try again"
+    "house_error_generic": "Could not save — please try again",
+    "entry_paycheck": "Paycheck",
+    "journal_add_shift_short": "Add a shift",
+    "journal_add_paycheck": "Add a paycheck",
+    "log_paycheck_title": "Payday",
+    "log_paycheck_sub": "Counts in your week total",
+    "log_paycheck_amount": "Paycheck amount",
+    "log_paycheck_hint": "Net or gross — whatever you track. Tap to type.",
+    "log_paycheck_note": "Pay period, employer, anything",
+    "log_save_paycheck": "Add Paycheck",
+    "kpi_split_tips": "Tips",
+    "kpi_split_paycheck": "Paycheck"
   },
   "tools_page": {
     "assistant_bar": "Bar",

@@ -39,7 +39,8 @@ import {
 import { menuBadgeForSeason as menuBadgeForSeasonUtil, compareBySectionThenOrder } from '@/utils/menuBadges';
 import MenuTopArea, { MenuSeasonTabs } from '@/components/MenuTopArea';
 import MenuSearchRow from '@/components/MenuSearchRow';
-import MenuCategoryTabs from '@/components/MenuCategoryTabs';
+import MenuCategoryTabs, { CATEGORY_TABS_PAD_BOTTOM } from '@/components/MenuCategoryTabs';
+import ContentFadeMask from '@/components/ContentFadeMask';
 import MenuItemDetailSheet, { type MenuItemForDetail } from '@/components/MenuItemDetailSheet';
 import { MenuItemSquareCard, MenuItemBannerCard } from '@/components/MenuItemCards';
 import MenuFilterSheet, { type DietKey } from '@/components/MenuFilterSheet';
@@ -496,7 +497,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
 
   const pagerRef = useRef<FlatList>(null);
 
-  // ── Search collapse + sticky-tab backdrop, driven by the ACTIVE page's scrollY ──
+  // ── Search collapse (sticky tab rows), driven by the ACTIVE page's scrollY ──
   // The collapse is NOT scroll-linked 1:1 — a fast fling made the raw mapping
   // read as an instant jump, and on pages barely taller than the viewport it
   // oscillated (collapsing frees 57pt → the offset falls back → re-expand →
@@ -513,8 +514,6 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
   // no reopen shake). This replaced the old short-page no-collapse gate:
   // Steve's round-5 rule is that every page collapses uniformly.
   const [pageViewportH, setPageViewportH] = useState(0);
-  const backdropOnRef = useRef(false);
-  const [backdropOn, setBackdropOn] = useState(false);
   const currentPageIndexRef = useRef(currentPageIndex);
 
   // Collapse fires past 48pt; reopen fires already at 28pt — early enough that
@@ -539,9 +538,9 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
 
   // The band fades out faster than it travels (gone by ~65% of the glide) so
   // it has dissolved before its slide carries it over the header chips.
-  // Parked, the tabs' backdrop meets the header exactly — the breathing room
-  // lives INSIDE the frosted bar (MenuCategoryTabs' top padding), never as a
-  // see-through slot with cards swimming in it (Steve's round-6 screenshot).
+  // Parked, the tab rows sit directly under the header on open glow (s89: no
+  // backdrop any more); the pager's ContentFadeMask dissolves cards at the
+  // pill row's bottom edge so none ever swim behind the chips.
   const collapseOpacity = collapseAnim.interpolate({
     inputRange: [0, 0.65, 1],
     outputRange: [1, 0, 0],
@@ -578,6 +577,10 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
   // by it so the list top sits exactly under the open rows. Transforms don't
   // affect layout, so the measurement is stable while the overlay glides.
   const [chromeH, setChromeH] = useState(SEARCH_ROW_H + 88);
+  // s89 fade-behind rail: the pager is alpha-masked so cards dissolve at the
+  // pill row's BOTTOM EDGE once the rows have parked under the header (the
+  // overlay translates up by bandH, so the rows' bottom = chromeH - bandH).
+  const tabsFadeFrom = Math.max(0, chromeH - bandH - CATEGORY_TABS_PAD_BOTTOM);
 
   const resetCollapse = useCallback(() => {
     collapseRunRef.current?.stop();
@@ -586,16 +589,6 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     collapseAnim.setValue(0);
   }, [collapseAnim]);
 
-  // A page collapses only when hiding the row still leaves real content to
-  // scroll — otherwise the freed 57pt immediately un-scrolls the page and the
-  // header shakes open/shut.
-  const syncBackdrop = useCallback((y: number) => {
-    const on = y > 6;
-    if (on !== backdropOnRef.current) {
-      backdropOnRef.current = on;
-      setBackdropOn(on);
-    }
-  }, []);
 
   // Each page records its own offset; only the active page drives the shared
   // collapse state (a background page's late momentum must not fight it).
@@ -609,12 +602,11 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     } else if (y < EXPAND_AT) {
       setCollapsed(false);
     } // between the thresholds: keep whatever state we're in (hysteresis)
-    syncBackdrop(y);
-  }, [setCollapsed, syncBackdrop]);
+  }, [setCollapsed]);
 
   // Page swipes NEVER change the collapse state (Steve's round-4 rule: once
   // the chrome is tucked away, browsing categories keeps it away — only a
-  // pull-down brings it back). Retarget the active page + backdrop; and when
+  // pull-down brings it back). Retarget the active page; and when
   // arriving collapsed on a page still resting near its top, tuck it to
   // y=bandH so the first cards sit under the parked tabs instead of a
   // band-sized gap (the constant padding reserves space for the OPEN chrome).
@@ -626,8 +618,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
       pageOffsetsRef.current[currentPageIndex] = bandH;
       y = bandH;
     }
-    syncBackdrop(y);
-  }, [currentPageIndex, bandH, syncBackdrop]);
+  }, [currentPageIndex, bandH]);
 
   // Derive selected category/subcategory from page index
   const currentPage = PAGES[currentPageIndex];
@@ -695,7 +686,6 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     // offsets no longer describe what's on screen, so open the search row.
     pageOffsetsRef.current = {};
     resetCollapse();
-    syncBackdrop(0);
     // PAGES can be shorter than bridgeOffset+1 (logout teardown empties menuCats;
     // a zero-category org is legit too) — scrollToIndex past the end throws an
     // out-of-range Invariant caught by the root ErrorBoundary. Clamp to the list.
@@ -753,8 +743,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
   useEffect(() => {
     pageOffsetsRef.current = {};
     resetCollapse();
-    syncBackdrop(0);
-  }, [isSearchOrFilterMode, resetCollapse, syncBackdrop]);
+  }, [isSearchOrFilterMode, resetCollapse]);
 
   // Get filtered items for search/filter mode
   const getSearchFilteredItems = useCallback(() => {
@@ -1319,7 +1308,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
   // price, and only while the org has food redemptions switched on.
   const detailCtx = (() => {
     const item = selectedMenuItem;
-    if (!item) return { detailItem: null as MenuItemForDetail | null, menuLabel: '', isWine: false, isLibations: false, redeem: null as { label: string; onPress: () => void } | null, recipe: null as { label: string; onPress: () => void } | null };
+    if (!item) return { detailItem: null as MenuItemForDetail | null, menuLabel: '', isWine: false, isLibations: false, redeem: null as { label: string; onPress: () => void } | null, recipe: null as { label: string; onPress: () => void } | null, categoryColor: null as string | null };
     const isWine = isWineName(item.category);
     const isLibations = catOf(item.category)?.system_key === 'cat.libations';
     const trimmed = (item.price || '').trim();
@@ -1379,6 +1368,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
       unique_selling_points: item.unique_selling_points ?? null,
       unique_selling_points_es: item.unique_selling_points_es ?? null,
       is_active: item.is_active,
+      is_weekly_special: !!item.is_weekly_special,
       dietary: {
         gf: item.is_gluten_free,
         gfa: item.is_gluten_free_available,
@@ -1392,7 +1382,10 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
       },
     };
     const menuLabel = organization.menu_count === 2 ? menuBadgeForSeason(item.season).label : '';
-    return { detailItem, menuLabel, isWine, isLibations, redeem, recipe };
+    // The Poster's no-photo board takes the item's OWN category hue (a specials-
+    // page item keeps its home colour); the active tab's hue is the fallback.
+    const categoryColor = catOf(item.category)?.color || activeCategoryColor;
+    return { detailItem, menuLabel, isWine, isLibations, redeem, recipe, categoryColor };
   })();
 
   return (
@@ -1478,6 +1471,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
            Pages pad their content by the measured overlay height, so nothing
            reflows when the search row collapses or returns. */
         <View style={styles.pagerArea}>
+          <ContentFadeMask from={tabsFadeFrom}>
           {(loading || categoriesLoading) ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={colors.primary} />
@@ -1501,6 +1495,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
               initialScrollIndex={Math.min(bridgeOffset, Math.max(PAGES.length - 1, 0))}
             />
           )}
+          </ContentFadeMask>
 
           <Animated.View
             style={[styles.chromeOverlay, { transform: [{ translateY: overlayTranslate }] }]}
@@ -1558,7 +1553,6 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
               activeSubcategory={activeSubTab}
               onSelectSubcategory={handleSelectSubcategory}
               activeColor={activeCategoryColor}
-              showBackdrop={backdropOn}
             />
           </Animated.View>
         </View>
@@ -1597,6 +1591,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
         isLibations={detailCtx.isLibations}
         redeem={detailCtx.redeem}
         recipe={detailCtx.recipe}
+        categoryColor={detailCtx.categoryColor}
       />
 
       {/* The ⚙ Menu sheet — managers/owners only (employees never see the chip) */}

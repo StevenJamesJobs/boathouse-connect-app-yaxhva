@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tile Palette Toggle</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600;700&display=swap">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{min-height:100vh;display:flex;flex-direction:column;align-items:center;gap:14px;padding:26px 12px 60px;background:#0C0D11;color:#D6D9DE;font-family:'Inter',system-ui,sans-serif}
+h1{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:22px;letter-spacing:-0.3px;color:#F4F6F8}
+h1 span{color:#F99861}
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center;max-width:1100px}
+.grp{display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);padding:6px;border-radius:16px}
+.gl2{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:#6E7681;margin:0 4px 0 6px}
+.tb{background:rgba(255,255,255,0.06);color:#D6D9DE;border:1px solid rgba(255,255,255,0.10);border-radius:11px;padding:7px 11px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:.18s}
+.tb:hover{background:rgba(255,255,255,0.12)}
+.tb.on{background:#F4F6F8;color:#15171C;border-color:#F4F6F8}
+.hint{color:#6E7681;font-size:11.5px;font-family:'JetBrains Mono',monospace;text-align:center;max-width:980px;line-height:1.7}
+.hint b{color:#AEB4BD;font-weight:600}
+.hint em{font-style:normal;color:#2FBF8F}
+.row{display:flex;flex-wrap:wrap;gap:18px;justify-content:center;align-items:flex-start;max-width:1800px}
+.col{display:flex;flex-direction:column;gap:10px;align-items:center}
+.concept{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:#6E7681;display:flex;align-items:center;gap:8px;width:380px}
+.concept b{color:#F99861}
+.concept .ln{flex:1;height:1px;background:rgba(255,255,255,0.08)}
+.bcap{width:380px;font-size:11px;color:#8A9098;line-height:1.55;font-style:italic}
+.bcap b{font-style:normal;color:#D6D9DE;font-weight:600}
+.notes{max-width:1100px;width:100%;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;margin-top:6px}
+.note{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:12px 14px;font-size:11.5px;line-height:1.55;color:#AEB4BD}
+.note b{display:block;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:#F99861;margin-bottom:5px}
+.note em{font-style:normal;color:#F4F6F8;font-weight:600}
+
+/* ---------- phone + palettes ---------- */
+.phone{
+  --bg:#141724; --text:#F4F2EE; --muted:#9C9BA6; --fire:#F99861; --blue:#36B0C9; --fireText:#1F2334; --tint:#F99861;
+  --glass:rgba(255,255,255,0.07); --glassbd:rgba(255,255,255,0.12); --surf:rgba(255,255,255,0.05); --surfbd:rgba(255,255,255,0.09); --hair:rgba(255,255,255,0.07);
+  --glowA:rgba(249,152,97,0.30); --glowB:rgba(120,140,210,0.18);
+  --azure:#3B82F6; --violet:#7C5CE0; --emerald:#10A56F; --gold:#F59E0B; --kitchen:#FF6B1A; --bart:#3B82F6; --host:#5B5BD6; --team:#36B0C9;
+  position:relative;width:380px;height:760px;background:var(--bg);border-radius:48px;border:1px solid #2A2D3A;
+  box-shadow:0 22px 60px rgba(0,0,0,0.5);overflow:hidden;color:var(--text);display:flex;flex-direction:column}
+.phone.t-moon-l{--bg:#F2F3F6;--text:#1F2334;--muted:#6B6F80;--fire:#E8792F;--blue:#1390A8;--fireText:#FFFFFF;--tint:#E8792F;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.88);--surf:rgba(255,255,255,0.66);--surfbd:rgba(0,0,0,0.07);--hair:rgba(0,0,0,0.07);--glowA:rgba(232,121,47,0.18);--glowB:rgba(31,35,52,0.10);--azure:#2563EB;--violet:#6D28D9;--emerald:#087A52;--gold:#B45309;--kitchen:#E8590C;--bart:#2563EB;--host:#4A46B4}
+.phone.t-ocean-d{--bg:#1A2332;--text:#FFFFFF;--muted:#A8B8D8;--fire:#4A90E2;--blue:#5DADE2;--fireText:#0A1422;--tint:#5DA0E5;--glassbd:rgba(255,255,255,0.13);--surfbd:rgba(255,255,255,0.10);--hair:rgba(255,255,255,0.08);--glowA:rgba(74,144,226,0.30);--glowB:rgba(93,173,226,0.15)}
+.phone.t-ocean-l{--bg:#E8F4F8;--text:#1A3A52;--muted:#4A6B7C;--fire:#1976D2;--blue:#42A5F5;--fireText:#FFFFFF;--tint:#1976D2;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.7);--surfbd:rgba(13,71,161,0.10);--hair:rgba(13,71,161,0.08);--glowA:rgba(25,118,210,0.16);--glowB:rgba(66,165,245,0.12);--azure:#2563EB;--violet:#6D28D9;--emerald:#087A52;--gold:#B45309;--kitchen:#E8590C;--bart:#2563EB;--host:#4A46B4}
+.phone.t-mid-d{--bg:#141628;--text:#E8EAF6;--muted:#9FA8DA;--fire:#8089DC;--blue:#9FA8DA;--fireText:#0E1124;--tint:#9AA4EA;--glowA:rgba(121,134,203,0.30);--glowB:rgba(159,168,218,0.14)}
+/* the toggle: ON = every tile family accent becomes the theme tint */
+.phone.themed{--azure:var(--tint);--violet:var(--tint);--emerald:var(--tint);--kitchen:var(--tint);--bart:var(--tint);--host:var(--tint);--team:var(--tint)}
+.phone *{box-sizing:border-box}
+.glow{position:absolute;top:-90px;right:-60px;width:300px;height:250px;border-radius:50%;background:radial-gradient(circle,var(--glowA),transparent 66%);z-index:0;pointer-events:none}
+.glow2{position:absolute;top:-50px;left:-70px;width:220px;height:200px;border-radius:50%;background:radial-gradient(circle,var(--glowB),transparent 68%);z-index:0;pointer-events:none}
+.sb{position:relative;z-index:3;display:flex;justify-content:space-between;align-items:center;padding:14px 28px 6px;font-size:13px;font-weight:600;font-family:'JetBrains Mono',monospace;flex:0 0 auto}
+.ic{width:16px;height:16px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+.screen{position:relative;z-index:2;flex:1;overflow-y:auto;padding:0 16px 120px;scrollbar-width:none}
+.screen::-webkit-scrollbar{display:none}
+.hdr{display:flex;align-items:center;gap:8px;margin:2px 0 12px;min-height:40px}
+.c38{width:38px;height:38px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;background:var(--glass);border:1px solid var(--glassbd);color:var(--text)}
+.hmid{flex:1;text-align:center;min-width:0}
+.eyebrow{font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:1.6px;text-transform:uppercase;color:var(--tint);font-weight:600}
+.htitle{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:19px;letter-spacing:-0.3px;line-height:1.1}
+.eyeb{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:var(--tint);font-weight:600;margin:14px 2px 8px}
+.seg3{display:flex;padding:3px;gap:3px;border-radius:13px;background:var(--glass);border:1px solid var(--glassbd)}
+.seg3 span{flex:1;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;gap:6px;font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:600;font-size:13px;color:var(--muted)}
+.seg3 span.on{background:var(--tint);color:var(--fireText)}
+.tgrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.tcard{border-radius:14px;overflow:hidden;background:var(--surf);border:1px solid var(--surfbd);position:relative}
+.tcard.on{border-color:var(--tint);box-shadow:0 0 0 1px var(--tint)}
+.tcard .pvb{height:44px;background:var(--tb);position:relative;overflow:hidden}
+.tcard .pvb::before{content:"";position:absolute;top:-20px;right:-10px;width:60px;height:56px;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--tp) 45%,transparent),transparent 68%)}
+.tcard .pvb i{position:absolute;left:7px;bottom:7px;width:22px;height:8px;border-radius:4px;background:var(--tp)}
+.tcard .lab{padding:6px 8px;font-size:11px;font-weight:600;display:flex;align-items:center;gap:4px}
+.tcard .lab .ck{margin-left:auto;width:14px;height:14px;border-radius:7px;background:var(--tint);color:var(--fireText);display:flex;align-items:center;justify-content:center}
+.tcard .lab .ck .ic{width:8px;height:8px;stroke-width:3}
+.bigtile{border-radius:16px;padding:12px;display:flex;align-items:center;gap:12px;background:color-mix(in srgb,var(--tint) 10%,transparent);border:1px solid color-mix(in srgb,var(--tint) 28%,transparent);margin-top:8px}
+.bigtile .hue{width:44px;height:44px;border-radius:14px;background:conic-gradient(#FF5A3C,#FFB020,#7BE04A,#2DD4BF,#3B82F6,#8B5CF6,#EC4899,#FF5A3C);flex:0 0 auto;border:2px solid var(--glassbd)}
+.bigtile .tt{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:600;font-size:15px}
+.bigtile .ts{font-size:11px;color:var(--muted);margin-top:2px}
+.bigtile .edit{margin-left:auto;height:30px;padding:0 12px;border-radius:9px;background:var(--glass);border:1px solid var(--glassbd);color:var(--tint);font-size:12px;font-weight:600;display:flex;align-items:center}
+/* ===== the new toggle row ===== */
+.trow{display:flex;align-items:center;gap:12px;padding:12px 13px;border-radius:14px;background:var(--surf);border:1px solid var(--surfbd);margin-top:10px}
+.trow.hl{border-color:color-mix(in srgb,var(--tint) 45%,transparent);box-shadow:0 0 0 1px color-mix(in srgb,var(--tint) 30%,transparent)}
+.trow .sq{width:36px;height:36px;border-radius:11px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--tint) 14%,transparent);border:1px solid color-mix(in srgb,var(--tint) 30%,transparent);color:var(--tint);flex:0 0 auto}
+.trow .txt{flex:1;min-width:0}
+.trow .tt{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:600;font-size:14px}
+.trow .ts{font-size:11px;line-height:15px;color:var(--muted);margin-top:2px}
+.sw{width:46px;height:28px;border-radius:14px;background:var(--glass);border:1px solid var(--glassbd);position:relative;flex:0 0 auto}
+.sw i{position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:10px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.4);transition:.2s}
+.sw.on{background:var(--tint);border-color:var(--tint)}
+.sw.on i{left:21px}
+.swatchline{display:flex;align-items:center;gap:6px;margin-top:10px;padding:0 2px;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted)}
+.swatchline i{width:14px;height:14px;border-radius:5px;display:block;border:1px solid rgba(255,255,255,.15)}
+.swatchline .arr{margin:0 4px}
+/* preview card */
+.pv{border-radius:16px;overflow:hidden;background:var(--bg);border:1px solid var(--surfbd);padding:10px;display:grid;grid-template-columns:1fr 1fr;gap:7px;position:relative;margin-top:8px}
+.pv::before{content:"";position:absolute;top:-60px;right:-40px;width:180px;height:160px;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--tint) 22%,transparent),transparent 68%);pointer-events:none}
+.pv .mt{position:relative;height:48px;border-radius:11px;padding:8px 9px;font-size:10.5px;font-weight:600;display:flex;flex-direction:column;justify-content:flex-end;gap:2px;--acc:var(--tint);background:color-mix(in srgb,var(--acc) 11%,transparent);border:1px solid color-mix(in srgb,var(--acc) 28%,transparent)}
+.pv .mt small{font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--acc);letter-spacing:.6px;text-transform:uppercase}
+.pv .mt.az{--acc:var(--azure)}.pv .mt.vi{--acc:var(--violet)}.pv .mt.em{--acc:var(--emerald)}
+/* ===== Tools tiles (CommandTile grammar: tinted glass, accent 11%/28%) ===== */
+.hero{border-radius:18px;padding:14px;min-height:118px;position:relative;overflow:hidden;color:#fff;background:linear-gradient(135deg,#0D9488,#4C5FC7 55%,#7C5CE0);margin-bottom:12px}
+.hero .he{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:#FFB07A;font-weight:600}
+.hero h3{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:19px;letter-spacing:-0.3px;margin-top:6px;line-height:1.1}
+.hero p{font-size:11.5px;color:rgba(255,255,255,.8);margin-top:4px}
+.hero .dots{display:flex;gap:5px;margin-top:12px}
+.hero .dots i{width:6px;height:6px;border-radius:3px;background:rgba(255,255,255,.4)}
+.hero .dots i.on{width:16px;background:#fff}
+.srule{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px;margin:4px 2px 9px}
+.srule .ln{flex:1;height:1px;background:var(--hair)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.lt{position:relative;border-radius:16px;padding:12px;min-height:96px;display:flex;flex-direction:column;justify-content:space-between;--acc:var(--tint);background:color-mix(in srgb,var(--acc) 11%,transparent);border:1px solid color-mix(in srgb,var(--acc) 28%,transparent)}
+.lt .lth{display:flex;align-items:center;gap:7px;font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:600;font-size:14px;line-height:1.1}
+.lt .lth .ic{color:var(--acc)}
+.lt .lth .chev{margin-left:auto;width:14px;height:14px;color:var(--muted)}
+.lt .lbig{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:16px;margin-top:10px}
+.lt .lbig span{color:var(--acc)}
+.lt .lsub{font-size:11px;color:var(--muted);margin-top:3px}
+.lt .lsub b{color:var(--acc);font-weight:700}
+.lt.az{--acc:var(--azure)}.lt.vi{--acc:var(--violet)}.lt.em{--acc:var(--emerald)}.lt.gold{--acc:var(--gold)}.lt.kit{--acc:var(--kitchen)}.lt.bar{--acc:var(--bart)}.lt.host{--acc:var(--host)}.lt.team{--acc:var(--team)}
+.lt.wide{grid-column:1/-1;min-height:0;flex-direction:row;align-items:center;gap:12px}
+.lt.wide .lth{flex:1}
+.lt .bpx{position:absolute;top:10px;right:10px;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--acc);color:#fff;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 4px color-mix(in srgb,var(--acc) 22%,transparent)}
+.lt.wide .cta{height:30px;padding:0 11px;border-radius:10px;background:var(--acc);color:#fff;display:flex;align-items:center;gap:5px;font-size:12px;font-weight:600;flex:0 0 auto}
+.asrail{display:flex;border-radius:16px;border:1px solid var(--glassbd);background:var(--glass);padding:5px;margin-top:12px}
+.asrail .as{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 4px;font-size:10.5px;font-weight:600;color:var(--text);border-right:1px solid var(--hair)}
+.asrail .as:last-child{border-right:0}
+.asrail .as .disc{width:36px;height:36px;border-radius:12px;display:flex;align-items:center;justify-content:center;--acc:var(--tint);background:color-mix(in srgb,var(--acc) 16%,transparent);border:1px solid color-mix(in srgb,var(--acc) 34%,transparent);color:var(--acc)}
+.asrail .as.kit .disc{--acc:var(--kitchen)}.asrail .as.bar .disc{--acc:var(--bart)}.asrail .as.host .disc{--acc:var(--host)}
+/* Favorites (My Hub) */
+.hubhead{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.hubhead .av{width:46px;height:46px;border-radius:50%;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;justify-content:center;font-weight:700;font-family:'Bricolage Grotesque'}
+.hubhead .nm{font-family:'Bricolage Grotesque';font-weight:700;font-size:16px}
+.hubhead .jt{font-size:10px;color:var(--muted);font-family:'JetBrains Mono';text-transform:uppercase;letter-spacing:.5px}
+.hubseg{display:flex;padding:3px;gap:3px;border-radius:12px;background:var(--glass);border:1px solid var(--glassbd);margin-bottom:12px}
+.hubseg span{flex:1;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-family:'Bricolage Grotesque';font-weight:600;font-size:12.5px;color:var(--muted)}
+.hubseg span.on{background:var(--tint);color:var(--fireText)}
+.jolt{margin-top:12px;border-radius:16px;background:var(--glass);border:1px solid var(--glassbd);padding:10px 12px}
+.jolt .jh{display:flex;align-items:center;gap:8px;font-family:'JetBrains Mono';font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.jolt .jh .bolt{width:22px;height:22px;border-radius:11px;background:#F4F2EE;color:#1F2334;display:flex;align-items:center;justify-content:center}
+.jolt .jr{display:flex;align-items:center;gap:9px;padding:6px 0;font-size:12.5px;font-weight:600}
+.jolt .jr .d{width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;--acc:var(--tint);background:color-mix(in srgb,var(--acc) 16%,transparent);color:var(--acc)}
+.jolt .jr .d.az{--acc:var(--azure)}.jolt .jr .d.vi{--acc:var(--violet)}.jolt .jr .d.gold{--acc:var(--gold)}.jolt .jr .d.bar{--acc:var(--bart)}.jolt .jr .d.team{--acc:var(--team)}
+.jolt .jr small{margin-left:auto;font-family:'JetBrains Mono';font-size:9px;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 19V5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2zm0 0a2 2 0 0 0 2 2h13"/></symbol>
+  <symbol id="i-game" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="11" rx="4"/><path d="M6 12h4M8 10v4M15 11h.01M18 13h.01"/></symbol>
+  <symbol id="i-quiz" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01"/></symbol>
+  <symbol id="i-dollar" viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></symbol>
+  <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></symbol>
+  <symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 22c4-2 7-5.5 7-10 0-3-2-5-3-6 0 2-1 3-2 3 0-3-2-6-5-7 1 3-1 5-3 7-2 2-2 4-2 5 0 4 3 6 8 8z"/></symbol>
+  <symbol id="i-wine" viewBox="0 0 24 24"><path d="M8 22h8M12 15v7M5 3h14l-1 7a6 6 0 0 1-12 0z"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.5 3.2-5.5 6.5-5.5s5.9 2 6.5 5.5"/><circle cx="17.5" cy="9" r="2.6"/><path d="M16.5 14.7c2.6.3 4.5 2 5 4.8"/></symbol>
+  <symbol id="i-palette" viewBox="0 0 24 24"><path d="M12 3a9 9 0 0 0 0 18h1a2 2 0 0 0 1.5-3.3 2 2 0 0 1 1.5-3.2H18a3 3 0 0 0 3-3 8.7 8.7 0 0 0-9-8.5z"/><circle cx="7.5" cy="11.5" r="1.2"/><circle cx="10.5" cy="7.5" r="1.2"/><circle cx="15" cy="7.5" r="1.2"/></symbol>
+  <symbol id="i-cal" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></symbol>
+  <symbol id="i-clip" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></symbol>
+</svg>
+
+<h1>App-wide tile palette <span>— F</span></h1>
+<div class="toolbar">
+  <div class="grp"><span class="gl2">Theme</span>
+    <button class="tb on" data-theme="">Moonstone dark</button><button class="tb" data-theme="t-moon-l">Moonstone light</button><button class="tb" data-theme="t-ocean-d">Ocean dark</button><button class="tb" data-theme="t-ocean-l">Ocean light</button><button class="tb" data-theme="t-mid-d">Midnight dark</button></div>
+  <div class="grp"><span class="gl2">Toggle</span>
+    <button class="tb" data-themed="off">MyResto colour set</button><button class="tb on" data-themed="on">Theme palette</button></div>
+</div>
+<p class="hint"><b>Frame 1</b> is the Appearance page with the new row under the Custom accent tile. <b>Frames 2–4</b> are what the toggle changes: the Tools tiles, the assistant rail, the My Hub Favorites tiles and the Jolt palette discs all take the theme's accent. <em>Flip the Toggle buttons to compare, and switch themes to see Ocean / Midnight tiles follow their own accents.</em> Kept as-is on purpose: the Tools hero rotisserie, the gold Rewards tile (it is the approvals signal), status reds and golds, and every family console (quiz boards, tips console, game boards).</p>
+
+<div class="row">
+
+<!-- ===== 1 · APPEARANCE ===== -->
+<div class="col">
+  <div class="concept"><b>1</b> Appearance · the new row<span class="ln"></span></div>
+  <div class="phone themed">
+    <div class="glow"></div><div class="glow2"></div>
+    <div class="sb"><span>9:41</span><span>●●● ▲ ▮</span></div>
+    <div class="screen">
+      <div class="hdr"><div class="c38"><svg class="ic"><use href="#i-back"/></svg></div><div class="hmid"><div class="eyebrow">Settings</div><div class="htitle">Appearance</div></div><div style="width:38px"></div></div>
+      <div class="seg3"><span>Light</span><span class="on">Dark</span><span>Auto</span></div>
+      <div class="eyeb">Select Theme</div>
+      <div class="tgrid">
+        <div class="tcard on" style="--tb:#141724;--tp:#F99861"><div class="pvb"><i></i></div><div class="lab">Moonstone<span class="ck"><svg class="ic"><use href="#i-check"/></svg></span></div></div>
+        <div class="tcard" style="--tb:#1A2332;--tp:#5DA0E5"><div class="pvb"><i></i></div><div class="lab">Ocean</div></div>
+        <div class="tcard" style="--tb:#141628;--tp:#9AA4EA"><div class="pvb"><i></i></div><div class="lab">Midnight</div></div>
+        <div class="tcard" style="--tb:#0B2E33;--tp:#7CC6CE"><div class="pvb"><i></i></div><div class="lab">Emerald</div></div>
+        <div class="tcard" style="--tb:#1C1A14;--tp:#E2B04A"><div class="pvb"><i></i></div><div class="lab">Gilded</div></div>
+        <div class="tcard" style="--tb:#1E1412;--tp:#F0623A"><div class="pvb"><i></i></div><div class="lab">Ember</div></div>
+      </div>
+      <div class="bigtile"><div class="hue"></div><div><div class="tt">Custom</div><div class="ts">Pick your own accent on any base</div></div><div class="edit">Edit</div></div>
+
+      <div class="trow hl"><div class="sq"><svg class="ic"><use href="#i-palette"/></svg></div><div class="txt"><div class="tt">App-wide tile palette</div><div class="ts">When on, every tile across the app uses your theme's colour palette instead of the MyResto colour set.</div></div><div class="sw on"><i></i></div></div>
+      <div class="swatchline">Tiles <i style="background:#3B82F6"></i><i style="background:#7C5CE0"></i><i style="background:#10A56F"></i><i style="background:#FF6B1A"></i><span class="arr">→</span><i style="background:var(--tint)"></i><i style="background:var(--tint)"></i><i style="background:var(--tint)"></i><i style="background:var(--tint)"></i></div>
+
+      <div class="eyeb">Preview</div>
+      <div class="pv">
+        <div class="mt az"><small>Game Hub</small>You're #4</div>
+        <div class="mt vi"><small>Quizzes</small>1 new</div>
+        <div class="mt em"><small>Tips</small>$412 this wk</div>
+        <div class="mt"><small>Guides</small>24 guides</div>
+      </div>
+    </div>
+  </div>
+  <div class="bcap">A glass settings row directly under the Custom tile: palette icon, your title and description, a GlassToggle. The little swatch line under it shows what flips, and the Preview below gains four mini tiles so the page itself proves the toggle (the hosting page is the preview — the s86 rule).</div>
+</div>
+
+<!-- ===== 2 · TOOLS ===== -->
+<div class="col">
+  <div class="concept"><b>2</b> Tools · tiles + assistant rail<span class="ln"></span></div>
+  <div class="phone themed">
+    <div class="glow"></div><div class="glow2"></div>
+    <div class="sb"><span>9:41</span><span>●●● ▲ ▮</span></div>
+    <div class="screen">
+      <div class="hdr" style="justify-content:space-between"><div><div class="eyebrow">MyResto Test</div><div class="htitle" style="font-size:24px">Tools</div></div></div>
+      <div class="hero"><div class="he">Quizzes &amp; Exams</div><h3>Wine service quiz is live</h3><p>8 questions · $4 in Bucks if you ace it</p><div class="dots"><i class="on"></i><i></i><i></i></div></div>
+      <div class="srule">Your tools<span class="ln"></span></div>
+      <div class="grid2">
+        <div class="lt"><div class="lth"><svg class="ic"><use href="#i-book"/></svg>Guides &amp; Training<svg class="ic chev"><use href="#i-chev"/></svg></div><div><div class="lbig"><span>24</span> guides</div><div class="lsub">6 sets · <b>2 new</b> this week</div></div></div>
+        <div class="lt az"><span class="bpx">1</span><div class="lth"><svg class="ic"><use href="#i-game"/></svg>Game Hub<svg class="ic chev"><use href="#i-chev"/></svg></div><div><div class="lbig">You're <span>#4</span></div><div class="lsub">Maria passed you · 2h</div></div></div>
+        <div class="lt vi"><span class="bpx">1</span><div class="lth"><svg class="ic"><use href="#i-quiz"/></svg>Quizzes &amp; Exams<svg class="ic chev"><use href="#i-chev"/></svg></div><div><div class="lbig"><span>1</span> new</div><div class="lsub">Wine service · due Fri</div></div></div>
+        <div class="lt em"><div class="lth"><svg class="ic"><use href="#i-dollar"/></svg>Tips &amp; Checkouts<svg class="ic chev"><use href="#i-chev"/></svg></div><div><div class="lbig"><span>$412</span> this wk</div><div class="lsub">3 shifts · $31/hr</div></div></div>
+        <div class="lt gold wide"><div class="lth"><svg class="ic"><use href="#i-trophy"/></svg>Rewards &amp; Reviews</div><div class="cta">3 waiting</div></div>
+      </div>
+      <div class="srule" style="margin-top:14px">Assistants<span class="ln"></span></div>
+      <div class="asrail"><div class="as kit"><div class="disc"><svg class="ic"><use href="#i-flame"/></svg></div>Kitchen</div><div class="as bar"><div class="disc"><svg class="ic"><use href="#i-wine"/></svg></div>Bartender</div><div class="as host"><div class="disc"><svg class="ic"><use href="#i-users"/></svg></div>Host</div></div>
+    </div>
+  </div>
+  <div class="bcap">Toggle ON: Guides, Game Hub, Quizzes and Tips tiles wear the tint; the assistant discs too. The hero keeps its tri-role gradient and the Rewards tile keeps gold (flip the Toggle buttons above to see the MyResto set: azure, violet, emerald, kitchen flame).</div>
+</div>
+
+<!-- ===== 3 · MY HUB ===== -->
+<div class="col">
+  <div class="concept"><b>3</b> My Hub · Favorites + Jolt palette<span class="ln"></span></div>
+  <div class="phone themed">
+    <div class="glow"></div><div class="glow2"></div>
+    <div class="sb"><span>9:41</span><span>●●● ▲ ▮</span></div>
+    <div class="screen">
+      <div class="hubhead"><div class="av">SE</div><div><div class="nm">Steven Eccles</div><div class="jt">Manager · MyResto Test</div></div></div>
+      <div class="hubseg"><span class="on">My Hub</span><span>Settings</span></div>
+      <div class="srule">Favorites<span class="ln"></span></div>
+      <div class="grid2">
+        <div class="lt az"><div class="lth"><svg class="ic"><use href="#i-game"/></svg>Game Hub<svg class="ic chev"><use href="#i-chev"/></svg></div><div><div class="lbig">You're <span>#4</span></div><div class="lsub">Picture This</div></div></div>
+        <div class="lt vi"><div class="lth"><svg class="ic"><use href="#i-quiz"/></svg>Quizzes<svg class="ic chev"><use href="#i-chev"/></svg></div><div><div class="lbig"><span>1</span> new</div><div class="lsub">due Fri</div></div></div>
+        <div class="lt em"><div class="lth"><svg class="ic"><use href="#i-dollar"/></svg>Tips<svg class="ic chev"><use href="#i-chev"/></svg></div><div><div class="lbig"><span>$412</span></div><div class="lsub">this week</div></div></div>
+        <div class="lt bar"><div class="lth"><svg class="ic"><use href="#i-wine"/></svg>Bartender<svg class="ic chev"><use href="#i-chev"/></svg></div><div><div class="lbig"><span>34</span> recipes</div><div class="lsub">2 menus</div></div></div>
+        <div class="lt team"><div class="lth"><svg class="ic"><use href="#i-cal"/></svg>My Schedule<svg class="ic chev"><use href="#i-chev"/></svg></div><div><div class="lbig">Fri <span>4 PM</span></div><div class="lsub">next shift</div></div></div>
+        <div class="lt"><div class="lth"><svg class="ic"><use href="#i-book"/></svg>Guides<svg class="ic chev"><use href="#i-chev"/></svg></div><div><div class="lbig"><span>2</span> new</div><div class="lsub">this week</div></div></div>
+      </div>
+      <div class="jolt"><div class="jh"><div class="bolt"><svg class="ic" style="width:12px;height:12px;fill:currentColor;stroke:none"><use href="#i-bolt"/></svg></div>Jolt · recent</div>
+        <div class="jr"><div class="d az"><svg class="ic" style="width:13px;height:13px"><use href="#i-game"/></svg></div>Picture This<small>Game Hub</small></div>
+        <div class="jr"><div class="d gold"><svg class="ic" style="width:13px;height:13px"><use href="#i-star"/></svg></div>Approvals<small>Rewards</small></div>
+        <div class="jr"><div class="d bar"><svg class="ic" style="width:13px;height:13px"><use href="#i-wine"/></svg></div>Dockside Paloma<small>Recipe</small></div>
+        <div class="jr"><div class="d team"><svg class="ic" style="width:13px;height:13px"><use href="#i-users"/></svg></div>Employees<small>Manage</small></div>
+      </div>
+    </div>
+  </div>
+  <div class="bcap">Favorites (LiveTile) and the Jolt palette discs both resolve through <b>favoriteAccent()</b>, so they flip together. The Approvals disc keeps gold — same rule as the Rewards tile.</div>
+</div>
+
+</div>
+
+<div class="notes">
+  <div class="note"><b>Code shape</b>A fourth ThemeContext key (`@app_theme_tiles`, 'myresto' | 'theme') exposed as `tilePalette`; `favoriteAccent()` and a new `toolsAccent()` return `colors.tint` when it is 'theme'. Call sites: the two Tools pages, CommandTile, AssistantRail, LiveTile, FavoritesEditorSheet, JoltPalette. Gold, the hero gradients and the family consoles are untouched.</div>
+  <div class="note"><b>Copy</b>Row title <em>App-wide tile palette</em>, description <em>When on, every tile across the app uses your theme's colour palette instead of the MyResto colour set.</em> (your wording, tightened to fit two lines on the phone). Two new i18n pairs.</div>
+  <div class="note"><b>In-pass fix</b>Four tile files read `mode` instead of `resolvedMode` (Auto on a dark phone gets the light hues). Fixed while routing them through the resolver.</div>
+</div>
+
+<script>
+const phones=[...document.querySelectorAll('.phone')];
+document.querySelectorAll('[data-theme]').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('[data-theme]').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+  phones.forEach(p=>{p.classList.remove('t-moon-l','t-ocean-d','t-ocean-l','t-mid-d');if(b.dataset.theme)p.classList.add(b.dataset.theme);});
+}));
+document.querySelectorAll('[data-themed]').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('[data-themed]').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+  const on=b.dataset.themed==='on';
+  phones.forEach(p=>p.classList.toggle('themed',on));
+  document.querySelectorAll('.sw').forEach(s=>s.classList.toggle('on',on));
+}));
+</script>
+</body>
+</html>

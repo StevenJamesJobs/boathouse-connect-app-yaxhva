@@ -37,7 +37,7 @@ interface Props {
 
 export default function FavoritesEditorSheet({ visible, onClose, tiles, data, onSave, isAllowed }: Props) {
   const colors = useThemeColors();
-  const { resolvedMode } = useAppTheme();
+  const { resolvedMode, tilePalette } = useAppTheme();
   const { user } = useAuth();
   const { t } = useTranslation();
   const { width } = useWindowDimensions();
@@ -97,7 +97,7 @@ export default function FavoritesEditorSheet({ visible, onClose, tiles, data, on
     ({ item, drag, isActive }: RenderItemParams<FavoriteTile>) => {
       const def = defForId(item.id);
       if (!def) return null;
-      const acc = favoriteAccent(def.accent, colors, resolvedMode);
+      const acc = favoriteAccent(def.accent, colors, resolvedMode, tilePalette);
       const sel = selectedSlot === item.id;
       return (
         <ScaleDecorator>
@@ -125,7 +125,7 @@ export default function FavoritesEditorSheet({ visible, onClose, tiles, data, on
         </ScaleDecorator>
       );
     },
-    [colors, resolvedMode, slotW, selectedSlot, tint]
+    [colors, resolvedMode, tilePalette, slotW, selectedSlot, tint]
   );
 
   const removeSelected = () => {
@@ -150,7 +150,7 @@ export default function FavoritesEditorSheet({ visible, onClose, tiles, data, on
   const renderSample = (def: FavoriteDef) => {
     const tile = byId.get(def.id);
     const on = !!tile;
-    const acc = favoriteAccent(def.accent, colors, resolvedMode);
+    const acc = favoriteAccent(def.accent, colors, resolvedMode, tilePalette);
     const line = def.line?.(preview, t) ?? null;
     const isWide = def.sizes.includes('wide');
     const factsOn = tile && def.facts ? def.facts.filter((f) => tile.facts[f.key] !== false).length : 0;

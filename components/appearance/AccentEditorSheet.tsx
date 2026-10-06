@@ -8,6 +8,7 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { FieldLabel, Hint, SegControl } from '@/components/content/FormKit';
 import ThemePreview from '@/components/appearance/ThemePreview';
 import HueSlider from '@/components/appearance/HueSlider';
+import { SheetNoDragZone } from '@/components/sheetDismiss';
 import { alpha, THEME_LABEL_KEY } from '@/components/appearance/appearanceKit';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useAppTheme } from '@/contexts/ThemeContext';
@@ -174,7 +175,11 @@ export default function AccentEditorSheet({ visible, onClose, initial }: AccentE
             {seed ? ` · ${t('appearance.custom_from_preset', { name: t(THEME_LABEL_KEY[seed]) })}` : ''}
           </Text>
         </View>
-        <HueSlider value={hue} onChange={setHue} ticks={ticks} />
+        {/* The slider owns its pan — fenced so a drag that starts on it never
+            pulls the sheet down (components/sheetDismiss.tsx). */}
+        <SheetNoDragZone>
+          <HueSlider value={hue} onChange={setHue} ticks={ticks} />
+        </SheetNoDragZone>
         <Hint>{t('appearance.custom_hue_hint')}</Hint>
 
         <View style={styles.baseLabel}>

@@ -3,7 +3,9 @@
  * segmented, hairline dividers, shared verbatim by O/M and employees (the whole
  * point of the wave's unification fix — membership varies, treatment never).
  * Icon hues are FIXED across themes (kitchen flame orange / bartender azure /
- * host violet — Steve's call after the theme-tinted flame went blue on Ocean).
+ * host violet — Steve's call after the theme-tinted flame went blue on Ocean)
+ * under the default tile palette; the s89 app-wide tile palette toggle swaps
+ * them for the theme tint through assistantAccent.
  */
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -11,7 +13,7 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useAppTheme } from '@/contexts/ThemeContext';
 import { fonts } from '@/constants/fonts';
-import { ASSISTANT_HUES, AssistantKey } from '@/components/tools/toolsVisuals';
+import { assistantAccent, AssistantKey } from '@/components/tools/toolsVisuals';
 
 export interface AssistantRailItem {
   key: AssistantKey;
@@ -23,8 +25,9 @@ export interface AssistantRailItem {
 
 export default function AssistantRail({ items }: { items: AssistantRailItem[] }) {
   const colors = useThemeColors();
-  const { mode } = useAppTheme();
-  const scheme = mode === 'dark' ? 'dark' : 'light';
+  // resolvedMode, never mode: under Auto `mode` is 'auto' and the raw check fell to
+  // the light hues on a dark phone.
+  const { resolvedMode: scheme, tilePalette } = useAppTheme();
 
   if (items.length === 0) return null;
 
@@ -41,7 +44,7 @@ export default function AssistantRail({ items }: { items: AssistantRailItem[] })
             ios_icon_name={item.iosIcon as any}
             android_material_icon_name={item.androidIcon as any}
             size={16}
-            color={ASSISTANT_HUES[item.key][scheme]}
+            color={assistantAccent(item.key, scheme, colors, tilePalette)}
           />
           <Text style={[styles.label, { color: colors.text }]} numberOfLines={1}>
             {item.label}

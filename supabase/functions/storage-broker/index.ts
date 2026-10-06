@@ -43,6 +43,9 @@
 // v16 (session 88): 'libation-recipe-images' + 'summer-libation-recipe-images'
 // join DELETE_BUCKETS — recipe deletes are real deletes now (the editors and
 // the two-menus → one retirement purge the photo after the row).
+//
+// v17 (session 89): 'notification-images' — the optional photo on a general
+//   notification (purpose notification_image, managers, 10 MB images).
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -104,6 +107,13 @@ const GATES: Record<string, Gate> = {
   },
   upcoming_event_image: {
     bucket: 'upcoming-events', roles: 'manager', maxBytes: 10 * MB, mimes: IMAGES,
+    path: (c) => `${c.orgId}/${c.ts}-${c.rand}.${c.ext}`,
+  },
+  // s89 (D1): the optional photo on a general notification (Notification
+  // Center). Lands in the shade row + the detail Poster, and rides the push as
+  // an Android thumbnail (send-push-notification mints a signed URL for it).
+  notification_image: {
+    bucket: 'notification-images', roles: 'manager', maxBytes: 10 * MB, mimes: IMAGES,
     path: (c) => `${c.orgId}/${c.ts}-${c.rand}.${c.ext}`,
   },
   // s80: one-time post attachments (PDF or image, 20MB — Steve's cap). They live
@@ -211,18 +221,21 @@ const GATES: Record<string, Gate> = {
 // v14 (s82b): + 'menu-uploads' — Recent Uploads can delete a saved/failed scan
 // (delete_menu_upload returns the file_url; the client broker-deletes it after).
 // v16 (s88): + the two libation recipe image buckets (hard recipe deletes).
+// v17 (s89): + 'notification-images' (a composer that drops a picked photo).
 const DELETE_BUCKETS = new Set([
   'guides-and-training', 'announcements', 'special-features', 'upcoming-events', 'menu-items',
   'menu-uploads', 'schedules', 'libation-recipe-images', 'summer-libation-recipe-images',
+  'notification-images',
 ]);
 
-// The 15 real buckets sign-read will mint READ URLs for (excludes the inert,
-// empty b4a-proof bucket).
+// The 16 real buckets sign-read will mint READ URLs for (excludes the inert,
+// empty b4a-proof bucket). v17: + 'notification-images'.
 const READ_BUCKETS = new Set([
   'announcements', 'cocktail-images', 'guides-and-training', 'host-section-images',
   'libation-recipe-images', 'menu-items', 'menu-uploads', 'message-attachments',
-  'organization-logos', 'profile-pictures', 'puree-syrup-recipe-images', 'schedules',
-  'special-features', 'summer-libation-recipe-images', 'upcoming-events',
+  'notification-images', 'organization-logos', 'profile-pictures',
+  'puree-syrup-recipe-images', 'schedules', 'special-features',
+  'summer-libation-recipe-images', 'upcoming-events',
 ]);
 
 // Signed-read expiry tiers. `image` keeps in-app renders cache-stable for a full

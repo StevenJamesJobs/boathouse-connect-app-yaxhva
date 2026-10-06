@@ -6,44 +6,44 @@ import {
   Pressable,
   StyleSheet,
   Animated,
-  PanResponder,
-  Dimensions,
 } from 'react-native';
 import { Platform } from 'react-native';
+import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import Reanimated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import GlassCard from '@/components/GlassCard';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { fonts } from '@/constants/fonts';
-
-const SCREEN_HEIGHT = Dimensions.get('window').height;
-const DISMISS_THRESHOLD = 120;
+import { SheetHeaderZone, useSheetDismiss } from '@/components/sheetDismiss';
 
 /**
- * The hero-photo variant of the glass bottom sheet — MenuItemDetailSheet's
- * shell, extracted for the recipe detail sheets (s73: Cocktails A-Z + the
- * Libations viewers) so the photo-flush-to-the-top continuity is one component
- * instead of a fourth hand-mirrored copy.
+ * The hero-photo variant of the glass bottom sheet — the shell under the
+ * Poster (components/PosterSheet.tsx) and the plain hero sheets.
  *
  * Deliberately NOT composed from <GlassSheet>: GlassSheet unconditionally
  * renders its grab handle + title row ABOVE the body, and the whole point is
  * the hero bleeding to the sheet's top edge. This mirrors the shell
  * byte-for-byte — same scrim, GlassCard variant="glass" radius 26 intensity 32,
- * same 10/18 paddings, Android bottomPad floor, 88% cap — and keeps
- * MenuItemDetailSheet's pull-down-to-dismiss riding the grab handle.
+ * same 10/18 paddings, Android bottomPad floor, 88% cap.
  *
- * `hero` renders inside a full-bleed 196pt box at the very top (pass the image
- * + any scrim/overlays); without it the grab sits in its normal spot and the
+ * `hero` renders inside a full-bleed box at the very top (pass the image +
+ * any scrim/overlays); without it the grab sits in its normal spot and the
  * body starts at the top like a regular sheet. The footer defaults to the
- * pinned Close button; pass `footer` to replace it (per MenuItemDetailSheet,
- * actions that present anything must defer past the dismissal).
+ * pinned Close button; pass `footer` to replace it (actions that present
+ * anything must defer past the dismissal — useSheetHandoff).
+ *
+ * s89: swipe-down-to-dismiss from anywhere (components/sheetDismiss.tsx) —
+ * the grab strip always, the body whenever its scroll is at the top. That is
+ * also the Poster's two-stage pull: a drag that begins with the panel UP only
+ * restores the photo; a fresh drag at rest pulls the sheet down.
  */
 interface GlassHeroSheetProps {
   visible: boolean;
   onClose: () => void;
   /** Full-bleed hero content (image + overlays). Box + top radii come from the sheet. */
   hero?: React.ReactNode;
-  /** Hero box height — 196 (the recipe sheets); ContentDetailModal's poster passes ~46% of the window. */
+  /** Hero box height — 196 (plain hero sheets); the Poster passes ~46% of the window. */
   heroHeight?: number;
   /**
    * The Poster collapse (s81): pass an Animated.Value and the sheet drives it
@@ -54,14 +54,12 @@ interface GlassHeroSheetProps {
    */
   scrollY?: Animated.Value;
   pinHero?: boolean;
-  /** Fired when the body is pulled past its top by PULL_DISMISS (iOS bounce) — the poster's "pull down to leave". */
-  onPullDown?: () => void;
   children: React.ReactNode;
   /** Replaces the default pinned Close button row. */
   footer?: React.ReactNode;
+  /** s89 escape hatch — see GlassSheet. */
+  dragToDismiss?: boolean;
 }
-
-const PULL_DISMISS = 72;
 
 export default function GlassHeroSheet({
   visible,
@@ -70,9 +68,9 @@ export default function GlassHeroSheet({
   heroHeight = 196,
   scrollY,
   pinHero = false,
-  onPullDown,
   children,
   footer,
+  dragToDismiss = true,
 }: GlassHeroSheetProps) {
   const { t } = useTranslation();
   const colors = useThemeColors();
@@ -81,168 +79,128 @@ export default function GlassHeroSheet({
   // not always report the nav-bar inset.
   const bottomPad = Math.max(20, insets.bottom + 12, Platform.OS === 'android' ? 36 : 0);
 
-  // ─── Pull-down-to-dismiss (the ContentDetailModal recipe, unchanged) ──────
-  const translateY = useRef(new Animated.Value(0)).current;
-  const dragDismissing = useRef(false);
-  // Where the last body drag began — the two-stage pull-down guard.
-  const dragStartY = useRef(0);
+  const dragDismissingRef = useRef(false);
+  const { gesture, bodyNative, shellStyle, trackBodyScroll, reset, contextValue, SheetDismissProvider } = useSheetDismiss({
+    onClose,
+    dragDismissingRef,
+    enabled: dragToDismiss,
+    bodyTracked: true,
+  });
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gestureState) =>
-        gestureState.dy > 4 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
-      onPanResponderMove: (_, gestureState) => {
-        if (gestureState.dy > 0) {
-          translateY.setValue(gestureState.dy);
-        }
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dy > DISMISS_THRESHOLD) {
-          dragDismissing.current = true;
-          Animated.timing(translateY, {
-            toValue: SCREEN_HEIGHT,
-            duration: 250,
-            useNativeDriver: true,
-          }).start(() => {
-            onClose();
-          });
-        } else {
-          Animated.spring(translateY, {
-            toValue: 0,
-            useNativeDriver: true,
-            tension: 80,
-            friction: 10,
-          }).start();
-        }
-      },
-    })
-  ).current;
+  // The body scroll feeds the Poster's scrollY (native driver) AND the dismiss
+  // pan's at-top check (JS listener) from the one event.
+  const onBodyScroll = scrollY
+    ? Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+        useNativeDriver: true,
+        listener: trackBodyScroll,
+      })
+    : trackBodyScroll;
 
   return (
     <Modal
       visible={visible}
-      animationType={dragDismissing.current ? 'none' : 'slide'}
+      animationType={dragDismissingRef.current ? 'none' : 'slide'}
       transparent
       onRequestClose={onClose}
       statusBarTranslucent
-      onShow={() => {
-        translateY.setValue(0);
-        dragDismissing.current = false;
-      }}
+      onShow={reset}
     >
-      <View style={styles.wrap}>
+      <GestureHandlerRootView style={styles.wrap}>
         <Pressable style={styles.scrim} onPress={onClose} />
-        {/* The drag translate stays on this OUTER view — GlassCard is a plain
-            function component (no forwardRef), so it cannot be wrapped by
-            Animated.createAnimatedComponent. The shell owns the 88% cap; the
-            card shrinks inside it. */}
-        <Animated.View style={[styles.shell, { transform: [{ translateY }] }]}>
-          <GlassCard
-            variant="glass"
-            radius={26}
-            androidBaseAlpha={0.98}
-            intensity={32}
-            style={[styles.sheet, { paddingBottom: bottomPad }]}
-          >
-            {!hero && (
-              // No photo → the grab handle keeps its normal GlassSheet
-              // position above the body. The pan handlers ride it.
-              <View {...panResponder.panHandlers} style={styles.dragArea}>
-                <View style={[styles.grab, { backgroundColor: colors.glassBorder }]} />
-              </View>
-            )}
+        <SheetDismissProvider value={contextValue}>
+          <GestureDetector gesture={gesture}>
+            {/* The drag translate stays on this OUTER view — GlassCard is a plain
+                function component (no forwardRef), so it cannot be wrapped by
+                Animated.createAnimatedComponent. The shell owns the 88% cap; the
+                card shrinks inside it. */}
+            <Reanimated.View style={[styles.shell, shellStyle]}>
+              <GlassCard
+                variant="glass"
+                radius={26}
+                androidBaseAlpha={0.98}
+                intensity={32}
+                style={[styles.sheet, { paddingBottom: bottomPad }]}
+              >
+                {!hero && (
+                  // No photo → the grab handle keeps its normal GlassSheet
+                  // position above the body.
+                  <SheetHeaderZone style={styles.dragArea}>
+                    <View style={[styles.grab, { backgroundColor: colors.glassBorder }]} />
+                  </SheetHeaderZone>
+                )}
 
-            <Animated.ScrollView
-              // The body escapes the shell's padding (10 top / 18 horizontal —
-              // GlassSheet's exact values) so the hero can sit flush to the
-              // sheet's top edge, then the content container pads the normal
-              // sections back in. A negative top margin ON the hero itself
-              // would land above scroll offset 0 and be clipped.
-              style={[styles.scroll, !!hero && styles.scrollWithHero]}
-              contentContainerStyle={styles.scrollContent}
-              showsVerticalScrollIndicator={false}
-              onScroll={
-                scrollY
-                  ? Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })
-                  : undefined
-              }
-              scrollEventThrottle={16}
-              // Two-stage pull (Steve): a drag that starts while the panel is
-              // UP only restores the photo, however far it overshoots; only a
-              // drag that begins AT REST and pulls past the top dismisses.
-              onScrollBeginDrag={
-                onPullDown
-                  ? (e) => {
-                      dragStartY.current = e.nativeEvent.contentOffset.y;
-                    }
-                  : undefined
-              }
-              onScrollEndDrag={
-                onPullDown
-                  ? (e) => {
-                      if (dragStartY.current <= 2 && e.nativeEvent.contentOffset.y < -PULL_DISMISS) onPullDown();
-                    }
-                  : undefined
-              }
-            >
-              {!!hero && (
-                <Animated.View
-                  style={[
-                    styles.hero,
-                    { height: heroHeight, backgroundColor: colors.thumbPlaceholder },
-                    // Pinned: translate by the scroll offset so the hero holds
-                    // the sheet's top while the children ride up over it. The
-                    // overscroll bounce is clamped so a pull-down drags the
-                    // photo with the content instead of opening a gap.
-                    pinHero && scrollY
-                      ? {
-                          transform: [
-                            {
-                              translateY: scrollY.interpolate({
-                                inputRange: [0, 1],
-                                outputRange: [0, 1],
-                                extrapolateLeft: 'clamp',
-                              }),
-                            },
-                          ],
-                        }
-                      : null,
-                  ]}
+                <GestureDetector gesture={bodyNative}>
+                <Animated.ScrollView
+                  // The body escapes the shell's padding (10 top / 18 horizontal —
+                  // GlassSheet's exact values) so the hero can sit flush to the
+                  // sheet's top edge, then the content container pads the normal
+                  // sections back in. A negative top margin ON the hero itself
+                  // would land above scroll offset 0 and be clipped.
+                  style={[styles.scroll, !!hero && styles.scrollWithHero]}
+                  contentContainerStyle={styles.scrollContent}
+                  showsVerticalScrollIndicator={false}
+                  onScroll={onBodyScroll}
+                  scrollEventThrottle={16}
+                  // The dismiss pan takes an at-top pull; no rubber-band to fight it.
+                  bounces={false}
                 >
-                  {hero}
-                </Animated.View>
-              )}
-              {pinHero ? <View style={styles.overHero}>{children}</View> : children}
-            </Animated.ScrollView>
+                  {!!hero && (
+                    <Animated.View
+                      style={[
+                        styles.hero,
+                        { height: heroHeight, backgroundColor: colors.thumbPlaceholder },
+                        // Pinned: translate by the scroll offset so the hero holds
+                        // the sheet's top while the children ride up over it.
+                        pinHero && scrollY
+                          ? {
+                              transform: [
+                                {
+                                  translateY: scrollY.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [0, 1],
+                                    extrapolateLeft: 'clamp',
+                                  }),
+                                },
+                              ],
+                            }
+                          : null,
+                      ]}
+                    >
+                      {hero}
+                    </Animated.View>
+                  )}
+                  {pinHero ? <View style={styles.overHero}>{children}</View> : children}
+                </Animated.ScrollView>
+                </GestureDetector>
 
-            {!!hero && (
-              // The grab handle floats OVER the photo — pinned at the sheet
-              // (not scroll) level so drag-to-dismiss stays reachable after
-              // the body scrolls.
-              <View {...panResponder.panHandlers} style={styles.dragStrip}>
-                <View style={styles.grabOver} />
-              </View>
-            )}
+                {!!hero && (
+                  // The grab handle floats OVER the photo — pinned at the sheet
+                  // (not scroll) level so it stays reachable after the body scrolls.
+                  <SheetHeaderZone style={styles.dragStrip}>
+                    <View style={styles.grabOver} />
+                  </SheetHeaderZone>
+                )}
 
-            {footer ?? (
-              <View style={styles.footerRow}>
-                <Pressable
-                  style={[
-                    styles.closeBtn,
-                    { backgroundColor: colors.glass, borderColor: colors.glassBorder },
-                  ]}
-                  onPress={onClose}
-                >
-                  <Text style={[styles.closeLabel, { color: colors.textSecondary }]}>
-                    {t('common.close')}
-                  </Text>
-                </Pressable>
-              </View>
-            )}
-          </GlassCard>
-        </Animated.View>
-      </View>
+                {footer ?? (
+                  <View style={styles.footerRow}>
+                    <Pressable
+                      style={[
+                        styles.closeBtn,
+                        { backgroundColor: colors.glass, borderColor: colors.glassBorder },
+                      ]}
+                      onPress={onClose}
+                    >
+                      <Text style={[styles.closeLabel, { color: colors.textSecondary }]}>
+                        {t('common.close')}
+                      </Text>
+                    </Pressable>
+                  </View>
+                )}
+              </GlassCard>
+            </Reanimated.View>
+          </GestureDetector>
+        </SheetDismissProvider>
+      </GestureHandlerRootView>
     </Modal>
   );
 }

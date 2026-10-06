@@ -7,24 +7,32 @@
  * that day" pre-dated to it. Chart scopes per the locked mapping: WK = 7
  * nights (ghost = last week) · MO = day-by-day · 3M = 13 weeks · YR = 12
  * months (ghost = last year). All data is the on-device journal.
+ *
+ * PAYCHECKS (s89 "G", J-B): a payday is a journal entry of its own kind. It
+ * counts in the period total and the chart (stacked as the OUTLINED emerald
+ * segment above the tips bar), never in shift count, $/hr, tip average, best
+ * day or the "a double" label. The Journal's dashed add row splits into
+ * "Add a shift" / "Add a paycheck"; the top Log Shift button stays shift-only.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { useFocusEffect } from "expo-router/react-navigation";
+import { LinearGradient } from 'expo-linear-gradient';
 import GlassCard from '@/components/GlassCard';
 import GameToast from '@/components/game/GameToast';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useJournalAccent, useTipsAccent } from '@/components/tips/useTipsAccent';
-import { TIPS_VISUALS } from '@/components/tips/tipsVisuals';
+import { TIPS_PAYCHECK, TIPS_VISUALS } from '@/components/tips/tipsVisuals';
 import LogShiftSheet, { WEATHER_ICONS } from '@/components/tips/LogShiftSheet';
 import CheckoutDetailSheet from '@/components/tips/CheckoutDetailSheet';
 import { formatMoney } from '@/components/tips/TipsBits';
 import {
   type CheckoutSnapshot,
   type DayRollup,
+  type EntryKind,
   type ShiftEntry,
   type TrackerPeriod,
   addDays,
@@ -32,6 +40,7 @@ import {
   dateKey,
   entriesForDay,
   entryTotalTips,
+  isPaycheck,
   loadEntries,
   parseDateKey,
   periodRange,
@@ -61,10 +70,17 @@ export default function TrackerView({ active }: { active: boolean }) {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
-  const [logSheet, setLogSheet] = useState<{ open: boolean; date: string; edit: ShiftEntry | null }>({
+  const [logSheet, setLogSheet] = useState<{
+    open: boolean;
+    date: string;
+    edit: ShiftEntry | null;
+    /** What a NEW entry from this opener is; an edit opens as its own kind. */
+    mode: EntryKind;
+  }>({
     open: false,
     date: todayKey,
     edit: null,
+    mode: 'shift',
   });
   const [detailSnapshot, setDetailSnapshot] = useState<CheckoutSnapshot | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -105,12 +121,14 @@ export default function TrackerView({ active }: { active: boolean }) {
     [entries, chartRange],
   );
   const bars = useMemo(() => chartBars(entries, period, chartRef), [entries, period, chartRef]);
+  const hasPaydayBar = bars.some((b) => b.paychecks > 0);
+  const hasGhost = bars.some((b) => b.prevTips !== null);
 
   const dayRollups = useMemo(() => rollupByDay(entries), [entries]);
   const selectedEntries = useMemo(() => entriesForDay(entries, selectedDay), [entries, selectedDay]);
 
-  const openLog = (date: string, edit: ShiftEntry | null = null) =>
-    setLogSheet({ open: true, date, edit });
+  const openLog = (date: string, edit: ShiftEntry | null = null, mode: EntryKind = 'shift') =>
+    setLogSheet({ open: true, date, edit, mode });
 
   const onLogSaved = (next: ShiftEntry[]) => {
     setEntries(next);
@@ -180,17 +198,21 @@ export default function TrackerView({ active }: { active: boolean }) {
 
           {/* KPI tiles — explicit pair rows, never a percentage wrap grid. */}
           <View style={styles.kpiRow}>
+            {/* The total is all-in; with a payday in range the detail line
+                becomes the Tips · Paycheck split (mockup D) so the number's
+                two parts are always visible. */}
             <Kpi
               iosIcon="dollarsign.circle.fill"
               androidIcon="attach-money"
               label={t(`tips_checkouts.kpi_total_${period}`)}
-              value={moneyWhole(summary.tips)}
+              value={moneyWhole(summary.total)}
               detail={
                 tipsDelta !== null
                   ? t('tips_checkouts.kpi_vs_last', { pct: `${tipsDelta >= 0 ? '▲' : '▼'}${Math.abs(Math.round(tipsDelta * 100))}%` })
                   : t('tips_checkouts.kpi_shifts_n', { n: summary.shiftCount })
               }
               detailTone={tipsDelta === null ? undefined : tipsDelta >= 0 ? 'up' : 'down'}
+              split={summary.paychecks > 0 ? { tips: summary.tips, paychecks: summary.paychecks } : undefined}
             />
             <Kpi
               iosIcon="clock.fill"
@@ -263,25 +285,41 @@ export default function TrackerView({ active }: { active: boolean }) {
                 setMode('journal');
               }}
             />
-            {bars.some((b) => b.prevTips !== null) && (
+            {/* One legend row: Tips / Paycheck whenever a payday is in the
+                chart's range (else the plain "this period" swatch), plus the
+                ghost swatch on the periods that draw one. */}
+            {(hasPaydayBar || hasGhost) && (
               <View style={styles.legendRow}>
                 <View style={[styles.legendSwatch, { backgroundColor: accent }]} />
                 <Text style={[styles.legendText, { color: colors.textSecondary }]}>
-                  {t('tips_checkouts.legend_this')}
+                  {hasPaydayBar ? t('tips_checkouts.kpi_split_tips') : t('tips_checkouts.legend_this')}
                 </Text>
-                <View style={[styles.legendSwatch, { backgroundColor: colors.glassBorder }]} />
-                <Text style={[styles.legendText, { color: colors.textSecondary }]}>
-                  {t('tips_checkouts.legend_last')}
-                </Text>
+                {hasPaydayBar && (
+                  <>
+                    <View style={[styles.legendSwatch, styles.paycheckOutline]} />
+                    <Text style={[styles.legendText, { color: colors.textSecondary }]}>
+                      {t('tips_checkouts.kpi_split_paycheck')}
+                    </Text>
+                  </>
+                )}
+                {hasGhost && (
+                  <>
+                    <View style={[styles.legendSwatch, { backgroundColor: colors.glassBorder }]} />
+                    <Text style={[styles.legendText, { color: colors.textSecondary }]}>
+                      {t('tips_checkouts.legend_last')}
+                    </Text>
+                  </>
+                )}
               </View>
             )}
-            {chartPrevSummary.tips > 0 && (
+            {/* All-in, like the bars it sits under (the ghost bar is all-in too). */}
+            {chartPrevSummary.total > 0 && (
               <View style={[styles.chartNote, { borderTopColor: colors.hairline }]}>
                 <Text style={[styles.chartNoteLabel, { color: colors.textSecondary }]}>
                   {t('tips_checkouts.chart_vs_last')}
                 </Text>
                 <Text style={[styles.chartNoteValue, { color: colors.text }]}>
-                  {`${chartSummary.tips - chartPrevSummary.tips >= 0 ? '+' : '−'}${formatMoney(chartSummary.tips - chartPrevSummary.tips)}`}
+                  {`${chartSummary.total - chartPrevSummary.total >= 0 ? '+' : '−'}${formatMoney(chartSummary.total - chartPrevSummary.total)}`}
                 </Text>
               </View>
             )}
@@ -308,7 +346,8 @@ export default function TrackerView({ active }: { active: boolean }) {
           todayKey={todayKey}
           locale={locale}
           onAddShift={(date) => openLog(date)}
-          onEditEntry={(entry) => openLog(entry.date, entry)}
+          onAddPaycheck={(date) => openLog(date, null, 'paycheck')}
+          onEditEntry={(entry) => openLog(entry.date, entry, isPaycheck(entry) ? 'paycheck' : 'shift')}
           onCheckoutDetail={setDetailSnapshot}
         />
       )}
@@ -320,6 +359,7 @@ export default function TrackerView({ active }: { active: boolean }) {
         initialDate={logSheet.date}
         allEntries={entries}
         editEntry={logSheet.edit}
+        mode={logSheet.mode}
         onClose={() => setLogSheet((s) => ({ ...s, open: false }))}
         onSaved={onLogSaved}
       />
@@ -343,6 +383,7 @@ function JournalBody({
   todayKey,
   locale,
   onAddShift,
+  onAddPaycheck,
   onEditEntry,
   onCheckoutDetail,
 }: {
@@ -356,6 +397,7 @@ function JournalBody({
   todayKey: string;
   locale: string;
   onAddShift: (date: string) => void;
+  onAddPaycheck: (date: string) => void;
   onEditEntry: (entry: ShiftEntry) => void;
   onCheckoutDetail: (snapshot: CheckoutSnapshot) => void;
 }) {
@@ -368,11 +410,12 @@ function JournalBody({
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const leadingBlanks = new Date(year, month, 1).getDay(); // Sunday-first grid
 
+  // Dot tiers size by the day's all-in take (a payday is still money).
   const monthMax = useMemo(() => {
     let max = 0;
     for (let d = 1; d <= daysInMonth; d++) {
       const roll = dayRollups.get(dateKey(new Date(year, month, d)));
-      if (roll && roll.tips > max) max = roll.tips;
+      if (roll && roll.total > max) max = roll.total;
     }
     return max;
   }, [dayRollups, year, month, daysInMonth]);
@@ -397,8 +440,25 @@ function JournalBody({
   const weeks: Array<Array<{ key: string; day: number } | null>> = [];
   for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
 
-  const dayTotal = selectedEntries.reduce((sum, e) => sum + entryTotalTips(e), 0);
-  const dayHours = selectedEntries.reduce((sum, e) => sum + (e.hours || 0), 0);
+  // The day row keeps the shift math visible — "tips · hrs" — and appends the
+  // paycheck as its own "+ $" term; a payday alone shows just that term.
+  const dayShifts = selectedEntries.filter((e) => !isPaycheck(e));
+  const dayTips = dayShifts.reduce((sum, e) => sum + entryTotalTips(e), 0);
+  const dayHours = dayShifts.reduce((sum, e) => sum + (e.hours || 0), 0);
+  const dayPaychecks = selectedEntries
+    .filter(isPaycheck)
+    .reduce((sum, e) => sum + entryTotalTips(e), 0);
+  const dayTotalText = [
+    dayShifts.length > 0
+      ? t('tips_checkouts.journal_day_total', {
+          total: formatMoney(dayTips),
+          hours: Math.round(dayHours * 10) / 10,
+        })
+      : null,
+    dayPaychecks > 0 ? `+ ${formatMoney(dayPaychecks)}` : null,
+  ]
+    .filter(Boolean)
+    .join(' ');
   const selectedLabel = parseDateKey(selectedDay).toLocaleDateString(locale, {
     weekday: 'short',
     month: 'short',
@@ -439,7 +499,9 @@ function JournalBody({
             {week.map((cell, ci) => {
               if (!cell) return <View key={ci} style={styles.dayCell} />;
               const roll = dayRollups.get(cell.key);
-              const tier = roll && monthMax > 0 ? dotTier(roll.tips, monthMax) : 0;
+              const tier = roll && monthMax > 0 ? dotTier(roll.total, monthMax) : 0;
+              // A payday's dot is the outlined square (the mockup's calendar mark).
+              const payday = !!roll && roll.paychecks > 0;
               const sel = cell.key === selectedDay;
               const isToday = cell.key === todayKey;
               return (
@@ -468,6 +530,7 @@ function JournalBody({
                       tier === 1 && { width: 5, height: 5, backgroundColor: `${accent}73` },
                       tier === 2 && { width: 7, height: 7, backgroundColor: `${accent}BF` },
                       tier === 3 && { width: 9, height: 9, backgroundColor: accent },
+                      payday && styles.dayDotPayday,
                     ]}
                   />
                 </TouchableOpacity>
@@ -481,56 +544,72 @@ function JournalBody({
         <>
           <View style={[styles.dayTotalRow, { backgroundColor: `${accent}14`, borderColor: `${accent}4D` }]}>
             <Text style={[styles.dayTotalLabel, { color: accent }]} numberOfLines={1}>
-              {selectedEntries.length > 1
+              {dayShifts.length > 1
                 ? t('tips_checkouts.journal_day_double', { date: selectedLabel })
                 : selectedLabel}
             </Text>
-            <Text style={[styles.dayTotalValue, { color: accent }]}>
-              {t('tips_checkouts.journal_day_total', {
-                total: formatMoney(dayTotal),
-                hours: Math.round(dayHours * 10) / 10,
-              })}
-            </Text>
+            <Text style={[styles.dayTotalValue, { color: accent }]}>{dayTotalText}</Text>
           </View>
-          {selectedEntries.map((entry) => (
-            <TouchableOpacity
-              key={entry.id}
-              onPress={() => onEditEntry(entry)}
-              style={[styles.entryRow, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
-            >
-              <View style={[styles.entryIcon, { backgroundColor: `${accent}1F` }]}>
-                <IconSymbol
-                  ios_icon_name={entry.weather?.[0] ? WEATHER_ICONS[entry.weather[0]].ios : 'book.fill'}
-                  android_material_icon_name={entry.weather?.[0] ? WEATHER_ICONS[entry.weather[0]].android : 'menu-book'}
-                  size={15}
-                  color={accent}
-                />
-              </View>
-              <View style={styles.entryMid}>
-                <Text style={[styles.entryTitle, { color: colors.text }]} numberOfLines={1}>
-                  {entry.shift ? t(`tips_checkouts.shift_${entry.shift}`) : t('tips_checkouts.log_saved_shift')}
-                </Text>
-                <Text style={[styles.entrySub, { color: colors.textSecondary }]} numberOfLines={1}>
-                  {entrySubline(entry, t)}
-                </Text>
-              </View>
-              {entry.checkout && (
-                <TouchableOpacity onPress={() => onCheckoutDetail(entry.checkout!)} hitSlop={8}>
-                  <IconSymbol ios_icon_name="doc.plaintext" android_material_icon_name="receipt-long" size={17} color={colors.textSecondary} />
-                </TouchableOpacity>
-              )}
-              <Text style={[styles.entryValue, { color: accent }]}>{formatMoney(entryTotalTips(entry))}</Text>
-            </TouchableOpacity>
-          ))}
-          <TouchableOpacity
-            onPress={() => onAddShift(selectedDay)}
-            style={[styles.addDash, { borderColor: `${accent}70`, backgroundColor: `${accent}10` }]}
-          >
-            <IconSymbol ios_icon_name="plus" android_material_icon_name="add" size={14} color={accent} />
-            <Text style={[styles.addDashText, { color: accent }]}>
-              {t('tips_checkouts.journal_add_shift', { date: selectedLabel })}
-            </Text>
-          </TouchableOpacity>
+          {selectedEntries.map((entry) =>
+            isPaycheck(entry) ? (
+              // Same row, banknote in the disc, outlined PAYCHECK pill, the note as subline.
+              <TouchableOpacity
+                key={entry.id}
+                onPress={() => onEditEntry(entry)}
+                style={[styles.entryRow, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
+              >
+                <View style={[styles.entryIcon, { backgroundColor: `${accent}1F` }]}>
+                  <IconSymbol ios_icon_name="banknote" android_material_icon_name="payments" size={15} color={accent} />
+                </View>
+                <View style={styles.entryMid}>
+                  <View style={styles.entryTitleRow}>
+                    <Text style={[styles.entryTitle, { color: colors.text }]} numberOfLines={1}>
+                      {t('tips_checkouts.entry_paycheck')}
+                    </Text>
+                    <View style={styles.paycheckPill}>
+                      <Text style={styles.paycheckPillText}>{t('tips_checkouts.entry_paycheck').toUpperCase()}</Text>
+                    </View>
+                  </View>
+                  {!!entry.note && (
+                    <Text style={[styles.entrySub, { color: colors.textSecondary }]} numberOfLines={1}>
+                      {entry.note}
+                    </Text>
+                  )}
+                </View>
+                <Text style={[styles.entryValue, { color: accent }]}>{formatMoney(entryTotalTips(entry))}</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                key={entry.id}
+                onPress={() => onEditEntry(entry)}
+                style={[styles.entryRow, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
+              >
+                <View style={[styles.entryIcon, { backgroundColor: `${accent}1F` }]}>
+                  <IconSymbol
+                    ios_icon_name={entry.weather?.[0] ? WEATHER_ICONS[entry.weather[0]].ios : 'book.fill'}
+                    android_material_icon_name={entry.weather?.[0] ? WEATHER_ICONS[entry.weather[0]].android : 'menu-book'}
+                    size={15}
+                    color={accent}
+                  />
+                </View>
+                <View style={styles.entryMid}>
+                  <Text style={[styles.entryTitle, { color: colors.text }]} numberOfLines={1}>
+                    {entry.shift ? t(`tips_checkouts.shift_${entry.shift}`) : t('tips_checkouts.log_saved_shift')}
+                  </Text>
+                  <Text style={[styles.entrySub, { color: colors.textSecondary }]} numberOfLines={1}>
+                    {entrySubline(entry, t)}
+                  </Text>
+                </View>
+                {entry.checkout && (
+                  <TouchableOpacity onPress={() => onCheckoutDetail(entry.checkout!)} hitSlop={8}>
+                    <IconSymbol ios_icon_name="doc.plaintext" android_material_icon_name="receipt-long" size={17} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                )}
+                <Text style={[styles.entryValue, { color: accent }]}>{formatMoney(entryTotalTips(entry))}</Text>
+              </TouchableOpacity>
+            ),
+          )}
+          <AddPair accent={accent} onAddShift={() => onAddShift(selectedDay)} onAddPaycheck={() => onAddPaycheck(selectedDay)} />
         </>
       ) : (
         <>
@@ -543,18 +622,40 @@ function JournalBody({
               {t('tips_checkouts.journal_empty_sub')}
             </Text>
           </GlassCard>
-          <TouchableOpacity
-            onPress={() => onAddShift(selectedDay)}
-            style={[styles.addDash, { borderColor: `${accent}70`, backgroundColor: `${accent}10` }]}
-          >
-            <IconSymbol ios_icon_name="plus" android_material_icon_name="add" size={14} color={accent} />
-            <Text style={[styles.addDashText, { color: accent }]}>
-              {t('tips_checkouts.journal_add_shift', { date: selectedLabel })}
-            </Text>
-          </TouchableOpacity>
+          <AddPair accent={accent} onAddShift={() => onAddShift(selectedDay)} onAddPaycheck={() => onAddPaycheck(selectedDay)} />
         </>
       )}
     </>
+  );
+}
+
+/** The J-B pair: two dashed buttons side by side, a paycheck one tap away. */
+function AddPair({
+  accent,
+  onAddShift,
+  onAddPaycheck,
+}: {
+  accent: string;
+  onAddShift: () => void;
+  onAddPaycheck: () => void;
+}) {
+  const { t } = useTranslation();
+  const dashStyle = [styles.addDash, { borderColor: `${accent}70`, backgroundColor: `${accent}10` }];
+  return (
+    <View style={styles.addPair}>
+      <TouchableOpacity onPress={onAddShift} style={dashStyle}>
+        <IconSymbol ios_icon_name="plus" android_material_icon_name="add" size={14} color={accent} />
+        <Text style={[styles.addDashText, { color: accent }]} numberOfLines={1}>
+          {t('tips_checkouts.journal_add_shift_short')}
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={onAddPaycheck} style={dashStyle}>
+        <IconSymbol ios_icon_name="banknote" android_material_icon_name="payments" size={14} color={accent} />
+        <Text style={[styles.addDashText, { color: accent }]} numberOfLines={1}>
+          {t('tips_checkouts.journal_add_paycheck')}
+        </Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -569,6 +670,7 @@ function Kpi({
   value,
   detail,
   detailTone,
+  split,
 }: {
   iosIcon: string;
   androidIcon: string;
@@ -576,7 +678,10 @@ function Kpi({
   value: string;
   detail: string;
   detailTone?: 'up' | 'down';
+  /** Tips · Paycheck swatch line — takes the detail slot when present. */
+  split?: { tips: number; paychecks: number };
 }) {
+  const { t } = useTranslation();
   const colors = useThemeColors();
   const accent = useTipsAccent();
   const toneColor =
@@ -592,9 +697,33 @@ function Kpi({
       <Text style={[styles.kpiValue, { color: colors.text }]} numberOfLines={1} adjustsFontSizeToFit>
         {value}
       </Text>
-      <Text style={[styles.kpiDetail, { color: toneColor }]} numberOfLines={1}>
-        {detail}
-      </Text>
+      {split ? (
+        <View style={styles.kpiSplit}>
+          <View style={styles.kpiSplitItem}>
+            <LinearGradient
+              colors={[TIPS_VISUALS.gradient[1], TIPS_VISUALS.gradient[0]]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0, y: 1 }}
+              style={styles.kpiSwatch}
+            />
+            <Text style={[styles.kpiSplitText, { color: colors.textSecondary }]} numberOfLines={1}>
+              {t('tips_checkouts.kpi_split_tips')}{' '}
+              <Text style={[styles.kpiSplitValue, { color: colors.text }]}>{moneyWhole(split.tips)}</Text>
+            </Text>
+          </View>
+          <View style={styles.kpiSplitItem}>
+            <View style={[styles.kpiSwatch, styles.paycheckOutline]} />
+            <Text style={[styles.kpiSplitText, { color: colors.textSecondary }]} numberOfLines={1}>
+              {t('tips_checkouts.kpi_split_paycheck')}{' '}
+              <Text style={[styles.kpiSplitValue, { color: colors.text }]}>{moneyWhole(split.paychecks)}</Text>
+            </Text>
+          </View>
+        </View>
+      ) : (
+        <Text style={[styles.kpiDetail, { color: toneColor }]} numberOfLines={1}>
+          {detail}
+        </Text>
+      )}
     </GlassCard>
   );
 }
@@ -607,9 +736,11 @@ function Chart({
   onBarPress: (fromDate: string) => void;
 }) {
   const colors = useThemeColors();
+  // Scale by the all-in bar (tips + paycheck stacked) so a payday fits.
   const max = Math.max(1, ...bars.map((b) => Math.max(b.tips, b.prevTips ?? 0)));
+  // "Best" is the best TIPS bucket — a payday never steals the highlight.
   const bestIndex = bars.reduce(
-    (best, bar, i) => (bar.tips > bars[best].tips ? i : best),
+    (best, bar, i) => (bar.shiftTips > bars[best].shiftTips ? i : best),
     0,
   );
   // Month has up to 31 bars — labels every ~5th keep the axis readable.
@@ -618,7 +749,9 @@ function Chart({
     <View style={styles.chartRow}>
       {bars.map((bar, i) => {
         const showGhost = bar.prevTips !== null;
-        const isBest = i === bestIndex && bar.tips > 0;
+        const isBest = i === bestIndex && bar.shiftTips > 0;
+        const tipsH = bar.shiftTips > 0 ? Math.max(2, (bar.shiftTips / max) * CHART_H) : 0;
+        const payH = bar.paychecks > 0 ? Math.max(2, (bar.paychecks / max) * CHART_H) : 0;
         return (
           <TouchableOpacity
             key={`${bar.fromDate}-${i}`}
@@ -634,16 +767,26 @@ function Chart({
                   ]}
                 />
               )}
-              <View
-                style={[
-                  styles.chartBar,
-                  {
-                    height: Math.max(3, (bar.tips / max) * CHART_H),
-                    backgroundColor: TIPS_VISUALS.accent,
-                  },
-                  isBest && { backgroundColor: TIPS_VISUALS.gradient[1] },
-                ]}
-              />
+              {/* The stack: tips below, the outlined paycheck segment above;
+                  an empty bucket keeps the 3pt stub in the tips colour. */}
+              <View style={styles.chartStack}>
+                {payH > 0 && (
+                  <View style={[styles.chartSegment, styles.paycheckOutline, styles.chartPaySegment, { height: payH }]} />
+                )}
+                {(tipsH > 0 || payH === 0) && (
+                  <View
+                    style={[
+                      styles.chartSegment,
+                      {
+                        height: tipsH > 0 ? tipsH : 3,
+                        backgroundColor: TIPS_VISUALS.accent,
+                        marginTop: payH > 0 ? 2 : 0,
+                      },
+                      isBest && { backgroundColor: TIPS_VISUALS.gradient[1] },
+                    ]}
+                  />
+                )}
+              </View>
             </View>
             <Text style={[styles.chartLabel, { color: colors.textSecondary }]} numberOfLines={1}>
               {i % labelEvery === 0 ? bar.label : ''}
@@ -731,6 +874,17 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   kpiDetail: { fontFamily: fonts.body.medium, fontSize: 9.5, marginTop: 2 },
+  kpiSplit: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
+  kpiSplitItem: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 },
+  kpiSwatch: { width: 7, height: 7, borderRadius: 2 },
+  kpiSplitText: { fontFamily: fonts.mono.medium, fontSize: 9, flexShrink: 1 },
+  kpiSplitValue: { fontFamily: fonts.mono.semibold, fontVariant: ['tabular-nums'] },
+  /** The paycheck mark everywhere: 40% emerald behind a 1px emerald line. */
+  paycheckOutline: {
+    backgroundColor: TIPS_PAYCHECK.fill,
+    borderWidth: 1,
+    borderColor: TIPS_PAYCHECK.line,
+  },
   chartCard: { padding: 14, marginBottom: 10 },
   chartHead: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 10 },
   chartTitle: { flex: 1, fontFamily: fonts.display.semibold, fontSize: 14.5 },
@@ -755,6 +909,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   chartBar: { flex: 1, maxWidth: 14, borderTopLeftRadius: 4, borderTopRightRadius: 4 },
+  // The stacked column takes the bar's slot in the row (flex 1 across, 14 max);
+  // its segments are plain height-sized views — `chartBar`'s flex would fight
+  // the column's main axis — and stretch to the column's width.
+  chartStack: { flex: 1, maxWidth: 14, justifyContent: 'flex-end' },
+  chartSegment: { borderTopLeftRadius: 4, borderTopRightRadius: 4 },
+  chartPaySegment: { borderBottomWidth: 0 },
   chartLabel: { fontFamily: fonts.mono.medium, fontSize: 7.5 },
   legendRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
   legendSwatch: { width: 8, height: 8, borderRadius: 3 },
@@ -811,6 +971,14 @@ const styles = StyleSheet.create({
   dayNumDim: { opacity: 0.5 },
   dayDot: { borderRadius: 5 },
   dayDotNone: { width: 5, height: 5, backgroundColor: 'transparent' },
+  dayDotPayday: {
+    width: 7,
+    height: 7,
+    borderRadius: 2,
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: TIPS_PAYCHECK.line,
+  },
   dayTotalRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -848,10 +1016,27 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   entryMid: { flex: 1, minWidth: 0 },
-  entryTitle: { fontFamily: fonts.body.semibold, fontSize: 12.5 },
+  entryTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  entryTitle: { fontFamily: fonts.body.semibold, fontSize: 12.5, flexShrink: 1 },
   entrySub: { fontFamily: fonts.mono.medium, fontSize: 9, marginTop: 2 },
   entryValue: { fontFamily: fonts.mono.semibold, fontSize: 14.5, fontVariant: ['tabular-nums'] },
+  // The outlined mono pill after a paycheck row's title (mockup's .pcpill).
+  paycheckPill: {
+    borderWidth: 1,
+    borderColor: `${TIPS_PAYCHECK.line}8C`,
+    borderRadius: 5,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+  },
+  paycheckPillText: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 7.5,
+    letterSpacing: 1,
+    color: TIPS_PAYCHECK.line,
+  },
+  addPair: { flexDirection: 'row', gap: 8, marginBottom: 10 },
   addDash: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -859,10 +1044,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1.5,
     borderStyle: 'dashed',
-    paddingVertical: 11,
-    marginBottom: 10,
+    height: 40,
+    paddingHorizontal: 8,
   },
-  addDashText: { fontFamily: fonts.body.semibold, fontSize: 12.5 },
+  addDashText: { fontFamily: fonts.body.semibold, fontSize: 12.5, flexShrink: 1 },
   emptyDayCard: { alignItems: 'center', padding: 20, marginBottom: 10, gap: 6 },
   emptyDayTitle: { fontFamily: fonts.display.semibold, fontSize: 14.5, textAlign: 'center' },
   emptyDaySub: { fontFamily: fonts.body.regular, fontSize: 11, textAlign: 'center' },

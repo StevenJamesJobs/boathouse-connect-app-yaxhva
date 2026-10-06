@@ -16,17 +16,14 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import type { Database } from '@/app/integrations/supabase/types';
-import FormattedText from '@/components/FormattedText';
 import { StorageImage } from '@/components/StorageImage';
-import { useLanguage } from '@/contexts/LanguageContext';
-import { getLocalizedField } from '@/utils/translateContent';
 import { useAuth } from '@/contexts/AuthContext';
 import { isManagerOrOwner } from '@/utils/roles';
 import AmbientGlow from '@/components/AmbientGlow';
 import ScreenHeader from '@/components/ScreenHeader';
 import HeaderNavMenu from '@/components/HeaderNavMenu';
 import { useManagerPermissions } from '@/hooks/useManagerPermissions';
-import GlassHeroSheet from '@/components/GlassHeroSheet';
+import RecipeDetailSheet from '@/components/RecipeDetailSheet';
 import { RECIPE_TILE_SIZE } from '@/components/RecipeGridCard';
 import { fonts } from '@/constants/fonts';
 
@@ -55,7 +52,6 @@ const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1587049352846-4a222
 export default function PureeSyrupRecipesScreen() {
   const router = useRouter();
   const { t } = useTranslation();
-  const { language } = useLanguage();
   const colors = useThemeColors();
   const { user } = useAuth();
   const isManager = isManagerOrOwner(user);
@@ -276,57 +272,22 @@ export default function PureeSyrupRecipesScreen() {
         </ScrollView>
       )}
 
-      {/* Recipe detail sheet — hero photo flush to the top edge (the
-          MenuItemDetailSheet continuity). */}
-      <GlassHeroSheet
+      {/* Recipe detail — the shared recipe Poster: no price, the category on
+          the slate pill. */}
+      <RecipeDetailSheet
         visible={showDetailModal}
         onClose={closeDetailModal}
-        hero={selectedRecipe?.thumbnail_url ? (
-          <>
-            <StorageImage
-              source={{ uri: getImageUrl(selectedRecipe.thumbnail_url) }}
-              style={styles.heroFill}
-              resizeMode="cover"
-            />
-            <LinearGradient
-              colors={['rgba(14,11,9,0)', 'rgba(14,11,9,0.92)']}
-              locations={[0.42, 0.94]}
-              style={StyleSheet.absoluteFill}
-              pointerEvents="none"
-            />
-          </>
-        ) : undefined}
-      >
-        <Text style={[styles.detailTitle, { color: colors.text }]}>{selectedRecipe?.name}</Text>
-
-        <View style={styles.detailSection}>
-          <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('purees_syrups.ingredients')}</Text>
-          {selectedRecipe?.ingredients && selectedRecipe.ingredients.length > 0 ? (
-            selectedRecipe.ingredients.map((item, index) => (
-              <View
-                key={index}
-                style={[styles.ingredientRow, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}
-              >
-                <Text style={[styles.ingredientAmount, { color: colors.primary }]}>{item.amount}</Text>
-                <Text style={[styles.ingredientName, { color: colors.text }]}>{item.ingredient}</Text>
-              </View>
-            ))
-          ) : (
-            <Text style={[styles.noDataText, { color: colors.textSecondary }]}>{t('purees_syrups.no_ingredients')}</Text>
-          )}
-        </View>
-
-        {!!selectedRecipe?.procedure && (
-          <View style={styles.detailSection}>
-            <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('purees_syrups.procedure')}</Text>
-            <View style={[styles.procedureBox, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
-              <FormattedText style={[styles.procedureText, { color: colors.text }]}>
-                {getLocalizedField(selectedRecipe, 'procedure', language)}
-              </FormattedText>
-            </View>
-          </View>
-        )}
-      </GlassHeroSheet>
+        recipe={selectedRecipe ? {
+          name: selectedRecipe.name,
+          ingredients: selectedRecipe.ingredients,
+          procedure: selectedRecipe.procedure,
+          procedure_es: selectedRecipe.procedure_es,
+          // Real thumbnails only — the Unsplash placeholder is a tile stand-in;
+          // the Poster shows its slate board instead.
+          thumbnail_url: selectedRecipe.thumbnail_url,
+          subcategoryLabel: getCategoryLabel(selectedRecipe.category || 'Other'),
+        } : null}
+      />
     </View>
   );
 }
@@ -448,63 +409,5 @@ const styles = StyleSheet.create({
     fontSize: 13.5,
     lineHeight: 16.5,
     color: '#FFFFFF',
-  },
-  // Detail sheet — the hero box/radii come from GlassHeroSheet; this just
-  // fills it.
-  heroFill: {
-    width: '100%',
-    height: '100%',
-  },
-  detailTitle: {
-    fontFamily: fonts.display.bold,
-    fontSize: 22,
-    letterSpacing: -0.3,
-    marginTop: 12,
-    marginBottom: 10,
-  },
-  detailSection: {
-    marginBottom: 8,
-  },
-  detailLabel: {
-    fontFamily: fonts.mono.semibold,
-    fontSize: 10,
-    letterSpacing: 1.1,
-    textTransform: 'uppercase',
-    marginBottom: 7,
-  },
-  ingredientRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 9,
-    paddingHorizontal: 11,
-    borderRadius: 11,
-    borderWidth: StyleSheet.hairlineWidth + 0.5,
-    marginBottom: 7,
-  },
-  ingredientAmount: {
-    fontFamily: fonts.mono.semibold,
-    fontSize: 11.5,
-    minWidth: 64,
-  },
-  ingredientName: {
-    fontFamily: fonts.body.regular,
-    fontSize: 13.5,
-    flex: 1,
-  },
-  noDataText: {
-    fontFamily: fonts.body.regular,
-    fontSize: 13,
-    fontStyle: 'italic',
-  },
-  procedureBox: {
-    borderRadius: 13,
-    borderWidth: StyleSheet.hairlineWidth + 0.5,
-    padding: 13,
-  },
-  procedureText: {
-    fontFamily: fonts.body.regular,
-    fontSize: 13.5,
-    lineHeight: 22,
   },
 });

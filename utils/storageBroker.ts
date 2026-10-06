@@ -18,6 +18,7 @@ export type UploadPurpose =
   | 'announcement_attachment'
   | 'special_feature_attachment'
   | 'upcoming_event_attachment'
+  | 'notification_image'
   | 'host_section_image'
   | 'host_section_file'
   | 'menu_item_image'

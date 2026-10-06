@@ -55,3 +55,14 @@ export const TIPS_CONSOLE_EMBER = '#FFB07A';
  * navy (#4C5FC7) and violet (#7C5CE0). Light themes take the deeper step.
  */
 export const TIPS_JOURNAL_ACCENT = { dark: '#6366F1', light: '#4F46E5' } as const;
+
+/**
+ * Paycheck marks (s89 "G" lockdown): a paycheck is the OUTLINED variant of the
+ * same emerald — the gradient's light stop at 40% alpha behind a 1px line of
+ * it — so paydays read as "money, not tips" in the KPI split, the stacked
+ * chart segment, the legend swatch, the Journal pill and the calendar dot.
+ */
+export const TIPS_PAYCHECK = {
+  fill: '#10B98166',
+  line: '#10B981',
+} as const;

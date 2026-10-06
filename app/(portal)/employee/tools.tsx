@@ -27,7 +27,7 @@ import PriorityHero, { PriorityCard } from '@/components/tools/PriorityHero';
 import CommandTile from '@/components/tools/CommandTile';
 import AssistantRail, { AssistantRailItem } from '@/components/tools/AssistantRail';
 import { SectionRule } from '@/components/tools/ToolsBits';
-import { FAMILY_ACCENTS } from '@/components/tools/toolsVisuals';
+import { toolsFamilyAccent } from '@/components/tools/toolsVisuals';
 import { fonts } from '@/constants/fonts';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -39,8 +39,9 @@ export default function EmployeeToolsScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
-  const { mode } = useAppTheme();
-  const scheme = mode === 'dark' ? 'dark' : 'light';
+  // resolvedMode, never mode: under Auto `mode` is 'auto' and the raw check fell to
+  // the light hues on a dark phone.
+  const { resolvedMode: scheme, tilePalette } = useAppTheme();
   const { user } = useAuth();
   const { organization } = useOrganization();
 
@@ -52,6 +53,8 @@ export default function EmployeeToolsScreen() {
   const data = useToolsPageData({ manager: false, includeTips: canSeeTips });
 
   const firstName = (user?.name || '').trim().split(/\s+/)[0];
+  // Gold stays gold under either tile palette — it is the rank / rewards signal.
+  const goldAccent = toolsFamilyAccent('rewards', scheme, colors, tilePalette);
 
   // ---- Priority Hero ladder ----
   const heroCards = useMemo<PriorityCard[]>(() => {
@@ -186,7 +189,7 @@ export default function EmployeeToolsScreen() {
         <SectionRule label={t('tools_page.your_tools')} />
         <View style={styles.grid}>
           <CommandTile
-            accent={colors.tint}
+            accent={toolsFamilyAccent('guides', scheme, colors, tilePalette)}
             iosIcon="book.fill"
             androidIcon="menu-book"
             title={t('employee_tools.guides_training')}
@@ -196,7 +199,7 @@ export default function EmployeeToolsScreen() {
             onPress={() => router.push('/guides-and-training')}
           />
           <CommandTile
-            accent={FAMILY_ACCENTS.game[scheme]}
+            accent={toolsFamilyAccent('game', scheme, colors, tilePalette)}
             iosIcon="gamecontroller.fill"
             androidIcon="sports-esports"
             title={t('employee_tools.game_hub')}
@@ -206,7 +209,7 @@ export default function EmployeeToolsScreen() {
               ) : data.gameRank ? (
                 <>
                   {t('tools_page.game_rank_prefix')}{' '}
-                  <Text style={{ color: FAMILY_ACCENTS.rewards[scheme] }}>
+                  <Text style={{ color: goldAccent }}>
                     #{data.gameRank.rank}
                   </Text>{' '}
                   {t('tools_page.game_rank_suffix', { total: data.gameRank.total })}
@@ -229,7 +232,7 @@ export default function EmployeeToolsScreen() {
           />
           {canSeeQuizzes && (
             <CommandTile
-              accent={FAMILY_ACCENTS.quiz[scheme]}
+              accent={toolsFamilyAccent('quiz', scheme, colors, tilePalette)}
               iosIcon="graduationcap.fill"
               androidIcon="school"
               title={t('employee_tools.weekly_quizzes')}
@@ -243,7 +246,7 @@ export default function EmployeeToolsScreen() {
           )}
           {canSeeTips && (
             <CommandTile
-              accent={FAMILY_ACCENTS.tips[scheme]}
+              accent={toolsFamilyAccent('tips', scheme, colors, tilePalette)}
               iosIcon="dollarsign.circle.fill"
               androidIcon="calculate"
               title={t('tips_checkouts.title')}

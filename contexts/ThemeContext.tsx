@@ -19,11 +19,22 @@ import {
 
 const PALETTE_STORAGE_KEY = '@app_theme_palette';
 const MODE_STORAGE_KEY = '@app_theme_mode';
+const TILES_STORAGE_KEY = '@app_theme_tiles';
 
 // Defaults (Steve, s86): MyResto → Moonstone Dark (the logo palette), Boathouse → Ocean Light.
 // Only devices that never saved a mode feel a default change.
 const DEFAULT_PALETTE: PresetPaletteId = IS_MCLOONES ? 'ocean' : 'moonstone';
 const DEFAULT_MODE: ThemeMode = IS_MCLOONES ? 'light' : 'dark';
+
+/**
+ * App-wide tile palette (s89, the Appearance toggle). 'myresto' = tiles wear the fixed
+ * MyResto family hues (game azure, quiz violet, tips emerald, the assistant trio);
+ * 'theme' = every tile takes the theme's accent instead. Gold (rewards / approvals),
+ * the hero gradients and the family consoles ignore it — the resolvers in
+ * toolsVisuals / profileVisuals apply the rule.
+ */
+export type TilePalette = 'myresto' | 'theme';
+const DEFAULT_TILE_PALETTE: TilePalette = 'myresto';
 
 interface ThemeContextType {
   palette: ThemePaletteId;
@@ -38,6 +49,9 @@ interface ThemeContextType {
   setMode: (mode: ThemeMode) => Promise<void>;
   /** Save a custom accent AND select it. */
   setCustomAccent: (accent: CustomAccent) => Promise<void>;
+  /** 'theme' = every tile across the app takes the theme accent (the Appearance toggle). */
+  tilePalette: TilePalette;
+  setTilePalette: (palette: TilePalette) => Promise<void>;
 }
 
 const ThemeContext = createContext<ThemeContextType>({
@@ -50,12 +64,15 @@ const ThemeContext = createContext<ThemeContextType>({
   setPalette: async () => {},
   setMode: async () => {},
   setCustomAccent: async () => {},
+  tilePalette: DEFAULT_TILE_PALETTE,
+  setTilePalette: async () => {},
 });
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [palette, setPaletteState] = useState<ThemePaletteId>(DEFAULT_PALETTE);
   const [mode, setModeState] = useState<ThemeMode>(DEFAULT_MODE);
   const [customAccent, setCustomAccentState] = useState<CustomAccent | null>(null);
+  const [tilePalette, setTilePaletteState] = useState<TilePalette>(DEFAULT_TILE_PALETTE);
   const systemColorScheme = useColorScheme();
 
   useEffect(() => {
@@ -63,7 +80,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       AsyncStorage.getItem(PALETTE_STORAGE_KEY),
       AsyncStorage.getItem(MODE_STORAGE_KEY),
       AsyncStorage.getItem(CUSTOM_ACCENT_KEY),
-    ]).then(([savedPalette, savedMode, savedCustom]) => {
+      AsyncStorage.getItem(TILES_STORAGE_KEY),
+    ]).then(([savedPalette, savedMode, savedCustom, savedTiles]) => {
       const custom = parseCustomAccent(savedCustom);
       if (custom) setCustomAccentState(custom);
       if (savedPalette) {
@@ -79,6 +97,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       }
       if (savedMode === 'light' || savedMode === 'dark' || savedMode === 'auto') {
         setModeState(savedMode);
+      }
+      if (savedTiles === 'myresto' || savedTiles === 'theme') {
+        setTilePaletteState(savedTiles);
       }
     });
   }, []);
@@ -115,9 +136,26 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     ]);
   };
 
+  const setTilePalette = async (next: TilePalette) => {
+    setTilePaletteState(next);
+    await AsyncStorage.setItem(TILES_STORAGE_KEY, next);
+  };
+
   return (
     <ThemeContext.Provider
-      value={{ palette, mode, resolvedMode, colors, activePalette, customAccent, setPalette, setMode, setCustomAccent }}
+      value={{
+        palette,
+        mode,
+        resolvedMode,
+        colors,
+        activePalette,
+        customAccent,
+        setPalette,
+        setMode,
+        setCustomAccent,
+        tilePalette,
+        setTilePalette,
+      }}
     >
       {children}
     </ThemeContext.Provider>

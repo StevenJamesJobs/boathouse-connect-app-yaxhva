@@ -51,6 +51,8 @@ import ConnectBar, { ConnectBarTab } from '@/components/ConnectBar';
 import { useUnreadContent } from '@/hooks/useUnreadContent';
 import { useUnreadNotifications } from '@/hooks/useUnreadNotifications';
 import WeeklyCalendarStrip from '@/components/WeeklyCalendarStrip';
+import ContentFadeMask from '@/components/ContentFadeMask';
+import GlassCard from '@/components/GlassCard';
 import UpcomingShiftsCard from '@/components/UpcomingShiftsCard';
 import ShiftsFlipCard from '@/components/schedule/ShiftsFlipCard';
 import ShiftToolTile from '@/components/schedule/ShiftToolTile';
@@ -62,6 +64,10 @@ import { useScheduleSettings } from '@/hooks/useScheduleSettings';
 import { useScheduleAttention, ackScheduleDecisions, refreshAllScheduleAttention } from '@/hooks/useScheduleAttention';
 import { eventFallsOnDate } from '@/utils/dateUtils';
 import { fonts } from '@/constants/fonts';
+
+// substick's bottom padding — the pinned capsule's bottom edge = measured
+// substick height − this (the fade mask's `from`).
+const SUBSTICK_PAD_BOTTOM = 9;
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -261,8 +267,17 @@ export default function PortalHome({ role }: PortalHomeProps) {
   const eventsScrollY = useRef(new Animated.Value(0)).current;
   const [headerAreaHeight, setHeaderAreaHeight] = useState(0);
   const [bandHeight, setBandHeight] = useState(0);
+  // The leaves' viewport height (every leaf shares it). A leaf whose cards are
+  // shorter than the viewport could never scroll by the collapsible height, so
+  // a pull just rubber-banded and the capsule fought its way back — the binding
+  // collapse rule: content minHeight = viewport + collapsible (Steve's device
+  // round, s89). Measured on the leaf page; 0 until the first layout.
+  const [leafHeight, setLeafHeight] = useState(0);
   const [calendarHeight, setCalendarHeight] = useState(248);
   const [subTabsHeight, setSubTabsHeight] = useState(62);
+  // The Events capsule measures itself (it used to borrow the Today one's
+  // height — fine while both were the same bar, wrong once either restyles).
+  const [eventsSubTabsHeight, setEventsSubTabsHeight] = useState(62);
 
 
   // Events section state (calendar + tabs - managed here for sticky layout)
@@ -312,7 +327,10 @@ export default function PortalHome({ role }: PortalHomeProps) {
     link?: string | null;
     guideFile?: GuideFile | null;
     category?: string | null;
-    kind?: ContentKind;
+    kind?: ContentKind | 'notification';
+    // s89 D1 (general notifications from the shade): sender line + destination chip.
+    meta?: string | null;
+    action?: { label: string; onPress: () => void } | null;
   } | null>(null);
 
   const SECTIONS: ConnectBarTab[] = ['schedule', 'today', 'events', 'specials'];
@@ -543,7 +561,9 @@ export default function PortalHome({ role }: PortalHomeProps) {
     link?: string | null;
     guideFile?: GuideFile | null;
     category?: string | null;
-    kind?: ContentKind;
+    kind?: ContentKind | 'notification';
+    meta?: string | null;
+    action?: { label: string; onPress: () => void } | null;
   }) => {
     setSelectedItem(item);
     setDetailModalVisible(true);
@@ -632,7 +652,13 @@ export default function PortalHome({ role }: PortalHomeProps) {
   // The collapsible portion (band / calendar) scrolls under the Connect bar; the
   // sub-tabs pin. todayHappeningList empty → bandHeight measures 0.
   const todayHeaderHeight = bandHeight + subTabsHeight;
-  const eventsHeaderHeight = calendarHeight + subTabsHeight;
+  const eventsHeaderHeight = calendarHeight + eventsSubTabsHeight;
+  // s89 fade-behind rail: each leaf is alpha-masked so its cards dissolve to
+  // nothing at the pinned capsule's BOTTOM EDGE (the capsule parks at
+  // substick's paddingTop; its bottom = measured height − paddingBottom).
+  // Nothing is ever visible between the capsule and the Connect bar.
+  const todayFadeFrom = Math.max(0, subTabsHeight - SUBSTICK_PAD_BOTTOM);
+  const eventsFadeFrom = Math.max(0, eventsSubTabsHeight - SUBSTICK_PAD_BOTTOM);
 
   const renderEventCard = (event: UpcomingEvent, index: number) => {
     const additionalImages = contentImagesMap.get(event.id);
@@ -1209,40 +1235,57 @@ export default function PortalHome({ role }: PortalHomeProps) {
     );
   };
 
-  const renderTodaySubTabs = (activeSubTab: 'Announcements' | 'Special Features') => (
-    <View style={[styles.substick, { backgroundColor: colors.background }]}>
-      <View style={[styles.subTabsContainer, { backgroundColor: colors.surface, marginBottom: 0 }]}>
-        <TouchableOpacity
-          style={[styles.subTab, activeSubTab === 'Announcements' && { backgroundColor: colors.primary }]}
-          onPress={() => goToLeaf(1)}
-          activeOpacity={0.7}
-        >
-          <View style={styles.subTabLabelRow}>
-            <Text style={[styles.subTabText, { color: colors.textSecondary }, activeSubTab === 'Announcements' && { color: colors.fireText }]}>
-              {t('manager_home.announcements')}
-            </Text>
-            {announcementsHasNew && activeSubTab !== 'Announcements' && (
-              <View style={styles.subTabBadgeDot} />
-            )}
-          </View>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.subTab, activeSubTab === 'Special Features' && { backgroundColor: colors.primary }]}
-          onPress={() => goToLeaf(2)}
-          activeOpacity={0.7}
-        >
-          <View style={styles.subTabLabelRow}>
-            <Text style={[styles.subTabText, { color: colors.textSecondary }, activeSubTab === 'Special Features' && { color: colors.fireText }]}>
-              {t('manager_home.special_features')}
-            </Text>
-            {specialFeaturesHasNew && activeSubTab !== 'Special Features' && (
-              <View style={styles.subTabBadgeDot} />
-            )}
-          </View>
-        </TouchableOpacity>
-      </View>
+  // The pinned sub-tab capsule (s89): a GLASS capsule and nothing else — no
+  // bar, no wash, no shadow behind it. It floats on the AmbientGlow at rest
+  // and parked; the leaf's ContentFadeMask keeps cards from ever sitting
+  // behind it. Grammar = View All Events' segmentCapsule (glass fill +
+  // glassBorder hairline, r12 / p3 / gap 3, display-semibold 12.5, primary
+  // fill + fireText when active, inline red unread dot).
+  const renderSubTabCapsule = (
+    tabs: { label: string; active: boolean; hasNew: boolean; onPress: () => void }[],
+  ) => (
+    <View style={styles.substick}>
+      <GlassCard variant="glass" radius={12} intensity={18} style={styles.subTabsCapsule}>
+        {tabs.map((tab) => (
+          <TouchableOpacity
+            key={tab.label}
+            style={[styles.subTab, tab.active && { backgroundColor: colors.primary }]}
+            onPress={tab.onPress}
+            activeOpacity={0.7}
+          >
+            <View style={styles.subTabLabelRow}>
+              <Text
+                style={[
+                  styles.subTabText,
+                  { color: tab.active ? colors.fireText : colors.textSecondary },
+                ]}
+                numberOfLines={1}
+              >
+                {tab.label}
+              </Text>
+              {tab.hasNew && !tab.active && <View style={styles.subTabBadgeDot} />}
+            </View>
+          </TouchableOpacity>
+        ))}
+      </GlassCard>
     </View>
   );
+
+  const renderTodaySubTabs = (activeSubTab: 'Announcements' | 'Special Features') =>
+    renderSubTabCapsule([
+      {
+        label: t('manager_home.announcements'),
+        active: activeSubTab === 'Announcements',
+        hasNew: announcementsHasNew,
+        onPress: () => goToLeaf(1),
+      },
+      {
+        label: t('manager_home.special_features'),
+        active: activeSubTab === 'Special Features',
+        hasNew: specialFeaturesHasNew,
+        onPress: () => goToLeaf(2),
+      },
+    ]);
 
   // FlatList leaf for Today — CARDS ONLY. The band + sub-tabs live in the fixed
   // overlay (see renderSectionHeaderOverlay); the leaf reserves their height as
@@ -1250,11 +1293,19 @@ export default function PortalHome({ role }: PortalHomeProps) {
   const renderTodayLeaf = (subTab: 'Announcements' | 'Special Features') => {
     const isAnn = subTab === 'Announcements';
     return (
-    <View style={[styles.sectionPage, { width: SCREEN_WIDTH }]}>
+    <View
+      style={[styles.sectionPage, { width: SCREEN_WIDTH }]}
+      onLayout={(e: LayoutChangeEvent) => setLeafHeight(e.nativeEvent.layout.height)}
+    >
+      <ContentFadeMask from={todayFadeFrom}>
       <Animated.ScrollView
         ref={isAnn ? annScrollRef : featScrollRef}
         style={styles.sectionScroll}
-        contentContainerStyle={{ paddingTop: todayHeaderHeight }}
+        contentContainerStyle={{
+          paddingTop: todayHeaderHeight,
+          // Room to park the band even on a one-card page (see leafHeight).
+          minHeight: leafHeight > 0 ? leafHeight + bandHeight : undefined,
+        }}
         showsVerticalScrollIndicator={false}
         nestedScrollEnabled
         scrollEventThrottle={16}
@@ -1328,6 +1379,7 @@ export default function PortalHome({ role }: PortalHomeProps) {
           )}
         </View>
       </Animated.ScrollView>
+      </ContentFadeMask>
     </View>
     );
   };
@@ -1345,59 +1397,47 @@ export default function PortalHome({ role }: PortalHomeProps) {
         new Date(e.created_at) > new Date(lastViewedEvents)
       );
     });
+    // s89: the strip is BARE on the AmbientGlow (the Roster grammar) — no
+    // solid card, no shadow; `card: 'transparent'` + `edgeToEdge` drop its own
+    // r12 slab and the wrapper restores the s81 "one geometry" (16 outer =
+    // 8 here + the strip's own 8 inset).
     return (
-      <WeeklyCalendarStrip
-        selectedDate={eventsSelectedDate}
-        onSelectDate={setEventsSelectedDate}
-        colors={{
-          primary: colors.primary,
-          fireText: colors.fireText,
-          background: colors.background,
-          text: colors.text,
-          textSecondary: colors.darkSecondaryText,
-          card: colors.card,
-        }}
-        events={upcomingEvents}
-        onViewAll={() => router.push('/view-all-upcoming-events')}
-        onNewAdded={hasNewAdded ? async () => { await markAllEventsViewed(); router.push('/view-all-upcoming-events'); } : undefined}
-      />
+      <View style={styles.calendarWrap}>
+        <WeeklyCalendarStrip
+          selectedDate={eventsSelectedDate}
+          onSelectDate={setEventsSelectedDate}
+          colors={{
+            primary: colors.primary,
+            fireText: colors.fireText,
+            background: colors.background,
+            text: colors.text,
+            textSecondary: colors.darkSecondaryText,
+            card: 'transparent',
+          }}
+          edgeToEdge
+          events={upcomingEvents}
+          onViewAll={() => router.push('/view-all-upcoming-events')}
+          onNewAdded={hasNewAdded ? async () => { await markAllEventsViewed(); router.push('/view-all-upcoming-events'); } : undefined}
+        />
+      </View>
     );
   };
 
-  const renderEventsSeg = (activeSubTab: 'Event' | 'Entertainment') => (
-    <View style={[styles.substick, { backgroundColor: colors.background }]}>
-      <View style={[styles.subTabsContainer, { backgroundColor: colors.surface, marginBottom: 0 }]}>
-        <TouchableOpacity
-          style={[styles.subTab, activeSubTab === 'Event' && { backgroundColor: colors.primary }]}
-          onPress={() => goToLeaf(3)}
-          activeOpacity={0.7}
-        >
-          <View style={styles.subTabLabelRow}>
-            <Text style={[styles.subTabText, { color: colors.textSecondary }, activeSubTab === 'Event' && { color: colors.fireText }]}>
-              {t('upcoming_events.events', 'Events')}
-            </Text>
-            {eventsEventHasNew && activeSubTab !== 'Event' && (
-              <View style={styles.subTabBadgeDot} />
-            )}
-          </View>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.subTab, activeSubTab === 'Entertainment' && { backgroundColor: colors.primary }]}
-          onPress={() => goToLeaf(4)}
-          activeOpacity={0.7}
-        >
-          <View style={styles.subTabLabelRow}>
-            <Text style={[styles.subTabText, { color: colors.textSecondary }, activeSubTab === 'Entertainment' && { color: colors.fireText }]}>
-              {t('upcoming_events.entertainment', 'Entertainment')}
-            </Text>
-            {eventsEntertainmentHasNew && activeSubTab !== 'Entertainment' && (
-              <View style={styles.subTabBadgeDot} />
-            )}
-          </View>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+  const renderEventsSeg = (activeSubTab: 'Event' | 'Entertainment') =>
+    renderSubTabCapsule([
+      {
+        label: t('upcoming_events.events', 'Events'),
+        active: activeSubTab === 'Event',
+        hasNew: eventsEventHasNew,
+        onPress: () => goToLeaf(3),
+      },
+      {
+        label: t('upcoming_events.entertainment', 'Entertainment'),
+        active: activeSubTab === 'Entertainment',
+        hasNew: eventsEntertainmentHasNew,
+        onPress: () => goToLeaf(4),
+      },
+    ]);
 
   // FlatList leaf for Events — CARDS ONLY. The calendar strip + sub-tab segment
   // live in the fixed overlay; the leaf reserves their height and drives the
@@ -1407,11 +1447,19 @@ export default function PortalHome({ role }: PortalHomeProps) {
     const isEvent = subTab === 'Event';
 
     return (
-      <View style={[styles.sectionPage, { width: SCREEN_WIDTH }]}>
+      <View
+        style={[styles.sectionPage, { width: SCREEN_WIDTH }]}
+        onLayout={(e: LayoutChangeEvent) => setLeafHeight(e.nativeEvent.layout.height)}
+      >
+        <ContentFadeMask from={eventsFadeFrom}>
         <Animated.ScrollView
           ref={isEvent ? eventScrollRef : entScrollRef}
           style={styles.sectionScroll}
-          contentContainerStyle={{ paddingTop: eventsHeaderHeight }}
+          contentContainerStyle={{
+            paddingTop: eventsHeaderHeight,
+            // Room to park the calendar even on an empty page (see leafHeight).
+            minHeight: leafHeight > 0 ? leafHeight + calendarHeight : undefined,
+          }}
           showsVerticalScrollIndicator={false}
           nestedScrollEnabled
           scrollEventThrottle={16}
@@ -1447,6 +1495,7 @@ export default function PortalHome({ role }: PortalHomeProps) {
             )}
           </View>
         </Animated.ScrollView>
+        </ContentFadeMask>
       </View>
     );
   };
@@ -1586,6 +1635,16 @@ export default function PortalHome({ role }: PortalHomeProps) {
       outputRange: [0, -collapsible],
       extrapolate: 'clamp',
     });
+    // The collapsing piece (Happening Today / the calendar) FADES as it slides
+    // (gone by 65% of the glide — the Menu's collapseOpacity rule) so it is
+    // never seen being clipped under the Connect bar. Opacity rides its own
+    // node, the translate rides the parent: both native-driver, never one
+    // Animated.View carrying both kinds of style.
+    const collapsibleOpacity = scrollY.interpolate({
+      inputRange: [0, Math.max(1, collapsible * 0.65)],
+      outputRange: [1, 0],
+      extrapolate: 'clamp',
+    });
     return (
       <View
         style={[styles.headerOverlayClip, { top: headerAreaHeight, height: headerHeight }]}
@@ -1594,19 +1653,27 @@ export default function PortalHome({ role }: PortalHomeProps) {
         <Animated.View style={{ transform: [{ translateY }] }} pointerEvents="box-none">
           {isToday ? (
             <>
-              <View onLayout={(e: LayoutChangeEvent) => setBandHeight(e.nativeEvent.layout.height)}>
+              <Animated.View
+                style={{ opacity: collapsibleOpacity }}
+                onLayout={(e: LayoutChangeEvent) => setBandHeight(e.nativeEvent.layout.height)}
+              >
                 {renderHappeningBand()}
-              </View>
+              </Animated.View>
               <View onLayout={(e: LayoutChangeEvent) => setSubTabsHeight(e.nativeEvent.layout.height)}>
                 {renderTodaySubTabs(whatsHappeningTab)}
               </View>
             </>
           ) : (
             <>
-              <View onLayout={(e: LayoutChangeEvent) => setCalendarHeight(e.nativeEvent.layout.height)}>
+              <Animated.View
+                style={{ opacity: collapsibleOpacity }}
+                onLayout={(e: LayoutChangeEvent) => setCalendarHeight(e.nativeEvent.layout.height)}
+              >
                 {renderEventsCalendar()}
+              </Animated.View>
+              <View onLayout={(e: LayoutChangeEvent) => setEventsSubTabsHeight(e.nativeEvent.layout.height)}>
+                {renderEventsSeg(eventsTab)}
               </View>
-              {renderEventsSeg(eventsTab)}
             </>
           )}
         </Animated.View>
@@ -1714,6 +1781,9 @@ export default function PortalHome({ role }: PortalHomeProps) {
           kind={selectedItem.kind}
           link={selectedItem.link}
           guideFile={selectedItem.guideFile}
+          orgLogoUrl={organization.logo_url}
+          meta={selectedItem.meta}
+          action={selectedItem.action}
           colors={{
             text: colors.text,
             textSecondary: colors.textSecondary,
@@ -1777,37 +1847,35 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 2,
   },
+  // The pinned capsule's home: NO background, shadow or elevation (s89) — the
+  // capsule is the only paint; the glow shows through the padding.
   substick: {
     paddingHorizontal: 14,
     paddingTop: 8,
-    paddingBottom: 9,
+    paddingBottom: SUBSTICK_PAD_BOTTOM,
     zIndex: 2,
-    boxShadow: '0px 4px 8px -4px rgba(0, 0, 0, 0.25)',
-    elevation: 3,
   },
   subpad: {
     paddingHorizontal: 14,
     paddingTop: 11,
     paddingBottom: 140,
   },
-  subTabsContainer: {
+  subTabsCapsule: {
     flexDirection: 'row',
-    marginBottom: 12,
-    borderRadius: 10,
-    padding: 4,
-    gap: 4,
+    padding: 3,
+    gap: 3,
   },
   subTab: {
     flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 8,
+    paddingVertical: 9,
+    paddingHorizontal: 10,
+    borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
   },
   subTabText: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontFamily: fonts.display.semibold,
+    fontSize: 12.5,
   },
   subTabLabelRow: {
     flexDirection: 'row',
@@ -1815,10 +1883,15 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   subTabBadgeDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
     backgroundColor: '#EF4444',
+  },
+  // Restores the s81 "one geometry" around the bare calendar strip (16 outer
+  // = this 8 + the strip's own 8 inset).
+  calendarWrap: {
+    paddingHorizontal: 8,
   },
   newPill: {
     backgroundColor: '#EF4444',

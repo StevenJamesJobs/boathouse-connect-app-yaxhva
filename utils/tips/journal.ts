@@ -14,7 +14,11 @@
  *    kept so either can be edited later;
  *  - shift/weather values are canonical keys (display strings are t()'d in the
  *    screens — the translation architecture's data-stays-canonical rule);
- *  - a saved checkout keeps its full snapshot for the "Checkout details" view.
+ *  - a saved checkout keeps its full snapshot for the "Checkout details" view;
+ *  - a PAYCHECK (s89 "G") is an entry with `kind: 'paycheck'` — date, amount,
+ *    optional note. Its amount lives in `tips` so `entryTotalTips`, the day
+ *    rollups and the chart count it with no new math; the shift-only numbers
+ *    (shift count, $/hr, tip %, best day, the "a double" label) filter it out.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -70,8 +74,15 @@ export interface CheckoutSnapshot {
   settledAt: number;
 }
 
+export type EntryKind = 'shift' | 'paycheck';
+
 export interface ShiftEntry {
   id: string;
+  /**
+   * Absent = shift, so every entry stored before s89 stays valid. A paycheck
+   * carries only date / `tips` (its amount) / `note`.
+   */
+  kind?: EntryKind;
   /** Local calendar day, 'YYYY-MM-DD'. */
   date: string;
   createdAt: number;
@@ -90,12 +101,19 @@ export interface ShiftEntry {
   /** Free text — "Patio · tables 21–24". */
   location?: string;
   checkout?: CheckoutSnapshot;
+  /** Paycheck free text — "Sep 16 – 30 · base + hourly". */
+  note?: string;
 }
 
 const STORE_KEY = '@tips_journal:v1';
 
+/** Tips + extra cash for a shift; the amount for a paycheck (extra cash is 0). */
 export function entryTotalTips(entry: ShiftEntry): number {
   return (entry.tips || 0) + (entry.extraCashTips || 0);
+}
+
+export function isPaycheck(entry: ShiftEntry): boolean {
+  return entry.kind === 'paycheck';
 }
 
 export function makeEntryId(): string {
@@ -169,7 +187,12 @@ export function entriesForDay(entries: ShiftEntry[], key: string): ShiftEntry[] 
 export interface DayRollup {
   date: string;
   entries: ShiftEntry[];
+  /** Shift tips only (take-home + extra cash) — what "Best day" ranks. */
   tips: number;
+  /** Paycheck amounts that landed on this day. */
+  paychecks: number;
+  /** tips + paychecks — the all-in number the calendar dots size by. */
+  total: number;
   hours: number;
 }
 
@@ -178,39 +201,51 @@ export function rollupByDay(entries: ShiftEntry[]): Map<string, DayRollup> {
   for (const entry of entries) {
     let day = map.get(entry.date);
     if (!day) {
-      day = { date: entry.date, entries: [], tips: 0, hours: 0 };
+      day = { date: entry.date, entries: [], tips: 0, paychecks: 0, total: 0, hours: 0 };
       map.set(entry.date, day);
     }
     day.entries.push(entry);
-    day.tips += entryTotalTips(entry);
+    const amount = entryTotalTips(entry);
+    if (isPaycheck(entry)) day.paychecks += amount;
+    else day.tips += amount;
+    day.total += amount;
     day.hours += entry.hours || 0;
   }
   return map;
 }
 
 export interface RangeSummary {
+  /** Shift tips only — the base for perHour / avgTipPct / bestDay. */
   tips: number;
+  /** Sum of paycheck amounts in the range. */
+  paychecks: number;
+  /** tips + paychecks — the period-total KPI. */
+  total: number;
   hours: number;
   sales: number;
   tippedOut: number;
+  /** Shift entries only — a paycheck is never a shift. */
   shiftCount: number;
   /** tips ÷ hours, null when no hours were logged. */
   perHour: number | null;
-  /** Mean of per-entry tips÷sales across entries that recorded sales. */
+  /** Mean of per-shift tips÷sales across shifts that recorded sales. */
   avgTipPct: number | null;
-  /** Highest single DAY (rolled up — a double counts as one day). */
+  /** Highest single DAY by shift tips (rolled up — a double counts as one day). */
   bestDay: DayRollup | null;
 }
 
 /** from/to are inclusive local day keys. */
 export function summarizeRange(entries: ShiftEntry[], from: string, to: string): RangeSummary {
   const inRange = entries.filter((e) => e.date >= from && e.date <= to);
+  const shifts = inRange.filter((e) => !isPaycheck(e));
   const summary: RangeSummary = {
     tips: 0,
+    paychecks: 0,
+    total: 0,
     hours: 0,
     sales: 0,
     tippedOut: 0,
-    shiftCount: inRange.length,
+    shiftCount: shifts.length,
     perHour: null,
     avgTipPct: null,
     bestDay: null,
@@ -218,6 +253,10 @@ export function summarizeRange(entries: ShiftEntry[], from: string, to: string):
   let pctSum = 0;
   let pctCount = 0;
   for (const entry of inRange) {
+    if (isPaycheck(entry)) {
+      summary.paychecks += entryTotalTips(entry);
+      continue;
+    }
     summary.tips += entryTotalTips(entry);
     summary.hours += entry.hours || 0;
     summary.sales += entry.sales || 0;
@@ -227,9 +266,11 @@ export function summarizeRange(entries: ShiftEntry[], from: string, to: string):
       pctCount += 1;
     }
   }
+  summary.total = summary.tips + summary.paychecks;
   if (summary.hours > 0) summary.perHour = summary.tips / summary.hours;
   if (pctCount > 0) summary.avgTipPct = pctSum / pctCount;
-  for (const day of rollupByDay(inRange).values()) {
+  // Rolled up from SHIFTS only, so a payday never wins "Best day".
+  for (const day of rollupByDay(shifts).values()) {
     if (!summary.bestDay || day.tips > summary.bestDay.tips) summary.bestDay = day;
   }
   return summary;
@@ -293,67 +334,87 @@ export function periodRange(period: TrackerPeriod, today: Date): PeriodRange {
 export interface ChartBar {
   /** Short axis label — screens map period buckets through t() where needed. */
   label: string;
+  /** The bucket's all-in take (shiftTips + paychecks) — the bar's full height. */
   tips: number;
-  /** Same bucket in the previous window (the ghost bar); null = not shown. */
+  /** The two stacked segments: shift tips below, the paycheck outline above. */
+  shiftTips: number;
+  paychecks: number;
+  /** Same bucket in the previous window (the ghost bar, all-in); null = not shown. */
   prevTips: number | null;
   /** First day of the bucket — tap-through into the Journal. */
   fromDate: string;
 }
+
+interface DayTake {
+  shift: number;
+  pay: number;
+}
+
+const NO_TAKE: DayTake = { shift: 0, pay: 0 };
 
 /**
  * Chart buckets per the locked mapping: WK = 7 nights (ghost = last week),
  * MO = day-by-day, 3M = 13 Monday-weeks, YR = 12 months (ghost = last year).
  */
 export function chartBars(entries: ShiftEntry[], period: TrackerPeriod, today: Date): ChartBar[] {
-  const dayTips = new Map<string, number>();
+  const dayTake = new Map<string, DayTake>();
   for (const entry of entries) {
-    dayTips.set(entry.date, (dayTips.get(entry.date) || 0) + entryTotalTips(entry));
+    const take = dayTake.get(entry.date) ?? { shift: 0, pay: 0 };
+    if (isPaycheck(entry)) take.pay += entryTotalTips(entry);
+    else take.shift += entryTotalTips(entry);
+    dayTake.set(entry.date, take);
   }
-  const sumRange = (from: Date, to: Date): number => {
-    let total = 0;
+  const sumRange = (from: Date, to: Date): DayTake => {
+    const total: DayTake = { shift: 0, pay: 0 };
     const fromKey = dateKey(from);
     const toKey = dateKey(to);
-    for (const [key, tips] of dayTips) {
-      if (key >= fromKey && key <= toKey) total += tips;
+    for (const [key, take] of dayTake) {
+      if (key >= fromKey && key <= toKey) {
+        total.shift += take.shift;
+        total.pay += take.pay;
+      }
     }
     return total;
   };
+  const bar = (label: string, take: DayTake, prev: DayTake | null, fromDate: string): ChartBar => ({
+    label,
+    tips: take.shift + take.pay,
+    shiftTips: take.shift,
+    paychecks: take.pay,
+    prevTips: prev ? prev.shift + prev.pay : null,
+    fromDate,
+  });
 
   if (period === 'week') {
     const start = startOfWeek(today);
     return Array.from({ length: 7 }, (_, i) => {
       const day = addDays(start, i);
       const prev = addDays(day, -7);
-      return {
-        label: 'MTWTFSS'[i],
-        tips: dayTips.get(dateKey(day)) || 0,
-        prevTips: dayTips.get(dateKey(prev)) || 0,
-        fromDate: dateKey(day),
-      };
+      return bar(
+        'MTWTFSS'[i],
+        dayTake.get(dateKey(day)) ?? NO_TAKE,
+        dayTake.get(dateKey(prev)) ?? NO_TAKE,
+        dateKey(day),
+      );
     });
   }
   if (period === 'month') {
     const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
     return Array.from({ length: daysInMonth }, (_, i) => {
       const day = new Date(today.getFullYear(), today.getMonth(), i + 1);
-      return {
-        label: `${i + 1}`,
-        tips: dayTips.get(dateKey(day)) || 0,
-        prevTips: null,
-        fromDate: dateKey(day),
-      };
+      return bar(`${i + 1}`, dayTake.get(dateKey(day)) ?? NO_TAKE, null, dateKey(day));
     });
   }
   if (period === 'quarter') {
     const thisWeek = startOfWeek(today);
     return Array.from({ length: 13 }, (_, i) => {
       const weekStart = addDays(thisWeek, (i - 12) * 7);
-      return {
-        label: `${weekStart.getMonth() + 1}/${weekStart.getDate()}`,
-        tips: sumRange(weekStart, addDays(weekStart, 6)),
-        prevTips: null,
-        fromDate: dateKey(weekStart),
-      };
+      return bar(
+        `${weekStart.getMonth() + 1}/${weekStart.getDate()}`,
+        sumRange(weekStart, addDays(weekStart, 6)),
+        null,
+        dateKey(weekStart),
+      );
     });
   }
   return Array.from({ length: 12 }, (_, i) => {
@@ -361,11 +422,11 @@ export function chartBars(entries: ShiftEntry[], period: TrackerPeriod, today: D
     const monthEnd = new Date(today.getFullYear(), i + 1, 0);
     const prevStart = new Date(today.getFullYear() - 1, i, 1);
     const prevEnd = new Date(today.getFullYear() - 1, i + 1, 0);
-    return {
-      label: 'JFMAMJJASOND'[i],
-      tips: sumRange(monthStart, monthEnd),
-      prevTips: sumRange(prevStart, prevEnd),
-      fromDate: dateKey(monthStart),
-    };
+    return bar(
+      'JFMAMJJASOND'[i],
+      sumRange(monthStart, monthEnd),
+      sumRange(prevStart, prevEnd),
+      dateKey(monthStart),
+    );
   });
 }

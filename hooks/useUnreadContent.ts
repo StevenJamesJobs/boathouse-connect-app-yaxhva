@@ -215,8 +215,11 @@ export function useUnreadContent(): UnreadContentResult {
       const specialsCount = specialIds.size;
       setSpecialsHasNew(specialsCount > 0);
 
-      // Total count for notification bell badge
-      setNewContentCount(todayCount + eventsCount + specialsCount);
+      // Total count for the notification bell badge. Specials are NOT in it
+      // (s89): they no longer appear in the shade, so counting them lit a
+      // badge the user could never clear from the shade. The Specials tab's
+      // own dot (specialsHasNew) carries that signal.
+      setNewContentCount(todayCount + eventsCount);
     } catch (err) {
       console.log('Error checking unread content:', err);
     }

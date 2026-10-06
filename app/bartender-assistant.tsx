@@ -24,10 +24,7 @@ import AmbientGlow from '@/components/AmbientGlow';
 import ScreenHeader from '@/components/ScreenHeader';
 import HeaderNavMenu from '@/components/HeaderNavMenu';
 import ProgressRing from '@/components/ProgressRing';
-import GlassHeroSheet from '@/components/GlassHeroSheet';
-import FormattedText from '@/components/FormattedText';
-import { getLocalizedField } from '@/utils/translateContent';
-import { useLanguage } from '@/contexts/LanguageContext';
+import RecipeDetailSheet from '@/components/RecipeDetailSheet';
 import { RECIPE_TILE_SIZE } from '@/components/RecipeGridCard';
 import { menuIconAndroid } from '@/constants/menuIcons';
 import { fonts } from '@/constants/fonts';
@@ -45,6 +42,8 @@ interface FeaturedSip {
   name: string;
   price: string;
   thumbnail_url: string | null;
+  /** Which libation menu it came from — the Poster's pill + its editor deep link. */
+  menu: 1 | 2;
   glassware: string | null;
   garnish: string | null;
   ingredients: { amount: string; ingredient: string }[];
@@ -74,7 +73,6 @@ export default function BartenderAssistantScreen() {
   const colors = useThemeColors();
   const { organization } = useOrganization();
   const { user } = useAuth();
-  const { language } = useLanguage();
   const { perms } = useManagerPermissions();
   const isManager = isManagerOrOwner(user);
   const [hub, setHub] = useState<HubData | null>(null);
@@ -110,13 +108,14 @@ export default function BartenderAssistantScreen() {
       );
       const countDone = (items: any[] | null | undefined) =>
         (items || []).filter((i) => doneIds.has(i.id)).length;
+      const toSip = (menu: 1 | 2) => (r: any): FeaturedSip => ({
+        id: r.id, name: r.name, price: r.price, thumbnail_url: r.thumbnail_url, menu,
+        glassware: r.glassware ?? null, garnish: r.garnish ?? null,
+        ingredients: r.ingredients ?? [], procedure: r.procedure ?? null, procedure_es: r.procedure_es ?? null,
+      });
 
       setHub({
-        featured: [...m1Feat, ...(twoMenus ? m2Feat : [])].map((r: any) => ({
-          id: r.id, name: r.name, price: r.price, thumbnail_url: r.thumbnail_url,
-          glassware: r.glassware ?? null, garnish: r.garnish ?? null,
-          ingredients: r.ingredients ?? [], procedure: r.procedure ?? null, procedure_es: r.procedure_es ?? null,
-        })),
+        featured: [...m1Feat.map(toSip(1)), ...(twoMenus ? m2Feat.map(toSip(2)) : [])],
         m1: { count: m1.length, feat: m1Feat.length, thumbs: firstThumbs(m1) },
         m2: { count: m2.length, feat: m2Feat.length, thumbs: firstThumbs(m2) },
         az: { count: (azR.data || []).length, thumbs: firstThumbs(azR.data) },
@@ -147,6 +146,10 @@ export default function BartenderAssistantScreen() {
 
   // Pure client clock: mornings point at Opening, evenings at Closing.
   const openingIsNow = new Date().getHours() < 16;
+
+  // The grid tiles' menu names, reused by the Featured Poster's pill.
+  const menuName = (menu: 1 | 2) =>
+    menu === 2 ? (organization?.menu_2_name || 'Summer') : (organization?.menu_1_name || 'Winter');
 
   const zlabel = (label: string, count?: number) => (
     <View style={styles.zlabelRow}>
@@ -380,78 +383,31 @@ export default function BartenderAssistantScreen() {
           </View>
         </ScrollView>
       )}
-      {/* Featured recipe detail — the libation viewers' sheet, served in place. */}
-      <GlassHeroSheet
+      {/* Featured recipe detail — the shared recipe Poster, served in place. */}
+      <RecipeDetailSheet
         visible={showFeaturedDetail}
         onClose={() => { setShowFeaturedDetail(false); setFeaturedDetail(null); }}
-        hero={featuredDetail?.thumbnail_url ? (
-          <>
-            <StorageImage
-              source={{ uri: featuredDetail.thumbnail_url }}
-              style={styles.heroFill}
-              resizeMode="cover"
-            />
-            <LinearGradient
-              colors={['rgba(14,11,9,0)', 'rgba(14,11,9,0.92)']}
-              locations={[0.42, 0.94]}
-              style={StyleSheet.absoluteFill}
-              pointerEvents="none"
-            />
-          </>
-        ) : undefined}
-      >
-        <Text style={[styles.detailTitle, { color: colors.text }]}>{featuredDetail?.name}</Text>
-
-        <View style={styles.detailTwoCol}>
-          <View style={styles.detailCol}>
-            <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('libation_recipes.price')}</Text>
-            <View style={[styles.pricePill, { backgroundColor: colors.primary }]}>
-              <Text style={[styles.pricePillText, { color: colors.fireText }]}>{featuredDetail?.price}</Text>
-            </View>
-          </View>
-          {!!featuredDetail?.glassware && (
-            <View style={styles.detailCol}>
-              <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('libation_recipes.glassware')}</Text>
-              <Text style={[styles.detailValue, { color: colors.text }]}>{featuredDetail.glassware}</Text>
-            </View>
-          )}
-        </View>
-
-        {!!featuredDetail?.garnish && (
-          <View style={styles.detailSection}>
-            <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('libation_recipes.garnish')}</Text>
-            <Text style={[styles.detailValue, { color: colors.text }]}>{featuredDetail.garnish}</Text>
-          </View>
-        )}
-
-        <View style={styles.detailSection}>
-          <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('libation_recipes.ingredients')}</Text>
-          {featuredDetail?.ingredients && featuredDetail.ingredients.length > 0 ? (
-            featuredDetail.ingredients.map((item, index) => (
-              <View
-                key={index}
-                style={[styles.ingredientRow, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}
-              >
-                <Text style={[styles.ingredientAmount, { color: colors.primary }]}>{item.amount}</Text>
-                <Text style={[styles.ingredientName, { color: colors.text }]}>{item.ingredient}</Text>
-              </View>
-            ))
-          ) : (
-            <Text style={[styles.noDataText, { color: colors.textSecondary }]}>{t('libation_recipes.no_ingredients')}</Text>
-          )}
-        </View>
-
-        {!!featuredDetail?.procedure && (
-          <View style={styles.detailSection}>
-            <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('libation_recipes.procedure')}</Text>
-            <View style={[styles.procedureBox, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
-              <FormattedText style={[styles.procedureText, { color: colors.text }]}>
-                {getLocalizedField(featuredDetail, 'procedure', language)}
-              </FormattedText>
-            </View>
-          </View>
-        )}
-      </GlassHeroSheet>
+        recipe={featuredDetail ? {
+          name: featuredDetail.name,
+          price: featuredDetail.price,
+          glassware: featuredDetail.glassware,
+          garnish: featuredDetail.garnish,
+          ingredients: featuredDetail.ingredients,
+          procedure: featuredDetail.procedure,
+          procedure_es: featuredDetail.procedure_es,
+          thumbnail_url: featuredDetail.thumbnail_url,
+          // The shelf mixes both menus, so the pill names the menu when that
+          // disambiguates; a one-menu hub shows the price pill alone.
+          subcategoryLabel: twoMenus ? menuName(featuredDetail.menu) : null,
+        } : null}
+        editAction={isManager && featuredDetail ? {
+          label: t('common.edit'),
+          onPress: () => router.push({
+            pathname: featuredDetail.menu === 2 ? '/summer-libation-recipes-editor' : '/libation-recipes-editor',
+            params: { edit: featuredDetail.name },
+          } as any),
+        } : null}
+      />
 
       <BottomNavBar activeTab="tools" />
     </View>
@@ -656,84 +612,5 @@ const styles = StyleSheet.create({
   peekImage: {
     width: '100%',
     height: '100%',
-  },
-  // Featured detail sheet — the libation viewers' vocabulary.
-  heroFill: {
-    width: '100%',
-    height: '100%',
-  },
-  detailTitle: {
-    fontFamily: fonts.display.bold,
-    fontSize: 22,
-    letterSpacing: -0.3,
-    marginTop: 12,
-    marginBottom: 10,
-  },
-  detailTwoCol: {
-    flexDirection: 'row',
-    gap: 14,
-    marginBottom: 8,
-  },
-  detailCol: {
-    flex: 1,
-  },
-  detailSection: {
-    marginBottom: 8,
-  },
-  detailLabel: {
-    fontFamily: fonts.mono.semibold,
-    fontSize: 10,
-    letterSpacing: 1.1,
-    textTransform: 'uppercase',
-    marginBottom: 7,
-  },
-  detailValue: {
-    fontFamily: fonts.body.semibold,
-    fontSize: 14,
-  },
-  pricePill: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-  },
-  pricePillText: {
-    fontFamily: fonts.mono.semibold,
-    fontSize: 13,
-  },
-  ingredientRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 9,
-    paddingHorizontal: 11,
-    borderRadius: 11,
-    borderWidth: StyleSheet.hairlineWidth + 0.5,
-    marginBottom: 7,
-  },
-  ingredientAmount: {
-    fontFamily: fonts.mono.semibold,
-    fontSize: 11.5,
-    minWidth: 64,
-  },
-  ingredientName: {
-    fontFamily: fonts.body.regular,
-    fontSize: 13.5,
-    flex: 1,
-  },
-  noDataText: {
-    fontFamily: fonts.body.regular,
-    fontSize: 13,
-    fontStyle: 'italic',
-  },
-  procedureBox: {
-    borderRadius: 13,
-    borderWidth: StyleSheet.hairlineWidth + 0.5,
-    padding: 13,
-  },
-  procedureText: {
-    fontFamily: fonts.body.regular,
-    fontSize: 13.5,
-    lineHeight: 22,
   },
 });

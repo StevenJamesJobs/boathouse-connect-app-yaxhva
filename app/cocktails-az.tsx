@@ -14,19 +14,13 @@ import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
-import FormattedText from '@/components/FormattedText';
-import { StorageImage } from '@/components/StorageImage';
-import { GlasswareGlyph } from '@/components/GlasswareIconPicker';
-import { useLanguage } from '@/contexts/LanguageContext';
-import { getLocalizedField } from '@/utils/translateContent';
 import { useAuth } from '@/contexts/AuthContext';
 import { isManagerOrOwner } from '@/utils/roles';
-import { LinearGradient } from 'expo-linear-gradient';
 import AmbientGlow from '@/components/AmbientGlow';
 import ScreenHeader from '@/components/ScreenHeader';
 import HeaderNavMenu from '@/components/HeaderNavMenu';
 import { useManagerPermissions } from '@/hooks/useManagerPermissions';
-import GlassHeroSheet from '@/components/GlassHeroSheet';
+import RecipeDetailSheet from '@/components/RecipeDetailSheet';
 import { fonts } from '@/constants/fonts';
 
 interface Cocktail {
@@ -61,12 +55,20 @@ const parseCocktailIngredients = (raw: string | null): { amount: string; ingredi
   return [];
 };
 
+// The Poster's ingredient rows: the parsed { amount, ingredient } rows, or a
+// legacy plain string as one amount-less row (nothing when empty).
+const cocktailIngredientRows = (raw: string | null): { amount?: string; ingredient: string }[] => {
+  const rows = parseCocktailIngredients(raw);
+  if (rows.length > 0) return rows;
+  const s = (raw || '').trim();
+  return s ? [{ ingredient: s }] : [];
+};
+
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
 export default function CocktailsAZScreen() {
   const router = useRouter();
   const { t } = useTranslation();
-  const { language } = useLanguage();
   const colors = useThemeColors();
   const { user } = useAuth();
   const isManager = isManagerOrOwner(user);
@@ -302,76 +304,22 @@ export default function CocktailsAZScreen() {
         </View>
       </View>
 
-      {/* Detail Sheet — hero photo flush to the top edge, the
-          MenuItemDetailSheet continuity (Steve's smoke call). */}
-      <GlassHeroSheet
+      {/* Detail — the shared recipe Poster: no price, the alcohol type rides
+          the slate pill. */}
+      <RecipeDetailSheet
         visible={showDetailModal}
         onClose={closeDetailModal}
-        hero={selectedCocktail?.thumbnail_url ? (
-          <>
-            <StorageImage
-              source={{ uri: selectedCocktail.thumbnail_url }}
-              style={styles.heroFill}
-              resizeMode="cover"
-            />
-            <LinearGradient
-              colors={['rgba(14,11,9,0)', 'rgba(14,11,9,0.92)']}
-              locations={[0.42, 0.94]}
-              style={StyleSheet.absoluteFill}
-              pointerEvents="none"
-            />
-          </>
-        ) : undefined}
-      >
-        <Text style={[styles.detailTitle, { color: colors.text }]}>{selectedCocktail?.name}</Text>
-
-        <View style={styles.detailSection}>
-          <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('cocktails.alcohol_type')}</Text>
-          <View style={[styles.alcoholTypeBadge, { backgroundColor: colors.primary }]}>
-            <Text style={[styles.alcoholTypeText, { color: colors.fireText }]}>{selectedCocktail?.alcohol_type}</Text>
-          </View>
-        </View>
-
-        {(selectedCocktail?.glassware || selectedCocktail?.garnish) && (
-          <View style={styles.detailSection}>
-            {selectedCocktail?.glassware ? (
-              <>
-                <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('cocktails.glassware')}</Text>
-                <View style={styles.glasswareRow}>
-                  <GlasswareGlyph name={selectedCocktail.glassware} size={22} color={colors.primary} />
-                  <Text style={[styles.detailText, { color: colors.text, marginLeft: 8 }]}>{selectedCocktail.glassware}</Text>
-                </View>
-              </>
-            ) : null}
-            {selectedCocktail?.garnish ? (
-              <>
-                <Text style={[styles.detailLabel, { color: colors.textSecondary }, selectedCocktail?.glassware ? { marginTop: 12 } : null]}>{t('cocktails.garnish')}</Text>
-                <Text style={[styles.detailText, { color: colors.text }]}>{selectedCocktail.garnish}</Text>
-              </>
-            ) : null}
-          </View>
-        )}
-
-        <View style={styles.detailSection}>
-          <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('cocktails.ingredients')}</Text>
-          {(() => {
-            const rows = parseCocktailIngredients(selectedCocktail?.ingredients || null);
-            if (rows.length === 0) {
-              return <Text style={[styles.detailText, { color: colors.text }]}>{selectedCocktail?.ingredients}</Text>;
-            }
-            return rows.map((row, i) => (
-              <Text key={i} style={[styles.detailText, { color: colors.text }]}>
-                {'•'} {row.amount ? `${row.amount} ` : ''}{row.ingredient}
-              </Text>
-            ));
-          })()}
-        </View>
-
-        <View style={styles.detailSection}>
-          <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('cocktails.procedure')}</Text>
-          <FormattedText style={[styles.detailText, { color: colors.text }]}>{getLocalizedField(selectedCocktail || {}, 'procedure', language)}</FormattedText>
-        </View>
-      </GlassHeroSheet>
+        recipe={selectedCocktail ? {
+          name: selectedCocktail.name,
+          glassware: selectedCocktail.glassware,
+          garnish: selectedCocktail.garnish,
+          ingredients: cocktailIngredientRows(selectedCocktail.ingredients),
+          procedure: selectedCocktail.procedure,
+          procedure_es: selectedCocktail.procedure_es,
+          thumbnail_url: selectedCocktail.thumbnail_url,
+          subcategoryLabel: selectedCocktail.alcohol_type,
+        } : null}
+      />
     </View>
   );
 }
@@ -490,46 +438,5 @@ const styles = StyleSheet.create({
   alphabetButtonText: {
     fontFamily: fonts.mono.semibold,
     fontSize: 11,
-  },
-  // The hero box/radii come from GlassHeroSheet; this just fills it.
-  heroFill: {
-    width: '100%',
-    height: '100%',
-  },
-  detailTitle: {
-    fontFamily: fonts.display.bold,
-    fontSize: 22,
-    letterSpacing: -0.3,
-    marginTop: 12,
-    marginBottom: 10,
-  },
-  detailSection: {
-    marginBottom: 6,
-  },
-  detailLabel: {
-    fontFamily: fonts.mono.semibold,
-    fontSize: 10,
-    letterSpacing: 1.1,
-    textTransform: 'uppercase',
-    marginBottom: 7,
-  },
-  alcoholTypeBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-  },
-  alcoholTypeText: {
-    fontFamily: fonts.body.semibold,
-    fontSize: 13,
-  },
-  glasswareRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  detailText: {
-    fontFamily: fonts.body.regular,
-    fontSize: 14,
-    lineHeight: 21,
   },
 });

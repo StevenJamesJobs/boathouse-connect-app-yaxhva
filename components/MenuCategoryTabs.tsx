@@ -5,29 +5,26 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  Animated,
   Dimensions,
 } from 'react-native';
-import GlassBlur from '@/components/GlassBlur';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useAppTheme } from '@/contexts/ThemeContext';
-import { hexToRgba } from '@/styles/commonStyles';
 import { fonts } from '@/constants/fonts';
 
 /**
- * MenuCategoryTabs — the sticky category chip row + plain-text subcategory row
- * that sit in the Menus surface's FIXED header stack, plus the scrolled-state
- * backdrop behind BOTH rows.
+ * MenuCategoryTabs — the sticky category chip row + subcategory pill row that
+ * sit in the Menus surface's FIXED header stack (user Menu + Menu Editor).
  *
- * Category chips are squarer glass chips; the ACTIVE chip underlines in that
+ * Category chips are squarer surface chips; the ACTIVE chip underlines in that
  * category's OWN colour (category colours are underline + card-fade only, never
- * text colours). Subcategories drop the chip for plain text with a moving
- * underline in the active category's colour. Row order is the caller's page
- * order (s88: no virtual 'All'; a trailing 'Other' entry may close the row).
+ * text colours). Subcategories are smaller surface pills (s89) with the same
+ * moving underline in the active category's colour. Row order is the caller's
+ * page order (s88: no virtual 'All'; a trailing 'Other' entry may close the row).
  *
- * The backdrop (blur + background wash + hairline bottom rule) fades in over
- * 150ms once the active page is scrolled (`showBackdrop` = scrollY > 6) and is
- * fully transparent at rest so the layout-level AmbientGlow reads through.
+ * There is NO backdrop behind the rows any more (s89, Steve's call: the old
+ * blur + 78% background wash read as a solid bar that cut the AmbientGlow
+ * off). The rows float on the glow at rest AND parked; what keeps them
+ * legible while cards scroll up is the host's ContentFadeMask over the pager —
+ * cards dissolve to nothing at the pill row's bottom edge, so nothing ever
+ * sits behind a chip. The 10pt above the chips is open glow, by design.
  *
  * Name matching is case-INSENSITIVE (catKey) — the DB uniqueness index is
  * lower()-based, so 'Chow Fun' and 'chow fun' are the same category (s66 fix).
@@ -41,8 +38,11 @@ export interface MenuCategoryTabsProps {
   activeSubcategory: string;        // raw name (or the caller's virtual key)
   onSelectSubcategory: (name: string) => void;
   activeColor: string;              // active category's colour (underlines)
-  showBackdrop: boolean;            // scrollY > 6
 }
+
+/** Bottom padding under the pill row — hosts subtract it from the measured
+ *  tabs height to find the pills' bottom edge (the fade mask's `from`). */
+export const CATEGORY_TABS_PAD_BOTTOM = 8;
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -58,9 +58,7 @@ export default function MenuCategoryTabs({
   activeSubcategory,
   onSelectSubcategory,
   activeColor,
-  showBackdrop,
 }: MenuCategoryTabsProps) {
-  const { resolvedMode } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const catScrollRef = useRef<ScrollView>(null);
@@ -71,16 +69,6 @@ export default function MenuCategoryTabs({
   const activeKey = catKey(activeCategory);
   const activeSubKey = catKey(activeSubcategory);
 
-  // Backdrop fade — always mounted so it can fade back OUT.
-  const backdropAnim = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    Animated.timing(backdropAnim, {
-      toValue: showBackdrop ? 1 : 0,
-      duration: 150,
-      useNativeDriver: true,
-    }).start();
-  }, [showBackdrop, backdropAnim]);
-
   // Auto-scroll category chips to center the active one.
   useEffect(() => {
     const layout = catLayoutsRef.current[activeKey];
@@ -90,9 +78,9 @@ export default function MenuCategoryTabs({
     }
   }, [activeKey]);
 
-  // Auto-scroll subcategory items to center the active one. On a category
-  // change the new items are still rendering and their layouts aren't measured
-  // yet: scroll to start immediately (first item is always at x=0), then try
+  // Auto-scroll subcategory pills to center the active one. On a category
+  // change the new pills are still rendering and their layouts aren't measured
+  // yet: scroll to start immediately (first pill is always at x=0), then try
   // to center after a short delay once onLayout has fired.
   const prevCategoryRef = useRef(activeKey);
   useEffect(() => {
@@ -123,27 +111,6 @@ export default function MenuCategoryTabs({
 
   return (
     <View style={styles.wrap}>
-      <Animated.View pointerEvents="none" style={[styles.backdrop, { opacity: backdropAnim }]}>
-        <GlassBlur
-          intensity={18}
-          tint={resolvedMode === 'dark' ? 'dark' : 'light'}
-          style={StyleSheet.absoluteFill}
-        />
-        {/* The wash fades in from its top edge so the bar doesn't meet the
-            header's bottom as a hard line when the rows park under it — but it
-            reaches full strength quickly so cards never swim visibly through
-            the breathing-room strip above the chips. */}
-        <LinearGradient
-          colors={[
-            hexToRgba(colors.background, 0.5),
-            hexToRgba(colors.background, 0.78),
-            hexToRgba(colors.background, 0.78),
-          ]}
-          locations={[0, 0.25, 1]}
-          style={StyleSheet.absoluteFill}
-        />
-      </Animated.View>
-
       {/* Category chips */}
       <ScrollView
         ref={catScrollRef}
@@ -181,7 +148,7 @@ export default function MenuCategoryTabs({
         })}
       </ScrollView>
 
-      {/* Subcategory row — plain text + moving underline in the active category's colour. */}
+      {/* Subcategory pills — smaller surface pills, moving underline in the active category's colour. */}
       {subcategories.length > 0 && (
         <ScrollView
           ref={subScrollRef}
@@ -195,10 +162,10 @@ export default function MenuCategoryTabs({
             return (
               <TouchableOpacity
                 key={sub.name}
-                style={styles.subItem}
+                style={styles.subPill}
                 onPress={() => onSelectSubcategory(sub.name)}
                 activeOpacity={0.7}
-                hitSlop={{ top: 6, bottom: 6 }}
+                hitSlop={{ top: 4, bottom: 4 }}
                 onLayout={(e) => {
                   subLayoutsRef.current[`${activeKey}_${catKey(sub.name)}`] = {
                     x: e.nativeEvent.layout.x,
@@ -225,17 +192,10 @@ const createStyles = (colors: any) =>
   StyleSheet.create({
     wrap: {
       position: 'relative',
-      // Air ABOVE the chips, inside the backdrop — when the rows park under
-      // the header this is the breathing room (the backdrop covers it, so it
-      // reads as part of the frosted bar, never a see-through slot).
+      // Air above the chips when the rows park under the header — open glow,
+      // not a frosted strip (the backdrop is gone, s89).
       paddingTop: 10,
-      paddingBottom: 8,
-    },
-    backdrop: {
-      ...StyleSheet.absoluteFill,
-      overflow: 'hidden',
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: colors.hairline,
+      paddingBottom: CATEGORY_TABS_PAD_BOTTOM,
     },
     catScroll: {
       flexGrow: 0,
@@ -276,15 +236,22 @@ const createStyles = (colors: any) =>
     },
     subContent: {
       paddingHorizontal: 16,
-      gap: 16,
+      gap: 8,
       alignItems: 'center',
     },
-    subItem: {
+    subPill: {
+      height: 30,
+      borderRadius: 9,
+      paddingHorizontal: 11,
+      justifyContent: 'center',
       alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderWidth: StyleSheet.hairlineWidth + 0.5,
+      borderColor: colors.surfaceBorder,
     },
     subLabel: {
       fontFamily: fonts.body.semibold,
-      fontSize: 13,
+      fontSize: 12.5,
       color: colors.textSecondary,
     },
     subLabelActive: {
@@ -294,6 +261,6 @@ const createStyles = (colors: any) =>
       alignSelf: 'stretch',
       height: 2,
       borderRadius: 1,
-      marginTop: 3,
+      marginTop: 2,
     },
   });

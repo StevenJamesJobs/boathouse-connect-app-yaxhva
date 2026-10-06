@@ -233,6 +233,26 @@ serve(async (req) => {
       };
     };
 
+    // s89 (D1): an attached photo rides the push as Expo `richContent.image`.
+    // Android shows it natively as the notification's thumbnail; iOS needs a
+    // Notification Service Extension to fetch it (post-launch) and simply
+    // ignores the field until then. The stored URL is the private bucket's
+    // public-URL format, so mint ONE signed read (7 days — FCM fetches it at
+    // delivery, not at send) for the whole fan-out.
+    let richImageUrl: string | null = null;
+    const thumb = typeof data?.thumbnail_url === 'string' ? data.thumbnail_url : '';
+    const m = thumb.match(/\/storage\/v1\/object\/(?:public|sign)\/([^/]+)\/(.+?)(?:\?.*)?$/);
+    if (m) {
+      try {
+        const { data: signed } = await supabaseClient.storage
+          .from(decodeURIComponent(m[1]))
+          .createSignedUrl(decodeURIComponent(m[2]), 7 * 24 * 3600);
+        richImageUrl = signed?.signedUrl ?? null;
+      } catch (e) {
+        console.log('rich image sign failed (push goes out without it):', e);
+      }
+    }
+
     // Prepare messages for Expo Push API
     const messages = filteredTokens.map((item: any) => {
       // Server-computed total reflects the DB right now. For quiz activation
@@ -250,6 +270,7 @@ serve(async (req) => {
         body: copy.body,
         data: data || {},
         badge: badgeValue,
+        ...(richImageUrl ? { richContent: { image: richImageUrl } } : {}),
       };
     });
 

@@ -40,7 +40,8 @@ import AmbientGlow from '@/components/AmbientGlow';
 import BottomNavBar from '@/components/BottomNavBar';
 import MenuTopArea, { MenuSeasonTabs } from '@/components/MenuTopArea';
 import MenuSearchRow from '@/components/MenuSearchRow';
-import MenuCategoryTabs from '@/components/MenuCategoryTabs';
+import MenuCategoryTabs, { CATEGORY_TABS_PAD_BOTTOM } from '@/components/MenuCategoryTabs';
+import ContentFadeMask from '@/components/ContentFadeMask';
 import MenuSheet from '@/components/MenuSheet';
 import MenuItemDetailSheet, { type MenuItemForDetail } from '@/components/MenuItemDetailSheet';
 import GlassActionSheet, { type GlassAction } from '@/components/GlassActionSheet';
@@ -234,7 +235,7 @@ export default function MenuEditorScreen() {
 
   const isSearchMode = searchQuery.trim().length > 0;
 
-  // ── Search collapse + sticky-tab backdrop — the user side's architecture,
+  // ── Search collapse + sticky tab rows — the user side's architecture,
   // ported verbatim (MenuDisplay): the chrome band is an absolute overlay on a
   // native-driver transform; nothing resizes during scroll. Hysteresis picks a
   // state; a timed ease glides between them.
@@ -244,8 +245,6 @@ export default function MenuEditorScreen() {
   const pageOffsetsRef = useRef<{ [index: number]: number }>({});
   const pageListRefs = useRef<{ [index: number]: FlatList<MenuItem> | null }>({});
   const [pageViewportH, setPageViewportH] = useState(0);
-  const backdropOnRef = useRef(false);
-  const [backdropOn, setBackdropOn] = useState(false);
   const currentPageIndexRef = useRef(currentPageIndex);
 
   const COLLAPSE_AT = 48;
@@ -282,6 +281,10 @@ export default function MenuEditorScreen() {
   }, [collapseAnim]);
 
   const [chromeH, setChromeH] = useState(SEARCH_ROW_H + 88);
+  // s89 fade-behind rail: the pager is alpha-masked so cards dissolve at the
+  // pill row's BOTTOM EDGE once the rows have parked under the header (the
+  // overlay translates up by bandH, so the rows' bottom = chromeH - bandH).
+  const tabsFadeFrom = Math.max(0, chromeH - bandH - CATEGORY_TABS_PAD_BOTTOM);
 
   const resetCollapse = useCallback(() => {
     collapseRunRef.current?.stop();
@@ -290,13 +293,6 @@ export default function MenuEditorScreen() {
     collapseAnim.setValue(0);
   }, [collapseAnim]);
 
-  const syncBackdrop = useCallback((y: number) => {
-    const on = y > 6;
-    if (on !== backdropOnRef.current) {
-      backdropOnRef.current = on;
-      setBackdropOn(on);
-    }
-  }, []);
 
   // Each page records its own offset; only the active page drives the shared
   // collapse state. Between the thresholds the state holds (hysteresis).
@@ -308,8 +304,7 @@ export default function MenuEditorScreen() {
     } else if (y < EXPAND_AT) {
       setCollapsed(false);
     }
-    syncBackdrop(y);
-  }, [setCollapsed, syncBackdrop]);
+  }, [setCollapsed]);
 
   // Page swipes NEVER change collapse state — only retarget + the
   // collapsed-arrival snap to y=bandH (pre-paint) so cards sit tucked under
@@ -322,16 +317,14 @@ export default function MenuEditorScreen() {
       pageOffsetsRef.current[currentPageIndex] = bandH;
       y = bandH;
     }
-    syncBackdrop(y);
-  }, [currentPageIndex, bandH, syncBackdrop]);
+  }, [currentPageIndex, bandH]);
 
   // Entering/leaving search mode swaps the pager for a flat list — the stored
   // offsets no longer describe live views; the row must be usable while typing.
   useEffect(() => {
     pageOffsetsRef.current = {};
     resetCollapse();
-    syncBackdrop(0);
-  }, [isSearchMode, resetCollapse, syncBackdrop]);
+  }, [isSearchMode, resetCollapse]);
 
   // Loud loads only on mount/menu-switch; mutations reload silently so the
   // pager (and the collapse state) survives in place — the old full-spinner
@@ -373,7 +366,6 @@ export default function MenuEditorScreen() {
     // A menu switch replaces every page's content — reopen the chrome.
     pageOffsetsRef.current = {};
     resetCollapse();
-    syncBackdrop(0);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [season]);
 
@@ -393,8 +385,7 @@ export default function MenuEditorScreen() {
     if (first) return;
     pageOffsetsRef.current = {};
     resetCollapse();
-    syncBackdrop(0);
-  }, [pagesSig, resetCollapse, syncBackdrop]);
+  }, [pagesSig, resetCollapse]);
 
   // Refresh the category tree when returning from Manage Categories.
   useFocusEffect(
@@ -758,6 +749,7 @@ export default function MenuEditorScreen() {
       unique_selling_points: item.unique_selling_points ?? null,
       unique_selling_points_es: item.unique_selling_points_es ?? null,
       is_active: item.is_active,
+      is_weekly_special: !!item.is_weekly_special,
       dietary: {
         gf: item.is_gluten_free,
         gfa: item.is_gluten_free_available,
@@ -1241,6 +1233,7 @@ export default function MenuEditorScreen() {
         /* Normal mode: pager + the collapsing chrome overlay (native-driver
            transform over constant-padding pages — nothing resizes on scroll). */
         <View style={styles.pagerArea}>
+          <ContentFadeMask from={tabsFadeFrom}>
           {(loading || categoriesLoading) ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={colors.primary} />
@@ -1266,6 +1259,7 @@ export default function MenuEditorScreen() {
               initialScrollIndex={Math.max(0, Math.min(currentPageIndex, Math.max(pages.length - 1, 0)))}
             />
           )}
+          </ContentFadeMask>
 
           <Animated.View
             style={[styles.chromeOverlay, { transform: [{ translateY: overlayTranslate }] }]}
@@ -1319,7 +1313,6 @@ export default function MenuEditorScreen() {
               activeSubcategory={selectedSubcategory || ''}
               onSelectSubcategory={(name) => navigateToPage(selectedCategory, name)}
               activeColor={activeCategoryColor}
-              showBackdrop={backdropOn}
             />
           </Animated.View>
         </View>
@@ -1348,6 +1341,9 @@ export default function MenuEditorScreen() {
         isLibations={recipeDetailCtx.isLibations}
         redeem={null}
         editAction={recipeDetailCtx.editAction}
+        // The no-photo board takes the item's own category hue; the active tab's
+        // hue is the fallback (resolved here, where activeCategoryColor exists).
+        categoryColor={recipeDetail ? catOf(recipeDetail.category)?.color || activeCategoryColor : null}
       />
 
       {/* Shared Order Position picker (the inline duplicate is gone — §B4). */}

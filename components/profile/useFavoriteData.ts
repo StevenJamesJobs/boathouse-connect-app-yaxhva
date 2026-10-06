@@ -87,8 +87,10 @@ export function useFavoriteData(tiles: FavoriteTile[]): LiveData {
         loadEntries().then((entries) => {
           const ws = startOfWeek(new Date());
           const s = summarizeRange(entries, dateKey(ws), dateKey(addJournalDays(ws, 6)));
+          // Week total is all-in (tips + paychecks); the per-shift average
+          // stays shift tips over shift count, so a payday never inflates it.
           out.tips = {
-            weekTotal: s.tips,
+            weekTotal: s.total,
             weekShifts: s.shiftCount,
             avgPerShift: s.shiftCount > 0 ? s.tips / s.shiftCount : null,
             lastVerdict: null,

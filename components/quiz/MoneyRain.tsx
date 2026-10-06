@@ -81,15 +81,17 @@ function Drop({ spec, height }: { spec: DropSpec; height: number }) {
   );
 }
 
-export default function MoneyRain({ count = 16 }: { count?: number }) {
+export default function MoneyRain({ count = 22 }: { count?: number }) {
   const { height } = useWindowDimensions();
 
   // Randomized once per mount — stable across re-renders.
+  // Glyphs run 24–40pt (s89: "make them bigger so they can really see the
+  // money signs") — the old 12–21pt read as confetti, not cash.
   const drops = useMemo<DropSpec[]>(
     () =>
       Array.from({ length: count }, () => ({
         x: Math.random() * 0.94,
-        size: 12 + Math.random() * 9,
+        size: 24 + Math.random() * 16,
         duration: 2800 + Math.random() * 2200,
         delay: Math.random() * 2600,
         spin: (Math.random() - 0.5) * 260,

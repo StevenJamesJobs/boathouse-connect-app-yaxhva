@@ -9,7 +9,8 @@
  * Index (loaded once per session on first open): the favorites catalog (tools),
  * jolt-only tools (approvals · AI menu upload), people, menu items AND the
  * recipe-fed libations (both menus), posts, and the Settings entries. Results
- * group under mono eyebrows; icon discs wear their family hue; Recent replaces
+ * group under mono eyebrows; icon discs wear their family hue (the theme tint
+ * instead under the app-wide tile palette — gold stays gold); Recent replaces
  * Suggested once there is history; aliases in both languages (joltKeywords).
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -90,8 +91,11 @@ export interface JoltPaletteProps {
 
 export default function JoltPalette({ open, role, boxTop, anchored, onClose }: JoltPaletteProps) {
   const colors = useThemeColors();
-  const { resolvedMode } = useAppTheme();
+  const { resolvedMode, tilePalette } = useAppTheme();
   const scheme: 'dark' | 'light' = resolvedMode === 'dark' ? 'dark' : 'light';
+  // The app-wide tile palette: under 'theme' every disc hue except gold is the tint —
+  // the same rule favoriteAccent applies to the favorites catalog.
+  const tileHue = (hue: string) => (tilePalette === 'theme' ? colors.tint : hue);
   const { user } = useAuth();
   const { organizationId } = useOrganization();
   const router = useRouter();
@@ -132,7 +136,7 @@ export default function JoltPalette({ open, role, boxTop, anchored, onClose }: J
         // Steve's ask: "staff" / "employees" must land on the Manage Employees pane.
         label: tl.id === 'team' ? t('jolt.employees') : t(tl.labelKey, tl.id),
         keywords: JOLT_KEYWORDS[id],
-        hue: favoriteAccent(tl.accent, colors, scheme),
+        hue: favoriteAccent(tl.accent, colors, scheme, tilePalette),
         iosIcon: tl.iosIcon,
         androidIcon: tl.androidIcon,
         go: () => router.push(resolve(tl.route)),
@@ -154,7 +158,7 @@ export default function JoltPalette({ open, role, boxTop, anchored, onClose }: J
       { id: 'jolt-language', kind: 'setting', label: t('settings.language'), subtitle: settingsPath, keywords: JOLT_KEYWORDS['jolt-language'], hue: SLATE, iosIcon: 'globe', androidIcon: 'language', go: toSettings('language') },
     ];
     return [...tools, ...extra, ...settings];
-  }, [user, isMgr, portal, t, router, colors, scheme]);
+  }, [user, isMgr, portal, t, router, colors, scheme, tilePalette]);
 
   // ── live index: people · menu (+ libations) · posts ────────────────────────
   const loadIndex = async () => {
@@ -177,7 +181,7 @@ export default function JoltPalette({ open, role, boxTop, anchored, onClose }: J
               kind: 'person' as const,
               label: u.name,
               subtitle: (Array.isArray(u.job_titles) && u.job_titles.length > 0 ? u.job_titles.join(' · ') : u.job_title) || undefined,
-              hue: TEAM_HUE[scheme],
+              hue: tileHue(TEAM_HUE[scheme]),
               iosIcon: 'person.fill',
               androidIcon: 'person',
               go: () => openMiniProfile(u.id),
@@ -202,11 +206,11 @@ export default function JoltPalette({ open, role, boxTop, anchored, onClose }: J
           // Recipe-fed libations: the SAME synthetic ids MenuDisplay injects (lr- / slr-),
           // so the pick lands on the exact menu row and opens its sheet.
           const drink = (prefix: 'lr' | 'slr') => (r: any) =>
-            c.push({ id: `menu-${prefix}-${r.id}`, kind: 'menu', sub: 'drink', label: r.name, subtitle: [r.category, r.subcategory].filter(Boolean).join(' › '), keywords: 'cocktail drink libation coctel bebida', hue: ASSISTANT_HUES.bartender[scheme], iosIcon: 'wineglass.fill', androidIcon: 'local-bar', go: goItem(`${prefix}-${r.id}`) });
+            c.push({ id: `menu-${prefix}-${r.id}`, kind: 'menu', sub: 'drink', label: r.name, subtitle: [r.category, r.subcategory].filter(Boolean).join(' › '), keywords: 'cocktail drink libation coctel bebida', hue: tileHue(ASSISTANT_HUES.bartender[scheme]), iosIcon: 'wineglass.fill', androidIcon: 'local-bar', go: goItem(`${prefix}-${r.id}`) });
           (winter.data || []).forEach(drink('lr'));
           (summer.data || []).forEach(drink('slr'));
           (events.data || []).forEach((e: any) =>
-            c.push({ id: `event-${e.id}`, kind: 'post', sub: 'event', label: e.title, hue: AZURE_HUE[scheme], iosIcon: 'calendar', androidIcon: 'event', go: () => router.push({ pathname: homePath as any, params: { openEventId: e.id } }) })
+            c.push({ id: `event-${e.id}`, kind: 'post', sub: 'event', label: e.title, hue: tileHue(AZURE_HUE[scheme]), iosIcon: 'calendar', androidIcon: 'event', go: () => router.push({ pathname: homePath as any, params: { openEventId: e.id } }) })
           );
           (anns.data || []).forEach((a: any) =>
             c.push({ id: `ann-${a.id}`, kind: 'post', sub: 'announcement', label: a.title, hue: colors.tint, iosIcon: 'megaphone.fill', androidIcon: 'campaign', go: () => router.push({ pathname: homePath as any, params: { openAnnouncementId: a.id } }) })
