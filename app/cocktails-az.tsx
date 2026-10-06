@@ -33,9 +33,23 @@ interface Cocktail {
   glassware?: string | null;
   garnish?: string | null;
   thumbnail_url: string | null;
+  // s90 multi-images: every stored photo URL, cover first (mirrors thumbnail_url).
+  images?: string[] | null;
   display_order: number;
   is_active: boolean;
 }
+
+// The RPC's `images` Json → the stored-URL list, cover first. Rows from before
+// s90 carry no list (or an empty one), so the lone thumbnail stands in for it.
+const parseImageList = (raw: unknown, thumbnail?: string | null): string[] => {
+  let value = raw;
+  if (typeof value === 'string' && value.trim().startsWith('[')) {
+    try { value = JSON.parse(value); } catch { value = null; }
+  }
+  const list = Array.isArray(value) ? value.filter((u): u is string => typeof u === 'string' && !!u) : [];
+  if (list.length > 0) return list;
+  return thumbnail ? [thumbnail] : [];
+};
 
 // Cocktails store ingredients as TEXT: new rows are a JSON-stringified array of
 // { amount, ingredient }; legacy rows are a single plain string. Parse to rows
@@ -121,7 +135,11 @@ export default function CocktailsAZScreen() {
       const { data, error } = await supabase.rpc('get_cocktails', { p_actor_id: user.id });
 
       if (error) throw error;
-      const sorted = (data || []).slice().sort((a: any, b: any) => (a.name || '').localeCompare(b.name || ''));
+      const sorted = (data || [])
+        .slice()
+        .sort((a: any, b: any) => (a.name || '').localeCompare(b.name || ''))
+        // The Json photo list → string[] once, here (the Poster pages it).
+        .map((row) => ({ ...row, images: parseImageList(row.images, row.thumbnail_url) }));
       setCocktails(sorted);
     } catch (error) {
       console.error('Error loading cocktails:', error);
@@ -305,7 +323,8 @@ export default function CocktailsAZScreen() {
       </View>
 
       {/* Detail — the shared recipe Poster: no price, the alcohol type rides
-          the slate pill. */}
+          the slate pill. Managers get the Edit chip, which deep-links into the
+          editor's edit modal by name (?edit=). */}
       <RecipeDetailSheet
         visible={showDetailModal}
         onClose={closeDetailModal}
@@ -317,7 +336,12 @@ export default function CocktailsAZScreen() {
           procedure: selectedCocktail.procedure,
           procedure_es: selectedCocktail.procedure_es,
           thumbnail_url: selectedCocktail.thumbnail_url,
+          images: parseImageList(selectedCocktail.images, selectedCocktail.thumbnail_url),
           subcategoryLabel: selectedCocktail.alcohol_type,
+        } : null}
+        editAction={isManager && selectedCocktail ? {
+          label: t('common.edit'),
+          onPress: () => router.push({ pathname: '/cocktails-az-editor', params: { edit: selectedCocktail.name } } as any),
         } : null}
       />
     </View>

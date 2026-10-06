@@ -7,15 +7,12 @@ import {
   Pressable,
   Switch,
   Alert,
-  ActivityIndicator,
   StyleSheet,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import * as ImagePicker from 'expo-image-picker';
 import GlassSheet from '@/components/GlassSheet';
-import { type GlassAction } from '@/components/GlassActionSheet';
 import { IconSymbol } from '@/components/IconSymbol';
-import { StorageImage } from '@/components/StorageImage';
+import MultiImageField, { MAX_ITEM_PHOTOS } from '@/components/MultiImageField';
 import RichTextToolbar from '@/components/RichTextToolbar';
 import { useTranslationSection } from '@/components/TranslationSection';
 import { supabase } from '@/app/integrations/supabase/client';
@@ -25,7 +22,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useMenuCategories, type MenuCategory } from '@/hooks/useMenuCategories';
 import { categoryLabel, subcategoryLabel } from '@/utils/menuCategoryLabels';
 import { saveTranslations } from '@/utils/translateContent';
-import { brokerDelete, brokerUploadImage } from '@/utils/storageBroker';
+import { brokerDelete } from '@/utils/storageBroker';
 import { translateServerError } from '@/utils/serverErrors';
 import { fonts } from '@/constants/fonts';
 import type { ThemeColorSet } from '@/styles/commonStyles';
@@ -45,18 +42,29 @@ import type { ThemeColorSet } from '@/styles/commonStyles';
  * (findFormCat), so a case-different or renamed row is never a false miss
  * (the bug the old file had via its viewing-tree-bound isWineName).
  *
- * The nested photo-source sheet presents INSIDE this sheet's own Modal — this
- * sheet never closes for a photo pick/take/remove. Its rows launch the image
- * pickers DIRECTLY while it stays open (the MenuUploadSheet pattern, the only
- * one proven on iOS): a deferred launch after the nested sheet's dismissal is
- * silently dropped by iOS, which is why this is deliberately NOT a
- * GlassActionSheet.
+ * Photos (s90): up to four per item through <MultiImageField>, cover first.
+ * The field uploads on pick through the storage broker and holds STORED URLs
+ * only, so the save path never uploads; its nested photo sheet presents
+ * INSIDE this sheet's own Modal and launches the pickers DIRECTLY while it
+ * stays open (the MenuUploadSheet pattern, the only one proven on iOS — a
+ * deferred launch after a nested sheet's dismissal is silently dropped). A
+ * removed photo is broker-deleted only AFTER the row save succeeds, so a
+ * storage failure can never read as a failed save.
  */
 
 // Case-insensitive category/subcategory name matching — the DB unique index
 // is lower()-based (mirrors MenuDisplay.tsx's catKey; duplicated locally
 // since this lane owns a single new file and MenuDisplay is out of scope).
 const catKey = (name: string | null | undefined) => (name || '').toLowerCase();
+
+// The strip's seed for an existing row: the stored list (cover first), else a
+// one-photo list from the legacy thumbnail, so the form and the save path
+// never special-case a pre-s90 item.
+const seedImages = (item: MenuItem): string[] => {
+  const list = Array.isArray(item.images) ? item.images.filter((u) => typeof u === 'string' && u.length > 0) : [];
+  if (list.length > 0) return list.slice(0, MAX_ITEM_PHOTOS);
+  return item.thumbnail_url ? [item.thumbnail_url] : [];
+};
 
 type DietaryField =
   | 'is_gluten_free'
@@ -110,6 +118,11 @@ export interface MenuItem {
   is_salt_free: boolean;
   thumbnail_url: string | null;
   thumbnail_shape: string;
+  /**
+   * s90: the stored photo list (cover first) — get_menu_items returns it as
+   * Json; the host casts. A pre-s90 row carries only thumbnail_url.
+   */
+  images?: string[] | null;
   display_order: number;
   is_active: boolean;
   is_weekly_special: boolean;
@@ -189,6 +202,8 @@ export default function MenuItemEditSheet({
     is_sugar_free: false,
     is_salt_free: false,
     thumbnail_shape: 'square',
+    // Stored URLs only, cover first (MultiImageField uploads on pick).
+    images: [] as string[],
     display_order: 0,
     is_weekly_special: false,
     name_es: '',
@@ -204,15 +219,12 @@ export default function MenuItemEditSheet({
     unique_selling_points_es: '',
     item_season: 'both' as 'winter' | 'summer' | 'both',
   });
-  const [uploadingImage, setUploadingImage] = useState(false);
-  const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
-  // Set by the photo sheet's Remove row — distinct from "never had a photo":
-  // it tells handleSave to send p_thumbnail_url null instead of round-tripping
-  // editingItem.thumbnail_url, and to clean up the old blob after a successful
-  // update.
-  const [removedPhoto, setRemovedPhoto] = useState(false);
+  // Photos the strip's Remove row dropped this session — distinct from "never
+  // had one": they are broker-deleted only AFTER a successful save (a storage
+  // failure must never read as a failed save), and nothing is deleted on
+  // Cancel. Cleared on every open.
+  const removedPhotosRef = useRef<string[]>([]);
   const [descriptionSelection, setDescriptionSelection] = useState({ start: 0, end: 0 });
-  const [photoActionsVisible, setPhotoActionsVisible] = useState(false);
 
   const descriptionInputRef = useRef<TextInput>(null);
   const addSessionRef = useRef(0);
@@ -310,8 +322,6 @@ export default function MenuItemEditSheet({
   const subToSave = showSubcategory ? formData.subcategory : '';
 
   const showWeeklySpecialFeature = formHasWeeklySpecialsCat && selectedFormCat?.system_key !== 'cat.weekly_specials';
-
-  const photoUri = selectedImageUri || (removedPhoto ? null : editingItem?.thumbnail_url || null);
 
   // Per-menu drops the 'both' choice for NEW selections; a legacy 'both' item
   // keeps it offered so it's never stranded (verbatim old-file rule).
@@ -411,6 +421,7 @@ export default function MenuItemEditSheet({
         is_sugar_free: editingItem.is_sugar_free,
         is_salt_free: editingItem.is_salt_free,
         thumbnail_shape: editingItem.thumbnail_shape,
+        images: seedImages(editingItem),
         display_order: editingItem.display_order,
         is_weekly_special: editingItem.is_weekly_special,
         name_es: editingItem.name_es || '',
@@ -446,6 +457,7 @@ export default function MenuItemEditSheet({
         is_sugar_free: false,
         is_salt_free: false,
         thumbnail_shape: 'square',
+        images: [],
         display_order: 0,
         is_weekly_special: false,
         name_es: '',
@@ -463,87 +475,10 @@ export default function MenuItemEditSheet({
       });
       addSessionRef.current += 1;
     }
-    setSelectedImageUri(null);
-    setRemovedPhoto(false);
+    removedPhotosRef.current = [];
     setDescriptionSelection({ start: 0, end: 0 });
-    // Defensive — mirrors MenuSheet's "reset the nested sheet on OPEN, not on
-    // close" rule, though there's no real path back into this sheet with the
-    // photo action sheet left open.
-    setPhotoActionsVisible(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, editingItem]);
-
-  const uploadImage = async (uri: string): Promise<string | null> => {
-    if (!user?.id) return null;
-    try {
-      setUploadingImage(true);
-      const publicUrl = await brokerUploadImage('menu_item_image', uri, user.id);
-      if (!publicUrl) {
-        Alert.alert(t('common:error'), t('menu_editor:upload_image_error'));
-        return null;
-      }
-      return publicUrl;
-    } finally {
-      setUploadingImage(false);
-    }
-  };
-
-  // ⚠️ The pickers launch DIRECTLY from the open photo sheet — the
-  // MenuUploadSheet pattern, the only one proven on iOS. The first build
-  // deferred these until after the nested sheet dismissed, and iOS silently
-  // swallowed the picker presentation every time (Android's timer path was
-  // fine) — Steve's smoke: both rows dead on iOS. The photo sheet closes on a
-  // successful pick and stays open on cancel, exactly like the upload sheet.
-  const openPhotoLibrary = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: formData.thumbnail_shape === 'square' ? [1, 1] : [16, 9],
-        quality: 0.8,
-      });
-      if (!result.canceled && result.assets[0]) {
-        setSelectedImageUri(result.assets[0].uri);
-        setRemovedPhoto(false);
-        setPhotoActionsVisible(false);
-      }
-    } catch (error) {
-      console.error('Error picking image:', error);
-      Alert.alert(t('common:error'), t('menu_editor:pick_image_error'));
-    }
-  };
-
-  // Denial alert presents over the still-open photo sheet — the upload sheet
-  // does the same and it is safe (no dismissal is in flight).
-  const openCamera = async () => {
-    try {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert(t('menu_upload_sheet.camera_denied_title'), t('menu_upload_sheet.camera_denied_msg'));
-        return;
-      }
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ['images'],
-        quality: 0.8,
-        allowsEditing: true,
-        aspect: formData.thumbnail_shape === 'square' ? [1, 1] : [16, 9],
-      });
-      if (!result.canceled && result.assets[0]) {
-        setSelectedImageUri(result.assets[0].uri);
-        setRemovedPhoto(false);
-        setPhotoActionsVisible(false);
-      }
-    } catch (error) {
-      console.error('Error taking photo:', error);
-      Alert.alert(t('common:error'), t('menu_editor:pick_image_error'));
-    }
-  };
-
-  const removePhoto = () => {
-    setSelectedImageUri(null);
-    setRemovedPhoto(true);
-    setPhotoActionsVisible(false);
-  };
 
   // Indexed assignment (not an object-literal computed property) so the
   // union-typed `field` resolves against a single, unambiguous FormData type.
@@ -554,35 +489,6 @@ export default function MenuItemEditSheet({
       return next;
     });
   };
-
-  // Built with push (not a ternary-spread) so every element is directly
-  // contextually typed against GlassAction — no inference ambiguity.
-  const photoActions: GlassAction[] = [
-    {
-      key: 'library',
-      label: t('menu_upload_sheet.choose_library'),
-      iosIcon: 'photo.on.rectangle',
-      androidIcon: 'photo-library',
-      onPress: openPhotoLibrary,
-    },
-    {
-      key: 'camera',
-      label: t('menu_upload_sheet.take_photo'),
-      iosIcon: 'camera.fill',
-      androidIcon: 'camera-alt',
-      onPress: openCamera,
-    },
-  ];
-  if (photoUri) {
-    photoActions.push({
-      key: 'remove',
-      label: t('menu_editor:photo_remove'),
-      iosIcon: 'trash',
-      androidIcon: 'delete',
-      destructive: true,
-      onPress: removePhoto,
-    });
-  }
 
   const handleSave = async () => {
     const authorName = isSpanishAuthor ? formData.name_es : formData.name;
@@ -609,13 +515,12 @@ export default function MenuItemEditSheet({
     if (!resolved) return;
 
     try {
-      // removedPhoto wins over the round-tripped editingItem url; a fresh pick
-      // (which always clears removedPhoto) wins over both.
-      let thumbnailUrl: string | null = removedPhoto ? null : editingItem?.thumbnail_url || null;
-      if (selectedImageUri) {
-        const uploadedUrl = await uploadImage(selectedImageUri);
-        if (uploadedUrl) thumbnailUrl = uploadedUrl;
-      }
+      // The strip holds stored URLs only (uploaded on pick), cover first. With
+      // p_images passed the RPCs set thumbnail_url = images[0] themselves;
+      // p_thumbnail_url carries the same cover for the arg contract (null
+      // clears a row whose last photo was removed).
+      const images = formData.images;
+      const thumbnailUrl: string | null = images[0] ?? null;
 
       // location_es is clearable for wine items only (a wine's region should
       // clear like its name); for non-wine items it stays OUT — it is sent as
@@ -646,6 +551,7 @@ export default function MenuItemEditSheet({
           p_is_salt_free: formData.is_salt_free,
           p_thumbnail_url: thumbnailUrl as string,
           p_thumbnail_shape: formData.thumbnail_shape,
+          p_images: images,
           // TRAP: p_display_order defaults to 0 / p_season to 'both' on the
           // live RPC — omitting either on update RESETS the row. Always
           // round-trip both exactly, never derive them here.
@@ -664,17 +570,6 @@ export default function MenuItemEditSheet({
         if (error) {
           console.error('Error updating menu item:', error);
           throw error;
-        }
-
-        // Cleanup isolated in its own try/catch — a storage failure here must
-        // never surface as a false "save failed" alert after the row update
-        // already succeeded (mirrors the delete flow's brokerDelete isolation).
-        if (removedPhoto && editingItem.thumbnail_url) {
-          try {
-            await brokerDelete('menu-items', [editingItem.thumbnail_url], user.id);
-          } catch (cleanupError) {
-            console.error('Error deleting removed menu item photo:', cleanupError);
-          }
         }
 
         await saveTranslations(
@@ -712,6 +607,7 @@ export default function MenuItemEditSheet({
           p_is_salt_free: formData.is_salt_free,
           p_thumbnail_url: thumbnailUrl as string,
           p_thumbnail_shape: formData.thumbnail_shape,
+          p_images: images,
           p_display_order: nextOrder,
           p_location: isWine ? resolved.location?.en || undefined : undefined,
           p_glass_price: isWine ? formData.glass_price || undefined : undefined,
@@ -741,6 +637,21 @@ export default function MenuItemEditSheet({
             user.id,
             { clearBlank }
           );
+        }
+      }
+      // Cleanup isolated in its own try/catch — a storage failure here must
+      // never surface as a false "save failed" alert after the row write
+      // already succeeded (mirrors the delete flow's brokerDelete isolation).
+      // Runs after a create too: a photo picked then removed before the first
+      // save was uploaded on pick and is referenced by no row. The broker
+      // takes at most 10 urls per call, so this chunks like the delete flow.
+      const removed = removedPhotosRef.current.filter((url) => !images.includes(url));
+      removedPhotosRef.current = [];
+      for (let i = 0; i < removed.length; i += 10) {
+        try {
+          await brokerDelete('menu-items', removed.slice(i, i + 10), user.id);
+        } catch (cleanupError) {
+          console.error('Error deleting removed menu item photos:', cleanupError);
         }
       }
       // No success alert / no close here — the host owns both, timed off its
@@ -777,18 +688,10 @@ export default function MenuItemEditSheet({
       <Pressable style={[styles.footerBtn, styles.footerBtnCancel]} onPress={onClose}>
         <Text style={[styles.footerBtnLabel, { color: colors.text }]}>{t('common:cancel')}</Text>
       </Pressable>
-      <Pressable
-        style={[styles.footerBtn, styles.footerBtnSave, uploadingImage && styles.footerBtnDisabled]}
-        onPress={handleSave}
-        disabled={uploadingImage}
-      >
-        {uploadingImage ? (
-          <ActivityIndicator color={colors.fireText} />
-        ) : (
-          <Text style={[styles.footerBtnLabel, { color: colors.fireText }]}>
-            {editingItem ? t('menu_editor:save_button') : t('menu_editor:add_save_button')}
-          </Text>
-        )}
+      <Pressable style={[styles.footerBtn, styles.footerBtnSave]} onPress={handleSave}>
+        <Text style={[styles.footerBtnLabel, { color: colors.fireText }]}>
+          {editingItem ? t('menu_editor:save_button') : t('menu_editor:add_save_button')}
+        </Text>
       </Pressable>
     </View>
   );
@@ -953,32 +856,32 @@ export default function MenuItemEditSheet({
           chips, then this. The section gap already spaces it. */}
       {showWineLibNote && <Text style={[styles.hint, { marginTop: 0 }]}>{t('menu_editor:wine_libations_note')}</Text>}
 
-      {/* 4. Photo + Name */}
+      {/* 4. Name */}
       <View>
-        <View style={styles.photoNameRow}>
-          <Pressable
-            style={[styles.photoZone, !photoUri && styles.photoZoneEmpty]}
-            onPress={() => setPhotoActionsVisible(true)}
-          >
-            {photoUri ? (
-              <StorageImage source={{ uri: photoUri }} style={styles.photoImage} key={photoUri} />
-            ) : (
-              <IconSymbol ios_icon_name="photo" android_material_icon_name="add-photo-alternate" size={26} color={colors.textSecondary} />
-            )}
-          </Pressable>
-          <View style={styles.nameCol}>
-            <Text style={styles.formLabel}>{t('menu_editor:name_label')}</Text>
-            <TextInput
-              style={styles.input}
-              placeholder={t('menu_editor:name_placeholder')}
-              placeholderTextColor={colors.textSecondary}
-              value={isSpanishAuthor ? formData.name_es : formData.name}
-              onChangeText={(text) =>
-                setFormData((prev) => (isSpanishAuthor ? { ...prev, name_es: text } : { ...prev, name: text }))
-              }
-            />
-          </View>
-        </View>
+        <Text style={styles.formLabel}>{t('menu_editor:name_label')}</Text>
+        <TextInput
+          style={styles.input}
+          placeholder={t('menu_editor:name_placeholder')}
+          placeholderTextColor={colors.textSecondary}
+          value={isSpanishAuthor ? formData.name_es : formData.name}
+          onChangeText={(text) =>
+            setFormData((prev) => (isSpanishAuthor ? { ...prev, name_es: text } : { ...prev, name: text }))
+          }
+        />
+      </View>
+
+      {/* 4.5 Photos — up to four, cover first (s90). The field uploads on pick
+          and owns its nested photo sheet (library / camera / make cover / move
+          / remove); the Shape segment right below governs the whole set's crop. */}
+      <View>
+        <MultiImageField
+          images={formData.images}
+          onChange={(next) => setFormData((prev) => ({ ...prev, images: next }))}
+          onRemove={(url) => removedPhotosRef.current.push(url)}
+          purpose="menu_item_image"
+          bucket="menu-items"
+          aspect={formData.thumbnail_shape === 'square' ? [1, 1] : [16, 9]}
+        />
         {isWine && (
           <View style={styles.winePhotoTipRow}>
             <IconSymbol ios_icon_name="info.circle" android_material_icon_name="info" size={13} color={colors.textSecondary} />
@@ -1199,40 +1102,6 @@ export default function MenuItemEditSheet({
           />
         </View>
       )}
-
-      {/* Nested inside this sheet's own Modal on purpose (the MenuSheet
-          precedent) — a hidden Modal renders null, so it costs the body
-          nothing when closed. NOT a GlassActionSheet: that component defers
-          every row until its own Modal has dismissed, and iOS silently drops
-          an image-picker presentation issued in that window (Steve's smoke —
-          both rows dead on iOS, Android fine). These rows launch the pickers
-          directly while the sheet stays open, the MenuUploadSheet pattern. */}
-      <GlassSheet
-        visible={photoActionsVisible}
-        onClose={() => setPhotoActionsVisible(false)}
-        title={t('menu_editor:photo_title')}
-      >
-        {photoActions.map((a) => (
-          <Pressable
-            key={a.key}
-            onPress={a.onPress}
-            style={[styles.photoRow, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}
-          >
-            <IconSymbol
-              ios_icon_name={a.iosIcon}
-              android_material_icon_name={a.androidIcon}
-              size={19}
-              color={a.destructive ? '#E74C3C' : colors.text}
-            />
-            <Text
-              style={[styles.photoRowLabel, { color: a.destructive ? '#E74C3C' : colors.text }]}
-              numberOfLines={1}
-            >
-              {a.label}
-            </Text>
-          </Pressable>
-        ))}
-      </GlassSheet>
     </GlassSheet>
   );
 }
@@ -1240,18 +1109,6 @@ export default function MenuItemEditSheet({
 const createStyles = (colors: ThemeColorSet) =>
   StyleSheet.create({
     section: { gap: 12 },
-    // The photo-source rows — GlassActionSheet's row geometry, rendered
-    // locally because these rows must NOT defer (see the photo sheet's JSX).
-    photoRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 12,
-      paddingHorizontal: 14,
-      paddingVertical: 14,
-      borderRadius: 13,
-      borderWidth: StyleSheet.hairlineWidth + 0.5,
-    },
-    photoRowLabel: { flex: 1, flexShrink: 1, fontFamily: fonts.display.semibold, fontSize: 15 },
     formLabel: {
       fontFamily: fonts.mono.semibold,
       fontSize: 10,
@@ -1348,21 +1205,8 @@ const createStyles = (colors: ThemeColorSet) =>
     chipAbbrev: { fontFamily: fonts.mono.medium, fontSize: 10, letterSpacing: 0.4 },
     chipLabel: { fontFamily: fonts.body.semibold, fontSize: 11.5 },
 
-    photoNameRow: { flexDirection: 'row', gap: 12 },
-    photoZone: {
-      width: 96,
-      height: 96,
-      borderRadius: 13,
-      overflow: 'hidden',
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: colors.thumbPlaceholder,
-    },
-    photoZoneEmpty: { borderWidth: 1, borderStyle: 'dashed', borderColor: colors.glassBorder },
-    photoImage: { width: '100%', height: '100%' },
     winePhotoTipRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 5, marginTop: 8 },
     winePhotoTipText: { flex: 1, fontFamily: fonts.body.regular, fontSize: 11.5, lineHeight: 16, color: colors.textSecondary },
-    nameCol: { flex: 1, justifyContent: 'flex-start' },
 
     fieldBlock: { gap: 6 },
 
@@ -1394,6 +1238,5 @@ const createStyles = (colors: ThemeColorSet) =>
     },
     footerBtnCancel: { backgroundColor: colors.glass, borderColor: colors.glassBorder },
     footerBtnSave: { backgroundColor: colors.primary, borderColor: colors.primary },
-    footerBtnDisabled: { opacity: 0.6 },
     footerBtnLabel: { fontFamily: fonts.body.semibold, fontSize: 15 },
   });

@@ -6,13 +6,10 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
-  TextInput,
   Alert,
   ActivityIndicator,
-  Switch,
 } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -25,13 +22,8 @@ import { useTranslation } from 'react-i18next';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { saveTranslations } from '@/utils/translateContent';
 import { useTranslationSection } from '@/components/TranslationSection';
-import { brokerUploadImage, brokerDelete } from '@/utils/storageBroker';
+import { brokerDelete } from '@/utils/storageBroker';
 import { toPublicUrl } from '@/utils/storageResolver';
-import RichTextToolbar from '@/components/RichTextToolbar';
-import ProcedureResizeHandle from '@/components/ProcedureResizeHandle';
-import CollapsibleSection from '@/components/CollapsibleSection';
-import SimpleSelectPicker, { SelectField } from '@/components/SimpleSelectPicker';
-import GlasswareIconPicker from '@/components/GlasswareIconPicker';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useMenuCategories } from '@/hooks/useMenuCategories';
 import {
@@ -48,6 +40,13 @@ import AmbientGlow from '@/components/AmbientGlow';
 import ScreenHeader from '@/components/ScreenHeader';
 import HeaderNavMenu from '@/components/HeaderNavMenu';
 import GlassSheet from '@/components/GlassSheet';
+import LibationRecipeForm, {
+  FEATURED_SENTINEL,
+  cleanIngredients,
+  emptyLibationDraft,
+  type LibationRecipeDraft,
+} from '@/components/LibationRecipeForm';
+import LibationUploadSheet from '@/components/LibationUploadSheet';
 import MenuSearchRow from '@/components/MenuSearchRow';
 import { useManagerPermissions } from '@/hooks/useManagerPermissions';
 import type { MenuSubcategory } from '@/hooks/useMenuCategories';
@@ -67,6 +66,8 @@ interface LibationRecipe {
   procedure: string | null;
   procedure_es?: string | null;
   thumbnail_url: string | null;
+  /** s90: every photo, cover first (the server mirrors [0] into thumbnail_url). */
+  images: string[];
   display_order: number;
   is_active: boolean;
 }
@@ -77,12 +78,12 @@ const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1514362545857-3bc16
 
 const TRASH_RED = '#E53935';
 
-// The category picker's "Featured" choice (s73): a recipe added straight to
-// the Featured section — no menu subcategory (it never feeds a menu surface),
-// stored as subcategory_id NULL + the legacy category string 'Featured' +
-// is_featured true. The RPCs write p_subcategory_id straight through (verified
-// no-COALESCE), so omitting it on update also CLEARS a previous subcategory.
-const FEATURED_SENTINEL = '__featured__';
+// The category picker's "Featured" choice (FEATURED_SENTINEL, s73) lives in
+// LibationRecipeForm: a recipe added straight to the Featured section — no menu
+// subcategory, stored as subcategory_id NULL + the legacy category string
+// 'Featured' + is_featured true. The RPCs write p_subcategory_id straight
+// through (verified no-COALESCE), so omitting it on update also CLEARS a
+// previous subcategory.
 
 export default function SummerLibationRecipesEditorScreen() {
   useRequireManagerRoute();
@@ -96,8 +97,6 @@ export default function SummerLibationRecipesEditorScreen() {
   // Menu 2 → slot 2 in per-menu scope (shared scope ignores the slot).
   const { categories: menuCats, refresh: refreshMenuCats } = useMenuCategories({ includeHidden: true, menuSlot: 2 });
   const cocktailSubOptions = cocktailFedSubOptions(menuCats, t);
-  const procedureInputRef = useRef<TextInput>(null);
-  const [procedureSelection, setProcedureSelection] = useState({ start: 0, end: 0 });
   const [recipes, setRecipes] = useState<LibationRecipe[]>([]);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -114,24 +113,12 @@ export default function SummerLibationRecipesEditorScreen() {
   const [reorderOpen, setReorderOpen] = useState(false);
   const [reorderSubs, setReorderSubs] = useState<MenuSubcategory[]>([]);
 
-  // Form state
-  const [name, setName] = useState('');
-  const [price, setPrice] = useState('');
-  const [subcategoryId, setSubcategoryId] = useState('');
-  const [isFeatured, setIsFeatured] = useState(false);
-  const [glassware, setGlassware] = useState('');
-  const [garnish, setGarnish] = useState('');
-  const [ingredients, setIngredients] = useState<{ amount: string; ingredient: string }[]>([
-    { amount: '', ingredient: '' },
-  ]);
-  const [procedure, setProcedure] = useState('');
-  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
-  const [uploadingImage, setUploadingImage] = useState(false);
-  const [procedureEs, setProcedureEs] = useState('');
-  // Dropdown pickers + auto-grow procedure height
-  const [subPickerOpen, setSubPickerOpen] = useState(false);
-  const [procH, setProcH] = useState(120);
-  const [procDragH, setProcDragH] = useState(0);
+  // Form state — the shared LibationRecipeForm draft (s90). Photos the user
+  // removed wait here until the save succeeds, then get broker-deleted.
+  const [draft, setDraft] = useState<LibationRecipeDraft>(emptyLibationDraft());
+  const removedImages = useRef<string[]>([]);
+  // s90: the Libations AI Upload sheet (the To User sheet's row).
+  const [uploadVisible, setUploadVisible] = useState(false);
 
   // Hybrid bilingual authoring (s61): the primary inputs bind the device
   // language; the shared section shows the other-language preview + translate
@@ -143,10 +130,10 @@ export default function SummerLibationRecipesEditorScreen() {
       {
         key: 'procedure',
         labelKey: 'translation_section:field_procedure',
-        enValue: procedure,
-        esValue: procedureEs,
-        setEnValue: setProcedure,
-        setEsValue: setProcedureEs,
+        enValue: draft.procedure,
+        esValue: draft.procedureEs,
+        setEnValue: (v: string) => setDraft((d) => ({ ...d, procedure: v })),
+        setEsValue: (v: string) => setDraft((d) => ({ ...d, procedureEs: v })),
         multiline: true,
       },
     ],
@@ -161,23 +148,32 @@ export default function SummerLibationRecipesEditorScreen() {
       const { data, error } = await supabase.rpc('get_summer_libation_recipes', { p_actor_id: user.id });
 
       if (error) {
-        console.error('Error loading libation recipes:', error);
+        console.error('Error loading summer libation recipes:', error);
         throw error;
       }
       const sorted = (data || []).slice().sort((a, b) =>
         (a.category || '').localeCompare(b.category || '') || (a.display_order ?? 0) - (b.display_order ?? 0));
-      setRecipes(sorted as (LibationRow & { ingredients: { amount: string; ingredient: string }[] })[]);
+      // s90: `images` arrives as Json — the stored URLs, cover first; rows that
+      // predate the list still carry only the thumbnail.
+      setRecipes(sorted.map((r) => ({
+        ...r,
+        images: Array.isArray(r.images) ? (r.images as string[]) : (r.thumbnail_url ? [r.thumbnail_url] : []),
+      })) as (LibationRow & { ingredients: { amount: string; ingredient: string }[]; images: string[] })[]);
     } catch (error) {
-      console.error('Error loading libation recipes:', error);
+      console.error('Error loading summer libation recipes:', error);
       Alert.alert(t('common.error'), t('summer_libation_editor.no_recipes'));
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    loadRecipes();
-  }, [loadRecipes]);
+  // Reload on every focus (s90): the Libations AI Upload review navigates back
+  // here after publishing, and the new recipes must be on the shelves.
+  useFocusEffect(
+    useCallback(() => {
+      loadRecipes();
+    }, [loadRecipes])
+  );
 
   // Deep-link from a recipe-fed menu card ("Open Recipes Editor"): ?edit=<name>
   // opens this editor's own edit modal for that recipe. Name is the bridge —
@@ -195,76 +191,24 @@ export default function SummerLibationRecipesEditorScreen() {
     if (target) openEditModal(target);
   }, [recipes, menuCats, deepLink.edit]);
 
-  const pickImage = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        await uploadImage(result.assets[0].uri);
-      }
-    } catch (error) {
-      console.error('Error picking image:', error);
-      Alert.alert(t('common.error'), t('summer_libation_editor.error_pick_image'));
-    }
-  };
-
-  const uploadImage = async (uri: string) => {
-    if (!user?.id) {
-      Alert.alert(t('common.error'), t('summer_libation_editor.error_not_authenticated_upload'));
-      return;
-    }
-
-    try {
-      setUploadingImage(true);
-
-      // Upload via the storage broker
-      const publicUrl = await brokerUploadImage('summer_libation_image', uri, user.id);
-      if (!publicUrl) {
-        throw new Error('Upload failed');
-      }
-
-      setThumbnailUrl(publicUrl);
-      Alert.alert(t('common.success'), t('summer_libation_editor.image_uploaded'));
-    } catch (error: any) {
-      console.error('Error uploading image:', error);
-      Alert.alert('Error', translateServerError(error, 'Failed to upload image'));
-    } finally {
-      setUploadingImage(false);
-    }
-  };
-
   const handleSave = async () => {
     try {
-      if (!name.trim()) {
+      const name = draft.name.trim();
+      if (!name) {
         Alert.alert(t('common.error'), t('summer_libation_editor.error_no_name'));
         return;
       }
-
-      if (!price.trim()) {
-        Alert.alert(t('common.error'), t('summer_libation_editor.error_no_price'));
-        return;
-      }
-
-      if (!subcategoryId) {
+      if (!draft.subcategoryId) {
         Alert.alert(t('common.error'), t('summer_libation_editor.error_no_category'));
         return;
       }
-
-      // Validate ingredients
-      const validIngredients = ingredients.filter(
-        (ing) => ing.amount.trim() && ing.ingredient.trim()
-      );
-
+      // s90: at least one NAMED ingredient; amounts are optional (manual and
+      // scanned recipes alike — Steve), and so is the price.
+      const validIngredients = cleanIngredients(draft.ingredients);
       if (validIngredients.length === 0) {
         Alert.alert(t('common.error'), t('summer_libation_editor.error_no_ingredients'));
         return;
       }
-
       if (!user?.id) {
         Alert.alert(t('common.error'), t('summer_libation_editor.error_not_authenticated'));
         return;
@@ -278,33 +222,36 @@ export default function SummerLibationRecipesEditorScreen() {
       // Resolve the chosen cocktail-fed subcategory; keep writing a stable legacy
       // `category` string (built-in vocab or custom name) for fallback resolution.
       // The Featured choice carries NO subcategory (it never feeds a menu surface).
-      const isFeaturedOnly = subcategoryId === FEATURED_SENTINEL;
+      const isFeaturedOnly = draft.subcategoryId === FEATURED_SENTINEL;
       const selectedSub = isFeaturedOnly
         ? undefined
-        : menuCats.flatMap((c) => c.subcategories).find((s) => s.id === subcategoryId);
+        : menuCats.flatMap((c) => c.subcategories).find((sub) => sub.id === draft.subcategoryId);
       const legacyCategory = isFeaturedOnly ? 'Featured' : (selectedSub ? recipeCategoryValueForSub(selectedSub) : '');
-      const subForRpc = isFeaturedOnly ? undefined : subcategoryId;
-      const featuredForRpc = isFeaturedOnly ? true : isFeatured;
+      const subForRpc = isFeaturedOnly ? undefined : draft.subcategoryId;
+      const featuredForRpc = isFeaturedOnly ? true : draft.isFeatured;
+      // The photo list's first entry is the cover (the server mirrors it into thumbnail_url).
+      const common = {
+        p_user_id: user.id,
+        p_organization_id: organizationId ?? undefined,
+        p_name: name,
+        p_price: draft.price.trim(),
+        p_category: legacyCategory,
+        p_subcategory_id: subForRpc,
+        p_is_featured: featuredForRpc,
+        p_glassware: (draft.glassware.trim() || null) as string,
+        p_garnish: (draft.garnish.trim() || null) as string,
+        p_ingredients: validIngredients,
+        p_procedure: (resolved.procedure.en.trim() || null) as string,
+        p_thumbnail_url: (draft.images[0] ?? null) as string,
+        p_images: draft.images,
+      };
 
       if (editingRecipe) {
-        // Update existing recipe using RPC function (same pattern as cocktails editor)
         const { error } = await supabase.rpc('update_summer_libation_recipe', {
-          p_user_id: user.id,
-          p_organization_id: organizationId ?? undefined,
+          ...common,
           p_recipe_id: editingRecipe.id,
-          p_name: name.trim(),
-          p_price: price.trim(),
-          p_category: legacyCategory,
-          p_subcategory_id: subForRpc,
-          p_is_featured: featuredForRpc,
-          p_glassware: (glassware.trim() || null) as string,
-          p_garnish: (garnish.trim() || null) as string,
-          p_ingredients: validIngredients,
-          p_procedure: (resolved.procedure.en.trim() || null) as string,
-          p_thumbnail_url: thumbnailUrl as string,
           p_display_order: editingRecipe.display_order,
         });
-
         if (error) {
           console.error('Error updating libation recipe:', error);
           throw error;
@@ -312,23 +259,10 @@ export default function SummerLibationRecipesEditorScreen() {
         await saveTranslations('summer_libation_recipes', editingRecipe.id, { procedure_es: resolved.procedure.es }, user?.id);
         Alert.alert(t('common.success'), t('summer_libation_editor.recipe_updated'));
       } else {
-        // Insert new recipe using RPC function (same pattern as cocktails editor)
         const { data, error } = await supabase.rpc('insert_summer_libation_recipe', {
-          p_user_id: user.id,
-          p_organization_id: organizationId ?? undefined,
-          p_name: name.trim(),
-          p_price: price.trim(),
-          p_category: legacyCategory,
-          p_subcategory_id: subForRpc,
-          p_is_featured: featuredForRpc,
-          p_glassware: (glassware.trim() || null) as string,
-          p_garnish: (garnish.trim() || null) as string,
-          p_ingredients: validIngredients,
-          p_procedure: (resolved.procedure.en.trim() || null) as string,
-          p_thumbnail_url: thumbnailUrl as string,
+          ...common,
           p_display_order: recipes.length,
         });
-
         if (error) {
           console.error('Error adding libation recipe:', error);
           throw error;
@@ -338,6 +272,17 @@ export default function SummerLibationRecipesEditorScreen() {
           await saveTranslations('summer_libation_recipes', data as string, { procedure_es: resolved.procedure.es }, user?.id);
         }
         Alert.alert(t('common.success'), t('summer_libation_editor.recipe_added'));
+      }
+
+      // Photos removed in the form go only now that the row is saved — a storage
+      // failure must never read as a failed save.
+      const removed = removedImages.current.splice(0);
+      if (removed.length > 0) {
+        try {
+          await brokerDelete('summer-libation-recipe-images', removed, user.id);
+        } catch (cleanupError) {
+          console.error('Error deleting removed recipe photos:', cleanupError);
+        }
       }
 
       setShowModal(false);
@@ -374,8 +319,9 @@ export default function SummerLibationRecipesEditorScreen() {
               console.error('Error deleting libation recipe:', error);
               throw error;
             }
-            // The row is gone for good (s88: a real delete) — drop its image too.
-            if (recipe.thumbnail_url) brokerDelete('summer-libation-recipe-images', [recipe.thumbnail_url], user.id);
+            // The row is gone for good (s88: a real delete) — drop EVERY photo too (s90).
+            const photos = recipe.images.length > 0 ? recipe.images : recipe.thumbnail_url ? [recipe.thumbnail_url] : [];
+            if (photos.length > 0) brokerDelete('summer-libation-recipe-images', photos, user.id);
             Alert.alert(t('common.success'), t('summer_libation_editor.recipe_deleted'));
             loadRecipes();
           } catch (error: any) {
@@ -444,23 +390,21 @@ export default function SummerLibationRecipesEditorScreen() {
 
   const openEditModal = (recipe: LibationRecipe) => {
     setEditingRecipe(recipe);
-    setName(recipe.name);
-    setPrice(recipe.price);
-    setSubcategoryId(
-      resolveRecipeSubId(menuCats, recipe) ||
-        (recipe.category === 'Featured' ? FEATURED_SENTINEL : '')
-    );
-    setIsFeatured(!!recipe.is_featured);
-    setGlassware(recipe.glassware || '');
-    setGarnish(recipe.garnish || '');
-    setIngredients(
-      recipe.ingredients.length > 0
-        ? recipe.ingredients
-        : [{ amount: '', ingredient: '' }]
-    );
-    setProcedure(recipe.procedure || '');
-    setProcedureEs(recipe.procedure_es || '');
-    setThumbnailUrl(recipe.thumbnail_url);
+    removedImages.current = [];
+    setDraft({
+      name: recipe.name,
+      price: recipe.price,
+      subcategoryId:
+        resolveRecipeSubId(menuCats, recipe) ||
+        (recipe.category === 'Featured' ? FEATURED_SENTINEL : ''),
+      isFeatured: !!recipe.is_featured,
+      glassware: recipe.glassware || '',
+      garnish: recipe.garnish || '',
+      ingredients: recipe.ingredients.length > 0 ? recipe.ingredients : [{ amount: '', ingredient: '' }],
+      procedure: recipe.procedure || '',
+      procedureEs: recipe.procedure_es || '',
+      images: recipe.images,
+    });
     setShowModal(true);
   };
 
@@ -471,32 +415,8 @@ export default function SummerLibationRecipesEditorScreen() {
 
   const resetForm = () => {
     setEditingRecipe(null);
-    setName('');
-    setPrice('');
-    setSubcategoryId('');
-    setIsFeatured(false);
-    setGlassware('');
-    setGarnish('');
-    setIngredients([{ amount: '', ingredient: '' }]);
-    setProcedure('');
-    setProcedureEs('');
-    setProcDragH(0);
-    setThumbnailUrl(null);
-  };
-
-  const addIngredient = () => {
-    setIngredients([...ingredients, { amount: '', ingredient: '' }]);
-  };
-
-  const removeIngredient = (index: number) => {
-    const newIngredients = ingredients.filter((_, i) => i !== index);
-    setIngredients(newIngredients.length > 0 ? newIngredients : [{ amount: '', ingredient: '' }]);
-  };
-
-  const updateIngredient = (index: number, field: 'amount' | 'ingredient', value: string) => {
-    const newIngredients = [...ingredients];
-    newIngredients[index][field] = value;
-    setIngredients(newIngredients);
+    setDraft(emptyLibationDraft());
+    removedImages.current = [];
   };
 
   const getImageUrl = (url: string | null) => {
@@ -658,6 +578,14 @@ export default function SummerLibationRecipesEditorScreen() {
                 iosIcon: 'fork.knife',
                 androidIcon: 'restaurant-menu',
                 onPress: () => router.push('/menu-editor' as any),
+              },
+              {
+                // s90: the Libations AI Upload — the sheet carries the gates.
+                key: 'upload',
+                label: t('bartender_assistant_editor.upload_tile'),
+                iosIcon: 'sparkles',
+                androidIcon: 'auto-awesome',
+                onPress: () => setUploadVisible(true),
               },
             ]}
           />
@@ -881,10 +809,10 @@ export default function SummerLibationRecipesEditorScreen() {
               style={[
                 styles.footerBtn,
                 { backgroundColor: colors.primary, borderColor: colors.primary },
-                (loading || uploadingImage) && styles.footerBtnDisabled,
+                loading && styles.footerBtnDisabled,
               ]}
               onPress={handleSave}
-              disabled={loading || uploadingImage}
+              disabled={loading}
               activeOpacity={0.8}
             >
               {loading ? (
@@ -898,222 +826,18 @@ export default function SummerLibationRecipesEditorScreen() {
           </View>
         }
       >
-        {/* ── Section 1: Recipe Basics (open) ── */}
-        <CollapsibleSection
-          glass
-          title={t('summer_libation_editor.section_basics')}
-          iconIos="wineglass.fill"
-          iconAndroid="local-bar"
-          iconColor={colors.primary}
-          defaultExpanded
-        >
-          {/* Thumbnail (tap to attach) + Name */}
-          <View style={styles.thumbAndNameRow}>
-            <TouchableOpacity
-              style={[styles.thumbSquare, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
-              onPress={pickImage}
-              disabled={uploadingImage}
-            >
-              {thumbnailUrl ? (
-                <StorageImage source={{ uri: getImageUrl(thumbnailUrl) }} style={styles.thumbImage} resizeMode="cover" />
-              ) : (
-                <View style={styles.thumbPlaceholder}>
-                  <IconSymbol ios_icon_name="photo" android_material_icon_name="add-photo-alternate" size={26} color={colors.textSecondary} />
-                </View>
-              )}
-              {uploadingImage && (
-                <View style={styles.thumbUploading}><ActivityIndicator color="#FFFFFF" /></View>
-              )}
-            </TouchableOpacity>
-            <View style={styles.nameColumn}>
-              <Text style={[styles.formLabel, { color: colors.textSecondary }]}>{t('summer_libation_editor.recipe_name_label')}</Text>
-              <TextInput
-                style={[styles.formInput, { backgroundColor: colors.glass, color: colors.text, borderColor: colors.glassBorder }]}
-                value={name}
-                onChangeText={setName}
-                placeholder={t('summer_libation_editor.recipe_name_placeholder')}
-                placeholderTextColor={colors.textSecondary}
-              />
-            </View>
-          </View>
-
-          {/* Subcategory (dropdown, Featured first) + Price */}
-          <View style={styles.twoColRow}>
-            <View style={styles.twoColLeft}>
-              <Text style={[styles.formLabel, { color: colors.textSecondary }]}>{t('summer_libation_editor.category_label')}</Text>
-              <SelectField
-                value={
-                  subcategoryId === FEATURED_SENTINEL
-                    ? t('summer_libation_recipes.featured')
-                    : cocktailSubOptions.find((o) => o.id === subcategoryId)?.label || ''
-                }
-                placeholder={t('summer_libation_editor.select_category')}
-                onPress={() => setSubPickerOpen(true)}
-              />
-              {cocktailSubOptions.length === 0 && (
-                <Text style={[styles.pickerEmptyHint, { color: colors.textSecondary }]}>
-                  {t('summer_libation_editor.no_cocktail_subs')}
-                </Text>
-              )}
-            </View>
-            <View style={styles.twoColRight}>
-              <Text style={[styles.formLabel, { color: colors.textSecondary }]}>{t('summer_libation_editor.price_label')}</Text>
-              <TextInput
-                style={[styles.formInput, { backgroundColor: colors.glass, color: colors.text, borderColor: colors.glassBorder }]}
-                value={price}
-                onChangeText={setPrice}
-                placeholder={t('summer_libation_editor.price_placeholder')}
-                placeholderTextColor={colors.textSecondary}
-              />
-            </View>
-          </View>
-
-          {/* Featured — locked ON when the category itself is Featured. */}
-          <View style={[styles.featuredRow, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
-            <View style={styles.featuredTextWrap}>
-              <Text style={[styles.featuredLabel, { color: colors.text }]}>{t('summer_libation_editor.featured_label')}</Text>
-              <Text style={[styles.featuredHint, { color: colors.textSecondary }]}>
-                {t('summer_libation_editor.featured_hint')}
-              </Text>
-            </View>
-            <Switch
-              value={subcategoryId === FEATURED_SENTINEL ? true : isFeatured}
-              onValueChange={setIsFeatured}
-              disabled={subcategoryId === FEATURED_SENTINEL}
-            />
-          </View>
-        </CollapsibleSection>
-
-        {/* ── Section 2: Recipe (collapsed) ── */}
-        <CollapsibleSection
-          glass
-          title={t('summer_libation_editor.section_recipe')}
-          iconIos="list.bullet"
-          iconAndroid="format-list-bulleted"
-          iconColor={colors.primary}
-          defaultExpanded={false}
-        >
-          {/* Glassware (visual picker) */}
-          <View style={styles.formField}>
-            <Text style={[styles.formLabel, { color: colors.textSecondary }]}>{t('summer_libation_editor.glassware_label')}</Text>
-            <GlasswareIconPicker
-              value={glassware}
-              onChange={setGlassware}
-              title={t('summer_libation_editor.select_glassware')}
-              placeholder={t('summer_libation_editor.select_glassware')}
-              customLabel={t('common.custom_option')}
-              customPlaceholder={t('summer_libation_editor.custom_glassware_placeholder')}
-            />
-          </View>
-          {/* Garnish */}
-          <View style={styles.formField}>
-            <Text style={[styles.formLabel, { color: colors.textSecondary }]}>{t('summer_libation_editor.garnish_label')}</Text>
-            <TextInput
-              style={[styles.formInput, { backgroundColor: colors.glass, color: colors.text, borderColor: colors.glassBorder }]}
-              value={garnish}
-              onChangeText={setGarnish}
-              placeholder={t('summer_libation_editor.garnish_placeholder')}
-              placeholderTextColor={colors.textSecondary}
-            />
-          </View>
-          {/* Ingredients */}
-          <View style={styles.formField}>
-            <Text style={[styles.formLabel, { color: colors.textSecondary }]}>{t('summer_libation_editor.ingredients_label')}</Text>
-            {ingredients.map((ingredient, index) => (
-              <View key={index} style={styles.ingredientRow}>
-                <TextInput
-                  style={[styles.formInput, styles.ingredientAmount, { backgroundColor: colors.glass, color: colors.text, borderColor: colors.glassBorder }]}
-                  value={ingredient.amount}
-                  onChangeText={(value) => updateIngredient(index, 'amount', value)}
-                  placeholder={t('summer_libation_editor.amount_placeholder')}
-                  placeholderTextColor={colors.textSecondary}
-                />
-                <TextInput
-                  style={[styles.formInput, styles.ingredientName, { backgroundColor: colors.glass, color: colors.text, borderColor: colors.glassBorder }]}
-                  value={ingredient.ingredient}
-                  onChangeText={(value) => updateIngredient(index, 'ingredient', value)}
-                  placeholder={t('summer_libation_editor.ingredient_placeholder')}
-                  placeholderTextColor={colors.textSecondary}
-                />
-                {ingredients.length > 1 && (
-                  <TouchableOpacity style={styles.removeIngredientButton} onPress={() => removeIngredient(index)}>
-                    <IconSymbol ios_icon_name="minus.circle.fill" android_material_icon_name="remove-circle" size={24} color={TRASH_RED} />
-                  </TouchableOpacity>
-                )}
-              </View>
-            ))}
-            <TouchableOpacity style={styles.addIngredientButton} onPress={addIngredient}>
-              <IconSymbol ios_icon_name="plus.circle.fill" android_material_icon_name="add-circle" size={20} color={colors.primary} />
-              <Text style={[styles.addIngredientText, { color: colors.primary }]}>{t('summer_libation_editor.add_ingredient')}</Text>
-            </TouchableOpacity>
-          </View>
-        </CollapsibleSection>
-
-        {/* ── Section 3: Procedure (collapsed) ── */}
-        <CollapsibleSection
-          glass
-          title={t('summer_libation_editor.section_procedure')}
-          iconIos="list.number"
-          iconAndroid="format-list-numbered"
-          iconColor={colors.primary}
-          defaultExpanded={false}
-        >
-          {/* Procedure (auto-grow) */}
-          <View style={styles.formField}>
-            <Text style={[styles.formLabel, { color: colors.textSecondary }]}>{t('summer_libation_editor.procedure_label')}</Text>
-            <RichTextToolbar
-              text={isSpanishAuthor ? procedureEs : procedure}
-              onChangeText={isSpanishAuthor ? setProcedureEs : setProcedure}
-              selection={procedureSelection}
-              onSelectionChange={setProcedureSelection}
-              textInputRef={procedureInputRef}
-              accentColor={colors.primary}
-              backgroundColor={colors.surface}
-              textColor={colors.text}
-            />
-            <View>
-              <TextInput
-                ref={procedureInputRef}
-                style={[styles.formInput, styles.textArea, { minHeight: Math.max(120, procDragH), paddingBottom: 22, backgroundColor: colors.glass, color: colors.text, borderColor: colors.glassBorder }]}
-                value={isSpanishAuthor ? procedureEs : procedure}
-                onChangeText={isSpanishAuthor ? setProcedureEs : setProcedure}
-                placeholder={t('summer_libation_editor.procedure_placeholder')}
-                placeholderTextColor={colors.textSecondary}
-                multiline
-                scrollEnabled={false}
-                onContentSizeChange={(e) => setProcH(e.nativeEvent.contentSize.height)}
-                onSelectionChange={(e) => setProcedureSelection(e.nativeEvent.selection)}
-              />
-              <ProcedureResizeHandle height={Math.max(120, procH, procDragH)} onResize={setProcDragH} />
-            </View>
-          </View>
-
-          {/* Bilingual authoring (s61 hybrid) */}
-          <View style={styles.formField}>
-            {translation.element}
-          </View>
-        </CollapsibleSection>
-
-        {/* Nested INSIDE the sheet's Modal tree so iOS can present it above the
-            open sheet (a sibling Modal would be silently dropped). */}
-        <SimpleSelectPicker
-          visible={subPickerOpen}
-          title={t('summer_libation_editor.select_category')}
-          options={[t('summer_libation_recipes.featured'), ...cocktailSubOptions.map((o) => o.label)]}
-          value={
-            subcategoryId === FEATURED_SENTINEL
-              ? t('summer_libation_recipes.featured')
-              : cocktailSubOptions.find((o) => o.id === subcategoryId)?.label || ''
-          }
-          onSelect={(label) => {
-            // A real subcategory wins a name collision with "Featured".
-            const opt = cocktailSubOptions.find((o) => o.label === label);
-            if (opt) setSubcategoryId(opt.id);
-            else if (label === t('summer_libation_recipes.featured')) setSubcategoryId(FEATURED_SENTINEL);
-          }}
-          onClose={() => setSubPickerOpen(false)}
+        <LibationRecipeForm
+          draft={draft}
+          onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))}
+          subOptions={cocktailSubOptions}
+          imagePurpose="summer_libation_image"
+          imageBucket="summer-libation-recipe-images"
+          onImageRemoved={(url) => { removedImages.current.push(url); }}
+          isSpanishAuthor={isSpanishAuthor}
+          translationElement={translation.element}
         />
       </GlassSheet>
+      <LibationUploadSheet visible={uploadVisible} onClose={() => setUploadVisible(false)} defaultSlot={2} />
     </View>
   );
 }
@@ -1254,91 +978,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body.semibold,
     fontSize: 15,
   },
-  formField: {
-    marginBottom: 14,
-  },
-  formLabel: {
-    fontFamily: fonts.mono.semibold,
-    fontSize: 10,
-    letterSpacing: 1.1,
-    textTransform: 'uppercase',
-    marginBottom: 6,
-  },
-  formInput: {
-    minHeight: 43,
-    borderRadius: 13,
-    paddingHorizontal: 13,
-    paddingVertical: 11,
-    fontFamily: fonts.body.regular,
-    fontSize: 14,
-    borderWidth: StyleSheet.hairlineWidth + 0.5,
-  },
-  textArea: {
-    minHeight: 120,
-    textAlignVertical: 'top',
-  },
-  thumbAndNameRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 14,
-    alignItems: 'flex-start',
-  },
-  thumbSquare: {
-    width: 80,
-    height: 80,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    overflow: 'hidden',
-  },
-  thumbImage: { width: '100%', height: '100%' },
-  thumbPlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  thumbUploading: {
-    ...StyleSheet.absoluteFill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.35)',
-  },
-  nameColumn: { flex: 1 },
-  twoColRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 14,
-  },
-  twoColLeft: { flex: 3 },
-  twoColRight: { flex: 2 },
-  pickerEmptyHint: {
-    fontFamily: fonts.body.regular,
-    fontSize: 12.5,
-    lineHeight: 17,
-    paddingVertical: 12,
-  },
-  featuredRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    borderRadius: 13,
-    borderWidth: StyleSheet.hairlineWidth + 0.5,
-    paddingHorizontal: 13,
-    paddingVertical: 11,
-  },
-  featuredTextWrap: { flex: 1 },
-  featuredLabel: {
-    fontFamily: fonts.display.semibold,
-    fontSize: 14,
-  },
-  featuredHint: {
-    fontFamily: fonts.body.regular,
-    fontSize: 11.5,
-    lineHeight: 15,
-    marginTop: 2,
-  },
-  ingredientRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 8 },
-  ingredientAmount: { flex: 1 },
-  ingredientName: { flex: 2 },
-  removeIngredientButton: { padding: 4 },
-  addIngredientButton: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 },
-  addIngredientText: { fontFamily: fonts.body.semibold, fontSize: 13 },
   // Category reorder sheet (48pt targets, constant border width). The wrap's
   // explicit maxHeight + shrink replace GestureHandlerRootView's default
   // flex:1, which would zero out in the content-sized sheet body.

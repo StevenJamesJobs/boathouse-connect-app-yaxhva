@@ -10,8 +10,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -24,8 +23,9 @@ import { useTranslation } from 'react-i18next';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { saveTranslations } from '@/utils/translateContent';
 import { useTranslationSection } from '@/components/TranslationSection';
-import { brokerUploadImage } from '@/utils/storageBroker';
+import { brokerDelete } from '@/utils/storageBroker';
 import { toPublicUrl } from '@/utils/storageResolver';
+import MultiImageField from '@/components/MultiImageField';
 import RichTextToolbar from '@/components/RichTextToolbar';
 import ProcedureResizeHandle from '@/components/ProcedureResizeHandle';
 import CollapsibleSection from '@/components/CollapsibleSection';
@@ -52,11 +52,25 @@ interface PureeSyrupRecipe {
   procedure: string | null;
   procedure_es?: string | null;
   thumbnail_url: string | null;
+  // s90 multi-images: every stored photo URL, cover first (mirrors thumbnail_url).
+  images?: string[] | null;
   display_order: number;
   is_active: boolean;
 }
 
 type PureeSyrupRow = Database['public']['Functions']['get_puree_syrup_recipes']['Returns'][number];
+
+// The RPC's `images` Json → the stored-URL list, cover first. Rows from before
+// s90 carry no list (or an empty one), so the lone thumbnail stands in for it.
+const parseImageList = (raw: unknown, thumbnail?: string | null): string[] => {
+  let value = raw;
+  if (typeof value === 'string' && value.trim().startsWith('[')) {
+    try { value = JSON.parse(value); } catch { value = null; }
+  }
+  const list = Array.isArray(value) ? value.filter((u): u is string => typeof u === 'string' && !!u) : [];
+  if (list.length > 0) return list;
+  return thumbnail ? [thumbnail] : [];
+};
 
 // The built-in categories keep their canonical EN values in the DB (DATA stays
 // EN-canonical; only display is localized). The picker's Custom… entry lets an
@@ -95,8 +109,11 @@ export default function PureeSyrupRecipesEditorScreen() {
     { amount: '', ingredient: '' },
   ]);
   const [procedure, setProcedure] = useState('');
-  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
-  const [uploadingImage, setUploadingImage] = useState(false);
+  // s90: up to four STORED photo URLs, cover first (MultiImageField uploads
+  // on pick). Photos the user removed wait here until the save succeeds —
+  // only then are they broker-deleted (never on cancel).
+  const [images, setImages] = useState<string[]>([]);
+  const removedImagesRef = useRef<string[]>([]);
   const [procedureEs, setProcedureEs] = useState('');
   const [catPickerOpen, setCatPickerOpen] = useState(false);
   const [procH, setProcH] = useState(120);
@@ -135,7 +152,14 @@ export default function PureeSyrupRecipesEditorScreen() {
       }
       const sorted = (data || []).slice().sort((a, b) =>
         (a.category || '').localeCompare(b.category || '') || (a.display_order ?? 0) - (b.display_order ?? 0));
-      setRecipes(sorted as (PureeSyrupRow & { ingredients: { amount: string; ingredient: string }[] })[]);
+      // The Json photo list → string[] once, here, so the rest of the screen
+      // never re-parses it.
+      setRecipes(
+        (sorted as (PureeSyrupRow & { ingredients: { amount: string; ingredient: string }[] })[]).map((r) => ({
+          ...r,
+          images: parseImageList(r.images, r.thumbnail_url),
+        }))
+      );
     } catch (error) {
       console.error('Error loading puree syrup recipes:', error);
       Alert.alert(t('common:error'), t('puree_editor:load_error'));
@@ -148,47 +172,20 @@ export default function PureeSyrupRecipesEditorScreen() {
     loadRecipes();
   }, [loadRecipes]);
 
-  const pickImage = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        await uploadImage(result.assets[0].uri);
-      }
-    } catch (error) {
-      console.error('Error picking image:', error);
-      Alert.alert(t('common:error'), t('puree_editor:pick_image_error'));
-    }
-  };
-
-  const uploadImage = async (uri: string) => {
-    if (!user?.id) {
-      Alert.alert(t('common:error'), t('puree_editor:error_not_authenticated'));
-      return;
-    }
-
-    try {
-      setUploadingImage(true);
-
-      const publicUrl = await brokerUploadImage('puree_syrup_image', uri, user.id);
-      if (!publicUrl) {
-        throw new Error('Upload failed');
-      }
-
-      setThumbnailUrl(publicUrl);
-      Alert.alert(t('common:success'), t('puree_editor:updated_success'));
-    } catch (error: any) {
-      console.error('Error uploading image:', error);
-      Alert.alert(t('common:error'), translateServerError(error, t('puree_editor:upload_image_error')));
-    } finally {
-      setUploadingImage(false);
-    }
-  };
+  // Deep-link from the recipe Poster's Edit chip (puree-syrup-recipes):
+  // ?edit=<name> opens this editor's own edit modal for that recipe. Name is
+  // the bridge. Waits for the list to load, applies once, and a name that no
+  // longer matches simply lands on the normal editor.
+  const deepLink = useLocalSearchParams<{ edit?: string }>();
+  const deepLinkApplied = useRef(false);
+  useEffect(() => {
+    if (deepLinkApplied.current || !deepLink.edit) return;
+    if (recipes.length === 0) return;
+    deepLinkApplied.current = true;
+    const wanted = String(deepLink.edit).trim().toLowerCase();
+    const target = recipes.find((r) => r.name.trim().toLowerCase() === wanted);
+    if (target) openEditModal(target);
+  }, [recipes, deepLink.edit]);
 
   const handleSave = async () => {
     try {
@@ -202,9 +199,11 @@ export default function PureeSyrupRecipesEditorScreen() {
         return;
       }
 
-      const validIngredients = ingredients.filter(
-        (ing) => ing.amount.trim() && ing.ingredient.trim()
-      );
+      // Named ingredients only — the amount may be blank (s90's scanned
+      // recipes carry none), but at least one row must name an ingredient.
+      const validIngredients = ingredients
+        .map((ing) => ({ amount: (ing.amount || '').trim(), ingredient: (ing.ingredient || '').trim() }))
+        .filter((ing) => ing.ingredient);
 
       if (validIngredients.length === 0) {
         Alert.alert(t('common:error'), t('puree_editor:error_ingredients'));
@@ -221,6 +220,10 @@ export default function PureeSyrupRecipesEditorScreen() {
       const resolved = await translation.resolveOnSave();
       if (!resolved) { setLoading(false); return; }
 
+      // The cover is the first photo; the server mirrors p_images[0] into
+      // thumbnail_url too, so tiles and the Poster agree.
+      const coverUrl: string | null = images[0] ?? null;
+
       if (editingRecipe) {
         const { error } = await supabase.rpc('update_puree_syrup_recipe', {
           p_user_id: user.id,
@@ -230,7 +233,8 @@ export default function PureeSyrupRecipesEditorScreen() {
           p_category: category.trim(),
           p_ingredients: validIngredients,
           p_procedure: (resolved.procedure.en.trim() || null) as string,
-          p_thumbnail_url: thumbnailUrl as string,
+          p_thumbnail_url: coverUrl as string,
+          p_images: images,
           p_display_order: editingRecipe.display_order,
         });
 
@@ -248,7 +252,8 @@ export default function PureeSyrupRecipesEditorScreen() {
           p_category: category.trim(),
           p_ingredients: validIngredients,
           p_procedure: (resolved.procedure.en.trim() || null) as string,
-          p_thumbnail_url: thumbnailUrl as string,
+          p_thumbnail_url: coverUrl as string,
+          p_images: images,
           p_display_order: recipes.length,
         });
 
@@ -261,6 +266,19 @@ export default function PureeSyrupRecipesEditorScreen() {
           await saveTranslations('puree_syrup_recipes', data as string, { procedure_es: resolved.procedure.es }, user?.id);
         }
         Alert.alert(t('common:success'), t('puree_editor:created_success'));
+      }
+
+      // Removed photos go only now, after the row saved — best-effort, in its
+      // own try/catch, so a storage hiccup never reads as a failed save (the
+      // MenuItemEditSheet removedPhoto rule).
+      const removed = removedImagesRef.current.filter((u) => !images.includes(u));
+      removedImagesRef.current = [];
+      if (removed.length > 0) {
+        try {
+          await brokerDelete('puree-syrup-recipe-images', removed, user.id);
+        } catch (cleanupError) {
+          console.error('Error deleting removed puree syrup photos:', cleanupError);
+        }
       }
 
       setShowModal(false);
@@ -372,7 +390,10 @@ export default function PureeSyrupRecipesEditorScreen() {
     );
     setProcedure(recipe.procedure || '');
     setProcedureEs(recipe.procedure_es || '');
-    setThumbnailUrl(recipe.thumbnail_url);
+    // Loaded rows already carry the parsed list; the thumbnail fallback covers
+    // a pre-s90 row that reached here with only thumbnail_url set.
+    setImages(parseImageList(recipe.images, recipe.thumbnail_url));
+    removedImagesRef.current = [];
     setShowModal(true);
   };
 
@@ -389,7 +410,8 @@ export default function PureeSyrupRecipesEditorScreen() {
     setProcedure('');
     setProcedureEs('');
     setProcDragH(0);
-    setThumbnailUrl(null);
+    setImages([]);
+    removedImagesRef.current = [];
   };
 
   const addIngredient = () => {
@@ -669,10 +691,10 @@ export default function PureeSyrupRecipesEditorScreen() {
               style={[
                 styles.footerBtn,
                 { backgroundColor: colors.primary, borderColor: colors.primary },
-                (loading || uploadingImage) && styles.footerBtnDisabled,
+                loading && styles.footerBtnDisabled,
               ]}
               onPress={handleSave}
-              disabled={loading || uploadingImage}
+              disabled={loading}
               activeOpacity={0.8}
             >
               {loading ? (
@@ -695,34 +717,29 @@ export default function PureeSyrupRecipesEditorScreen() {
           iconColor={colors.primary}
           defaultExpanded
         >
-          {/* Thumbnail (tap to attach) + Name */}
-          <View style={styles.thumbAndNameRow}>
-            <TouchableOpacity
-              style={[styles.thumbSquare, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
-              onPress={pickImage}
-              disabled={uploadingImage}
-            >
-              {thumbnailUrl ? (
-                <StorageImage source={{ uri: getImageUrl(thumbnailUrl) }} style={styles.thumbImage} resizeMode="cover" />
-              ) : (
-                <View style={styles.thumbPlaceholder}>
-                  <IconSymbol ios_icon_name="photo" android_material_icon_name="add-photo-alternate" size={26} color={colors.textSecondary} />
-                </View>
-              )}
-              {uploadingImage && (
-                <View style={styles.thumbUploading}><ActivityIndicator color="#FFFFFF" /></View>
-              )}
-            </TouchableOpacity>
-            <View style={styles.nameColumn}>
-              <Text style={[styles.formLabel, { color: colors.textSecondary }]}>{t('puree_editor:name_label')}</Text>
-              <TextInput
-                style={[styles.formInput, { backgroundColor: colors.glass, color: colors.text, borderColor: colors.glassBorder }]}
-                value={name}
-                onChangeText={setName}
-                placeholder={t('puree_editor:name_placeholder')}
-                placeholderTextColor={colors.textSecondary}
-              />
-            </View>
+          {/* Photos (s90: up to four, cover first) — the strip uploads on pick
+              and hands removed URLs back for the post-save cleanup. */}
+          <View style={styles.formField}>
+            <MultiImageField
+              images={images}
+              onChange={setImages}
+              onRemove={(url) => { removedImagesRef.current.push(url); }}
+              purpose="puree_syrup_image"
+              bucket="puree-syrup-recipe-images"
+              aspect={[1, 1]}
+            />
+          </View>
+
+          {/* Name */}
+          <View style={styles.formField}>
+            <Text style={[styles.formLabel, { color: colors.textSecondary }]}>{t('puree_editor:name_label')}</Text>
+            <TextInput
+              style={[styles.formInput, { backgroundColor: colors.glass, color: colors.text, borderColor: colors.glassBorder }]}
+              value={name}
+              onChangeText={setName}
+              placeholder={t('puree_editor:name_placeholder')}
+              placeholderTextColor={colors.textSecondary}
+            />
           </View>
 
           {/* Category (dropdown w/ Custom…) */}
@@ -986,29 +1003,6 @@ const styles = StyleSheet.create({
     minHeight: 120,
     textAlignVertical: 'top',
   },
-  thumbAndNameRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 14,
-    alignItems: 'flex-start',
-  },
-  thumbSquare: {
-    width: 80,
-    height: 80,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    overflow: 'hidden',
-  },
-  thumbImage: { width: '100%', height: '100%' },
-  thumbPlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  thumbUploading: {
-    ...StyleSheet.absoluteFill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.35)',
-  },
-  nameColumn: { flex: 1 },
   ingredientRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 8 },
   ingredientAmount: { flex: 1 },
   ingredientName: { flex: 2 },

@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Libations AI Upload</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap">
+<style>
+/* s90 — Libations AI Upload + multi-images. House mockup scaffold (menu-upload-redesign / bartender-assistant-redesign):
+   one phone, Frame + Palette toolbars, the glass tokens per palette. Single dark page ground on purpose (the phone carries the themes). */
+:root{color-scheme:dark}
+*{box-sizing:border-box;margin:0;padding:0}
+body{min-height:100vh;display:flex;flex-direction:column;align-items:center;gap:14px;padding-block:24px 60px;padding-inline:12px;background:#0C0D11;color:#D6D9DE;
+  font-family:'Inter','SF Pro Text',system-ui,sans-serif}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+.toolbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:center;max-width:820px}
+.grp{display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);padding:6px;border-radius:16px}
+.gl2{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:#6E7681;margin:0 4px 0 6px}
+.tb{background:rgba(255,255,255,0.06);color:#D6D9DE;border:1px solid rgba(255,255,255,0.10);border-radius:11px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:.18s}
+.tb:hover{background:rgba(255,255,255,0.12)}
+.tb.on{background:#F4F6F8;color:#15171C;border-color:#F4F6F8}
+.tb:focus-visible{outline:2px solid #FF7A2F;outline-offset:2px}
+.hint{color:#6E7681;font-size:11.5px;font-family:'JetBrains Mono',ui-monospace,monospace;text-align:center;max-width:640px;line-height:1.7}
+.hint b{color:#AEB4BD;font-weight:600}
+.subbar{display:none;gap:6px;flex-wrap:wrap;justify-content:center}
+.subbar.on{display:flex}
+
+.phone{
+  --bg:#181B21; --text:#F4F6F8; --muted:#9AA1A8; --blue:#8FA0AC; --bluetext:#CDD8DF; --fireText:#1A1E24; --tint:#FF7A2F;
+  --glass:rgba(255,255,255,0.07); --glassbd:rgba(255,255,255,0.12); --surf:rgba(255,255,255,0.045); --surfbd:rgba(255,255,255,0.09); --hair:rgba(255,255,255,0.07);
+  --thumbbg:#252A31; --glowA:rgba(230,234,238,0.12); --glowB:rgba(255,122,47,0.10); --danger:#E74C3C; --scrim:rgba(6,10,18,0.55); --card:#1F232A;
+  --need:#F5B942; --needink:#2A1F05; --ok:#10A56F; --okink:#06281C; --dup:#8A94A0;
+  position:relative;width:392px;max-width:100%;height:840px;background:var(--bg);border-radius:46px;border:1px solid #2A2E36;overflow:hidden;
+  box-shadow:0 40px 90px -30px rgba(0,0,0,0.8);transition:background .3s;display:flex;flex-direction:column;color:var(--text)}
+.phone.t-mono-l{--bg:#ECECEE;--text:#22262C;--muted:#6E747C;--blue:#7E8A94;--bluetext:#2A313C;--fireText:#FFFFFF;--tint:#EC6A1E;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.66);--surfbd:rgba(0,0,0,0.07);--hair:rgba(0,0,0,0.07);--thumbbg:#D8D8DC;--glowA:rgba(58,66,80,0.10);--glowB:rgba(236,106,30,0.12);--danger:#C0392B;--scrim:rgba(6,10,18,0.35);--card:#F7F7F8;--need:#B7791F;--needink:#FFFFFF;--ok:#087A52;--okink:#FFFFFF;--dup:#6E747C}
+.phone.t-ocean-d{--bg:#1A2332;--text:#FFFFFF;--muted:#A8B8D8;--blue:#5DADE2;--bluetext:#BFE3F7;--fireText:#0A1422;--tint:#5DA0E5;--glass:rgba(255,255,255,0.07);--glassbd:rgba(255,255,255,0.13);--surf:rgba(255,255,255,0.05);--surfbd:rgba(255,255,255,0.10);--hair:rgba(255,255,255,0.08);--thumbbg:#2C3E50;--glowA:rgba(74,144,226,0.32);--glowB:rgba(93,173,226,0.16);--card:#233041}
+.phone.t-ocean-l{--bg:#E8F4F8;--text:#1A3A52;--muted:#4A6B7C;--blue:#42A5F5;--bluetext:#0D47A1;--fireText:#FFFFFF;--tint:#1976D2;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.7);--surfbd:rgba(13,71,161,0.10);--hair:rgba(13,71,161,0.08);--thumbbg:#CFE4EC;--glowA:rgba(25,118,210,0.18);--glowB:rgba(66,165,245,0.13);--danger:#C0392B;--scrim:rgba(6,10,18,0.35);--card:#F3F9FC;--need:#B7791F;--needink:#FFFFFF;--ok:#087A52;--okink:#FFFFFF;--dup:#4A6B7C}
+
+.glow{position:absolute;top:-120px;right:-80px;width:360px;height:320px;border-radius:50%;background:radial-gradient(circle,var(--glowA),transparent 66%);z-index:0;pointer-events:none}
+.glow2{position:absolute;top:-70px;left:-90px;width:300px;height:280px;border-radius:50%;background:radial-gradient(circle,var(--glowB),transparent 68%);z-index:0;pointer-events:none}
+.sb{position:relative;z-index:3;display:flex;justify-content:space-between;align-items:center;padding:16px 30px 4px;font-size:13px;font-weight:600;font-family:'JetBrains Mono',ui-monospace,monospace}
+.screen{position:relative;z-index:2;flex:1;overflow-y:auto;overflow-x:hidden;padding:0 0 40px;scrollbar-width:none}
+.screen::-webkit-scrollbar{display:none}
+.design{display:none;padding:6px 16px 0;animation:fade .35s ease}
+.design.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.concept{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:7px;margin:4px 2px 12px}
+.concept b{color:var(--tint)}
+.concept .ln{flex:1;height:1px;background:var(--hair)}
+.bcap{font-size:10.5px;color:var(--muted);font-style:italic;margin:10px 2px 10px;line-height:1.5}
+
+.ic{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+.gcard{background:var(--glass);border:1px solid var(--glassbd);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.scard{background:var(--surf);border:1px solid var(--surfbd)}
+.c38{width:38px;height:38px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;background:var(--glass);border:1px solid var(--glassbd);color:var(--text);cursor:pointer}
+.hdr{display:flex;align-items:center;gap:8px;margin:2px 0 12px}
+.hsp{width:38px;flex:0 0 auto}
+.hmid{flex:1;text-align:center;min-width:0}
+.eyebrow{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;letter-spacing:1.6px;text-transform:uppercase;color:var(--tint);font-weight:600}
+.htitle{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:700;font-size:19px;letter-spacing:-0.3px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.navpill{display:inline-flex;align-items:center;gap:4px;padding:6px 10px;border-radius:16px;font-size:12.5px;font-weight:700;color:var(--tint);background:color-mix(in srgb,var(--tint) 11%,transparent);cursor:pointer;white-space:nowrap;flex:0 0 auto}
+.navpill .ic{width:14px;height:14px}
+.navpill .chev{width:11px;height:11px}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+.zlabel{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px;margin:14px 2px 10px}
+.zlabel .ln{flex:1;height:1px;background:var(--hair)}
+.cpill{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;font-weight:600;color:var(--bluetext);background:color-mix(in srgb,var(--blue) 20%,transparent);padding:2px 8px;border-radius:9px;white-space:nowrap}
+
+/* ---- frame 1: the Bar Assistant Editor grid ---- */
+.tilerow{display:flex;gap:10px;margin-bottom:10px}
+.ptile{flex:1;border-radius:14px;padding:12px 13px;display:flex;flex-direction:column;gap:9px;background:var(--surf);border:1px solid var(--surfbd)}
+.ptile .top{display:flex;align-items:center;gap:7px;font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:600;font-size:13px}
+.ptile .top .ic{color:var(--tint);width:16px;height:16px}
+.ptile .foot{display:flex;align-items:center;gap:10px}
+.ring{position:relative;width:44px;height:44px;flex:0 0 auto}
+.ring svg{transform:rotate(-90deg)}
+.ring .rlab{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10.5px;font-weight:700;color:var(--tint)}
+.ptile .stat b{display:block;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;font-weight:600}
+.ptile .stat span{font-size:10.5px;color:var(--muted)}
+.grid{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px 0}
+.gtile{width:48.5%;border-radius:14px;padding:12px;min-height:104px;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;background:var(--surf);border:1px solid var(--surfbd)}
+.gtile .toprow{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
+.ichip{width:34px;height:34px;border-radius:11px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;background:color-mix(in srgb,var(--tint) 13%,transparent);color:var(--tint)}
+.peek{display:flex}
+.peek span{width:32px;height:32px;border-radius:10px;border:1.5px solid var(--bg);margin-left:-9px;background:linear-gradient(135deg,#6B4E2E,#2E1F12)}
+.peek span:first-child{margin-left:0}
+.peek span:nth-child(2){background:linear-gradient(135deg,#8C2F2F,#3A1414)}
+.peek span:nth-child(3){background:linear-gradient(135deg,#2F6E8C,#14303A)}
+.gtile .nm{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:600;font-size:13.5px;line-height:1.2}
+.gtile .ct{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;color:var(--muted);margin-top:3px}
+.gtile .ct b{color:var(--tint);font-weight:600}
+/* the upload tile — tinted glass like the premium Tools tiles */
+.gtile.up{background:color-mix(in srgb,var(--tint) 11%,transparent);border-color:color-mix(in srgb,var(--tint) 28%,transparent)}
+.gtile.up.wide{width:100%;min-height:0;flex-direction:row;align-items:center;gap:12px;padding:12px 13px}
+.gtile.up.wide .bd{flex:1;min-width:0}
+.gtile.up.wide .nm{font-size:14px}
+.gtile.up .prem{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:#FFB07A;background:rgba(8,10,14,0.55);padding:3px 6px;border-radius:6px;white-space:nowrap}
+.phone.t-mono-l .gtile.up .prem,.phone.t-ocean-l .gtile.up .prem{color:#B7791F;background:rgba(183,121,31,0.14)}
+.gtile.up .lockchip{background:var(--glass);color:var(--muted)}
+.gtile.up.locked{opacity:.7}
+.gtile.up.locked .ct{color:var(--tint)}
+.chevr{width:14px;height:14px;color:var(--muted);flex:0 0 auto}
+
+/* ---- sheets (nav sheet, upload sheet, edit sheet, destination sheet) ---- */
+.ovl{position:absolute;inset:0;z-index:50;display:none;flex-direction:column;justify-content:flex-end}
+.ovl.show{display:flex}
+.ovl .scr{position:absolute;inset:0;background:var(--scrim)}
+.sheet{position:relative;z-index:2;border-radius:26px 26px 0 0;padding:10px 18px 26px;max-height:92%;overflow-y:auto;scrollbar-width:none;
+  background:color-mix(in srgb,var(--bg) 90%,var(--text) 10%);box-shadow:0 -18px 44px rgba(0,0,0,0.25);animation:up .32s cubic-bezier(.32,.72,.28,1)}
+.sheet::-webkit-scrollbar{display:none}
+@keyframes up{from{transform:translateY(60px);opacity:0}to{transform:none;opacity:1}}
+.grab{width:40px;height:4px;border-radius:2px;background:var(--hair);margin:2px auto 14px}
+.shead{display:flex;align-items:flex-start;gap:10px;margin-bottom:12px}
+.shead .t{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:700;font-size:18px;letter-spacing:-0.3px;flex:1}
+.shead .s{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.45}
+.xbtn{width:30px;height:30px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;background:var(--glass);border:1px solid var(--glassbd);color:var(--muted);cursor:pointer;flex:0 0 auto}
+.arow{display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:13px;margin-bottom:8px;font-size:14.5px;font-weight:600;background:var(--surf);border:1px solid var(--surfbd);cursor:pointer}
+.arow .ic{color:var(--tint);width:17px;height:17px}
+.arow .sub{font-size:11px;color:var(--muted);font-weight:400;margin-top:1px}
+.arow .bd{flex:1;min-width:0}
+.arow.lock{opacity:.6}
+.arow.lock .sub{color:var(--tint)}
+.arow .star{color:#FFB07A;width:14px;height:14px;margin-left:auto}
+.arow .lockic{color:var(--muted);width:15px;height:15px;margin-left:auto}
+.tipfoot{font-size:10.5px;color:var(--muted);font-style:italic;line-height:1.5;margin-top:4px}
+
+/* upload sheet */
+.credits{display:flex;align-items:center;gap:9px;padding:10px 13px;border-radius:13px;margin-bottom:12px;background:color-mix(in srgb,var(--blue) 13%,transparent);border:1px solid color-mix(in srgb,var(--blue) 28%,transparent)}
+.credits .n{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:15px;font-weight:600;color:var(--bluetext)}
+.credits .x{flex:1;font-size:11.5px;color:var(--muted);line-height:1.4}
+.credits .x b{font-family:'JetBrains Mono',ui-monospace,monospace;color:var(--text);font-weight:600}
+.seg{display:flex;border-radius:13px;padding:3px;gap:3px;margin-bottom:12px;background:var(--glass);border:1px solid var(--glassbd)}
+.seg span{flex:1;text-align:center;padding:9px 8px;border-radius:10px;font-size:12.5px;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.seg span .ic{width:14px;height:14px}
+.seg .on{background:color-mix(in srgb,var(--tint) 18%,transparent);color:var(--tint);font-weight:600}
+.seg.solid .on{background:var(--tint);color:var(--fireText)}
+.mrow{display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:13px;margin-bottom:8px;cursor:pointer;background:var(--surf);border:1px solid var(--surfbd)}
+.mrow .ic{color:var(--muted);width:20px;height:20px}
+.mrow .bd{flex:1;min-width:0}
+.mrow .l1{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:600;font-size:15px}
+.mrow .l2{font-size:11.5px;color:var(--muted);margin-top:2px}
+.mrow .cost{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;color:var(--muted);white-space:nowrap}
+.mrow.hist{background:transparent;border:1px dashed color-mix(in srgb,var(--tint) 45%,transparent);margin-top:10px}
+.mrow.hist .ic,.mrow.hist .l1{color:var(--tint)}
+.mrow.dim{opacity:.55}
+.divider{height:1px;background:var(--hair);margin:4px 0 2px}
+.proc{display:flex;flex-direction:column;gap:8px;padding:13px 14px;border-radius:13px;background:var(--surf);border:1px solid var(--surfbd);margin-bottom:8px}
+.proc .top{display:flex;align-items:center;gap:10px}
+.spin{width:18px;height:18px;border-radius:50%;border:2.5px solid color-mix(in srgb,var(--tint) 30%,transparent);border-top-color:var(--tint);animation:spin 1s linear infinite;flex:0 0 auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+.quip{flex:1;font-size:12.5px;font-weight:600;min-height:18px;transition:opacity .3s}
+.quip.fade{opacity:0}
+.proc .sub{font-size:12px;color:var(--muted);line-height:1.5}
+/* premium gate card (base tier) */
+.gate{border-radius:22px;padding:22px;text-align:center;display:flex;flex-direction:column;align-items:center}
+.gate .lockc{width:56px;height:56px;border-radius:18px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--tint) 11%,transparent);border:1px solid color-mix(in srgb,var(--tint) 32%,transparent);color:var(--tint)}
+.gate .lockc .ic{width:26px;height:26px}
+.gate .eb{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:1.3px;text-transform:uppercase;color:var(--tint);margin-top:14px;font-weight:600}
+.gate .t{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:700;font-size:20px;letter-spacing:-0.3px;margin-top:6px}
+.gate .d{font-size:13.5px;line-height:1.5;color:var(--muted);margin-top:8px}
+.gate .bul{align-self:stretch;margin-top:16px;display:flex;flex-direction:column;gap:10px;text-align:left}
+.gate .bul div{display:flex;gap:9px;font-size:13px;line-height:1.45}
+.gate .bul .ic{color:var(--tint);width:15px;height:15px;margin-top:2px}
+.gate .cta{align-self:stretch;height:50px;border-radius:15px;background:var(--tint);color:var(--fireText);display:flex;align-items:center;justify-content:center;font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:700;font-size:15px;margin-top:20px}
+
+/* ---- frame 3: review page ---- */
+.intro{font-size:13px;line-height:1.45;color:var(--muted);margin-bottom:14px}
+.flabel{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:600;font-size:13px;margin:6px 0 8px}
+.statline{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;letter-spacing:.4px;text-align:center;color:var(--muted);margin-bottom:12px}
+.statline b{color:var(--tint);font-weight:600}
+.sec{position:relative;border-radius:16px;padding:12px;margin-bottom:10px;overflow:hidden;background:var(--glass);border:1px solid var(--glassbd)}
+.sec .fade{position:absolute;top:0;left:0;right:0;height:2.5px;background:linear-gradient(90deg,var(--sc),color-mix(in srgb,var(--sc) 30%,transparent) 34%,transparent 68%)}
+.sec .eb{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;letter-spacing:1.2px;color:var(--muted);margin-bottom:3px;text-transform:uppercase}
+.sec .hd{display:flex;align-items:center;gap:8px}
+.sec .nm{flex:1;font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:700;font-size:15.5px;letter-spacing:-0.2px}
+.sec .cnt{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;color:var(--muted)}
+.dest{display:flex;align-items:center;gap:9px;margin-top:10px;padding:9px 11px;min-height:48px;border-radius:12px;background:var(--surf);border:1px solid var(--surfbd);cursor:pointer}
+.dest .bd{flex:1;min-width:0}
+.dest .dl{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;letter-spacing:1.2px;color:var(--muted);text-transform:uppercase;font-weight:600}
+.dest .dn{display:flex;align-items:center;gap:6px;margin-top:2px;font-size:13px;font-weight:600;line-height:1.3}
+.dot{width:10px;height:10px;border-radius:5px;border:1px solid rgba(0,0,0,0.18);flex:0 0 auto}
+.dest .chg{font-size:11.5px;font-weight:600;color:var(--tint)}
+.pills{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
+.pill{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--tint);background:color-mix(in srgb,var(--tint) 15%,transparent);padding:2.5px 7px;border-radius:6px}
+.rows{margin-top:9px;padding-top:8px;border-top:1px solid var(--hair)}
+.rrow{display:flex;gap:10px;align-items:flex-start;padding:9px 2px;border-bottom:1px solid var(--hair);cursor:pointer}
+.rrow:last-child{border-bottom:0}
+.cb{width:22px;height:22px;border-radius:6px;border:2px solid var(--tint);display:flex;align-items:center;justify-content:center;color:var(--fireText);background:var(--tint);flex:0 0 auto;margin-top:1px}
+.cb .ic{width:14px;height:14px;stroke-width:3}
+.cb.off{background:transparent;color:transparent;border-color:var(--muted)}
+.rrow .bd{flex:1;min-width:0}
+.rrow .l1{display:flex;align-items:baseline;gap:8px}
+.rrow .nm{flex:1;font-size:14px;font-weight:600;min-width:0}
+.rrow .pr{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12.5px;font-weight:500}
+.rrow .l2{display:flex;align-items:center;gap:7px;margin-top:4px;flex-wrap:wrap}
+.rrow .ing{font-size:11.5px;color:var(--muted);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:3px 7px;border-radius:6px;display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.chip .ic{width:10px;height:10px;stroke-width:3}
+.chip.need{color:var(--needink);background:var(--need)}
+.chip.ok{color:var(--okink);background:var(--ok)}
+.chip.dup{color:var(--dup);background:color-mix(in srgb,var(--dup) 16%,transparent)}
+.rrow.dup{opacity:.55}
+.rrow.dup .nm{text-decoration:none}
+.rrow .chevr{margin-top:3px}
+.rowsfoot{display:flex;gap:14px;justify-content:flex-end;margin-top:4px;font-size:12.5px;font-weight:600}
+.rowsfoot span:first-child{color:var(--tint)}
+.rowsfoot span:last-child{color:var(--muted)}
+.notecard{padding:12px 13px;border-radius:14px;background:color-mix(in srgb,var(--tint) 8%,transparent);border:1px solid color-mix(in srgb,var(--tint) 22%,transparent);font-size:12px;line-height:1.5;color:var(--muted);margin-bottom:10px}
+.notecard b{color:var(--text);font-weight:600}
+.dock{position:sticky;bottom:-40px;margin:8px -16px -40px;padding:10px 16px 24px;background:color-mix(in srgb,var(--bg) 92%,var(--text) 8%);border-top:1px solid var(--hair)}
+.dock .cl{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10.5px;text-align:center;color:var(--muted);margin-bottom:8px}
+.dock .cl b{color:var(--need);font-weight:600}
+.dock .cl i{color:var(--ok);font-style:normal;font-weight:600}
+.dock .bt{display:flex;gap:8px}
+.dock .b1{flex:1;padding:12px;border-radius:12px;text-align:center;font-size:13px;font-weight:600;background:var(--surf);border:1px solid var(--surfbd)}
+.dock .b2{flex:1.2;padding:12px 8px;border-radius:12px;text-align:center;font-size:14px;font-weight:600;background:var(--tint);color:var(--fireText)}
+
+/* ---- frame 4: edit sheet + destination sheet ---- */
+.fsec{border-radius:15px;padding:12px 13px;margin-bottom:10px;background:var(--glass);border:1px solid var(--glassbd)}
+.fsec .ft{display:flex;align-items:center;gap:8px;font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:600;font-size:14px;margin-bottom:10px}
+.fsec .ft .ic{color:var(--tint);width:16px;height:16px}
+.fsec .ft .chev{margin-left:auto;color:var(--muted);width:14px;height:14px}
+.flbl{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;letter-spacing:1.1px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;font-weight:600;display:flex;gap:6px;align-items:center}
+.flbl .opt{color:var(--muted);letter-spacing:.4px;text-transform:none;font-weight:500;opacity:.8}
+.inp{min-height:43px;border-radius:13px;padding:11px 13px;font-size:14px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;gap:8px}
+.inp.ph{color:var(--muted)}
+.inp .chev{margin-left:auto;color:var(--muted);width:14px;height:14px}
+.inp.area{min-height:96px;align-items:flex-start}
+.fld{margin-bottom:12px}
+.two{display:flex;gap:10px;margin-bottom:12px}
+.two .a{flex:3}.two .b{flex:2}
+.thumbrow{display:flex;gap:12px;margin-bottom:12px;align-items:flex-start}
+.tsq{width:80px;height:80px;border-radius:12px;border:2px dashed var(--glassbd);background:var(--glass);display:flex;align-items:center;justify-content:center;color:var(--muted);flex:0 0 auto}
+.tsq .ic{width:26px;height:26px}
+.ingrow{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.ingrow .inp{min-height:40px;padding:9px 12px;font-size:13.5px}
+.ingrow .am{flex:1}.ingrow .nmf{flex:2}
+.ingrow .rm{color:var(--danger);width:22px;height:22px;flex:0 0 auto}
+.addl{display:flex;align-items:center;gap:7px;color:var(--tint);font-size:13px;font-weight:600;padding:6px 0}
+.addl .ic{width:18px;height:18px}
+.togrow{display:flex;align-items:center;gap:10px;padding:11px 13px;border-radius:13px;background:var(--surf);border:1px solid var(--surfbd);margin-bottom:12px}
+.togrow .bd{flex:1}
+.togrow .l{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:600;font-size:14px}
+.togrow .s{font-size:11.5px;color:var(--muted);margin-top:2px}
+.tog{width:44px;height:26px;border-radius:13px;background:var(--glassbd);position:relative;flex:0 0 auto}
+.tog i{position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:10px;background:#fff}
+.gapline{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:12px}
+.gapline .chip{font-size:8.5px}
+.gapline .g{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;color:var(--muted)}
+.sfoot{display:flex;gap:11px;padding-top:12px}
+.sfoot div{flex:1;height:47px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600;background:var(--glass);border:1px solid var(--glassbd)}
+.sfoot .go{background:var(--tint);border-color:var(--tint);color:var(--fireText)}
+.frow{display:flex;align-items:center;gap:11px;padding:11px 13px;min-height:52px;border-radius:13px;margin-bottom:8px;background:var(--surf);border:1px solid var(--surfbd);cursor:pointer}
+.frow.pick{border-color:var(--tint);background:color-mix(in srgb,var(--tint) 10%,transparent)}
+.radio{width:18px;height:18px;border-radius:9px;border:1.5px solid var(--muted);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.frow.pick .radio{border-color:var(--tint)}
+.frow.pick .radio i{width:9px;height:9px;border-radius:5px;background:var(--tint)}
+.frow .bd{flex:1;min-width:0}
+.frow .l{font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:6px}
+.frow .s{font-size:11px;color:var(--muted);margin-top:1.5px;line-height:1.4}
+.footnote{font-size:11px;color:var(--muted);text-align:center;line-height:1.45;padding:4px 6px 0}
+.cta{height:50px;border-radius:16px;background:var(--tint);color:var(--fireText);display:flex;align-items:center;justify-content:center;font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:700;font-size:15.5px;margin-top:10px}
+
+/* ---- frame 5: multi-images ---- */
+.pstrip{display:flex;gap:8px;margin-bottom:8px}
+.pslot{flex:1;aspect-ratio:1;border-radius:12px;position:relative;overflow:hidden;border:1px solid var(--glassbd);background:var(--thumbbg)}
+.pslot.p1{background:linear-gradient(160deg,#C8782F 0%,#6B3A14 55%,#2A1608 100%)}
+.pslot.p2{background:linear-gradient(160deg,#8C2F4C 0%,#4A1727 55%,#1E0A11 100%)}
+.pslot.p3{background:linear-gradient(160deg,#2F7F8C 0%,#163F47 55%,#0A1D21 100%)}
+.pslot.add{border:2px dashed var(--glassbd);background:var(--glass);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--muted)}
+.pslot.add .ic{width:20px;height:20px}
+.pslot.add .n{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8px;letter-spacing:.5px}
+.pslot .cov{position:absolute;left:5px;bottom:5px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:7.5px;font-weight:700;letter-spacing:.6px;color:#1F1A10;background:#F5B942;padding:2px 5px;border-radius:5px;display:flex;align-items:center;gap:3px}
+.pslot .cov .ic{width:8px;height:8px;stroke-width:3}
+.pslot .x{position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:7px;background:rgba(8,10,14,0.55);border:1px solid rgba(255,255,255,0.22);display:flex;align-items:center;justify-content:center;color:#fff}
+.pslot .x .ic{width:10px;height:10px;stroke-width:3}
+.pslot .grabber{position:absolute;top:4px;left:4px;width:20px;height:20px;border-radius:7px;background:rgba(8,10,14,0.55);border:1px solid rgba(255,255,255,0.22);display:flex;align-items:center;justify-content:center;color:#fff}
+.pslot .grabber .ic{width:11px;height:11px}
+.phint{font-size:11px;color:var(--muted);line-height:1.45;margin-bottom:10px}
+.shape{display:flex;border-radius:11px;padding:3px;gap:3px;background:var(--glass);border:1px solid var(--glassbd);width:180px}
+.shape span{flex:1;text-align:center;padding:7px;border-radius:9px;font-size:12px;color:var(--muted)}
+.shape .on{background:var(--tint);color:var(--fireText);font-weight:600}
+/* the Poster */
+.poster{border-radius:22px;overflow:hidden;border:1px solid var(--glassbd);margin-bottom:10px;background:var(--card)}
+.poster .hero{position:relative;height:250px;background:linear-gradient(160deg,#8C2F4C 0%,#4A1727 55%,#1E0A11 100%)}
+.poster .hero::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(14,11,9,0) 36%,rgba(14,11,9,0.62) 70%,rgba(14,11,9,0.96) 100%)}
+.poster .grabh{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:40px;height:4px;border-radius:2px;background:rgba(255,255,255,0.55);z-index:2}
+.poster .dots{position:absolute;top:24px;left:0;right:0;display:flex;justify-content:center;gap:6px;z-index:2}
+.poster .dots i{width:6px;height:6px;border-radius:3px;background:rgba(255,255,255,0.45)}
+.poster .dots i.on{width:18px;background:#fff}
+.poster .cnt{position:absolute;top:12px;right:14px;z-index:2;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;color:#fff;background:rgba(8,10,14,0.55);padding:4px 10px;border-radius:13px}
+.poster .into{position:absolute;left:18px;right:18px;bottom:16px;z-index:2}
+.poster .pl{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.poster .kp{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:#fff;background:#4A5568;padding:3px 8px;border-radius:7px}
+.poster .pp{margin-left:auto;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:15px;font-weight:600;color:#14171E;background:var(--tint);padding:5px 12px;border-radius:9px;box-shadow:0 2px 8px rgba(0,0,0,0.25)}
+.poster .tt{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:700;font-size:28px;line-height:1.05;letter-spacing:-0.6px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,0.35)}
+.poster .panel{padding:14px 18px 16px;display:flex;flex-direction:column;gap:12px}
+.facts{display:flex;gap:8px}
+.fact{flex:1;display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:13px;background:var(--surf);border:1px solid var(--surfbd)}
+.fact .sq{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--tint) 16%,transparent);border:1px solid color-mix(in srgb,var(--tint) 30%,transparent);color:var(--tint);flex:0 0 auto}
+.fact .sq .ic{width:18px;height:18px}
+.fact .k{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;letter-spacing:1.2px;color:var(--muted);text-transform:uppercase;font-weight:600}
+.fact .v{font-size:13.5px;font-weight:600;margin-top:2px}
+.swipehint{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:.6px;color:var(--muted);text-align:center}
+.optcard{border-radius:14px;padding:12px 13px;margin-bottom:8px;background:var(--surf);border:1px solid var(--surfbd)}
+.optcard .t{display:flex;align-items:center;gap:8px;font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:600;font-size:13.5px;margin-bottom:4px}
+.optcard .t .pill{margin-left:auto}
+.optcard .d{font-size:11.5px;line-height:1.5;color:var(--muted)}
+.optcard.rec{border-color:color-mix(in srgb,var(--tint) 45%,transparent)}
+</style>
+</head>
+<body>
+
+<svg style="display:none" aria-hidden="true"><defs>
+<symbol id="i-back" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
+<symbol id="i-doc" viewBox="0 0 24 24"><path d="M14 2H7a2 2 0 00-2 2v16a2 2 0 002 2h10a2 2 0 002-2V7z"/><path d="M14 2v5h5"/></symbol>
+<symbol id="i-photos" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M21 15l-4.5-4.5L8 19"/></symbol>
+<symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1z"/><circle cx="12" cy="13" r="3.4"/></symbol>
+<symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l1.8 4.9L19 9.7l-4.6 2.4L13 17l-2.4-4.3L6 11.4l4.7-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.1 1L19 21l-.9-2L16 18l2.2-.8z"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></symbol>
+<symbol id="i-chevr" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+<symbol id="i-chevd" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></symbol>
+<symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></symbol>
+<symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></symbol>
+<symbol id="i-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></symbol>
+<symbol id="i-fork" viewBox="0 0 24 24"><path d="M7 3v7a3 3 0 006 0V3M10 3v18M17 3c-2 2-2 6-2 8h2v10"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-minus" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12h8"/></symbol>
+<symbol id="i-snow" viewBox="0 0 24 24"><path d="M12 2v20M2 12h20M5 5l14 14M19 5L5 19"/></symbol>
+<symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></symbol>
+<symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></symbol>
+<symbol id="i-drop" viewBox="0 0 24 24"><path d="M12 3s6 7 6 11.5a6 6 0 01-12 0C6 10 12 3 12 3z"/></symbol>
+<symbol id="i-wine" viewBox="0 0 24 24"><path d="M7 3h10l-1 7a4 4 0 01-8 0z"/><path d="M12 14v6M8 21h8"/></symbol>
+<symbol id="i-leaf" viewBox="0 0 24 24"><path d="M4 20C6 10 12 5 21 4c-1 9-6 15-16 16z"/><path d="M4 20c4-4 7-7 10-9"/></symbol>
+<symbol id="i-pencil" viewBox="0 0 24 24"><path d="M4 20l4-1 10-10-3-3L5 16z"/><path d="M13 7l3 3"/></symbol>
+<symbol id="i-sunrise" viewBox="0 0 24 24"><path d="M3 17h18M5 13a7 7 0 0114 0M12 3v4M4.9 7.9l1.6 1.6M19.1 7.9l-1.6 1.6"/></symbol>
+<symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 019.5 4a8 8 0 1010.5 10.5z"/></symbol>
+<symbol id="i-drag" viewBox="0 0 24 24"><path d="M4 8h16M4 12h16M4 16h16"/></symbol>
+<symbol id="i-steps" viewBox="0 0 24 24"><path d="M9 6h12M9 12h12M9 18h12"/><path d="M3 6h2M3 12h2M3 18h2"/></symbol>
+<symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V4M6 10l6-6 6 6"/><path d="M4 20h16"/></symbol>
+</defs></svg>
+
+<div class="toolbar">
+  <div class="grp"><span class="gl2">Frame</span>
+    <button class="tb on" data-c="f1">1 · Where it lives</button>
+    <button class="tb" data-c="f2">2 · Upload sheet</button>
+    <button class="tb" data-c="f3">3 · Review</button>
+    <button class="tb" data-c="f4">4 · Edit + Destination</button>
+    <button class="tb" data-c="f5">5 · Multi-images</button>
+  </div>
+  <div class="grp"><span class="gl2">Palette</span>
+    <button class="tb on" data-t="">Mono·D</button>
+    <button class="tb" data-t="t-mono-l">Mono·L</button>
+    <button class="tb" data-t="t-ocean-d">Ocean·D</button>
+    <button class="tb" data-t="t-ocean-l">Ocean·L</button>
+  </div>
+</div>
+<div class="subbar on" id="sub-f1">
+  <div class="grp"><span class="gl2">Tile</span>
+    <button class="tb on" data-w="wide">W1 · wide, last row</button>
+    <button class="tb" data-w="half">W2 · same as the others</button>
+  </div>
+  <div class="grp"><span class="gl2">State</span>
+    <button class="tb on" data-l="open">Premium · unlocked</button>
+    <button class="tb" data-l="base">Base tier · locked</button>
+    <button class="tb" data-l="mgr">Manager · not granted</button>
+  </div>
+  <div class="grp"><button class="tb" data-open="navovl">Open the To User sheet</button></div>
+</div>
+<div class="subbar" id="sub-f2">
+  <div class="grp"><span class="gl2">Sheet state</span>
+    <button class="tb on" data-u="ready">Ready</button>
+    <button class="tb" data-u="scan">Scanning</button>
+    <button class="tb" data-u="base">Base tier</button>
+    <button class="tb" data-u="mgr">Manager · not granted</button>
+  </div>
+</div>
+<div class="subbar" id="sub-f4">
+  <div class="grp"><span class="gl2">Sheet</span>
+    <button class="tb on" data-e="edit">Review a recipe</button>
+    <button class="tb" data-e="dest">Section destination</button>
+  </div>
+</div>
+<p class="hint" id="hintline"><b>1</b> · The Bar Assistant Editor grows an <b>Upload Libations</b> tile at the end of the Recipes grid, and the same row joins the To User sheet. Both open one sheet (frame 2). Toggle the tile shape and the three gate states.</p>
+
+<div class="phone" id="phone">
+  <div class="glow"></div><div class="glow2"></div>
+  <div class="sb"><span>9:41</span><span>▦ ⌁ ▮</span></div>
+  <div class="screen" id="screen">
+
+  <!-- ============ FRAME 1 · WHERE IT LIVES ============ -->
+  <div class="design on" id="f1">
+    <div class="concept"><b>1</b> Bar Assistant Editor · the tile + the sheet row<span class="ln"></span></div>
+    <div class="hdr">
+      <span class="c38"><svg class="ic"><use href="#i-back"/></svg></span>
+      <div class="hmid"><div class="htitle">Bar Assistant Editor</div></div>
+      <span class="navpill" data-open="navovl"><svg class="ic"><use href="#i-person"/></svg>To User<svg class="ic chev"><use href="#i-chevd"/></svg></span>
+    </div>
+
+    <div class="zlabel">Checklists<span class="ln"></span></div>
+    <div class="tilerow">
+      <div class="ptile"><div class="top"><svg class="ic"><use href="#i-sunrise"/></svg>Opening Checklist Editor</div>
+        <div class="foot"><div class="ring"><svg width="44" height="44" viewBox="0 0 44 44"><circle cx="22" cy="22" r="18" fill="none" stroke="var(--glassbd)" stroke-width="4"/><circle cx="22" cy="22" r="18" fill="none" stroke="var(--tint)" stroke-width="4" stroke-dasharray="113 113"/></svg><span class="rlab">24</span></div>
+        <div class="stat"><b>24 items</b><span>5 categories</span></div></div></div>
+      <div class="ptile"><div class="top"><svg class="ic"><use href="#i-moon"/></svg>Closing Checklist Editor</div>
+        <div class="foot"><div class="ring"><svg width="44" height="44" viewBox="0 0 44 44"><circle cx="22" cy="22" r="18" fill="none" stroke="var(--glassbd)" stroke-width="4"/><circle cx="22" cy="22" r="18" fill="none" stroke="var(--tint)" stroke-width="4" stroke-dasharray="113 113"/></svg><span class="rlab">19</span></div>
+        <div class="stat"><b>19 items</b><span>4 categories</span></div></div></div>
+    </div>
+
+    <div class="zlabel">Recipes<span class="ln"></span></div>
+    <div class="grid" id="f1grid">
+      <div class="gtile"><div class="toprow"><span class="ichip"><svg class="ic"><use href="#i-snow"/></svg></span><span class="peek"><span></span><span></span><span></span></span></div>
+        <div><div class="nm">Winter Libations Editor</div><div class="ct">16 recipes · <b>3 ✦</b></div></div></div>
+      <div class="gtile"><div class="toprow"><span class="ichip"><svg class="ic"><use href="#i-sun"/></svg></span><span class="peek"><span></span><span></span><span></span></span></div>
+        <div><div class="nm">Summer Libations Editor</div><div class="ct">18 recipes · <b>2 ✦</b></div></div></div>
+      <div class="gtile"><div class="toprow"><span class="ichip"><svg class="ic"><use href="#i-list"/></svg></span><span class="peek"><span></span><span></span><span></span></span></div>
+        <div><div class="nm">Cocktails A-Z Editor</div><div class="ct">112 recipes</div></div></div>
+      <div class="gtile"><div class="toprow"><span class="ichip"><svg class="ic"><use href="#i-drop"/></svg></span><span class="peek"><span></span><span></span></span></div>
+        <div><div class="nm">Mixes &amp; Essentials Editor</div><div class="ct">9 recipes</div></div></div>
+
+      <!-- W1 · the wide tile (default) -->
+      <div class="gtile up wide" id="tile-wide">
+        <span class="ichip" id="tw-chip"><svg class="ic"><use href="#i-spark"/></svg></span>
+        <div class="bd"><div class="nm">Upload Libations</div><div class="ct" id="tw-ct">Scan a cocktail list or recipe sheet · <b>6 of 10 credits</b></div></div>
+        <span class="prem" id="tw-prem">✦ Premium</span>
+        <svg class="ic chevr"><use href="#i-chevr"/></svg>
+      </div>
+      <!-- W2 · the half tile -->
+      <div class="gtile up" id="tile-half" style="display:none">
+        <div class="toprow"><span class="ichip" id="th-chip"><svg class="ic"><use href="#i-spark"/></svg></span><span class="prem" id="th-prem">✦ Premium</span></div>
+        <div><div class="nm">Upload Libations</div><div class="ct" id="th-ct">AI scan · <b>6 of 10 credits</b></div></div>
+      </div>
+    </div>
+    <div class="bcap" id="f1cap">The tile is tinted glass (the premium Tools-tile finish) so it reads as an action, not a fifth book. Tap → the Upload Libations sheet. Locked states keep the tile visible: a padlock in the icon chip and the reason on the second line, never hidden.</div>
+  </div>
+
+  <!-- ============ FRAME 2 · THE UPLOAD SHEET (shown over the editor) ============ -->
+  <div class="design" id="f2">
+    <div class="concept"><b>2</b> Upload Libations · one sheet, four states<span class="ln"></span></div>
+    <div class="hdr" style="opacity:.5">
+      <span class="c38"><svg class="ic"><use href="#i-back"/></svg></span>
+      <div class="hmid"><div class="htitle">Bar Assistant Editor</div></div>
+      <span class="navpill"><svg class="ic"><use href="#i-person"/></svg>To User<svg class="ic chev"><use href="#i-chevd"/></svg></span>
+    </div>
+    <div style="opacity:.35;pointer-events:none">
+      <div class="zlabel">Recipes<span class="ln"></span></div>
+      <div class="grid">
+        <div class="gtile"><div class="toprow"><span class="ichip"><svg class="ic"><use href="#i-snow"/></svg></span></div><div><div class="nm">Winter Libations Editor</div><div class="ct">16 recipes</div></div></div>
+        <div class="gtile"><div class="toprow"><span class="ichip"><svg class="ic"><use href="#i-sun"/></svg></span></div><div><div class="nm">Summer Libations Editor</div><div class="ct">18 recipes</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ FRAME 3 · REVIEW ============ -->
+  <div class="design" id="f3">
+    <div class="concept"><b>3</b> Review Libations · the menu-review grammar, per recipe<span class="ln"></span></div>
+    <div class="hdr">
+      <span class="c38"><svg class="ic"><use href="#i-back"/></svg></span>
+      <div class="hmid"><div class="eyebrow">Myresto Test</div><div class="htitle">Review Libations</div></div>
+      <span class="hsp"></span>
+    </div>
+    <p class="intro">We found 11 recipes. Tap any recipe to fill in what the scan couldn't read, then publish. Nothing goes live until you do.</p>
+
+    <div class="flabel">Adding to</div>
+    <div class="seg solid"><span class="on"><svg class="ic"><use href="#i-snow"/></svg>Winter Libations</span><span><svg class="ic"><use href="#i-sun"/></svg>Summer Libations</span></div>
+
+    <div class="statline"><b>11 recipes</b> · 3 sections · 2 already saved</div>
+
+    <!-- section 1 -->
+    <div class="sec" style="--sc:#C65D2E">
+      <div class="fade"></div>
+      <div class="eb">Found on the scan</div>
+      <div class="hd"><div class="nm">Signature Cocktails</div><div class="cnt">4 recipes</div></div>
+      <div class="dest"><div class="bd"><div class="dl">Goes to</div><div class="dn"><span class="dot" style="background:#C65D2E"></span>Libations › Signature Cocktails</div><div class="pills"><span class="pill">Matched</span></div></div><span class="chg">Change</span></div>
+      <div class="rows">
+        <div class="rrow" data-open="editovl"><span class="cb"><svg class="ic"><use href="#i-check"/></svg></span><div class="bd"><div class="l1"><span class="nm">Smoked Maple Old Fashioned</span><span class="pr">$14</span></div><div class="l2"><span class="chip need">Needs info</span><span class="ing">Bourbon · maple syrup · bitters · orange peel</span></div></div><svg class="ic chevr"><use href="#i-chevr"/></svg></div>
+        <div class="rrow" data-open="editovl"><span class="cb"><svg class="ic"><use href="#i-check"/></svg></span><div class="bd"><div class="l1"><span class="nm">Boathouse Mule</span><span class="pr">$13</span></div><div class="l2"><span class="chip ok"><svg class="ic"><use href="#i-check"/></svg>Reviewed</span><span class="ing">Copper mug · lime wheel · 4 ingredients · procedure</span></div></div><svg class="ic chevr"><use href="#i-chevr"/></svg></div>
+        <div class="rrow" data-open="editovl"><span class="cb"><svg class="ic"><use href="#i-check"/></svg></span><div class="bd"><div class="l1"><span class="nm">Blood Orange Margarita</span><span class="pr">$14</span></div><div class="l2"><span class="chip need">Needs info</span><span class="ing">Tequila · blood orange · lime · agave</span></div></div><svg class="ic chevr"><use href="#i-chevr"/></svg></div>
+        <div class="rrow" data-open="editovl"><span class="cb off"><svg class="ic"><use href="#i-check"/></svg></span><div class="bd"><div class="l1"><span class="nm">Lavender Bee's Knees</span><span class="pr">$13</span></div><div class="l2"><span class="chip need">Needs info</span><span class="ing">Gin · lavender honey · lemon</span></div></div><svg class="ic chevr"><use href="#i-chevr"/></svg></div>
+        <div class="rowsfoot"><span>All</span><span>None</span></div>
+      </div>
+    </div>
+
+    <!-- section 2 -->
+    <div class="sec" style="--sc:#5B5BD6">
+      <div class="fade"></div>
+      <div class="eb">Found on the scan</div>
+      <div class="hd"><div class="nm">Martinis</div><div class="cnt">3 recipes</div></div>
+      <div class="dest"><div class="bd"><div class="dl">Goes to</div><div class="dn"><span class="dot" style="background:#5B5BD6"></span>Libations › Martinis</div><div class="pills"><span class="pill">Matched</span></div></div><span class="chg">Change</span></div>
+      <div class="rows">
+        <div class="rrow dup"><span class="cb off" style="visibility:hidden"></span><div class="bd"><div class="l1"><span class="nm">Espresso Martini</span><span class="pr">$14</span></div><div class="l2"><span class="chip dup">Already saved</span><span class="ing">Skipped · edit it in the Winter Libations Editor</span></div></div></div>
+        <div class="rrow" data-open="editovl"><span class="cb"><svg class="ic"><use href="#i-check"/></svg></span><div class="bd"><div class="l1"><span class="nm">Cucumber Gimlet</span><span class="pr">$13</span></div><div class="l2"><span class="chip need">Needs info</span><span class="ing">Gin · cucumber · lime · simple</span></div></div><svg class="ic chevr"><use href="#i-chevr"/></svg></div>
+        <div class="rrow dup"><span class="cb off" style="visibility:hidden"></span><div class="bd"><div class="l1"><span class="nm">Dirty Martini</span><span class="pr">$14</span></div><div class="l2"><span class="chip dup">Already saved</span><span class="ing">Skipped · edit it in the Winter Libations Editor</span></div></div></div>
+      </div>
+    </div>
+
+    <!-- section 3 · new subcategory -->
+    <div class="sec" style="--sc:#607D8B">
+      <div class="fade"></div>
+      <div class="eb">Found on the scan</div>
+      <div class="hd"><div class="nm">Frozen &amp; Fun</div><div class="cnt">3 recipes</div></div>
+      <div class="dest" data-open="destovl"><div class="bd"><div class="dl">Goes to</div><div class="dn"><span class="dot" style="background:#607D8B"></span>Libations › Frozen &amp; Fun</div><div class="pills"><span class="pill">New subcategory</span></div></div><span class="chg">Change</span></div>
+      <div class="rows">
+        <div class="rrow" data-open="editovl"><span class="cb"><svg class="ic"><use href="#i-check"/></svg></span><div class="bd"><div class="l1"><span class="nm">Frosé</span><span class="pr">$12</span></div><div class="l2"><span class="chip ok"><svg class="ic"><use href="#i-check"/></svg>Reviewed</span><span class="ing">Hurricane · strawberry · 3 ingredients · procedure</span></div></div><svg class="ic chevr"><use href="#i-chevr"/></svg></div>
+        <div class="rrow" data-open="editovl"><span class="cb"><svg class="ic"><use href="#i-check"/></svg></span><div class="bd"><div class="l1"><span class="nm">Piña Colada</span><span class="pr">$12</span></div><div class="l2"><span class="chip need">Needs info</span><span class="ing">Rum · coconut cream · pineapple</span></div></div><svg class="ic chevr"><use href="#i-chevr"/></svg></div>
+        <div class="rrow" data-open="editovl"><span class="cb"><svg class="ic"><use href="#i-check"/></svg></span><div class="bd"><div class="l1"><span class="nm">Mango Daiquiri</span><span class="pr">$12</span></div><div class="l2"><span class="chip need">Needs info</span><span class="ing">Rum · mango · lime</span></div></div><svg class="ic chevr"><use href="#i-chevr"/></svg></div>
+      </div>
+    </div>
+
+    <div class="notecard"><b>Needs info</b> means the scan had the name and ingredients but not the glassware, garnish, amounts or procedure. You can publish as-is and fill those in later from the editor.</div>
+
+    <div class="dock">
+      <div class="cl"><b>5 need info</b> · <i>2 reviewed</i> · 1 unchecked · 2 already saved</div>
+      <div class="bt"><div class="b1">Save &amp; Review Later</div><div class="b2">Publish 8 recipes</div></div>
+    </div>
+  </div>
+
+  <!-- ============ FRAME 4 · EDIT + DESTINATION (sheets over the review) ============ -->
+  <div class="design" id="f4">
+    <div class="concept"><b>4</b> the two sheets the review opens<span class="ln"></span></div>
+    <div style="opacity:.4;pointer-events:none">
+      <div class="hdr">
+        <span class="c38"><svg class="ic"><use href="#i-back"/></svg></span>
+        <div class="hmid"><div class="eyebrow">Myresto Test</div><div class="htitle">Review Libations</div></div>
+        <span class="hsp"></span>
+      </div>
+      <div class="statline"><b>11 recipes</b> · 3 sections · 2 already saved</div>
+      <div class="sec" style="--sc:#C65D2E"><div class="fade"></div><div class="eb">Found on the scan</div><div class="hd"><div class="nm">Signature Cocktails</div><div class="cnt">4 recipes</div></div></div>
+    </div>
+  </div>
+
+  <!-- ============ FRAME 5 · MULTI-IMAGES ============ -->
+  <div class="design" id="f5">
+    <div class="concept"><b>5</b> up to four photos · editors + the Poster<span class="ln"></span></div>
+
+    <div class="zlabel">In every editor sheet<span class="ln"></span></div>
+    <div class="fsec">
+      <div class="ft"><svg class="ic"><use href="#i-wine"/></svg>Recipe Basics<svg class="ic chev"><use href="#i-chevd"/></svg></div>
+      <div class="flbl">Photos <span class="opt">· 3 of 4</span></div>
+      <div class="pstrip">
+        <div class="pslot p1"><span class="grabber"><svg class="ic"><use href="#i-drag"/></svg></span><span class="x"><svg class="ic"><use href="#i-x"/></svg></span><span class="cov"><svg class="ic"><use href="#i-star"/></svg>COVER</span></div>
+        <div class="pslot p2"><span class="grabber"><svg class="ic"><use href="#i-drag"/></svg></span><span class="x"><svg class="ic"><use href="#i-x"/></svg></span></div>
+        <div class="pslot p3"><span class="grabber"><svg class="ic"><use href="#i-drag"/></svg></span><span class="x"><svg class="ic"><use href="#i-x"/></svg></span></div>
+        <div class="pslot add"><svg class="ic"><use href="#i-plus"/></svg><span class="n">1 LEFT</span></div>
+      </div>
+      <div class="phint">Long-press a photo to reorder. The first one is the <b>cover</b> — it is what tiles, menu cards and the Featured shelf show. Tap ✕ to remove; removed photos are deleted when you save.</div>
+      <div class="flbl">Name</div>
+      <div class="inp">Smoked Maple Old Fashioned</div>
+    </div>
+
+    <div class="fsec">
+      <div class="ft"><svg class="ic"><use href="#i-fork"/></svg>Menu item · photo shape<svg class="ic chev"><use href="#i-chevd"/></svg></div>
+      <div class="flbl">Shape <span class="opt">· applies to every photo on this item</span></div>
+      <div class="shape"><span class="on">Square</span><span>Banner</span></div>
+      <div class="phint" style="margin-top:8px">Menu items keep their Square | Banner choice; it now governs the whole set, so the Poster pages four photos of one shape.</div>
+    </div>
+
+    <div class="zlabel">The Poster · already pages photos<span class="ln"></span></div>
+    <div class="poster">
+      <div class="hero">
+        <span class="grabh"></span>
+        <div class="dots"><i></i><i class="on"></i><i></i><i></i></div>
+        <span class="cnt">2 / 4</span>
+        <div class="into"><div class="pl"><span class="kp">Signature Cocktails</span><span class="pp">$14</span></div><div class="tt">Smoked Maple Old Fashioned</div></div>
+      </div>
+      <div class="panel">
+        <div class="facts">
+          <div class="fact"><span class="sq"><svg class="ic"><use href="#i-wine"/></svg></span><div><div class="k">Glassware</div><div class="v">Rocks</div></div></div>
+          <div class="fact"><span class="sq"><svg class="ic"><use href="#i-leaf"/></svg></span><div><div class="k">Garnish</div><div class="v">Orange peel</div></div></div>
+        </div>
+        <div class="swipehint">← SWIPE THE PHOTO · DOTS + 2 / 4 ALREADY SHIP IN POSTERSHEET →</div>
+      </div>
+    </div>
+
+    <div class="zlabel">How the photos are stored · pick one<span class="ln"></span></div>
+    <div class="optcard rec">
+      <div class="t"><svg class="ic" style="color:var(--tint);width:15px;height:15px"><use href="#i-list"/></svg>A · a photo list on the row<span class="pill">Recommended</span></div>
+      <div class="d">Each item and recipe row gains an <span class="mono">images</span> list (the photo links in display order). The first one stays mirrored into today's <span class="mono">thumbnail_url</span>, so every tile, shelf, hub peek and menu card keeps working untouched. The Poster reads the list. One column per table, no joins.</div>
+    </div>
+    <div class="optcard">
+      <div class="t"><svg class="ic" style="color:var(--muted);width:15px;height:15px"><use href="#i-grid"/></svg>B · one row per photo in a separate table</div>
+      <div class="d">A <span class="mono">content_images</span> table (which item, which photo, what position). Cleaner on paper, but every screen that shows a photo needs a second lookup, and all ten recipe/item write RPCs grow extra round trips.</div>
+    </div>
+    <div class="bcap">Both keep the 4-photo cap on the client and the server. A lets the five recipe families + menu items ship in one pass.</div>
+  </div>
+
+  </div><!-- /screen -->
+
+  <!-- ===== nav sheet (frame 1) ===== -->
+  <div class="ovl" id="navovl">
+    <div class="scr" data-close="navovl"></div>
+    <div class="sheet">
+      <div class="grab"></div>
+      <div class="shead"><span class="t">Bar Assistant Editor</span><span class="xbtn" data-close="navovl"><svg class="ic" style="width:14px;height:14px"><use href="#i-x"/></svg></span></div>
+      <div class="arow"><svg class="ic"><use href="#i-person"/></svg>To User</div>
+      <div class="arow"><svg class="ic"><use href="#i-grid"/></svg>Edit Categories</div>
+      <div class="arow"><svg class="ic"><use href="#i-fork"/></svg>Edit Menu</div>
+      <div class="arow" id="nav-up"><svg class="ic"><use href="#i-spark"/></svg><div class="bd">Upload Libations<div class="sub" id="nav-up-sub">Scan a cocktail list or recipe sheet</div></div><svg class="ic star" id="nav-up-star"><use href="#i-star"/></svg><svg class="ic lockic" id="nav-up-lock" style="display:none"><use href="#i-lock"/></svg></div>
+      <div class="tipfoot">The same GlassActionSheet the recipe pages ship with. Upload Libations joins it on the hub AND on the Winter / Summer editors; locked rows stay visible and dimmed (the MenuSheet rule). The star marks a manager unlocked by a grant.</div>
+    </div>
+  </div>
+
+  <!-- ===== upload sheet (frame 2) ===== -->
+  <div class="ovl" id="upovl">
+    <div class="scr"></div>
+    <div class="sheet" id="upsheet">
+      <div class="grab"></div>
+      <div class="shead"><div><span class="t">Upload Libations</span><div class="s">Scan a cocktail list or recipe sheet. You review every recipe before it goes live.</div></div></div>
+
+      <!-- READY -->
+      <div id="up-ready">
+        <div class="credits"><span class="n">6</span><span class="x">of 10 credits left this month · PDF = <b>3</b> · each photo = <b>1</b></span></div>
+        <div class="flabel" style="margin-top:0">Add these recipes to</div>
+        <div class="seg solid"><span class="on"><svg class="ic"><use href="#i-snow"/></svg>Winter Libations</span><span><svg class="ic"><use href="#i-sun"/></svg>Summer Libations</span></div>
+        <div class="mrow"><svg class="ic"><use href="#i-doc"/></svg><div class="bd"><div class="l1">Choose a File</div><div class="l2">A PDF or an image from Files</div></div><span class="cost">3 credits</span></div>
+        <div class="mrow"><svg class="ic"><use href="#i-photos"/></svg><div class="bd"><div class="l1">Choose Photos</div><div class="l2">Pick recipe pages from your library</div></div><span class="cost">1 each</span></div>
+        <div class="mrow"><svg class="ic"><use href="#i-camera"/></svg><div class="bd"><div class="l1">Take a Photo</div><div class="l2">Snap the recipe sheet right now</div></div><span class="cost">1 credit</span></div>
+        <div class="divider"></div>
+        <div class="mrow hist"><svg class="ic"><use href="#i-clock"/></svg><div class="bd"><div class="l1">Recent Uploads</div><div class="l2">Opens the AI Menu Upload page · Recent tab</div></div><svg class="ic chevr"><use href="#i-chevr"/></svg></div>
+        <div class="tipfoot">Credits are the one pool the menu upload uses. Cocktails A-Z and Mixes &amp; Essentials are not destinations — those books are curated by hand.</div>
+      </div>
+
+      <!-- SCANNING -->
+      <div id="up-scan" style="display:none">
+        <div class="credits"><span class="n">3</span><span class="x">of 10 credits left this month · PDF = <b>3</b> · each photo = <b>1</b></span></div>
+        <div class="flabel" style="margin-top:0">Adding to</div>
+        <div class="seg solid" style="opacity:.6"><span class="on"><svg class="ic"><use href="#i-snow"/></svg>Winter Libations</span><span><svg class="ic"><use href="#i-sun"/></svg>Summer Libations</span></div>
+        <div class="proc"><div class="top"><span class="spin"></span><span class="quip" id="quip">Shaking the pixels, not stirring…</span></div>
+          <div class="sub">AI is reading your recipes… this can take 40 seconds to 3 minutes depending on the file size. Please don't close the app while it scans your file.</div></div>
+        <div class="tipfoot">Same rotor as the menu scan, bar-flavoured quips. When the parse lands, the sheet closes and the Review page opens.</div>
+      </div>
+
+      <!-- BASE TIER -->
+      <div id="up-base" style="display:none">
+        <div class="gate gcard">
+          <span class="lockc"><svg class="ic"><use href="#i-lock"/></svg></span>
+          <div class="eb">Premium</div>
+          <div class="t">Libations AI Upload</div>
+          <div class="d">Scan a cocktail list or recipe sheet and we'll build your libation recipes. You review everything before it goes live.</div>
+          <div class="bul">
+            <div><svg class="ic"><use href="#i-check"/></svg>PDF, photos or the camera — 10 upload credits a month, shared with menu uploads</div>
+            <div><svg class="ic"><use href="#i-check"/></svg>Names, prices, ingredients, glassware and procedure, filed under your Libations subcategories</div>
+            <div><svg class="ic"><use href="#i-check"/></svg>Every recipe reviewed by you before it reaches the team</div>
+          </div>
+          <div class="cta">Upgrade to Premium</div>
+        </div>
+      </div>
+
+      <!-- MANAGER NOT GRANTED -->
+      <div id="up-mgr" style="display:none">
+        <div class="credits" style="opacity:.6"><span class="n">—</span><span class="x">Upload credits are shown once your owner turns this on</span></div>
+        <div class="mrow dim"><svg class="ic"><use href="#i-doc"/></svg><div class="bd"><div class="l1">Choose a File</div><div class="l2" style="color:var(--tint)">Ask your owner to enable AI Libation Uploads</div></div><svg class="ic" style="width:15px;height:15px"><use href="#i-lock"/></svg></div>
+        <div class="mrow dim"><svg class="ic"><use href="#i-photos"/></svg><div class="bd"><div class="l1">Choose Photos</div><div class="l2" style="color:var(--tint)">Ask your owner to enable AI Libation Uploads</div></div><svg class="ic" style="width:15px;height:15px"><use href="#i-lock"/></svg></div>
+        <div class="mrow dim"><svg class="ic"><use href="#i-camera"/></svg><div class="bd"><div class="l1">Take a Photo</div><div class="l2" style="color:var(--tint)">Ask your owner to enable AI Libation Uploads</div></div><svg class="ic" style="width:15px;height:15px"><use href="#i-lock"/></svg></div>
+        <div class="tipfoot">The grant is a new toggle in Org Settings › Jobs &amp; Tools › Manager Permissions › Menu Access, between AI Menu Uploads and Menu Configuration: "AI Libation Uploads · Scan recipe sheets and spend upload credits".</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== edit sheet (frames 3 + 4) ===== -->
+  <div class="ovl" id="editovl">
+    <div class="scr" data-close="editovl"></div>
+    <div class="sheet">
+      <div class="grab"></div>
+      <div class="shead"><div><span class="t">Review Recipe</span><div class="s">Smoked Maple Old Fashioned · Signature Cocktails</div></div><span class="xbtn" data-close="editovl"><svg class="ic" style="width:14px;height:14px"><use href="#i-x"/></svg></span></div>
+      <div class="gapline"><span class="chip need">Needs info</span><span class="g">glassware · garnish · amounts · procedure</span></div>
+
+      <div class="fsec">
+        <div class="ft"><svg class="ic"><use href="#i-wine"/></svg>Recipe Basics<svg class="ic chev"><use href="#i-chevd"/></svg></div>
+        <div class="thumbrow"><span class="tsq"><svg class="ic"><use href="#i-photos"/></svg></span>
+          <div style="flex:1"><div class="flbl">Recipe name</div><div class="inp">Smoked Maple Old Fashioned</div></div></div>
+        <div class="two"><div class="a"><div class="flbl">Category</div><div class="inp">Signature Cocktails<svg class="ic chev"><use href="#i-chevd"/></svg></div></div>
+          <div class="b"><div class="flbl">Price</div><div class="inp">$14</div></div></div>
+        <div class="togrow"><div class="bd"><div class="l">Featured</div><div class="s">Pinned to the Featured shelf</div></div><span class="tog"><i></i></span></div>
+      </div>
+
+      <div class="fsec">
+        <div class="ft"><svg class="ic"><use href="#i-list"/></svg>Recipe<svg class="ic chev"><use href="#i-chevd"/></svg></div>
+        <div class="fld"><div class="flbl">Glassware <span class="opt">· optional</span></div><div class="inp ph"><svg class="ic" style="width:16px;height:16px"><use href="#i-wine"/></svg>Choose glassware<svg class="ic chev"><use href="#i-chevd"/></svg></div></div>
+        <div class="fld"><div class="flbl">Garnish <span class="opt">· optional</span></div><div class="inp ph">e.g. Orange peel</div></div>
+        <div class="fld"><div class="flbl">Ingredients <span class="opt">· amounts optional</span></div>
+          <div class="ingrow"><div class="inp ph am">Amount</div><div class="inp nmf">Bourbon</div><svg class="ic rm"><use href="#i-minus"/></svg></div>
+          <div class="ingrow"><div class="inp ph am">Amount</div><div class="inp nmf">Maple syrup</div><svg class="ic rm"><use href="#i-minus"/></svg></div>
+          <div class="ingrow"><div class="inp ph am">Amount</div><div class="inp nmf">Angostura bitters</div><svg class="ic rm"><use href="#i-minus"/></svg></div>
+          <div class="ingrow"><div class="inp ph am">Amount</div><div class="inp nmf">Orange peel</div><svg class="ic rm"><use href="#i-minus"/></svg></div>
+          <div class="addl"><svg class="ic"><use href="#i-plus"/></svg>Add ingredient</div></div>
+      </div>
+
+      <div class="fsec">
+        <div class="ft"><svg class="ic"><use href="#i-steps"/></svg>Procedure<svg class="ic chev"><use href="#i-chevd"/></svg></div>
+        <div class="fld"><div class="flbl">Procedure <span class="opt">· optional</span></div><div class="inp area ph">Build in a rocks glass over a large cube…</div></div>
+      </div>
+
+      <div class="sfoot"><div data-close="editovl">Cancel</div><div class="go" data-close="editovl">Save to review</div></div>
+      <div class="tipfoot">The editors' own form (thumbnail · basics · recipe · procedure), lifted into one shared sheet. Save returns to the review with the chip flipped to Reviewed — nothing is written to the database until Publish.</div>
+    </div>
+  </div>
+
+  <!-- ===== destination sheet (frames 3 + 4) ===== -->
+  <div class="ovl" id="destovl">
+    <div class="scr" data-close="destovl"></div>
+    <div class="sheet">
+      <div class="grab"></div>
+      <div class="shead"><div><span class="t">Where should "Frozen &amp; Fun" go?</span><div class="s">3 recipes · under Libations</div></div><span class="xbtn" data-close="destovl"><svg class="ic" style="width:14px;height:14px"><use href="#i-x"/></svg></span></div>
+      <div class="frow pick"><span class="radio"><i></i></span><div class="bd"><div class="l">New subcategory <span class="pill">New</span></div><div class="s">Creates "Frozen &amp; Fun" under Libations, fed by these recipes</div></div></div>
+      <div class="zlabel" style="margin-top:6px">Existing Libations subcategories<span class="ln"></span></div>
+      <div class="frow"><span class="radio"></span><div class="bd"><div class="l"><span class="dot" style="background:#C65D2E"></span>Signature Cocktails</div><div class="s">4 recipes today</div></div></div>
+      <div class="frow"><span class="radio"></span><div class="bd"><div class="l"><span class="dot" style="background:#5B5BD6"></span>Martinis</div><div class="s">6 recipes today</div></div></div>
+      <div class="frow"><span class="radio"></span><div class="bd"><div class="l"><span class="dot" style="background:#B7791F"></span>Sangria</div><div class="s">2 recipes today</div></div></div>
+      <div class="frow"><span class="radio"></span><div class="bd"><div class="l"><span class="dot" style="background:#10A56F"></span>Mocktails</div><div class="s">No recipes yet</div></div></div>
+      <div class="footnote">Only recipe-fed Libations subcategories are listed. Any single recipe can still be moved from its own edit sheet.</div>
+      <div class="cta" data-close="destovl">Use this</div>
+    </div>
+  </div>
+
+</div><!-- /phone -->
+
+<script>
+(function(){
+  var phone=document.getElementById('phone');
+  function all(s,fn){[].slice.call(document.querySelectorAll(s)).forEach(fn)}
+  function el(id){return document.getElementById(id)}
+  var HINTS={
+    f1:'<b>1</b> · The Bar Assistant Editor grows an <b>Upload Libations</b> tile at the end of the Recipes grid, and the same row joins the To User sheet. Both open one sheet (frame 2). Toggle the tile shape and the three gate states.',
+    f2:'<b>2</b> · The Upload Libations sheet: credits strip → pick the book → three sources → the History row (Recent Uploads tab on the AI Menu Upload page). Scanning stays inside the sheet; base tier gets the PremiumGate card; an ungranted manager sees the rows locked.',
+    f3:'<b>3</b> · Review Libations: section cards with a Goes-to row (Libations subcategory, Matched / New), one row per recipe with its price and the chip — <b>Needs info</b>, <b>Reviewed</b> or <b>Already saved</b> (skipped by name). Tap a row to open frame 4\'s edit sheet; the dock publishes.',
+    f4:'<b>4</b> · The two sheets the review opens: the recipe edit sheet (the editors\' own form — photo, basics, glassware, garnish, ingredients with optional amounts, procedure) and the section destination picker.',
+    f5:'<b>5</b> · Multi-images: a four-slot photo strip in every editor sheet (cover star, long-press reorder, ✕), the Poster pages them already, and the two storage shapes to choose from.'
+  };
+  /* bar-flavoured scan quips (demo cadence 2.2 s) */
+  var QUIPS=["Shaking the pixels, not stirring…","Muddling the metadata…","Reading the bartender's handwriting…","Counting dashes of bitters…","Chilling the glassware column…","Double-straining the ingredients…","Expressing an orange peel over the data…","Garnishing the output…"];
+  var rotor=null;
+  function startRotor(){
+    stopRotor(); var node=el('quip'), i=0;
+    rotor=setInterval(function(){ node.classList.add('fade'); setTimeout(function(){ i=(i+1)%QUIPS.length; node.textContent=QUIPS[i]; node.classList.remove('fade'); },300); },2200);
+  }
+  function stopRotor(){ if(rotor){clearInterval(rotor);rotor=null;} }
+
+  /* overlays */
+  function open(id){ el(id).classList.add('show'); }
+  function close(id){ el(id).classList.remove('show'); }
+  all('[data-open]',function(b){b.addEventListener('click',function(e){ e.stopPropagation(); open(b.getAttribute('data-open')); })});
+  all('[data-close]',function(b){b.addEventListener('click',function(){ close(b.getAttribute('data-close')); })});
+
+  /* frame switcher */
+  var frame='f1';
+  function showFrame(f){
+    frame=f;
+    all('[data-c]',function(x){x.classList.toggle('on',x.getAttribute('data-c')===f)});
+    all('.design',function(d){d.classList.toggle('on',d.id===f)});
+    all('.subbar',function(s){s.classList.toggle('on',s.id==='sub-'+f)});
+    el('hintline').innerHTML=HINTS[f];
+    el('screen').scrollTop=0;
+    /* the always-on sheets per frame */
+    close('navovl'); close('editovl'); close('destovl');
+    if(f==='f2'){ open('upovl'); } else { close('upovl'); stopRotor(); }
+    if(f==='f4'){ setEdit(editMode); }
+  }
+  all('[data-c]',function(b){b.addEventListener('click',function(){ showFrame(b.getAttribute('data-c')); })});
+
+  /* frame 1 · tile shape + gate state */
+  all('[data-w]',function(b){b.addEventListener('click',function(){
+    all('[data-w]',function(x){x.classList.remove('on')}); b.classList.add('on');
+    var wide=b.getAttribute('data-w')==='wide';
+    el('tile-wide').style.display=wide?'':'none'; el('tile-half').style.display=wide?'none':'';
+  })});
+  var LOCK_ICON='<svg class="ic"><use href="#i-lock"/></svg>', SPARK_ICON='<svg class="ic"><use href="#i-spark"/></svg>';
+  function setLock(mode){
+    var locked=mode!=='open';
+    ['tile-wide','tile-half'].forEach(function(id){ el(id).classList.toggle('locked',locked); });
+    ['tw-chip','th-chip'].forEach(function(id){ el(id).innerHTML=locked?LOCK_ICON:SPARK_ICON; el(id).classList.toggle('lockchip',locked); });
+    var ct = mode==='base' ? 'Premium · upgrade to unlock' : mode==='mgr' ? 'Ask your owner to turn this on' : null;
+    el('tw-ct').innerHTML = ct || 'Scan a cocktail list or recipe sheet · <b>6 of 10 credits</b>';
+    el('th-ct').innerHTML = ct || 'AI scan · <b>6 of 10 credits</b>';
+    el('tw-prem').textContent = mode==='mgr' ? 'Locked' : '✦ Premium';
+    el('th-prem').textContent = mode==='mgr' ? 'Locked' : '✦ Premium';
+    /* nav sheet row */
+    el('nav-up').classList.toggle('lock',locked);
+    el('nav-up-sub').textContent = ct || 'Scan a cocktail list or recipe sheet';
+    el('nav-up-star').style.display = locked?'none':'';
+    el('nav-up-lock').style.display = locked?'':'none';
+    el('f1cap').textContent = mode==='base'
+      ? 'Base tier: the tile stays, a padlock replaces the sparkles and the second line says why. Tapping it opens the sheet in its PremiumGate state (frame 2 › Base tier) — the Upgrade button lives there, not on the tile.'
+      : mode==='mgr'
+      ? 'A manager without the grant: same padlock, "Ask your owner to turn this on". The owner flips AI Libation Uploads in Org Settings › Jobs & Tools › Manager Permissions › Menu Access.'
+      : 'The tile is tinted glass (the premium Tools-tile finish) so it reads as an action, not a fifth book. Tap → the Upload Libations sheet. Locked states keep the tile visible: a padlock in the icon chip and the reason on the second line, never hidden.';
+  }
+  all('[data-l]',function(b){b.addEventListener('click',function(){
+    all('[data-l]',function(x){x.classList.remove('on')}); b.classList.add('on'); setLock(b.getAttribute('data-l'));
+  })});
+
+  /* frame 2 · sheet state */
+  all('[data-u]',function(b){b.addEventListener('click',function(){
+    all('[data-u]',function(x){x.classList.remove('on')}); b.classList.add('on');
+    var m=b.getAttribute('data-u');
+    ['ready','scan','base','mgr'].forEach(function(k){ el('up-'+k).style.display = k===m?'':'none'; });
+    if(m==='scan') startRotor(); else stopRotor();
+  })});
+
+  /* frame 4 · which sheet */
+  var editMode='edit';
+  function setEdit(m){
+    editMode=m;
+    all('[data-e]',function(x){x.classList.toggle('on',x.getAttribute('data-e')===m)});
+    if(frame!=='f4') return;
+    if(m==='edit'){ open('editovl'); close('destovl'); } else { open('destovl'); close('editovl'); }
+  }
+  all('[data-e]',function(b){b.addEventListener('click',function(){ setEdit(b.getAttribute('data-e')); })});
+  /* closing a frame-4 sheet by the scrim re-opens it (the frame IS the sheet) */
+  all('#editovl .scr, #destovl .scr',function(s){ s.addEventListener('click',function(){ if(frame==='f4') setTimeout(function(){ setEdit(editMode); },0); }); });
+
+  /* palette */
+  all('[data-t]',function(b){b.addEventListener('click',function(){
+    all('[data-t]',function(x){x.classList.remove('on')}); b.classList.add('on');
+    phone.className='phone '+b.getAttribute('data-t');
+  })});
+})();
+</script>
+</body>
+</html>

@@ -34,7 +34,8 @@ export type UploadPurpose =
   | 'profile_picture'
   | 'org_logo'
   | 'menu_upload_file'
-  | 'schedule_upload_file';
+  | 'schedule_upload_file'
+  | 'libation_upload_file';
 
 interface SignUploadResponse {
   success: boolean;

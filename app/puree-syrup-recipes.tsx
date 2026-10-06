@@ -35,11 +35,25 @@ interface PureeSyrupRecipe {
   procedure: string | null;
   procedure_es?: string | null;
   thumbnail_url: string | null;
+  // s90 multi-images: every stored photo URL, cover first (mirrors thumbnail_url).
+  images?: string[] | null;
   display_order: number;
   is_active: boolean;
 }
 
 type PureeSyrupRow = Database['public']['Functions']['get_puree_syrup_recipes']['Returns'][number];
+
+// The RPC's `images` Json → the stored-URL list, cover first. Rows from before
+// s90 carry no list (or an empty one), so the lone thumbnail stands in for it.
+const parseImageList = (raw: unknown, thumbnail?: string | null): string[] => {
+  let value = raw;
+  if (typeof value === 'string' && value.trim().startsWith('[')) {
+    try { value = JSON.parse(value); } catch { value = null; }
+  }
+  const list = Array.isArray(value) ? value.filter((u): u is string => typeof u === 'string' && !!u) : [];
+  if (list.length > 0) return list;
+  return thumbnail ? [thumbnail] : [];
+};
 
 // The built-in categories keep their canonical EN values in the DB; owners can
 // also mint custom category strings from the editor's picker (s73), so the
@@ -77,7 +91,13 @@ export default function PureeSyrupRecipesScreen() {
         throw error;
       }
       const sorted = (data || []).slice().sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
-      setRecipes(sorted as (PureeSyrupRow & { ingredients: { amount: string; ingredient: string }[] })[]);
+      // The Json photo list → string[] once, here (the Poster pages it).
+      setRecipes(
+        (sorted as (PureeSyrupRow & { ingredients: { amount: string; ingredient: string }[] })[]).map((r) => ({
+          ...r,
+          images: parseImageList(r.images, r.thumbnail_url),
+        }))
+      );
     } catch (error) {
       console.error('Error loading puree syrup recipes:', error);
     } finally {
@@ -273,7 +293,8 @@ export default function PureeSyrupRecipesScreen() {
       )}
 
       {/* Recipe detail — the shared recipe Poster: no price, the category on
-          the slate pill. */}
+          the slate pill. Managers get the Edit chip, which deep-links into the
+          editor's edit modal by name (?edit=). */}
       <RecipeDetailSheet
         visible={showDetailModal}
         onClose={closeDetailModal}
@@ -285,7 +306,12 @@ export default function PureeSyrupRecipesScreen() {
           // Real thumbnails only — the Unsplash placeholder is a tile stand-in;
           // the Poster shows its slate board instead.
           thumbnail_url: selectedRecipe.thumbnail_url,
+          images: parseImageList(selectedRecipe.images, selectedRecipe.thumbnail_url),
           subcategoryLabel: getCategoryLabel(selectedRecipe.category || 'Other'),
+        } : null}
+        editAction={isManager && selectedRecipe ? {
+          label: t('common.edit'),
+          onPress: () => router.push({ pathname: '/puree-syrup-recipes-editor', params: { edit: selectedRecipe.name } } as any),
         } : null}
       />
     </View>

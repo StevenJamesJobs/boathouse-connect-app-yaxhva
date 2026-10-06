@@ -27,6 +27,8 @@ export interface MenuItemForDetail {
   price: string;
   thumbnail_url: string | null;
   thumbnail_shape: string;
+  /** s90: the stored photo list (cover first); the Poster pages it. */
+  images?: string[] | null;
   location?: string | null;
   location_es?: string | null;
   glass_price?: string | null;
@@ -171,7 +173,13 @@ export default function MenuItemDetailSheet({
   const flavor = item ? getLocalizedField(item, 'flavor_profile', language).trim() : '';
   const usp = item ? getLocalizedField(item, 'unique_selling_points', language).trim() : '';
 
-  const images = useMemo<string[]>(() => (item?.thumbnail_url ? [item.thumbnail_url] : []), [item?.thumbnail_url]);
+  // The Poster pages the stored list (cover first, s90); a pre-s90 row has
+  // only its thumbnail, which still makes a one-page hero.
+  const images = useMemo<string[]>(() => {
+    const list = item?.images;
+    if (list && list.length > 0) return list;
+    return item?.thumbnail_url ? [item.thumbnail_url] : [];
+  }, [item?.images, item?.thumbnail_url]);
 
   // ─── The pill row set into the photo ──────────────────────────────────────
   // Subcategory when the item has one, else its category.
