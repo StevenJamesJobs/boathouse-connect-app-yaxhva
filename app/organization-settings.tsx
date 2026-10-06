@@ -83,6 +83,8 @@ const PERM_SECTIONS: PermSectionDef[] = [
     rows: [
       { key: 'menu.edit_categories', live: true, labelKey: 'menu_sheet.edit_categories', labelFallback: 'Edit Categories', subKey: 'menu_sheet.edit_categories_sub', subFallback: 'Rename, hide, reorder, set colours' },
       { key: 'premium.ai_menu_upload', live: true, premium: true, labelKey: 'org_settings.perm_ai_uploads', labelFallback: 'AI Menu Uploads' },
+      // s90: the Libations AI Upload — between the menu upload and Menu Configuration (Steve's placement).
+      { key: 'premium.ai_libation_upload', live: true, premium: true, labelKey: 'org_settings.perm_libation_uploads', labelFallback: 'AI Libation Uploads', subKey: 'org_settings.perm_libation_uploads_sub', subFallback: 'Scan recipe sheets and spend upload credits' },
       { key: 'org_settings.menu', live: true, labelKey: 'menu_sheet.menu_configuration', labelFallback: 'Menu Configuration', subKey: 'menu_sheet.menu_configuration_sub', subFallback: 'Menu names, icons, one menu or two' },
     ],
   },

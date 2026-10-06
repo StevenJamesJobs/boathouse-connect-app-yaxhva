@@ -69,6 +69,8 @@ interface MenuItem {
   is_salt_free: boolean;
   thumbnail_url: string | null;
   thumbnail_shape: string;
+  /** s90: the stored photo list (cover first) — get_menu_items' Json, cast. */
+  images?: string[] | null;
   display_order: number;
   is_active: boolean;
   is_weekly_special: boolean;
@@ -101,6 +103,12 @@ interface PageConfig {
 // lower()-based and the AI upload path writes free-text names. Matching always
 // normalizes; display always prints the stored/translated name.
 const catKey = (name: string | null | undefined) => (name || '').toLowerCase();
+
+// get_menu_items returns `images` as Json (the stored photo list, cover first
+// — s90); the editor carries it as string[] so the edit sheet can seed its
+// strip and the delete flow can clean EVERY blob, not just the cover.
+const rowsToItems = (rows: unknown[] | null): MenuItem[] =>
+  ((rows || []) as MenuItem[]).map((r) => ({ ...r, images: Array.isArray(r.images) ? r.images : null }));
 
 // s88: the trailing virtual page that gathers a category's strays (same key as
 // the user side's 'Other' page; never persisted) — see strayItemsOf.
@@ -344,8 +352,8 @@ export default function MenuEditorScreen() {
       ]);
       if (seq !== loadSeqRef.current) return;
       if (scoped.error) throw scoped.error;
-      setMenuItems((scoped.data || []) as MenuItem[]);
-      setAllItems((all.data || []) as MenuItem[]);
+      setMenuItems(rowsToItems(scoped.data));
+      setAllItems(rowsToItems(all.data));
     } catch (error) {
       if (seq !== loadSeqRef.current) return;
       console.error('Error loading menu items:', error);
@@ -538,12 +546,15 @@ export default function MenuEditorScreen() {
               });
               if (error) throw error;
               // Blob cleanup is best-effort — a storage failure must not
-              // report the (already committed) delete as failed.
-              if (item.thumbnail_url) {
+              // report the (already committed) delete as failed. Every photo
+              // goes (s90: up to four; a pre-s90 row has only its thumbnail),
+              // in the broker's 10-url chunks.
+              const photos = item.images?.length ? item.images : item.thumbnail_url ? [item.thumbnail_url] : [];
+              for (let i = 0; i < photos.length; i += 10) {
                 try {
-                  await brokerDelete('menu-items', [item.thumbnail_url], user.id);
+                  await brokerDelete('menu-items', photos.slice(i, i + 10), user.id);
                 } catch (e) {
-                  console.error('Error deleting menu item image:', e);
+                  console.error('Error deleting menu item images:', e);
                 }
               }
               Alert.alert(t('common:success'), t('menu_editor:deleted_success'));
@@ -739,6 +750,7 @@ export default function MenuEditorScreen() {
       price: item.price,
       thumbnail_url: item.thumbnail_url,
       thumbnail_shape: item.thumbnail_shape,
+      images: item.images ?? null,
       location: item.location ?? null,
       location_es: item.location_es ?? null,
       glass_price: item.glass_price ?? null,

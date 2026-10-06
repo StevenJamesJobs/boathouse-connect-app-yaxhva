@@ -68,6 +68,8 @@ interface MenuItem {
   is_salt_free: boolean;
   thumbnail_url: string | null;
   thumbnail_shape: string;
+  /** s90: the stored photo list (cover first) — the Poster pages it. */
+  images?: string[] | null;
   display_order: number;
   is_active: boolean;
   is_weekly_special?: boolean;
@@ -817,7 +819,12 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     });
 
     if (error) throw error;
-    let items: MenuItem[] = data || [];
+    // get_menu_items returns `images` as Json (stored URLs, cover first — s90);
+    // carried as string[] so the detail Poster can page the set.
+    let items: MenuItem[] = (data || []).map((r) => ({
+      ...r,
+      images: Array.isArray(r.images) ? (r.images as string[]) : null,
+    }));
 
     if (seasonKey === 'summer') {
       // Mirror the winter dedup: hide manually-entered Libations cocktail menu
@@ -853,6 +860,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
           is_sugar_free: false,
           is_salt_free: false,
           thumbnail_url: r.thumbnail_url,
+          images: Array.isArray(r.images) ? r.images : (r.thumbnail_url ? [r.thumbnail_url] : []),
           thumbnail_shape: 'square',
           display_order: r.is_featured ? -1000 + r.display_order : r.display_order,
           is_active: true,
@@ -899,6 +907,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
           is_sugar_free: false,
           is_salt_free: false,
           thumbnail_url: r.thumbnail_url,
+          images: Array.isArray(r.images) ? r.images : (r.thumbnail_url ? [r.thumbnail_url] : []),
           thumbnail_shape: 'square',
           display_order: r.is_featured ? -1000 + r.display_order : r.display_order,
           is_active: true,
@@ -1358,6 +1367,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
       price: item.price,
       thumbnail_url: item.thumbnail_url,
       thumbnail_shape: item.thumbnail_shape,
+      images: item.images ?? null,
       location: item.location ?? null,
       location_es: item.location_es ?? null,
       glass_price: item.glass_price ?? null,

@@ -22,6 +22,18 @@
 import i18n from '@/i18n';
 
 const EXACT_MAP: Record<string, string> = {
+  // s90 Libations AI Upload (create_menu_upload / save_menu_upload_draft /
+  // apply_parsed_libations / parse-libations credits) + the photo cap (_images_norm).
+  // 'Upload not found', 'Subcategory not found' and the taken-name string are
+  // already mapped below.
+  'You do not have permission to upload libation recipes': 'server_errors.s90_libation_upload_forbidden',
+  'This upload has already been applied': 'server_errors.s90_upload_already_applied',
+  'Invalid target menu': 'server_errors.s90_invalid_target_menu',
+  'Libations category not found': 'server_errors.s90_libations_category_missing',
+  'Recipe name is required': 'server_errors.s90_recipe_name_required',
+  'Nothing to add': 'server_errors.s90_nothing_to_add',
+  'Up to 4 photos per item': 'server_errors.s90_photo_cap',
+  'You’re out of upload credits this month. They reset next month, or upgrade for more.': 'server_errors.s90_upload_credits_exhausted',
   // s84 profile hub (update_profile_info)
   'Tagline must be 60 characters or fewer': 'server_errors.s84_tagline_too_long',
   // s83 schedule wave (request_time_off / decide_* / release_shift / claim_shift /

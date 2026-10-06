@@ -25,6 +25,7 @@ import AmbientGlow from '@/components/AmbientGlow';
 import ScreenHeader from '@/components/ScreenHeader';
 import HeaderNavMenu from '@/components/HeaderNavMenu';
 import RecipeDetailSheet from '@/components/RecipeDetailSheet';
+import LibationUploadSheet from '@/components/LibationUploadSheet';
 import { useManagerPermissions } from '@/hooks/useManagerPermissions';
 import { RECIPE_TILE_SIZE } from '@/components/RecipeGridCard';
 import { fonts } from '@/constants/fonts';
@@ -42,6 +43,8 @@ interface LibationRecipe {
   procedure: string | null;
   procedure_es?: string | null;
   thumbnail_url: string | null;
+  /** s90: every photo, cover first — the Poster pages them. */
+  images?: string[] | null;
   display_order: number;
   is_active: boolean;
 }
@@ -67,6 +70,9 @@ export default function SummerLibationRecipesScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRecipe, setSelectedRecipe] = useState<LibationRecipe | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  // s90: Upload Libations on the To Editor sheet too (the sheet carries the
+  // premium + grant gates; this page only mounts it for managers/owners).
+  const [uploadVisible, setUploadVisible] = useState(false);
   // Featured hero pager: measured width (full-bleed pages) + active dot.
   const [heroW, setHeroW] = useState(0);
   const [heroIdx, setHeroIdx] = useState(0);
@@ -86,7 +92,10 @@ export default function SummerLibationRecipesScreen() {
         throw error;
       }
       const sorted = (data || []).slice().sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
-      setRecipes(sorted as (LibationRow & { ingredients: { amount: string; ingredient: string }[] })[]);
+      setRecipes(sorted.map((r) => ({
+        ...r,
+        images: Array.isArray(r.images) ? (r.images as string[]) : null,
+      })) as (LibationRow & { ingredients: { amount: string; ingredient: string }[]; images: string[] | null })[]);
     } catch (error) {
       console.error('Error loading libation recipes:', error);
     } finally {
@@ -243,6 +252,13 @@ export default function SummerLibationRecipesScreen() {
                 iosIcon: 'fork.knife',
                 androidIcon: 'restaurant-menu',
                 onPress: () => router.push('/menu-editor' as any),
+              },
+              {
+                key: 'upload',
+                label: t('bartender_assistant_editor.upload_tile'),
+                iosIcon: 'sparkles',
+                androidIcon: 'auto-awesome',
+                onPress: () => setUploadVisible(true),
               },
             ]}
           />
@@ -409,6 +425,7 @@ export default function SummerLibationRecipesScreen() {
           // Real thumbnails only — the Unsplash placeholder is a tile stand-in;
           // the Poster shows its slate board instead.
           thumbnail_url: selectedRecipe.thumbnail_url,
+          images: selectedRecipe.images,
           subcategoryLabel: recipePillLabel(selectedRecipe),
         } : null}
         editAction={isManager && selectedRecipe ? {
@@ -416,6 +433,7 @@ export default function SummerLibationRecipesScreen() {
           onPress: () => router.push({ pathname: '/summer-libation-recipes-editor', params: { edit: selectedRecipe.name } } as any),
         } : null}
       />
+      {isManager && <LibationUploadSheet visible={uploadVisible} onClose={() => setUploadVisible(false)} defaultSlot={2} />}
     </View>
   );
 }

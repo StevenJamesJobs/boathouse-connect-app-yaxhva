@@ -60,6 +60,8 @@ export interface RecipeForDetail {
   procedure?: string | null;
   procedure_es?: string | null;
   thumbnail_url?: string | null;
+  /** s90 multi-images: every photo, cover first — the Poster pages them. */
+  images?: string[] | null;
   /** The slate pill set into the photo — subcategory, category or alcohol type. */
   subcategoryLabel?: string | null;
 }
@@ -93,7 +95,8 @@ export default function RecipeDetailSheet({ visible, onClose, recipe, editAction
 
   const price = r?.price?.trim() || '';
   const subcategoryLabel = r?.subcategoryLabel?.trim() || '';
-  const images = r?.thumbnail_url ? [r.thumbnail_url] : [];
+  // The photo list when the row carries one (s90), else the lone cover.
+  const images = r?.images && r.images.length > 0 ? r.images : r?.thumbnail_url ? [r.thumbnail_url] : [];
   const ingredients = (r?.ingredients || []).filter((i) => !!i && !!(i.ingredient || '').trim());
   const procedure = r ? getLocalizedField(r, 'procedure', language).trim() : '';
 

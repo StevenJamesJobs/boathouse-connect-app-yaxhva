@@ -25,6 +25,7 @@ import ScreenHeader from '@/components/ScreenHeader';
 import HeaderNavMenu from '@/components/HeaderNavMenu';
 import ProgressRing from '@/components/ProgressRing';
 import RecipeDetailSheet from '@/components/RecipeDetailSheet';
+import LibationUploadSheet from '@/components/LibationUploadSheet';
 import { RECIPE_TILE_SIZE } from '@/components/RecipeGridCard';
 import { menuIconAndroid } from '@/constants/menuIcons';
 import { fonts } from '@/constants/fonts';
@@ -42,6 +43,8 @@ interface FeaturedSip {
   name: string;
   price: string;
   thumbnail_url: string | null;
+  /** s90: every photo (cover first) — the Poster pages them. */
+  images: string[];
   /** Which libation menu it came from — the Poster's pill + its editor deep link. */
   menu: 1 | 2;
   glassware: string | null;
@@ -78,6 +81,10 @@ export default function BartenderAssistantScreen() {
   const [hub, setHub] = useState<HubData | null>(null);
   const [featuredDetail, setFeaturedDetail] = useState<FeaturedSip | null>(null);
   const [showFeaturedDetail, setShowFeaturedDetail] = useState(false);
+  // s90: the Libations AI Upload row on the To Editor sheet too (Steve's device
+  // round) — managers/owners only (the sheet itself carries the premium + grant
+  // gates), the same sheet the editor hub's tile opens.
+  const [uploadVisible, setUploadVisible] = useState(false);
 
   // A one-menu restaurant has no Menu 2 libations — its recipes tile and
   // featured sips stay out (any saved Menu 2 recipes are kept, just unlisted)
@@ -110,6 +117,7 @@ export default function BartenderAssistantScreen() {
         (items || []).filter((i) => doneIds.has(i.id)).length;
       const toSip = (menu: 1 | 2) => (r: any): FeaturedSip => ({
         id: r.id, name: r.name, price: r.price, thumbnail_url: r.thumbnail_url, menu,
+        images: Array.isArray(r.images) ? (r.images as string[]) : [],
         glassware: r.glassware ?? null, garnish: r.garnish ?? null,
         ingredients: r.ingredients ?? [], procedure: r.procedure ?? null, procedure_es: r.procedure_es ?? null,
       });
@@ -280,6 +288,13 @@ export default function BartenderAssistantScreen() {
           androidIcon: 'restaurant-menu',
           onPress: () => router.push('/menu-editor' as any),
         },
+        {
+          key: 'upload',
+          label: t('bartender_assistant_editor.upload_tile'),
+          iosIcon: 'sparkles',
+          androidIcon: 'auto-awesome',
+          onPress: () => setUploadVisible(true),
+        },
       ]}
     />
   );
@@ -299,7 +314,23 @@ export default function BartenderAssistantScreen() {
         </View>
       ) : (
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-          {/* ── Featured shelf (hides at zero ✦) ── */}
+          {/* ── Checklist rings ── */}
+          {zlabel(t('bartender_assistant.checklists'))}
+          <View style={styles.tileRow}>
+            {ringTile({
+              iconIos: 'sunrise.fill', iconAndroid: 'wb-sunny',
+              name: t('bartender_assistant.opening_checklist'),
+              now: openingIsNow, stat: hub.opening, route: '/bartender-opening-checklist',
+            })}
+            {ringTile({
+              iconIos: 'moon.fill', iconAndroid: 'nightlight',
+              name: t('bartender_assistant.closing_checklist'),
+              now: !openingIsNow, stat: hub.closing, route: '/bartender-closing-checklist',
+            })}
+          </View>
+
+          {/* ── Featured shelf (hides at zero ✦) — under the checklists, above the
+              recipes (Steve, s90) ── */}
           {hub.featured.length > 0 && (
             <>
               {zlabel(t('bartender_assistant.featured_tonight'), hub.featured.length)}
@@ -335,21 +366,6 @@ export default function BartenderAssistantScreen() {
               </ScrollView>
             </>
           )}
-
-          {/* ── Checklist rings ── */}
-          {zlabel(t('bartender_assistant.checklists'))}
-          <View style={styles.tileRow}>
-            {ringTile({
-              iconIos: 'sunrise.fill', iconAndroid: 'wb-sunny',
-              name: t('bartender_assistant.opening_checklist'),
-              now: openingIsNow, stat: hub.opening, route: '/bartender-opening-checklist',
-            })}
-            {ringTile({
-              iconIos: 'moon.fill', iconAndroid: 'nightlight',
-              name: t('bartender_assistant.closing_checklist'),
-              now: !openingIsNow, stat: hub.closing, route: '/bartender-closing-checklist',
-            })}
-          </View>
 
           {/* ── Recipe launcher grid ── */}
           {zlabel(t('bartender_assistant.recipes_label'))}
@@ -396,6 +412,7 @@ export default function BartenderAssistantScreen() {
           procedure: featuredDetail.procedure,
           procedure_es: featuredDetail.procedure_es,
           thumbnail_url: featuredDetail.thumbnail_url,
+          images: featuredDetail.images,
           // The shelf mixes both menus, so the pill names the menu when that
           // disambiguates; a one-menu hub shows the price pill alone.
           subcategoryLabel: twoMenus ? menuName(featuredDetail.menu) : null,
@@ -409,6 +426,7 @@ export default function BartenderAssistantScreen() {
         } : null}
       />
 
+      {isManager && <LibationUploadSheet visible={uploadVisible} onClose={() => setUploadVisible(false)} />}
       <BottomNavBar activeTab="tools" />
     </View>
   );

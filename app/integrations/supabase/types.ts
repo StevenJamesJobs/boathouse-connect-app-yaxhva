@@ -4469,6 +4469,7 @@ export type Database = {
           p_unique_selling_points?: string
           p_unique_selling_points_es?: string
           p_user_id: string
+          p_images?: Json
         }
         Returns: string
       }
@@ -4924,6 +4925,7 @@ export type Database = {
           procedure: string
           procedure_es: string
           thumbnail_url: string
+          images: Json
         }[]
       }
       get_libation_recipes: {
@@ -4944,6 +4946,7 @@ export type Database = {
           procedure_es: string
           subcategory_id: string
           thumbnail_url: string
+          images: Json
         }[]
       }
       get_summer_libation_recipes: {
@@ -4964,6 +4967,7 @@ export type Database = {
           procedure_es: string
           subcategory_id: string
           thumbnail_url: string
+          images: Json
         }[]
       }
       get_puree_syrup_recipes: {
@@ -4979,6 +4983,7 @@ export type Database = {
           procedure: string
           procedure_es: string
           thumbnail_url: string
+          images: Json
         }[]
       }
       get_wine_pairings: {
@@ -5056,6 +5061,7 @@ export type Database = {
           unique_selling_points: string
           unique_selling_points_es: string
           updated_at: string
+          images: Json
         }[]
       }
       reorder_menu_items: {
@@ -5415,6 +5421,8 @@ export type Database = {
           status: string
           target_menu_slot: number
           was_free: boolean
+          upload_kind: string
+          items_skipped: number
         }[]
       }
       create_menu_upload: {
@@ -5424,6 +5432,8 @@ export type Database = {
           p_file_url: string
           p_page_count: number
           p_source_type: string
+          p_kind?: string
+          p_target_slot?: number
         }
         Returns: string
       }
@@ -5462,6 +5472,20 @@ export type Database = {
         }
         Returns: Json
       }
+      apply_parsed_libations: {
+        Args: {
+          p_actor_id: string
+          p_payload: Json
+          p_target_slot: number
+          p_upload_id: string
+        }
+        Returns: Json
+      }
+      save_menu_upload_draft: {
+        Args: { p_actor_id: string; p_parsed_result: Json; p_upload_id: string }
+        Returns: boolean
+      }
+
       get_manager_permissions: {
         Args: { p_actor_id: string }
         Returns: {
@@ -5744,6 +5768,7 @@ export type Database = {
           p_procedure: string
           p_thumbnail_url: string
           p_user_id: string
+          p_images?: Json
         }
         Returns: string
       }
@@ -5762,6 +5787,7 @@ export type Database = {
           p_subcategory_id?: string
           p_thumbnail_url: string
           p_user_id: string
+          p_images?: Json
         }
         Returns: string
       }
@@ -5775,6 +5801,7 @@ export type Database = {
           p_procedure: string
           p_thumbnail_url: string
           p_user_id: string
+          p_images?: Json
         }
         Returns: string
       }
@@ -5793,6 +5820,7 @@ export type Database = {
           p_subcategory_id?: string
           p_thumbnail_url?: string
           p_user_id: string
+          p_images?: Json
         }
         Returns: string
       }
@@ -6090,6 +6118,7 @@ export type Database = {
           p_procedure: string
           p_thumbnail_url: string
           p_user_id: string
+          p_images?: Json
         }
         Returns: boolean
       }
@@ -6155,6 +6184,7 @@ export type Database = {
           p_subcategory_id?: string
           p_thumbnail_url: string
           p_user_id: string
+          p_images?: Json
         }
         Returns: boolean
       }
@@ -6200,6 +6230,7 @@ export type Database = {
           p_unique_selling_points?: string
           p_unique_selling_points_es?: string
           p_user_id: string
+          p_images?: Json
         }
         Returns: undefined
       }
@@ -6296,6 +6327,7 @@ export type Database = {
           p_recipe_id: string
           p_thumbnail_url: string
           p_user_id: string
+          p_images?: Json
         }
         Returns: undefined
       }
@@ -6369,6 +6401,7 @@ export type Database = {
           p_subcategory_id?: string
           p_thumbnail_url?: string
           p_user_id: string
+          p_images?: Json
         }
         Returns: undefined
       }

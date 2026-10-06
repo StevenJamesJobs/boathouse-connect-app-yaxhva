@@ -46,6 +46,9 @@
 //
 // v17 (session 89): 'notification-images' — the optional photo on a general
 //   notification (purpose notification_image, managers, 10 MB images).
+//
+// v18 (session 90): libation_upload_file — the Libations AI Upload scan file
+//   (menu-uploads bucket, grantKey premium.ai_libation_upload).
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -214,6 +217,14 @@ const GATES: Record<string, Gate> = {
     bucket: 'schedules', roles: 'owner', maxBytes: 25 * MB, mimes: UPLOAD_DOC_TYPES,
     path: (c) => `${c.orgId}/${c.ts}-${c.safeName}`,
     grantKey: 'premium.ai_schedule_upload',
+  },
+  libation_upload_file: {
+    // v18 (s90): the Libations AI Upload — same bucket + layout as a menu scan
+    // (parse-libations reads only this bucket under the org prefix); owner, or a
+    // manager holding premium.ai_libation_upload (_may_upload_libations server-side).
+    bucket: 'menu-uploads', roles: 'owner', maxBytes: 25 * MB, mimes: UPLOAD_DOC_TYPES,
+    path: (c) => `${c.orgId}/${c.ts}-${c.safeName}`,
+    grantKey: 'premium.ai_libation_upload',
   },
 };
 

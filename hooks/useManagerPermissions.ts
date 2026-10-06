@@ -15,6 +15,8 @@ import { useAuth } from '@/contexts/AuthContext';
 //   'org_settings.access'     → manager may open/edit the Access tab (join code,
 //                                self-signup, roster toggle, default password)
 //   'premium.review_refresh'  → manager may run manual Google-review refreshes
+//   'premium.ai_libation_upload' → s90: manager may run the Libations AI Upload
+//                                (spends the same credit pool as the menu upload)
 
 export interface ManagerPermissions {
   menuConfig: boolean;
@@ -26,17 +28,19 @@ export interface ManagerPermissions {
   reviewRefresh: boolean;
   /** 'premium.ai_schedule_upload' — LIVE since s83 (schedule scans + their credits) */
   aiScheduleUpload: boolean;
+  /** 'premium.ai_libation_upload' — s90: the Libations AI Upload (shares the menu-upload credit pool) */
+  aiLibationUpload: boolean;
 }
 
 const NONE: ManagerPermissions = {
   menuConfig: false, editCategories: false, aiUpload: false,
   branding: false, jobsTools: false, access: false, reviewRefresh: false,
-  aiScheduleUpload: false,
+  aiScheduleUpload: false, aiLibationUpload: false,
 };
 const ALL: ManagerPermissions = {
   menuConfig: true, editCategories: true, aiUpload: true,
   branding: true, jobsTools: true, access: true, reviewRefresh: true,
-  aiScheduleUpload: true,
+  aiScheduleUpload: true, aiLibationUpload: true,
 };
 
 interface UseManagerPermissionsResult {
@@ -84,6 +88,7 @@ export function useManagerPermissions(): UseManagerPermissionsResult {
         access: byKey.get('org_settings.access') ?? false,
         reviewRefresh: byKey.get('premium.review_refresh') ?? false,
         aiScheduleUpload: byKey.get('premium.ai_schedule_upload') ?? false,
+        aiLibationUpload: byKey.get('premium.ai_libation_upload') ?? false,
       });
     } catch (e) {
       // Fail CLOSED — an unreadable grant must never unlock anything.

@@ -44,6 +44,8 @@ interface MenuUpload {
   was_free: boolean | null;
   error_message: string | null;
   created_at: string;
+  /** s90: 'menu' | 'libations' — ONE Recent Uploads list for both scanners. */
+  upload_kind?: string | null;
 }
 
 interface Quota {
@@ -64,7 +66,7 @@ export default function MenuUploadScreen() {
   useRequireManagerRoute();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ onboarding?: string }>();
+  const params = useLocalSearchParams<{ onboarding?: string; tab?: string }>();
   const isOnboarding = params.onboarding === '1';
   const colors = useThemeColors();
   const { user } = useAuth();
@@ -73,8 +75,9 @@ export default function MenuUploadScreen() {
   const { perms } = useManagerPermissions();
   const { t } = useTranslation();
 
-  // s72: concept B — Upload | Recent Uploads tabs.
-  const [tab, setTab] = useState<'upload' | 'history'>('upload');
+  // s72: concept B — Upload | Recent Uploads tabs. `?tab=history` lands on
+  // Recent (s90: the Libations upload sheet's History row).
+  const [tab, setTab] = useState<'upload' | 'history'>(params.tab === 'history' ? 'history' : 'upload');
   const [uploads, setUploads] = useState<MenuUpload[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -615,24 +618,36 @@ export default function MenuUploadScreen() {
                   // ready_for_review → the live review; applied → the read-only
                   // scan viewer (the parsed snapshot outlives replaces — s72).
                   onPress={() => {
+                    // s90: a libations scan reviews on its own page (the same
+                    // ready → review / applied → viewer split).
+                    const review = u.upload_kind === 'libations' ? '/libation-upload-review' : '/menu-upload-review';
                     if (u.status === 'ready_for_review') {
-                      router.push({ pathname: '/menu-upload-review', params: { upload_id: u.id, ...(isOnboarding ? { onboarding: '1' } : {}) } });
+                      router.push({ pathname: review, params: { upload_id: u.id, ...(isOnboarding ? { onboarding: '1' } : {}) } } as any);
                     } else if (u.status === 'applied') {
-                      router.push({ pathname: '/menu-upload-review', params: { upload_id: u.id, view: '1' } });
+                      router.push({ pathname: review, params: { upload_id: u.id, view: '1' } } as any);
                     }
                   }}
                 >
                   <IconSymbol
-                    ios_icon_name={u.source_type === 'image' ? 'photo' : 'doc'}
-                    android_material_icon_name={u.source_type === 'image' ? 'image' : 'description'}
+                    ios_icon_name={u.upload_kind === 'libations' ? 'wineglass' : u.source_type === 'image' ? 'photo' : 'doc'}
+                    android_material_icon_name={u.upload_kind === 'libations' ? 'local-bar' : u.source_type === 'image' ? 'image' : 'description'}
                     size={20}
                     color={colors.textSecondary}
                   />
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.historyName, { color: colors.text }]} numberOfLines={1}>{u.file_name}</Text>
+                    <View style={styles.historyNameRow}>
+                      <Text style={[styles.historyName, styles.historyNameShrink, { color: colors.text }]} numberOfLines={1}>{u.file_name}</Text>
+                      {u.upload_kind === 'libations' && (
+                        <View style={[styles.kindPill, { backgroundColor: colors.primary + '26' }]}>
+                          <Text style={[styles.kindPillText, { color: colors.primary }]}>{t('menu_upload.kind_libations').toUpperCase()}</Text>
+                        </View>
+                      )}
+                    </View>
                     <Text style={[styles.historyMeta, { color: statusColor(u.status) }]}>
                       {statusLabel(u.status)}
-                      {u.status === 'applied' && u.items_inserted != null ? ` · ${u.items_inserted} ${t('menu_upload.items', 'items')}` : ''}
+                      {u.status === 'applied' && u.items_inserted != null
+                        ? ` · ${u.items_inserted} ${u.upload_kind === 'libations' ? t('menu_upload.recipes_word') : t('menu_upload.items', 'items')}`
+                        : ''}
                       {creditLabel(u) ? ` · ${creditLabel(u)}` : ''}
                     </Text>
                   </View>
@@ -843,6 +858,10 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderRadius: 13, borderWidth: StyleSheet.hairlineWidth + 0.5, marginBottom: 8,
   },
   historyName: { fontSize: 14, fontFamily: fonts.body.semibold },
+  historyNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  historyNameShrink: { flexShrink: 1 },
+  kindPill: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, flexShrink: 0 },
+  kindPillText: { fontFamily: fonts.mono.semibold, fontSize: 8, letterSpacing: 0.6 },
   historyMeta: { fontSize: 11.5, fontFamily: fonts.mono.medium, marginTop: 2 },
   historyTrash: { padding: 4 },
   dangerWrap: { marginTop: 20, alignItems: 'center', gap: 9 },

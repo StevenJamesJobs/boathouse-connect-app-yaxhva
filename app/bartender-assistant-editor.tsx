@@ -18,7 +18,9 @@ import BottomNavBar from '@/components/BottomNavBar';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useManagerPermissions } from '@/hooks/useManagerPermissions';
+import { useSubscription } from '@/contexts/SubscriptionContext';
 import { supabase } from '@/app/integrations/supabase/client';
+import LibationUploadSheet from '@/components/LibationUploadSheet';
 import { StorageImage } from '@/components/StorageImage';
 import AmbientGlow from '@/components/AmbientGlow';
 import ScreenHeader from '@/components/ScreenHeader';
@@ -62,10 +64,18 @@ export default function BartenderAssistantEditorScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
-  const { organization } = useOrganization();
+  const { organization, organizationId } = useOrganization();
   const { user } = useAuth();
   const { perms } = useManagerPermissions();
+  const { hasPremium } = useSubscription();
   const [hub, setHub] = useState<HubData | null>(null);
+  // s90: the Libations AI Upload — the tile at the end of the Recipes grid +
+  // the row on the To User sheet open ONE sheet. The grant (or the tier) only
+  // changes how the tile reads; the sheet carries the upsell / ask-your-owner.
+  const [uploadVisible, setUploadVisible] = useState(false);
+  const [credits, setCredits] = useState<{ remaining: number; max: number } | null>(null);
+  const isOwner = user?.role === 'owner';
+  const canUploadLibations = isOwner || perms.aiLibationUpload;
 
   // A one-menu restaurant has no Menu 2 libations — its recipes editor tile
   // and featured rows stay out (any saved Menu 2 recipes are kept, unlisted)
@@ -115,10 +125,21 @@ export default function BartenderAssistantEditorScreen() {
     }
   }, [user?.id, twoMenus]);
 
+  const loadCredits = useCallback(async () => {
+    if (!user?.id || !organizationId || !canUploadLibations || !hasPremium) {
+      setCredits(null);
+      return;
+    }
+    const { data } = await supabase.rpc('get_menu_upload_quota', { p_user_id: user.id, p_organization_id: organizationId });
+    const q = data as { success?: boolean; credits_remaining?: number; monthly_allowance?: number } | null;
+    if (q?.success) setCredits({ remaining: q.credits_remaining ?? 0, max: q.monthly_allowance ?? 0 });
+  }, [user?.id, organizationId, canUploadLibations, hasPremium]);
+
   useFocusEffect(
     useCallback(() => {
       loadHub();
-    }, [loadHub])
+      loadCredits();
+    }, [loadHub, loadCredits])
   );
 
   const zlabel = (label: string, count?: number) => (
@@ -205,6 +226,74 @@ export default function BartenderAssistantEditorScreen() {
     </TouchableOpacity>
   );
 
+  // The Upload Libations tile (s90): tinted glass (the premium Tools-tile
+  // finish) so it reads as an action, not a fifth book. WIDE when the recipe
+  // grid above it is even (both books present) so it closes the grid as its own
+  // row; HALF when Menu 2 is hidden so it fills the empty fourth slot (Steve's
+  // call). Locked states keep the tile visible: a padlock replaces the
+  // sparkles and the second line says why — never hidden.
+  const uploadTile = (wide: boolean) => {
+    const locked = !hasPremium || !canUploadLibations;
+    const sub = !hasPremium
+      ? t('bartender_assistant_editor.upload_locked_premium')
+      : !canUploadLibations
+        ? t('bartender_assistant_editor.upload_locked_owner')
+        : credits
+          ? `${t('bartender_assistant_editor.upload_tile_sub')} · ${t('bartender_assistant_editor.upload_tile_credits', { n: credits.remaining, max: credits.max })}`
+          : t('bartender_assistant_editor.upload_tile_sub');
+    const chip = (
+      <View style={[styles.iconChip, locked ? { backgroundColor: colors.glass } : { backgroundColor: colors.primary + '21' }]}>
+        <IconSymbol
+          ios_icon_name={locked ? 'lock.fill' : 'sparkles'}
+          android_material_icon_name={locked ? 'lock' : 'auto-awesome'}
+          size={18}
+          color={locked ? colors.textSecondary : colors.primary}
+        />
+      </View>
+    );
+    const pill = (
+      <View style={[styles.premPill, { backgroundColor: colors.primary + '26' }]}>
+        <Text style={[styles.premPillText, { color: colors.primary }]}>
+          {(locked && hasPremium ? t('bartender_assistant_editor.locked_pill') : `✦ ${t('common.premium_badge')}`).toUpperCase()}
+        </Text>
+      </View>
+    );
+    const tint = { backgroundColor: colors.primary + '1C', borderColor: colors.primary + '47' };
+    if (wide) {
+      return (
+        <TouchableOpacity
+          style={[styles.wideTile, tint, locked && styles.tileLocked]}
+          onPress={() => setUploadVisible(true)}
+          activeOpacity={0.7}
+        >
+          {chip}
+          <View style={styles.wideTileBody}>
+            <Text style={[styles.gridTileName, { color: colors.text }]} numberOfLines={1}>{t('bartender_assistant_editor.upload_tile')}</Text>
+            <Text style={[styles.gridTileCount, { color: locked ? colors.primary : colors.textSecondary }]} numberOfLines={2}>{sub}</Text>
+          </View>
+          {pill}
+          <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={14} color={colors.textSecondary} />
+        </TouchableOpacity>
+      );
+    }
+    return (
+      <TouchableOpacity
+        style={[styles.gridTile, tint, locked && styles.tileLocked]}
+        onPress={() => setUploadVisible(true)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.gridTileTop}>
+          {chip}
+          {pill}
+        </View>
+        <View>
+          <Text style={[styles.gridTileName, { color: colors.text }]} numberOfLines={2}>{t('bartender_assistant_editor.upload_tile')}</Text>
+          <Text style={[styles.gridTileCount, { color: locked ? colors.primary : colors.textSecondary }]} numberOfLines={2}>{sub}</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   const navMenu = (
     <HeaderNavMenu
       label={t('common:to_user')}
@@ -234,6 +323,14 @@ export default function BartenderAssistantEditorScreen() {
           androidIcon: 'restaurant-menu',
           onPress: () => router.push('/menu-editor' as any),
         },
+        {
+          // s90: the same sheet the tile opens (the sheet carries the gates).
+          key: 'upload',
+          label: t('bartender_assistant_editor.upload_tile'),
+          iosIcon: 'sparkles',
+          androidIcon: 'auto-awesome',
+          onPress: () => setUploadVisible(true),
+        },
       ]}
     />
   );
@@ -253,7 +350,23 @@ export default function BartenderAssistantEditorScreen() {
         </View>
       ) : (
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-          {/* ── Featured shelf (hides at zero ✦; taps land in the editors) ── */}
+          {/* ── Checklist editors ── */}
+          {zlabel(t('bartender_assistant.checklists'))}
+          <View style={styles.tileRow}>
+            {ringTile({
+              iconIos: 'sunrise.fill', iconAndroid: 'wb-sunny',
+              name: t('bartender_assistant_editor.opening_checklist_editor'),
+              stat: hub.opening, route: '/bartender-opening-checklist-editor',
+            })}
+            {ringTile({
+              iconIos: 'moon.fill', iconAndroid: 'nightlight',
+              name: t('bartender_assistant_editor.closing_checklist_editor'),
+              stat: hub.closing, route: '/bartender-closing-checklist-editor',
+            })}
+          </View>
+
+          {/* ── Featured shelf (hides at zero ✦; taps land in the editors) — under the
+              checklists, above the recipes (Steve, s90) ── */}
           {hub.featured.length > 0 && (
             <>
               {zlabel(t('bartender_assistant.featured_tonight'), hub.featured.length)}
@@ -290,21 +403,6 @@ export default function BartenderAssistantEditorScreen() {
             </>
           )}
 
-          {/* ── Checklist editors ── */}
-          {zlabel(t('bartender_assistant.checklists'))}
-          <View style={styles.tileRow}>
-            {ringTile({
-              iconIos: 'sunrise.fill', iconAndroid: 'wb-sunny',
-              name: t('bartender_assistant_editor.opening_checklist_editor'),
-              stat: hub.opening, route: '/bartender-opening-checklist-editor',
-            })}
-            {ringTile({
-              iconIos: 'moon.fill', iconAndroid: 'nightlight',
-              name: t('bartender_assistant_editor.closing_checklist_editor'),
-              stat: hub.closing, route: '/bartender-closing-checklist-editor',
-            })}
-          </View>
-
           {/* ── Recipe editor grid ── */}
           {zlabel(t('bartender_assistant.recipes_label'))}
           <View style={styles.grid}>
@@ -334,9 +432,11 @@ export default function BartenderAssistantEditorScreen() {
               count: hub.mix.count, thumbs: hub.mix.thumbs,
               route: '/puree-syrup-recipes-editor',
             })}
+            {uploadTile(twoMenus)}
           </View>
         </ScrollView>
       )}
+      <LibationUploadSheet visible={uploadVisible} onClose={() => setUploadVisible(false)} />
       <BottomNavBar activeTab="manage" />
     </View>
   );
@@ -490,6 +590,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 9,
+  },
+  // s90 Upload Libations — the wide variant closes an even grid as its own row.
+  wideTile: {
+    width: '100%',
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    paddingVertical: 12,
+    paddingHorizontal: 13,
+    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  wideTileBody: { flex: 1, minWidth: 0 },
+  tileLocked: { opacity: 0.72 },
+  premPill: {
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
+    flexShrink: 0,
+  },
+  premPillText: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 8,
+    letterSpacing: 0.8,
   },
   iconChip: {
     width: 34,

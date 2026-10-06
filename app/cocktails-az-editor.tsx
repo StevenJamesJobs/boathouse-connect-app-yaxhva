@@ -10,16 +10,14 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
-import { brokerUploadImage } from '@/utils/storageBroker';
-import { toPublicUrl } from '@/utils/storageResolver';
-import { useRouter } from 'expo-router';
+import { brokerDelete } from '@/utils/storageBroker';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 import { supabase } from '@/app/integrations/supabase/client';
 import { IconSymbol } from '@/components/IconSymbol';
-import { StorageImage } from '@/components/StorageImage';
+import MultiImageField from '@/components/MultiImageField';
 import { useTranslation } from 'react-i18next';
 import RichTextToolbar from '@/components/RichTextToolbar';
 import ProcedureResizeHandle from '@/components/ProcedureResizeHandle';
@@ -52,11 +50,25 @@ interface Cocktail {
   glassware?: string | null;
   garnish?: string | null;
   thumbnail_url: string | null;
+  // s90 multi-images: every stored photo URL, cover first (mirrors thumbnail_url).
+  images?: string[] | null;
   display_order: number;
   is_active: boolean;
 }
 
 type IngredientRow = { amount: string; ingredient: string };
+
+// The RPC's `images` Json → the stored-URL list, cover first. Rows from before
+// s90 carry no list (or an empty one), so the lone thumbnail stands in for it.
+const parseImageList = (raw: unknown, thumbnail?: string | null): string[] => {
+  let value = raw;
+  if (typeof value === 'string' && value.trim().startsWith('[')) {
+    try { value = JSON.parse(value); } catch { value = null; }
+  }
+  const list = Array.isArray(value) ? value.filter((u): u is string => typeof u === 'string' && !!u) : [];
+  if (list.length > 0) return list;
+  return thumbnail ? [thumbnail] : [];
+};
 
 // Parse a stored cocktails.ingredients value into structured rows. A JSON array
 // (new format) parses directly; a legacy plain string becomes a single row so it
@@ -123,8 +135,11 @@ export default function CocktailsAZEditorScreen() {
   const [garnish, setGarnish] = useState('');
   const [ingredients, setIngredients] = useState<IngredientRow[]>([{ amount: '', ingredient: '' }]);
   const [procedure, setProcedure] = useState('');
-  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
-  const [uploadingImage, setUploadingImage] = useState(false);
+  // s90: up to four STORED photo URLs, cover first (MultiImageField uploads
+  // on pick). Photos the user removed wait here until the save succeeds —
+  // only then are they broker-deleted (never on cancel).
+  const [images, setImages] = useState<string[]>([]);
+  const removedImagesRef = useRef<string[]>([]);
   const procedureInputRef = useRef<TextInput>(null);
   const [procedureSelection, setProcedureSelection] = useState({ start: 0, end: 0 });
   const [procedureEs, setProcedureEs] = useState('');
@@ -200,7 +215,12 @@ export default function CocktailsAZEditorScreen() {
         console.error('Error loading cocktails:', error);
         throw error;
       }
-      const sorted = (data || []).slice().sort((a: any, b: any) => (a.name || '').localeCompare(b.name || ''));
+      const sorted = (data || [])
+        .slice()
+        .sort((a: any, b: any) => (a.name || '').localeCompare(b.name || ''))
+        // The Json photo list → string[] once, here, so the rest of the screen
+        // never re-parses it.
+        .map((row) => ({ ...row, images: parseImageList(row.images, row.thumbnail_url) }));
       setCocktails(sorted);
     } catch (error) {
       console.error('Error loading cocktails:', error);
@@ -214,47 +234,20 @@ export default function CocktailsAZEditorScreen() {
     loadCocktails();
   }, [loadCocktails]);
 
-  const pickImage = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [16, 9],
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        await uploadImage(result.assets[0].uri);
-      }
-    } catch (error) {
-      console.error('Error picking image:', error);
-      Alert.alert(t('common.error'), t('cocktails_editor.error_pick_image'));
-    }
-  };
-
-  const uploadImage = async (uri: string) => {
-    if (!user?.id) {
-      Alert.alert(t('common.error'), t('cocktails_editor.error_not_authenticated_upload'));
-      return;
-    }
-
-    try {
-      setUploadingImage(true);
-
-      const publicUrl = await brokerUploadImage('cocktail_image', uri, user.id);
-      if (!publicUrl) {
-        throw new Error('Failed to upload image');
-      }
-
-      setThumbnailUrl(publicUrl);
-      Alert.alert(t('common.success'), t('cocktails_editor.image_uploaded'));
-    } catch (error: any) {
-      console.error('Error uploading image:', error);
-      Alert.alert('Error', translateServerError(error, 'Failed to upload image'));
-    } finally {
-      setUploadingImage(false);
-    }
-  };
+  // Deep-link from the recipe Poster's Edit chip (cocktails-az): ?edit=<name>
+  // opens this editor's own edit modal for that cocktail. Name is the bridge.
+  // Waits for the list to load, applies once, and a name that no longer
+  // matches simply lands on the normal editor.
+  const deepLink = useLocalSearchParams<{ edit?: string }>();
+  const deepLinkApplied = useRef(false);
+  useEffect(() => {
+    if (deepLinkApplied.current || !deepLink.edit) return;
+    if (cocktails.length === 0) return;
+    deepLinkApplied.current = true;
+    const wanted = String(deepLink.edit).trim().toLowerCase();
+    const target = cocktails.find((c) => c.name.trim().toLowerCase() === wanted);
+    if (target) openEditModal(target);
+  }, [cocktails, deepLink.edit]);
 
   const handleSave = async () => {
     try {
@@ -285,6 +278,10 @@ export default function CocktailsAZEditorScreen() {
       const resolved = await translation.resolveOnSave();
       if (!resolved) { setLoading(false); return; }
 
+      // The cover is the first photo; the server mirrors p_images[0] into
+      // thumbnail_url too, so tiles and the Poster agree.
+      const coverUrl: string | null = images[0] ?? null;
+
       if (editingCocktail) {
         const { error } = await supabase.rpc('update_cocktail', {
           p_user_id: user.id,
@@ -294,7 +291,8 @@ export default function CocktailsAZEditorScreen() {
           p_alcohol_type: alcoholType,
           p_ingredients: ingredientsJson,
           p_procedure: (resolved.procedure.en.trim() || null) as string,
-          p_thumbnail_url: thumbnailUrl as string,
+          p_thumbnail_url: coverUrl as string,
+          p_images: images,
           p_display_order: editingCocktail.display_order,
           p_glassware: glassware.trim() || null,
           p_garnish: garnish.trim() || null,
@@ -314,7 +312,8 @@ export default function CocktailsAZEditorScreen() {
           p_alcohol_type: alcoholType,
           p_ingredients: ingredientsJson,
           p_procedure: (resolved.procedure.en.trim() || null) as string,
-          p_thumbnail_url: thumbnailUrl as string,
+          p_thumbnail_url: coverUrl as string,
+          p_images: images,
           p_display_order: cocktails.length,
           p_glassware: glassware.trim() || null,
           p_garnish: garnish.trim() || null,
@@ -329,6 +328,19 @@ export default function CocktailsAZEditorScreen() {
           await saveTranslations('cocktails', data as string, { procedure_es: resolved.procedure.es }, user?.id);
         }
         Alert.alert(t('common.success'), t('cocktails_editor.cocktail_added'));
+      }
+
+      // Removed photos go only now, after the row saved — best-effort, in its
+      // own try/catch, so a storage hiccup never reads as a failed save (the
+      // MenuItemEditSheet removedPhoto rule).
+      const removed = removedImagesRef.current.filter((u) => !images.includes(u));
+      removedImagesRef.current = [];
+      if (removed.length > 0) {
+        try {
+          await brokerDelete('cocktail-images', removed, user.id);
+        } catch (cleanupError) {
+          console.error('Error deleting removed cocktail photos:', cleanupError);
+        }
       }
 
       setShowModal(false);
@@ -391,7 +403,10 @@ export default function CocktailsAZEditorScreen() {
     setIngredients(parseIngredients(cocktail.ingredients));
     setProcedure(cocktail.procedure || '');
     setProcedureEs(cocktail.procedure_es || '');
-    setThumbnailUrl(cocktail.thumbnail_url);
+    // Loaded rows already carry the parsed list; the thumbnail fallback covers
+    // a pre-s90 row that reached here with only thumbnail_url set.
+    setImages(parseImageList(cocktail.images, cocktail.thumbnail_url));
+    removedImagesRef.current = [];
     setShowModal(true);
   };
 
@@ -410,7 +425,8 @@ export default function CocktailsAZEditorScreen() {
     setProcedure('');
     setProcedureEs('');
     setProcDragH(0);
-    setThumbnailUrl(null);
+    setImages([]);
+    removedImagesRef.current = [];
   };
 
   // Boathouse-only owner action: push the curated Cocktails A-Z library out to
@@ -454,11 +470,6 @@ export default function CocktailsAZEditorScreen() {
         },
       ],
     );
-  };
-
-  const getImageUrl = (url: string | null) => {
-    if (!url) return null;
-    return toPublicUrl('cocktail-images', url);
   };
 
   return (
@@ -644,10 +655,10 @@ export default function CocktailsAZEditorScreen() {
               style={[
                 styles.footerBtn,
                 { backgroundColor: colors.primary, borderColor: colors.primary },
-                (loading || uploadingImage) && styles.footerBtnDisabled,
+                loading && styles.footerBtnDisabled,
               ]}
               onPress={handleSave}
-              disabled={loading || uploadingImage}
+              disabled={loading}
               activeOpacity={0.8}
             >
               {loading ? (
@@ -670,32 +681,29 @@ export default function CocktailsAZEditorScreen() {
           iconColor={colors.primary}
           defaultExpanded
         >
-          {/* Thumbnail (tap to attach) + Name */}
-          <View style={styles.thumbAndNameRow}>
-            <TouchableOpacity
-              style={[styles.thumbSquare, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
-              onPress={pickImage}
-              disabled={uploadingImage}
-            >
-              {thumbnailUrl ? (
-                <StorageImage source={{ uri: getImageUrl(thumbnailUrl) || undefined }} style={styles.thumbImage} resizeMode="cover" />
-              ) : (
-                <View style={styles.thumbPlaceholder}>
-                  <IconSymbol ios_icon_name="photo" android_material_icon_name="add-photo-alternate" size={26} color={colors.textSecondary} />
-                </View>
-              )}
-              {uploadingImage && (<View style={styles.thumbUploading}><ActivityIndicator color="#FFFFFF" /></View>)}
-            </TouchableOpacity>
-            <View style={styles.nameColumn}>
-              <Text style={[styles.formLabel, { color: colors.textSecondary }]}>{t('cocktails_editor.cocktail_name_label')}</Text>
-              <TextInput
-                style={[styles.formInput, { backgroundColor: colors.glass, color: colors.text, borderColor: colors.glassBorder }]}
-                value={name}
-                onChangeText={setName}
-                placeholder={t('cocktails_editor.cocktail_name_placeholder')}
-                placeholderTextColor={colors.textSecondary}
-              />
-            </View>
+          {/* Photos (s90: up to four, cover first) — the strip uploads on pick
+              and hands removed URLs back for the post-save cleanup. */}
+          <View style={styles.formField}>
+            <MultiImageField
+              images={images}
+              onChange={setImages}
+              onRemove={(url) => { removedImagesRef.current.push(url); }}
+              purpose="cocktail_image"
+              bucket="cocktail-images"
+              aspect={[1, 1]}
+            />
+          </View>
+
+          {/* Name */}
+          <View style={styles.formField}>
+            <Text style={[styles.formLabel, { color: colors.textSecondary }]}>{t('cocktails_editor.cocktail_name_label')}</Text>
+            <TextInput
+              style={[styles.formInput, { backgroundColor: colors.glass, color: colors.text, borderColor: colors.glassBorder }]}
+              value={name}
+              onChangeText={setName}
+              placeholder={t('cocktails_editor.cocktail_name_placeholder')}
+              placeholderTextColor={colors.textSecondary}
+            />
           </View>
 
           {/* Alcohol Type (dropdown) */}
@@ -994,30 +1002,6 @@ const styles = StyleSheet.create({
     minHeight: 120,
     textAlignVertical: 'top',
   },
-  // Tap-to-attach thumbnail + name row.
-  thumbAndNameRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 14,
-    alignItems: 'flex-start',
-  },
-  thumbSquare: {
-    width: 80,
-    height: 80,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    overflow: 'hidden',
-  },
-  thumbImage: { width: '100%', height: '100%' },
-  thumbPlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  thumbUploading: {
-    ...StyleSheet.absoluteFill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.35)',
-  },
-  nameColumn: { flex: 1 },
   // Structured ingredient rows (mirrors the libation editor).
   ingredientRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 8 },
   ingredientAmount: { flex: 1 },

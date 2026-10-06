@@ -19,6 +19,7 @@ import { useAppTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useManagerPermissions } from '@/hooks/useManagerPermissions';
 import NotificationPreferences from '@/components/NotificationPreferences';
 import { fonts } from '@/constants/fonts';
 import { themePalettes } from '@/styles/commonStyles';
@@ -39,6 +40,10 @@ export default function SettingsGrid({ openRequest }: SettingsGridProps = {}) {
   const { language } = useLanguage();
   const { tier, isTrialActive, trialDaysRemaining } = useSubscription();
   const { user } = useAuth();
+  // s90: the Org Settings tile — a second front door beside Manage's Plan &
+  // Access tile. Owners always; managers holding ANY org-settings tab grant get
+  // the scoped entry (same gate + routes as manage.tsx).
+  const { perms } = useManagerPermissions();
   const router = useRouter();
   const { t } = useTranslation();
   const tintHex = colors.tint.startsWith('#') ? colors.tint : '#FF7A2F';
@@ -122,6 +127,12 @@ export default function SettingsGrid({ openRequest }: SettingsGridProps = {}) {
   const modeLabel = resolvedMode === 'dark' ? t('appearance.dark_mode') : t('appearance.light_mode');
   const swatches = (palette === 'custom' ? activePalette : themePalettes[palette as keyof typeof themePalettes]).previewColors;
   const isOwner = user?.role === 'owner';
+  const hasOrgSettingsGrant = perms.menuConfig || perms.branding || perms.jobsTools || perms.access;
+  const showOrgSettings = isOwner || (user?.role === 'manager' && hasOrgSettingsGrant);
+  const openOrgSettings = () =>
+    isOwner
+      ? router.push('/organization-settings' as any)
+      : router.push({ pathname: '/organization-settings', params: { scoped: '1' } } as any);
   const planLabel = tier === 'trial' && isTrialActive ? t('profile_hub.sub_trial', { count: trialDaysRemaining }) : tier ? tier.charAt(0).toUpperCase() + tier.slice(1) : '';
 
   const contentStyle = {
@@ -242,6 +253,26 @@ export default function SettingsGrid({ openRequest }: SettingsGridProps = {}) {
         <View style={styles.hidden} pointerEvents="none">
           <NotificationPreferences onSummary={onNotifSummary} />
         </View>
+      ) : null}
+
+      {showOrgSettings ? (
+        <TouchableOpacity onPress={openOrgSettings} activeOpacity={0.85} style={[styles.subRow, { backgroundColor: colors.surface, borderColor: hexToRgba(colors.blue.startsWith('#') ? colors.blue : '#8FA0AC', 0.3) }]}>
+          <View style={[styles.subIcon, { backgroundColor: hexToRgba(tintHex, 0.14) }]}>
+            <IconSymbol ios_icon_name="gearshape.fill" android_material_icon_name="settings" size={17} color={colors.tint} />
+          </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <View style={styles.subTitleRow}>
+              <Text style={[styles.tt, { color: colors.text }]}>{t('profile_hub.tile_org_settings')}</Text>
+              <View style={[styles.ownerTag, { backgroundColor: hexToRgba(colors.blue.startsWith('#') ? colors.blue : '#8FA0AC', 0.18) }]}>
+                <Text style={[styles.ownerText, { color: colors.blueText }]}>{isOwner ? t('manager_manage.owner_tag', 'Owner') : t('profile_hub.manager_tag')}</Text>
+              </View>
+            </View>
+            <Text style={[styles.ts, { color: colors.textSecondary }]} numberOfLines={1}>
+              {isOwner ? t('profile_hub.org_settings_sub_owner') : t('profile_hub.org_settings_sub_manager')}
+            </Text>
+          </View>
+          <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={16} color={colors.textSecondary} />
+        </TouchableOpacity>
       ) : null}
 
       {isOwner ? (
