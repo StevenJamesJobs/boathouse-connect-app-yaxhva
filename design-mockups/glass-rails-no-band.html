@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Band-free Rails</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600;700&display=swap">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{min-height:100vh;display:flex;flex-direction:column;align-items:center;gap:14px;padding:26px 12px 60px;background:#0C0D11;color:#D6D9DE;font-family:'Inter',system-ui,sans-serif}
+h1{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:22px;letter-spacing:-0.3px;color:#F4F6F8}
+h1 span{color:#F99861}
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center;max-width:1100px}
+.grp{display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);padding:6px;border-radius:16px}
+.gl2{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:#6E7681;margin:0 4px 0 6px}
+.tb{background:rgba(255,255,255,0.06);color:#D6D9DE;border:1px solid rgba(255,255,255,0.10);border-radius:11px;padding:7px 11px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:.18s}
+.tb:hover{background:rgba(255,255,255,0.12)}
+.tb.on{background:#F4F6F8;color:#15171C;border-color:#F4F6F8}
+.hint{color:#6E7681;font-size:11.5px;font-family:'JetBrains Mono',monospace;text-align:center;max-width:980px;line-height:1.7}
+.hint b{color:#AEB4BD;font-weight:600}
+.hint em{font-style:normal;color:#2FBF8F}
+.row{display:flex;flex-wrap:wrap;gap:18px;justify-content:center;align-items:flex-start;max-width:1800px}
+.col{display:flex;flex-direction:column;gap:10px;align-items:center}
+.concept{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:#6E7681;display:flex;align-items:center;gap:8px;width:380px}
+.concept b{color:#F99861}
+.concept .ln{flex:1;height:1px;background:rgba(255,255,255,0.08)}
+.bcap{width:380px;font-size:11px;color:#8A9098;line-height:1.55;font-style:italic}
+.bcap b{font-style:normal;color:#D6D9DE;font-weight:600}
+.notes{max-width:1100px;width:100%;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;margin-top:6px}
+.note{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:12px 14px;font-size:11.5px;line-height:1.55;color:#AEB4BD}
+.note b{display:block;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:#F99861;margin-bottom:5px}
+.note em{font-style:normal;color:#F4F6F8;font-weight:600}
+.sect{width:100%;max-width:1800px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:1.6px;text-transform:uppercase;color:#F99861;display:flex;align-items:center;gap:10px;margin-top:10px}
+.sect i{flex:1;height:1px;background:rgba(255,255,255,0.10)}
+
+/* ---------- phone + palettes ---------- */
+.phone{
+  --bg:#141724; --text:#F4F2EE; --muted:#9C9BA6; --fire:#F99861; --blue:#36B0C9; --fireText:#1F2334; --tint:#F99861; --cat:#F5A524;
+  --glass:rgba(255,255,255,0.07); --glassbd:rgba(255,255,255,0.12); --surf:rgba(255,255,255,0.05); --surfbd:rgba(255,255,255,0.09); --hair:rgba(255,255,255,0.07);
+  --thumbbg:#232841; --glowA:rgba(249,152,97,0.30); --glowB:rgba(120,140,210,0.18);
+  position:relative;width:380px;height:760px;background:var(--bg);border-radius:48px;border:1px solid #2A2D3A;
+  box-shadow:0 22px 60px rgba(0,0,0,0.5);overflow:hidden;color:var(--text);display:flex;flex-direction:column}
+.phone.t-moon-l{--bg:#F2F3F6;--text:#1F2334;--muted:#6B6F80;--fire:#E8792F;--blue:#1390A8;--fireText:#FFFFFF;--tint:#E8792F;--cat:#C97A0C;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.88);--surf:rgba(255,255,255,0.66);--surfbd:rgba(0,0,0,0.07);--hair:rgba(0,0,0,0.07);--thumbbg:#D8DAE3;--glowA:rgba(232,121,47,0.18);--glowB:rgba(31,35,52,0.10)}
+.phone.t-ocean-d{--bg:#1A2332;--text:#FFFFFF;--muted:#A8B8D8;--fire:#4A90E2;--blue:#5DADE2;--fireText:#0A1422;--tint:#5DA0E5;--glassbd:rgba(255,255,255,0.13);--surfbd:rgba(255,255,255,0.10);--hair:rgba(255,255,255,0.08);--thumbbg:#2C3E50;--glowA:rgba(74,144,226,0.30);--glowB:rgba(93,173,226,0.15)}
+.phone.t-ocean-l{--bg:#E8F4F8;--text:#1A3A52;--muted:#4A6B7C;--fire:#1976D2;--blue:#42A5F5;--fireText:#FFFFFF;--tint:#1976D2;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.7);--surfbd:rgba(13,71,161,0.10);--hair:rgba(13,71,161,0.08);--thumbbg:#CFE4EC;--glowA:rgba(25,118,210,0.16);--glowB:rgba(66,165,245,0.12)}
+.phone *{box-sizing:border-box}
+.glow{position:absolute;top:-90px;right:-60px;width:300px;height:250px;border-radius:50%;background:radial-gradient(circle,var(--glowA),transparent 66%);z-index:0;pointer-events:none}
+.glow2{position:absolute;top:-50px;left:-70px;width:220px;height:200px;border-radius:50%;background:radial-gradient(circle,var(--glowB),transparent 68%);z-index:0;pointer-events:none}
+.glow3{position:absolute;top:300px;left:-80px;width:260px;height:260px;border-radius:50%;background:radial-gradient(circle,var(--glowA),transparent 66%);opacity:.55;z-index:0;pointer-events:none}
+.sb{position:relative;z-index:3;display:flex;justify-content:space-between;align-items:center;padding:14px 28px 6px;font-size:13px;font-weight:600;font-family:'JetBrains Mono',monospace;flex:0 0 auto}
+.ic{width:16px;height:16px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+
+/* Welcome chrome */
+.chrome{position:relative;z-index:7;flex:0 0 auto}
+.head{margin:2px 14px 0;padding:12px 14px;border-radius:20px;background:var(--glass);border:1px solid var(--glassbd);backdrop-filter:blur(18px) saturate(1.4);-webkit-backdrop-filter:blur(18px) saturate(1.4)}
+.greet{font-family:'Bricolage Grotesque';font-size:19px;font-weight:700;letter-spacing:-0.4px;margin-bottom:11px;padding-left:2px}
+.greet b{color:var(--fire)}
+.hrow{display:flex;align-items:center;gap:9px}
+.av{width:42px;height:42px;border-radius:50%;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;font-family:'Bricolage Grotesque';flex-shrink:0}
+.who{flex:1;min-width:0}
+.who .nm{font-family:'Bricolage Grotesque';font-size:14px;font-weight:700}
+.who .jt{font-size:10px;color:var(--muted);font-family:'JetBrains Mono';text-transform:uppercase;letter-spacing:0.5px;margin-top:1px}
+.gl{position:relative;height:36px;border-radius:12px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;justify-content:center;color:var(--text);font-size:13px;padding:0 10px;gap:4px;font-family:'JetBrains Mono';font-weight:600}
+.gl .dot{position:absolute;top:-5px;right:-5px;min-width:16px;height:16px;border-radius:8px;background:var(--blue);color:#06222B;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 3px;border:2px solid var(--bg)}
+.connect{display:flex;align-items:center;gap:6px;margin:12px 14px 0;padding:4px;border-radius:14px;background:var(--surf);border:1px solid var(--surfbd);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+.tab{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;height:34px;border-radius:10px;font-size:13px;font-weight:600;font-family:'Bricolage Grotesque';color:var(--muted);position:relative}
+.tab.io{flex:0 0 38px}
+.tab.on{background:var(--fire);color:var(--fireText)}
+.tab .td{position:absolute;top:4px;right:10px;width:6px;height:6px;border-radius:50%;background:var(--blue)}
+
+/* the leaf */
+.leaf{position:relative;z-index:2;flex:1;overflow-y:auto;scrollbar-width:none}
+.leaf::-webkit-scrollbar{display:none}
+.band{padding:8px 14px 2px}
+
+/* ===== the pinned capsule — the ONLY glass; no bar, no band ===== */
+.substick{position:sticky;top:0;z-index:6;padding:8px 14px 9px}
+.seg{display:flex;gap:3px;padding:3px;border-radius:12px;background:var(--glass);border:1px solid var(--glassbd);backdrop-filter:blur(18px) saturate(1.3);-webkit-backdrop-filter:blur(18px) saturate(1.3)}
+.seg div{flex:1;text-align:center;padding:9px 8px;border-radius:9px;font-size:12.5px;font-weight:600;font-family:'Bricolage Grotesque';color:var(--muted);display:flex;align-items:center;justify-content:center;gap:6px}
+.seg div.on{background:var(--fire);color:var(--fireText)}
+.seg .nd{width:7px;height:7px;border-radius:50%;background:#EF4444;display:inline-block}
+.subpad{padding:11px 14px 140px}
+.banner{position:relative;border-radius:18px;overflow:hidden;margin-bottom:11px;height:150px;background:var(--thumbbg)}
+.banner.ph{background:radial-gradient(120% 80% at 20% 10%,rgba(255,196,120,.55),transparent 55%),radial-gradient(90% 70% at 80% 80%,rgba(120,30,20,.9),transparent 60%),radial-gradient(60% 50% at 60% 30%,rgba(255,110,60,.85),transparent 60%),linear-gradient(160deg,#9C2E1F,#4A1410 70%,#2A0C0A)}
+.banner.p2{background:radial-gradient(100% 70% at 70% 20%,rgba(160,230,255,.6),transparent 55%),radial-gradient(80% 60% at 20% 90%,rgba(10,70,110,.95),transparent 60%),linear-gradient(200deg,#2C8DB0,#0F3E5C 70%,#071F31)}
+.banner::after{content:"";position:absolute;inset:0;background:linear-gradient(to top,rgba(14,11,9,0.93) 8%,rgba(14,11,9,0.05) 64%)}
+.btag{position:absolute;top:11px;left:11px;z-index:2;background:rgba(20,16,14,0.55);border:1px solid rgba(255,255,255,0.16);color:#FFB07A;font-family:'JetBrains Mono';font-size:9px;font-weight:600;letter-spacing:1px;padding:3px 8px;border-radius:7px;text-transform:uppercase;backdrop-filter:blur(6px)}
+.btag.ev{background:#3B82F6;border-color:#3B82F6;color:#fff}
+.bbody{position:absolute;left:14px;right:14px;bottom:12px;z-index:2;color:#F4F2EE}
+.bbody h3{font-family:'Bricolage Grotesque';font-weight:700;font-size:19px;letter-spacing:-0.3px;line-height:1.1}
+.bbody p{margin-top:4px;font-size:11.5px;color:#D7D0C6;line-height:1.35}
+.bbody .tm{margin-top:5px;font-family:'JetBrains Mono';font-size:9.5px;color:#FFB07A}
+.card{display:flex;gap:11px;align-items:flex-start;background:var(--surf);border:1px solid var(--surfbd);border-radius:16px;padding:11px;margin-bottom:11px}
+.card .th{width:62px;height:62px;border-radius:12px;flex-shrink:0;background:var(--thumbbg)}
+.card .th.ph{background:radial-gradient(80% 60% at 30% 30%,rgba(255,196,120,.6),transparent 60%),linear-gradient(160deg,#9C2E1F,#2A0C0A)}
+.card .th.p2{background:radial-gradient(80% 60% at 70% 30%,rgba(160,230,255,.6),transparent 60%),linear-gradient(200deg,#2C8DB0,#071F31)}
+.card .bd{flex:1;min-width:0}
+.card h3{font-family:'Bricolage Grotesque';font-weight:600;font-size:14px;line-height:1.2;display:flex;gap:6px;align-items:center}
+.card p{margin-top:4px;font-size:11.5px;color:var(--muted);line-height:1.4}
+.card .tm{margin-top:5px;font-family:'JetBrains Mono';font-size:9.5px;color:var(--tint)}
+.new{background:#EF4444;color:#fff;font-size:8px;font-weight:600;padding:2px 5px;border-radius:5px;font-family:'JetBrains Mono';letter-spacing:.8px}
+
+/* ===== Menu chrome ===== */
+.mhead{position:relative;z-index:7;display:flex;align-items:flex-start;justify-content:space-between;padding:10px 16px 10px;flex:0 0 auto}
+.mhead h2{font-family:'Bricolage Grotesque';font-weight:700;font-size:28px;letter-spacing:-0.5px;line-height:1}
+.mhead .eyeb{font-family:'JetBrains Mono';font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--fire);margin-top:5px}
+.mhead .acts{display:flex;gap:8px;align-items:center}
+.mhead .chipg{height:38px;padding:0 13px;border-radius:12px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;gap:6px;font-family:'Bricolage Grotesque';font-weight:600;font-size:13.5px;backdrop-filter:blur(14px)}
+.mhead .sq{width:38px;height:38px;border-radius:12px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(14px)}
+.search{margin:0 16px 8px;height:40px;border-radius:13px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;gap:8px;padding:0 12px;color:var(--muted);font-size:13px;backdrop-filter:blur(14px)}
+.search .bolt{margin-left:auto;width:26px;height:26px;border-radius:13px;background:#F4F2EE;color:#1F2334;display:flex;align-items:center;justify-content:center;box-shadow:0 0 12px rgba(249,152,97,.6)}
+.menustick{position:sticky;top:0;z-index:6;padding:10px 0 8px}
+.catrow{display:flex;gap:7px;padding:0 16px;overflow-x:auto;scrollbar-width:none}
+.catrow::-webkit-scrollbar{display:none}
+.gchip{flex:0 0 auto;height:38px;padding:0 13px;border-radius:11px;background:var(--glass);border:1px solid var(--glassbd);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Bricolage Grotesque';font-weight:600;font-size:13px;color:var(--muted);backdrop-filter:blur(16px) saturate(1.3);-webkit-backdrop-filter:blur(16px) saturate(1.3)}
+.gchip.on{color:var(--text)}
+.gchip i{display:block;width:100%;height:2.5px;border-radius:2px;margin-top:2.5px;background:transparent}
+.gchip.on i{background:var(--cat)}
+.subrow{display:flex;gap:8px;padding:0 16px;margin-top:8px;overflow-x:auto;scrollbar-width:none;align-items:center}
+.subrow::-webkit-scrollbar{display:none}
+/* M1: sub pills */
+.spill{flex:0 0 auto;height:30px;padding:0 11px;border-radius:9px;background:var(--glass);border:1px solid var(--glassbd);display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:12.5px;font-weight:600;color:var(--muted);backdrop-filter:blur(16px) saturate(1.3);-webkit-backdrop-filter:blur(16px) saturate(1.3)}
+.spill.on{color:var(--text)}
+.spill i{display:block;width:100%;height:2px;border-radius:1px;margin-top:2px;background:transparent}
+.spill.on i{background:var(--cat)}
+/* M2 / M3: a rail = one glass capsule holding text tabs */
+.rail{margin:8px 16px 0;height:36px;border-radius:12px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;gap:18px;padding:0 14px;overflow-x:auto;scrollbar-width:none;backdrop-filter:blur(18px) saturate(1.3);-webkit-backdrop-filter:blur(18px) saturate(1.3)}
+.rail::-webkit-scrollbar{display:none}
+.rail span{flex:0 0 auto;font-size:12.5px;font-weight:600;color:var(--muted);display:flex;flex-direction:column;align-items:center}
+.rail span.on{color:var(--text)}
+.rail span i{display:block;width:100%;height:2px;border-radius:1px;margin-top:3px;background:transparent}
+.rail span.on i{background:var(--cat)}
+.rail.cats{margin-top:0;height:42px;gap:4px;padding:4px}
+.rail.cats span{height:34px;padding:0 12px;border-radius:9px;justify-content:center;font-family:'Bricolage Grotesque';font-size:13px}
+.rail.cats span.on{background:color-mix(in srgb,var(--cat) 22%,transparent)}
+.rail.cats span i{display:none}
+.mpad{padding:8px 16px 140px}
+.mcard{display:flex;gap:12px;align-items:center;background:var(--surf);border:1px solid var(--surfbd);border-radius:16px;padding:10px;margin-bottom:10px;position:relative;overflow:hidden}
+.mcard::before{content:"";position:absolute;left:0;top:0;right:0;height:2px;background:linear-gradient(90deg,var(--cat),transparent 60%);opacity:.9}
+.mcard .th{width:62px;height:62px;border-radius:12px;flex-shrink:0;background:var(--thumbbg)}
+.mcard .th.p1{background:radial-gradient(70% 60% at 50% 35%,rgba(255,120,80,.95),transparent 60%),linear-gradient(180deg,#2B1020,#120812)}
+.mcard .th.p2{background:radial-gradient(80% 60% at 30% 30%,rgba(255,236,160,.75),transparent 60%),linear-gradient(170deg,#E0A03A,#4A2B08)}
+.mcard .th.p3{background:radial-gradient(80% 60% at 70% 30%,rgba(160,230,255,.6),transparent 60%),linear-gradient(200deg,#2C8DB0,#071F31)}
+.mcard .bd{flex:1;min-width:0}
+.mcard h3{font-family:'Bricolage Grotesque';font-weight:600;font-size:14.5px;line-height:1.2}
+.mcard p{margin-top:3px;font-size:12px;color:var(--muted);line-height:1.35}
+.mcard .pr{font-family:'JetBrains Mono';font-weight:700;font-size:14px;color:var(--text);flex:0 0 auto}
+/* the soft top fade option (28pt, bg → transparent) above the chips */
+.fade{position:absolute;left:0;right:0;height:28px;z-index:5;pointer-events:none;background:linear-gradient(to bottom,var(--bg),transparent);display:none}
+.phone.fadeon .fade{display:block}
+.nav{position:absolute;left:14px;right:14px;bottom:14px;height:62px;border-radius:24px;background:var(--glass);border:1px solid var(--glassbd);backdrop-filter:blur(18px);z-index:8;display:flex;align-items:center;justify-content:space-around;padding:0 8px}
+.nav span{font-size:10px;font-weight:600;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:3px}
+.nav span.on{color:var(--text);background:var(--glass);border:1px solid var(--glassbd);border-radius:18px;padding:6px 14px}
+.nav .ic{width:18px;height:18px}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+  <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M4 20h4l10-10-4-4L4 16zM13 7l4 4"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></symbol>
+  <symbol id="i-fork" viewBox="0 0 24 24"><path d="M7 3v8a3 3 0 0 0 3 3v7M7 3v5M10 3v5M17 3c-2 0-3 2-3 5v4h3v9"/></symbol>
+  <symbol id="i-tools" viewBox="0 0 24 24"><path d="M14 7l3 3-8 8H6v-3zM16 5l3 3"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+</svg>
+
+<h1>Band-free rails <span>— Today · Events · Menu</span></h1>
+<div class="toolbar">
+  <div class="grp"><span class="gl2">Theme</span>
+    <button class="tb on" data-theme="">Moonstone dark</button><button class="tb" data-theme="t-moon-l">Moonstone light</button><button class="tb" data-theme="t-ocean-d">Ocean dark</button><button class="tb" data-theme="t-ocean-l">Ocean light</button></div>
+  <div class="grp"><span class="gl2">Menu top edge</span>
+    <button class="tb on" data-fade="off">Hard cut</button><button class="tb" data-fade="on">Soft 28pt fade</button></div>
+</div>
+<p class="hint">No bar and no band anywhere: the <b>capsule / chips are the only glass</b>, sitting straight on the AmbientGlow. Cards slide under them and blur <em>inside</em> them; between them the glow and the cards stay visible. <em>Scroll any leaf to see it live.</em> For the Menu the question left is the subcategory row (today it is bare text + underline, which can't float over cards): <b>M1</b> makes them small glass pills, <b>M2</b> puts the text tabs inside one slim glass rail, <b>M3</b> makes both rows rails (the Connect-bar grammar). The "Menu top edge" toggle shows the one cost of a band-free Menu: cards get cut at the header's bottom with nothing spanning that line — a 28pt fade softens it.</p>
+
+<div class="sect">Welcome<i></i></div>
+<div class="row">
+
+<!-- ===== W1 · TODAY AT REST ===== -->
+<div class="col">
+  <div class="concept"><b>W1</b> Today · at rest<span class="ln"></span></div>
+  <div class="phone">
+    <div class="glow"></div><div class="glow2"></div><div class="glow3"></div>
+    <div class="sb"><span>9:41</span><span>●●● ▲ ▮</span></div>
+    <div class="chrome">
+      <div class="head"><div class="greet">Good evening, <b>Steven</b></div>
+        <div class="hrow"><div class="av">SE</div><div class="who"><div class="nm">Steven Eccles</div><div class="jt">Manager</div></div>
+          <div class="gl"><svg class="ic"><use href="#i-sun"/></svg>65°</div><div class="gl"><svg class="ic"><use href="#i-bell"/></svg><span class="dot">3</span></div></div></div>
+      <div class="connect"><div class="tab io"><svg class="ic"><use href="#i-clock"/></svg></div><div class="tab on">Today</div><div class="tab">Events<span class="td"></span></div><div class="tab">Specials<span class="td"></span></div></div>
+    </div>
+    <div class="leaf">
+      <div class="band"></div>
+      <div class="substick"><div class="seg"><div class="on">Announcements</div><div>Special Features <span class="nd"></span></div></div></div>
+      <div class="subpad">
+        <div class="card"><div class="th ph"></div><div class="bd"><h3>Test B8 Announcement <span class="new">IMPORTANT</span></h3><p>Test B8 Announcement</p><div class="tm">TODAY · 6:12 PM</div></div></div>
+        <div class="card"><div class="th p2"></div><div class="bd"><h3>Hello all!</h3><p>First and foremost I want to say how much I appreciate the way everyone pulled together this weekend.</p><div class="tm">YESTERDAY</div></div></div>
+        <div class="card"><div class="th"></div><div class="bd"><h3>Staff meal reminder</h3><p>Order before 3:30 so the kitchen can batch it with the family meal.</p><div class="tm">MON</div></div></div>
+        <div class="card"><div class="th"></div><div class="bd"><h3>Patio heaters on</h3><p>Lighters are in the host stand drawer.</p><div class="tm">SUN</div></div></div>
+        <div class="card"><div class="th"></div><div class="bd"><h3>Linen pickup moved</h3><p>Thursday instead of Wednesday this week.</p><div class="tm">SAT</div></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="bcap">The capsule is a <b>GlassCard-style surface</b> (glass fill + glassBorder + its own blur). Nothing behind it; the glow runs straight through the 8pt above and the 11pt below it.</div>
+</div>
+
+<!-- ===== W2 · TODAY SCROLLED ===== -->
+<div class="col">
+  <div class="concept"><b>W2</b> Today · scrolled (cards under the capsule)<span class="ln"></span></div>
+  <div class="phone">
+    <div class="glow"></div><div class="glow2"></div><div class="glow3"></div>
+    <div class="sb"><span>9:41</span><span>●●● ▲ ▮</span></div>
+    <div class="chrome">
+      <div class="head"><div class="greet">Good evening, <b>Steven</b></div>
+        <div class="hrow"><div class="av">SE</div><div class="who"><div class="nm">Steven Eccles</div><div class="jt">Manager</div></div>
+          <div class="gl"><svg class="ic"><use href="#i-sun"/></svg>65°</div><div class="gl"><svg class="ic"><use href="#i-bell"/></svg><span class="dot">3</span></div></div></div>
+      <div class="connect"><div class="tab io"><svg class="ic"><use href="#i-clock"/></svg></div><div class="tab on">Today</div><div class="tab">Events<span class="td"></span></div><div class="tab">Specials<span class="td"></span></div></div>
+    </div>
+    <div class="leaf" data-prescroll="96">
+      <div class="band"></div>
+      <div class="substick"><div class="seg"><div class="on">Announcements</div><div>Special Features <span class="nd"></span></div></div></div>
+      <div class="subpad">
+        <div class="card"><div class="th ph"></div><div class="bd"><h3>Test B8 Announcement <span class="new">IMPORTANT</span></h3><p>Test B8 Announcement</p><div class="tm">TODAY · 6:12 PM</div></div></div>
+        <div class="card"><div class="th p2"></div><div class="bd"><h3>Hello all!</h3><p>First and foremost I want to say how much I appreciate the way everyone pulled together this weekend.</p><div class="tm">YESTERDAY</div></div></div>
+        <div class="card"><div class="th"></div><div class="bd"><h3>Staff meal reminder</h3><p>Order before 3:30 so the kitchen can batch it with the family meal.</p><div class="tm">MON</div></div></div>
+        <div class="card"><div class="th"></div><div class="bd"><h3>Patio heaters on</h3><p>Lighters are in the host stand drawer.</p><div class="tm">SUN</div></div></div>
+        <div class="card"><div class="th"></div><div class="bd"><h3>Linen pickup moved</h3><p>Thursday instead of Wednesday this week.</p><div class="tm">SAT</div></div></div>
+        <div class="card"><div class="th"></div><div class="bd"><h3>Wine training</h3><p>Rioja flight with the rep, 3 PM in the private room.</p><div class="tm">FRI</div></div></div>
+        <div class="card"><div class="th"></div><div class="bd"><h3>Parking</h3><p>Use the marina lot on regatta days.</p><div class="tm">THU</div></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="bcap">Scrolled: the card under the capsule is blurred by the capsule itself; above the capsule it shows sharp for 8pt and then slides <b>under the Connect bar's edge</b> (the leaf is clipped there today, nothing changes). No wash, no hairline, no shadow.</div>
+</div>
+
+<!-- ===== W3 · EVENTS SCROLLED ===== -->
+<div class="col">
+  <div class="concept"><b>W3</b> Events · V2 calendar, scrolled<span class="ln"></span></div>
+  <div class="phone">
+    <div class="glow"></div><div class="glow2"></div><div class="glow3"></div>
+    <div class="sb"><span>9:41</span><span>●●● ▲ ▮</span></div>
+    <div class="chrome">
+      <div class="head"><div class="greet">Good evening, <b>Steven</b></div>
+        <div class="hrow"><div class="av">SE</div><div class="who"><div class="nm">Steven Eccles</div><div class="jt">Manager</div></div>
+          <div class="gl"><svg class="ic"><use href="#i-sun"/></svg>65°</div><div class="gl"><svg class="ic"><use href="#i-bell"/></svg><span class="dot">3</span></div></div></div>
+      <div class="connect"><div class="tab io"><svg class="ic"><use href="#i-clock"/></svg></div><div class="tab">Today</div><div class="tab on">Events</div><div class="tab">Specials<span class="td"></span></div></div>
+    </div>
+    <div class="leaf" data-prescroll="118">
+      <div style="padding:8px 16px 0">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin:0 4px 9px"><div style="font-family:'Bricolage Grotesque';font-size:15px;font-weight:700">October 2026</div><div style="color:var(--fire);font-size:12.5px;font-weight:700;font-family:'Bricolage Grotesque'">View all ›</div></div>
+        <div style="display:flex;gap:4px;margin-bottom:2px">
+          <div class="gchip" style="flex:1;height:48px;padding:0;font-size:12px">Mon</div><div class="gchip on" style="flex:1;height:48px;padding:0;font-size:12px">Tue</div><div class="gchip" style="flex:1;height:48px;padding:0;font-size:12px">Wed</div><div class="gchip" style="flex:1;height:48px;padding:0;font-size:12px">Thu</div><div class="gchip" style="flex:1;height:48px;padding:0;font-size:12px">Fri</div><div class="gchip" style="flex:1;height:48px;padding:0;font-size:12px">Sat</div><div class="gchip" style="flex:1;height:48px;padding:0;font-size:12px">Sun</div>
+        </div>
+      </div>
+      <div class="substick" style="padding-top:10px"><div class="seg"><div class="on">Events</div><div>Entertainment <span class="nd"></span></div></div></div>
+      <div class="subpad">
+        <div class="banner p2"><span class="btag ev">Event</span><div class="bbody"><h3>Crab Boil Weekend</h3><p>Three nights on the dock, live band Saturday.</p><div class="tm">FRI OCT 9 · 5:00 PM → SUN OCT 11</div></div></div>
+        <div class="card"><div class="th"></div><div class="bd"><h3>Oyster Hour <span class="new">NEW</span></h3><p>Dollar oysters at the raw bar, Tuesday to Thursday.</p><div class="tm">TUE OCT 6 · 4:00 PM</div></div></div>
+        <div class="card"><div class="th"></div><div class="bd"><h3>Regatta brunch</h3><p>Harbor-side seating opens at 10.</p><div class="tm">SAT OCT 10 · 10:00 AM</div></div></div>
+        <div class="card"><div class="th"></div><div class="bd"><h3>Trivia night</h3><p>Teams of up to six, prizes from the bar.</p><div class="tm">WED OCT 7 · 8:00 PM</div></div></div>
+        <div class="card"><div class="th"></div><div class="bd"><h3>Live jazz</h3><p>The Harbor Trio, no cover.</p><div class="tm">THU OCT 8 · 7:30 PM</div></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="bcap">The bare V2 calendar has collapsed up under the Connect bar (it still translates with the leaf, as today); the Events | Entertainment capsule pins alone and the banner slides under it. Scroll back up to bring the calendar down.</div>
+</div>
+
+</div>
+
+<div class="sect">Menu — same fix, three ways to carry the subcategory row<i></i></div>
+<div class="row">
+
+<!-- ===== M0 · AT REST ===== -->
+<div class="col">
+  <div class="concept"><b>M0</b> Menu · at rest (M1 chips)<span class="ln"></span></div>
+  <div class="phone">
+    <div class="glow"></div><div class="glow2"></div><div class="glow3"></div>
+    <div class="sb"><span>5:26</span><span>●●● ▲ ▮</span></div>
+    <div class="mhead"><div><h2>Menus</h2><div class="eyeb">MyResto Test</div></div><div class="acts"><div class="chipg"><svg class="ic"><use href="#i-gear"/></svg>Menu</div><div class="sq"><svg class="ic"><use href="#i-pencil"/></svg></div></div></div>
+    <div class="fade"></div>
+    <div class="leaf">
+      <div class="search"><svg class="ic"><use href="#i-search"/></svg>Search the menu<div class="bolt"><svg class="ic" style="width:14px;height:14px;fill:currentColor;stroke:none"><use href="#i-bolt"/></svg></div></div>
+      <div class="menustick">
+        <div class="catrow"><div class="gchip">Dinner<i></i></div><div class="gchip">Fried Dumplings<i></i></div><div class="gchip on">Libations<i></i></div><div class="gchip">Sticky Stuff<i></i></div><div class="gchip">Chow Fun<i></i></div></div>
+        <div class="subrow"><div class="spill on">Signature Cocktails<i></i></div><div class="spill">Martinis<i></i></div><div class="spill">Sangria<i></i></div><div class="spill">Low ABV<i></i></div><div class="spill">Zero ABV<i></i></div></div>
+      </div>
+      <div class="mpad">
+        <div class="mcard"><div class="th p1"></div><div class="bd"><h3>Test</h3><p>Bubbles, Love</p></div><div class="pr">$13</div></div>
+        <div class="mcard"><div class="th p2"></div><div class="bd"><h3>Test 2</h3><p>Hot, Dog, Wooo</p></div><div class="pr">$15</div></div>
+        <div class="mcard"><div class="th p3"></div><div class="bd"><h3>Dockside Paloma</h3><p>Blanco tequila, lime, agave, grapefruit soda</p></div><div class="pr">$14</div></div>
+        <div class="mcard"><div class="th"></div><div class="bd"><h3>Harbor Old Fashioned</h3><p>Rye, demerara, orange bitters</p></div><div class="pr">$15</div></div>
+      </div>
+    </div>
+    <div class="nav"><span><svg class="ic"><use href="#i-home"/></svg>Welcome</span><span class="on"><svg class="ic"><use href="#i-fork"/></svg>Menus</span><span><svg class="ic"><use href="#i-tools"/></svg>Tools</span><span><svg class="ic"><use href="#i-sliders"/></svg>Manage</span><span><svg class="ic"><use href="#i-user"/></svg>Profile</span></div>
+  </div>
+  <div class="bcap">At rest nothing is behind the rows: search field, category chips and subcategory pills all float on the glow. The category chips keep their underline in the <b>category's own colour</b>; the sub pills take the same underline.</div>
+</div>
+
+<!-- ===== M1 · SCROLLED ===== -->
+<div class="col">
+  <div class="concept"><b>M1</b> scrolled · glass chips + glass sub pills<span class="ln"></span></div>
+  <div class="phone">
+    <div class="glow"></div><div class="glow2"></div><div class="glow3"></div>
+    <div class="sb"><span>5:26</span><span>●●● ▲ ▮</span></div>
+    <div class="mhead"><div><h2>Menus</h2><div class="eyeb">MyResto Test</div></div><div class="acts"><div class="chipg"><svg class="ic"><use href="#i-gear"/></svg>Menu</div><div class="sq"><svg class="ic"><use href="#i-pencil"/></svg></div></div></div>
+    <div class="fade"></div>
+    <div class="leaf" data-prescroll="150">
+      <div class="search"><svg class="ic"><use href="#i-search"/></svg>Search the menu<div class="bolt"><svg class="ic" style="width:14px;height:14px;fill:currentColor;stroke:none"><use href="#i-bolt"/></svg></div></div>
+      <div class="menustick">
+        <div class="catrow"><div class="gchip">Dinner<i></i></div><div class="gchip">Fried Dumplings<i></i></div><div class="gchip on">Libations<i></i></div><div class="gchip">Sticky Stuff<i></i></div><div class="gchip">Chow Fun<i></i></div></div>
+        <div class="subrow"><div class="spill on">Signature Cocktails<i></i></div><div class="spill">Martinis<i></i></div><div class="spill">Sangria<i></i></div><div class="spill">Low ABV<i></i></div><div class="spill">Zero ABV<i></i></div></div>
+      </div>
+      <div class="mpad">
+        <div class="mcard"><div class="th p1"></div><div class="bd"><h3>Test</h3><p>Bubbles, Love</p></div><div class="pr">$13</div></div>
+        <div class="mcard"><div class="th p2"></div><div class="bd"><h3>Test 2</h3><p>Hot, Dog, Wooo</p></div><div class="pr">$15</div></div>
+        <div class="mcard"><div class="th p3"></div><div class="bd"><h3>Dockside Paloma</h3><p>Blanco tequila, lime, agave, grapefruit soda</p></div><div class="pr">$14</div></div>
+        <div class="mcard"><div class="th"></div><div class="bd"><h3>Harbor Old Fashioned</h3><p>Rye, demerara, orange bitters</p></div><div class="pr">$15</div></div>
+        <div class="mcard"><div class="th"></div><div class="bd"><h3>Marina Mule</h3><p>Vodka, ginger beer, lime, mint</p></div><div class="pr">$13</div></div>
+        <div class="mcard"><div class="th"></div><div class="bd"><h3>Smoked Negroni</h3><p>Gin, Campari, sweet vermouth, applewood smoke</p></div><div class="pr">$16</div></div>
+        <div class="mcard"><div class="th"></div><div class="bd"><h3>Espresso Martini</h3><p>Vodka, coffee liqueur, fresh espresso</p></div><div class="pr">$15</div></div>
+        <div class="mcard"><div class="th"></div><div class="bd"><h3>Dark & Stormy</h3><p>Dark rum, ginger beer, lime</p></div><div class="pr">$13</div></div>
+      </div>
+    </div>
+    <div class="nav"><span><svg class="ic"><use href="#i-home"/></svg>Welcome</span><span class="on"><svg class="ic"><use href="#i-fork"/></svg>Menus</span><span><svg class="ic"><use href="#i-tools"/></svg>Tools</span><span><svg class="ic"><use href="#i-sliders"/></svg>Manage</span><span><svg class="ic"><use href="#i-user"/></svg>Profile</span></div>
+  </div>
+  <div class="bcap">The search band has collapsed; the two chip rows park under the header and cards slide through them. Every chip blurs what passes under it, the gaps show the cards sharp. <b>Cost:</b> one blur view per chip (≈10–25 on screen) — fine on your iPhone, worth a watch on older phones; Android paints chips near-opaque (s85).</div>
+</div>
+
+<!-- ===== M2 · SCROLLED ===== -->
+<div class="col">
+  <div class="concept"><b>M2</b> scrolled · glass chips + one slim sub rail<span class="ln"></span></div>
+  <div class="phone">
+    <div class="glow"></div><div class="glow2"></div><div class="glow3"></div>
+    <div class="sb"><span>5:26</span><span>●●● ▲ ▮</span></div>
+    <div class="mhead"><div><h2>Menus</h2><div class="eyeb">MyResto Test</div></div><div class="acts"><div class="chipg"><svg class="ic"><use href="#i-gear"/></svg>Menu</div><div class="sq"><svg class="ic"><use href="#i-pencil"/></svg></div></div></div>
+    <div class="fade"></div>
+    <div class="leaf" data-prescroll="150">
+      <div class="search"><svg class="ic"><use href="#i-search"/></svg>Search the menu<div class="bolt"><svg class="ic" style="width:14px;height:14px;fill:currentColor;stroke:none"><use href="#i-bolt"/></svg></div></div>
+      <div class="menustick">
+        <div class="catrow"><div class="gchip">Dinner<i></i></div><div class="gchip">Fried Dumplings<i></i></div><div class="gchip on">Libations<i></i></div><div class="gchip">Sticky Stuff<i></i></div><div class="gchip">Chow Fun<i></i></div></div>
+        <div class="rail"><span class="on">Signature Cocktails<i></i></span><span>Martinis<i></i></span><span>Sangria<i></i></span><span>Low ABV<i></i></span><span>Zero ABV<i></i></span></div>
+      </div>
+      <div class="mpad">
+        <div class="mcard"><div class="th p1"></div><div class="bd"><h3>Test</h3><p>Bubbles, Love</p></div><div class="pr">$13</div></div>
+        <div class="mcard"><div class="th p2"></div><div class="bd"><h3>Test 2</h3><p>Hot, Dog, Wooo</p></div><div class="pr">$15</div></div>
+        <div class="mcard"><div class="th p3"></div><div class="bd"><h3>Dockside Paloma</h3><p>Blanco tequila, lime, agave, grapefruit soda</p></div><div class="pr">$14</div></div>
+        <div class="mcard"><div class="th"></div><div class="bd"><h3>Harbor Old Fashioned</h3><p>Rye, demerara, orange bitters</p></div><div class="pr">$15</div></div>
+        <div class="mcard"><div class="th"></div><div class="bd"><h3>Marina Mule</h3><p>Vodka, ginger beer, lime, mint</p></div><div class="pr">$13</div></div>
+        <div class="mcard"><div class="th"></div><div class="bd"><h3>Smoked Negroni</h3><p>Gin, Campari, sweet vermouth, applewood smoke</p></div><div class="pr">$16</div></div>
+        <div class="mcard"><div class="th"></div><div class="bd"><h3>Espresso Martini</h3><p>Vodka, coffee liqueur, fresh espresso</p></div><div class="pr">$15</div></div>
+        <div class="mcard"><div class="th"></div><div class="bd"><h3>Dark & Stormy</h3><p>Dark rum, ginger beer, lime</p></div><div class="pr">$13</div></div>
+      </div>
+    </div>
+    <div class="nav"><span><svg class="ic"><use href="#i-home"/></svg>Welcome</span><span class="on"><svg class="ic"><use href="#i-fork"/></svg>Menus</span><span><svg class="ic"><use href="#i-tools"/></svg>Tools</span><span><svg class="ic"><use href="#i-sliders"/></svg>Manage</span><span><svg class="ic"><use href="#i-user"/></svg>Profile</span></div>
+  </div>
+  <div class="bcap">Keeps today's subcategory grammar (text + moving underline) but inside <b>one 36pt glass rail</b> with the 16pt gutters, so the text never sits on a card. One extra blur view, not one per sub.</div>
+</div>
+
+<!-- ===== M3 · SCROLLED ===== -->
+<div class="col">
+  <div class="concept"><b>M3</b> scrolled · two rails (Connect-bar grammar)<span class="ln"></span></div>
+  <div class="phone">
+    <div class="glow"></div><div class="glow2"></div><div class="glow3"></div>
+    <div class="sb"><span>5:26</span><span>●●● ▲ ▮</span></div>
+    <div class="mhead"><div><h2>Menus</h2><div class="eyeb">MyResto Test</div></div><div class="acts"><div class="chipg"><svg class="ic"><use href="#i-gear"/></svg>Menu</div><div class="sq"><svg class="ic"><use href="#i-pencil"/></svg></div></div></div>
+    <div class="fade"></div>
+    <div class="leaf" data-prescroll="150">
+      <div class="search"><svg class="ic"><use href="#i-search"/></svg>Search the menu<div class="bolt"><svg class="ic" style="width:14px;height:14px;fill:currentColor;stroke:none"><use href="#i-bolt"/></svg></div></div>
+      <div class="menustick">
+        <div class="rail cats"><span>Dinner</span><span>Fried Dumplings</span><span class="on">Libations</span><span>Sticky Stuff</span><span>Chow Fun</span></div>
+        <div class="rail"><span class="on">Signature Cocktails<i></i></span><span>Martinis<i></i></span><span>Sangria<i></i></span><span>Low ABV<i></i></span><span>Zero ABV<i></i></span></div>
+      </div>
+      <div class="mpad">
+        <div class="mcard"><div class="th p1"></div><div class="bd"><h3>Test</h3><p>Bubbles, Love</p></div><div class="pr">$13</div></div>
+        <div class="mcard"><div class="th p2"></div><div class="bd"><h3>Test 2</h3><p>Hot, Dog, Wooo</p></div><div class="pr">$15</div></div>
+        <div class="mcard"><div class="th p3"></div><div class="bd"><h3>Dockside Paloma</h3><p>Blanco tequila, lime, agave, grapefruit soda</p></div><div class="pr">$14</div></div>
+        <div class="mcard"><div class="th"></div><div class="bd"><h3>Harbor Old Fashioned</h3><p>Rye, demerara, orange bitters</p></div><div class="pr">$15</div></div>
+        <div class="mcard"><div class="th"></div><div class="bd"><h3>Marina Mule</h3><p>Vodka, ginger beer, lime, mint</p></div><div class="pr">$13</div></div>
+        <div class="mcard"><div class="th"></div><div class="bd"><h3>Smoked Negroni</h3><p>Gin, Campari, sweet vermouth, applewood smoke</p></div><div class="pr">$16</div></div>
+        <div class="mcard"><div class="th"></div><div class="bd"><h3>Espresso Martini</h3><p>Vodka, coffee liqueur, fresh espresso</p></div><div class="pr">$15</div></div>
+        <div class="mcard"><div class="th"></div><div class="bd"><h3>Dark & Stormy</h3><p>Dark rum, ginger beer, lime</p></div><div class="pr">$13</div></div>
+      </div>
+    </div>
+    <div class="nav"><span><svg class="ic"><use href="#i-home"/></svg>Welcome</span><span class="on"><svg class="ic"><use href="#i-fork"/></svg>Menus</span><span><svg class="ic"><use href="#i-tools"/></svg>Tools</span><span><svg class="ic"><use href="#i-sliders"/></svg>Manage</span><span><svg class="ic"><use href="#i-user"/></svg>Profile</span></div>
+  </div>
+  <div class="bcap">Both rows become rails like the Connect bar: categories as segments inside one capsule (active = a tinted segment in the category colour), subs as text tabs inside a second. Two blur views total, the cheapest; the category chips lose their individual glass tiles.</div>
+</div>
+
+</div>
+
+<div class="notes">
+  <div class="note"><b>Code shape (Welcome)</b><em>PortalHome.tsx</em>: `substick` loses its background, shadow and (in the new version) any backdrop; the capsule becomes a glass surface with its own GlassBlur; the Events capsule gets its own onLayout. Calendar = `card: 'transparent'` + `edgeToEdge`, no wrapper (V2).</div>
+  <div class="note"><b>Code shape (Menu)</b><em>MenuCategoryTabs.tsx</em>: the whole `backdrop` layer (GlassBlur + wash + hairline + the showBackdrop fade) is deleted; chips/pills/rails become glass surfaces with their own blur. Both the user Menu and the Editor get it (one component). `syncBackdrop` and `backdropOn` go away in both hosts.</div>
+  <div class="note"><b>The top edge</b>With no band, a card scrolled under the Menu rows is cut at the header's bottom edge. "Hard cut" is literal; "Soft fade" adds a 28pt bg→transparent gradient pinned at that edge (not a bar: it only kisses the card's top). The Welcome page needs neither — the Connect bar's edge does the job.</div>
+</div>
+
+<script>
+const phones=[...document.querySelectorAll('.phone')];
+document.querySelectorAll('[data-theme]').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('[data-theme]').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+  phones.forEach(p=>{p.classList.remove('t-moon-l','t-ocean-d','t-ocean-l');if(b.dataset.theme)p.classList.add(b.dataset.theme);});
+}));
+document.querySelectorAll('[data-fade]').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('[data-fade]').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+  phones.forEach(p=>p.classList.toggle('fadeon',b.dataset.fade==='on'));
+}));
+document.querySelectorAll('.leaf').forEach(leaf=>{
+  const fade=leaf.parentElement.querySelector('.fade');
+  if(fade){ fade.style.top=leaf.offsetTop+'px'; }
+  if(leaf.dataset.prescroll){ requestAnimationFrame(()=>{ leaf.scrollTop=+leaf.dataset.prescroll; }); }
+});
+</script>
+</body>
+</html>

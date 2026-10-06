@@ -56,8 +56,9 @@ export default function CommandTile({
   rightBlock,
 }: CommandTileProps) {
   const colors = useThemeColors();
-  const { mode } = useAppTheme();
-  const scheme = mode === 'dark' ? 'dark' : 'light';
+  // resolvedMode, never mode: under Auto `mode` is 'auto' and the raw check fell to
+  // the light-scheme alphas on a dark phone.
+  const { resolvedMode: scheme } = useAppTheme();
 
   const bg = hexToRgba(accent, TILE_BG_ALPHA[scheme]);
   const border = hexToRgba(accent, TILE_BORDER_ALPHA[scheme]);

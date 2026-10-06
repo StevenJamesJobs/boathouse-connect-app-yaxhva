@@ -12,10 +12,19 @@
  *   theme-tinted flame rendered blue on Ocean): kitchen hot flame orange,
  *   bartender azure, host violet.
  *
+ * Both rules describe the default 'myresto' tile palette. The s89 app-wide tile
+ * palette toggle (ThemeContext.tilePalette = 'theme') swaps every family and
+ * assistant accent for the theme tint — go through toolsFamilyAccent /
+ * assistantAccent rather than the raw maps so the toggle is honoured. Rewards
+ * gold is exempt (it is the approvals signal), and HERO_GRADIENTS plus the
+ * family consoles never consult the toggle.
+ *
  * HERO_GRADIENTS are fixed-dark surfaces — text on them is literal white and
  * eyebrows take the literal ember (#FFB07A), never theme tokens (the rulebook's
  * ember rule).
  */
+import type { ThemeColorSet } from '@/styles/commonStyles';
+import type { TilePalette } from '@/contexts/ThemeContext';
 
 export type ToolsScheme = 'light' | 'dark';
 
@@ -36,6 +45,33 @@ export const ASSISTANT_HUES: Record<AssistantKey, Record<ToolsScheme, string>> =
   bartender: { dark: '#3B82F6', light: '#2563EB' },
   host: { dark: '#5B5BD6', light: '#4A46B4' },
 };
+
+/**
+ * The accent a Tools-family tile wears, honouring the app-wide tile palette:
+ * - rewards is ALWAYS gold (the approvals signal, under either palette);
+ * - guides ALWAYS follows the theme tint (the house family, see the header);
+ * - game / quiz / tips wear their fixed hue under 'myresto', the tint under 'theme'.
+ */
+export function toolsFamilyAccent(
+  family: FamilyKey,
+  scheme: ToolsScheme,
+  colors: ThemeColorSet,
+  tilePalette: TilePalette = 'myresto',
+): string {
+  if (family === 'rewards') return FAMILY_ACCENTS.rewards[scheme];
+  if (family === 'guides' || tilePalette === 'theme') return colors.tint;
+  return FAMILY_ACCENTS[family][scheme];
+}
+
+/** The assistant disc hue: the fixed trio under 'myresto', the theme tint under 'theme'. */
+export function assistantAccent(
+  key: AssistantKey,
+  scheme: ToolsScheme,
+  colors: ThemeColorSet,
+  tilePalette: TilePalette = 'myresto',
+): string {
+  return tilePalette === 'theme' ? colors.tint : ASSISTANT_HUES[key][scheme];
+}
 
 /** Tinted-glass tile wash (the r3 lockdown finish): accent at these alphas. */
 export const TILE_BG_ALPHA: Record<ToolsScheme, number> = { dark: 0.11, light: 0.09 };

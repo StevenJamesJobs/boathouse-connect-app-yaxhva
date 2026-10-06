@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Notification Composer</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600;700&display=swap">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{min-height:100vh;display:flex;flex-direction:column;align-items:center;gap:14px;padding:26px 12px 60px;background:#0C0D11;color:#D6D9DE;font-family:'Inter',system-ui,sans-serif}
+h1{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:22px;letter-spacing:-0.3px;color:#F4F6F8}
+h1 span{color:#F99861}
+.hint{color:#6E7681;font-size:11.5px;font-family:'JetBrains Mono',monospace;text-align:center;max-width:980px;line-height:1.7}
+.hint b{color:#AEB4BD;font-weight:600}
+.hint em{font-style:normal;color:#F99861}
+.row{display:flex;flex-wrap:wrap;gap:18px;justify-content:center;align-items:flex-start;max-width:1800px}
+.col{display:flex;flex-direction:column;gap:10px;align-items:center}
+.concept{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:#6E7681;display:flex;align-items:center;gap:8px;width:380px}
+.concept b{color:#F99861}
+.concept .ln{flex:1;height:1px;background:rgba(255,255,255,0.08)}
+.bcap{width:380px;font-size:11px;color:#8A9098;line-height:1.55;font-style:italic}
+.bcap b{font-style:normal;color:#D6D9DE;font-weight:600}
+.notes{max-width:1180px;width:100%;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;margin-top:6px}
+.note{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:12px 14px;font-size:11.5px;line-height:1.55;color:#AEB4BD}
+.note b{display:block;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:#F99861;margin-bottom:5px}
+.note em{font-style:normal;color:#F4F6F8;font-weight:600}
+
+/* ---------- phone (Moonstone dark, the Manage family = the theme primary) ---------- */
+.phone{
+  --bg:#141724; --text:#F4F2EE; --muted:#9C9BA6; --fireText:#1F2334; --tint:#F99861; --prim:#F4F2EE;
+  --glass:rgba(255,255,255,0.07); --glassbd:rgba(255,255,255,0.12); --surf:rgba(255,255,255,0.05); --surfbd:rgba(255,255,255,0.09); --hair:rgba(255,255,255,0.07);
+  --glowA:rgba(249,152,97,0.26); --glowB:rgba(120,140,210,0.16); --ok:#10B981;
+  position:relative;width:380px;height:760px;background:var(--bg);border-radius:48px;border:1px solid #2A2D3A;
+  box-shadow:0 22px 60px rgba(0,0,0,0.5);overflow:hidden;color:var(--text);display:flex;flex-direction:column}
+.phone *{box-sizing:border-box}
+.glow{position:absolute;top:-90px;right:-60px;width:300px;height:250px;border-radius:50%;background:radial-gradient(circle,var(--glowA),transparent 66%);z-index:0;pointer-events:none}
+.glow2{position:absolute;top:-50px;left:-70px;width:220px;height:200px;border-radius:50%;background:radial-gradient(circle,var(--glowB),transparent 68%);z-index:0;pointer-events:none}
+.sb{position:relative;z-index:3;display:flex;justify-content:space-between;align-items:center;padding:14px 28px 6px;font-size:13px;font-weight:600;font-family:'JetBrains Mono',monospace;flex:0 0 auto}
+.ic{width:16px;height:16px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+.screen{position:relative;z-index:2;flex:1;overflow-y:auto;padding:0 16px 40px;scrollbar-width:none}
+.screen::-webkit-scrollbar{display:none}
+.hdr{display:flex;align-items:center;gap:8px;margin:2px 0 10px;min-height:40px}
+.c38{width:38px;height:38px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;background:var(--glass);border:1px solid var(--glassbd);color:var(--text)}
+.hleft{flex:1;min-width:0}
+.eyebrow{font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:1.6px;text-transform:uppercase;color:var(--tint);font-weight:600}
+.htitle{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:19px;letter-spacing:-0.3px;line-height:1.1}
+.mono{font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums}
+.seg3{display:flex;padding:3px;gap:3px;border-radius:13px;background:var(--glass);border:1px solid var(--glassbd);margin-bottom:12px}
+.seg3 span{flex:1;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;gap:6px;font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:600;font-size:12.5px;color:var(--muted)}
+.seg3 span.on{background:var(--glass);border:1px solid var(--glassbd);color:var(--text)}
+.seg3 .ic{width:13px;height:13px}
+/* section cards + eyebrow rules */
+.gcard{border-radius:16px;border:1px solid var(--surfbd);background:var(--surf);padding:13px 13px 12px;margin-bottom:12px;position:relative}
+.eyeb{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:var(--tint);font-weight:600;display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.eyeb .ln{flex:1;height:1px;background:var(--hair)}
+.eyeb small{font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:1px;color:var(--muted);text-transform:uppercase}
+.lbl{display:flex;align-items:center;justify-content:space-between;font-size:12.5px;font-weight:600;margin:8px 1px 6px}
+.lbl small{font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--muted);font-weight:600}
+.inp{height:44px;border-radius:13px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;padding:0 13px;font-size:13px;color:var(--muted)}
+.inp b{color:var(--text);font-weight:500}
+.ta{min-height:92px;border-radius:13px;background:var(--glass);border:1px solid var(--glassbd);padding:11px 13px;font-size:13px;color:var(--muted);position:relative;line-height:1.45}
+.ta .hdl{position:absolute;right:8px;bottom:6px;width:26px;height:16px;border-radius:7px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;justify-content:center;color:var(--muted)}
+.ta .hdl i{display:block;width:12px;height:1.5px;background:currentColor;box-shadow:0 3px 0 currentColor;opacity:.7;margin-top:-3px}
+.fold{display:flex;align-items:center;gap:8px;height:42px;border-radius:12px;background:var(--glass);border:1px solid var(--glassbd);padding:0 12px;margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:1px;text-transform:uppercase;color:var(--text);font-weight:600}
+.fold small{margin-left:auto;font-size:9px;color:var(--muted);letter-spacing:.6px;text-transform:none}
+.fold .ic{width:13px;height:13px;color:var(--muted)}
+/* the Send-to row */
+.srow{display:flex;align-items:center;gap:10px;height:48px;border-radius:13px;background:var(--glass);border:1px solid var(--glassbd);padding:0 12px}
+.srow .sq{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--tint) 14%,transparent);border:1px solid color-mix(in srgb,var(--tint) 30%,transparent);color:var(--tint);flex:0 0 auto}
+.srow .sq .ic{width:14px;height:14px}
+.srow .txt{flex:1;min-width:0}
+.srow .tt{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:600;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.srow .ts{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);margin-top:1px;letter-spacing:.4px}
+.srow .ic.chev{color:var(--muted)}
+.minis{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.minis span{font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:.8px;text-transform:uppercase;padding:3px 7px;border-radius:7px;background:color-mix(in srgb,var(--tint) 12%,transparent);border:1px solid color-mix(in srgb,var(--tint) 32%,transparent);color:var(--tint);font-weight:600}
+/* pill cloud (the onboarding chip grammar: ring + fixed ○→✓ slot) */
+.cloud{display:flex;flex-wrap:wrap;gap:7px}
+.pill{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 11px 0 8px;border-radius:10px;background:var(--glass);border:1px solid var(--glassbd);font-size:12.5px;font-weight:500;color:var(--text)}
+.pill .ck{width:14px;height:14px;border-radius:7px;border:1.5px solid var(--glassbd);display:flex;align-items:center;justify-content:center;flex:0 0 auto;color:var(--fireText)}
+.pill .ck .ic{width:9px;height:9px;stroke-width:3}
+.pill.on{border-color:var(--tint);box-shadow:0 0 0 1px var(--tint);background:color-mix(in srgb,var(--tint) 10%,transparent)}
+.pill.on .ck{background:var(--tint);border-color:var(--tint)}
+.pill.all{padding-left:9px}
+.pill.all .ic.p{width:13px;height:13px;color:var(--tint)}
+.pill.more{color:var(--tint);font-weight:600;border-style:dashed}
+.allrow{display:flex;align-items:center;gap:10px;height:50px;border-radius:13px;background:var(--surf);border:1px solid var(--surfbd);padding:0 12px;margin-bottom:12px}
+.allrow.on{border-color:var(--tint);box-shadow:0 0 0 1px var(--tint)}
+.allrow .sq{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--tint) 14%,transparent);color:var(--tint)}
+.allrow .sq .ic{width:15px;height:15px}
+.allrow .txt{flex:1}
+.allrow .tt{font-family:'Bricolage Grotesque';font-weight:600;font-size:14px}
+.allrow .ts{font-size:10.5px;color:var(--muted);margin-top:1px}
+.allrow .rad{width:18px;height:18px;border-radius:9px;border:1.5px solid var(--glassbd);display:flex;align-items:center;justify-content:center;color:var(--fireText)}
+.allrow.on .rad{background:var(--tint);border-color:var(--tint)}
+.allrow .rad .ic{width:10px;height:10px;stroke-width:3}
+.countline{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin:10px 1px 0}
+.countline b{color:var(--tint)}
+.search{height:40px;border-radius:12px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;gap:8px;padding:0 12px;font-size:12.5px;color:var(--muted);margin-bottom:10px}
+.search .ic{width:14px;height:14px}
+/* photo + extras */
+.photo{display:flex;gap:10px;align-items:flex-start}
+.ptile{width:86px;height:86px;border-radius:14px;border:1.5px dashed var(--glassbd);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;color:var(--tint);font-size:10.5px;font-weight:600;flex:0 0 auto}
+.ptile .ic{width:20px;height:20px}
+.pside{flex:1;min-width:0}
+.seg2{display:flex;padding:3px;gap:3px;border-radius:11px;background:var(--glass);border:1px solid var(--glassbd)}
+.seg2 span{flex:1;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:12px;font-weight:600;color:var(--muted)}
+.seg2 span.on{background:var(--prim);color:var(--fireText)}
+.seg2 .ic{width:11px;height:11px}
+.phint{font-size:10.5px;color:var(--muted);line-height:1.45;margin-top:8px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tog{display:flex;align-items:center;gap:10px;margin-top:12px}
+.tog .txt{flex:1;min-width:0}
+.tog .tt{font-size:12.5px;font-weight:600}
+.tog .ts{font-size:10.5px;color:var(--muted);margin-top:2px}
+.sw{width:46px;height:28px;border-radius:14px;background:var(--glass);border:1px solid var(--glassbd);position:relative;flex:0 0 auto}
+.sw i{position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:10px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.4)}
+.sw.on{background:var(--tint);border-color:var(--tint)}
+.sw.on i{left:21px}
+/* preview + send */
+.pv{border-radius:14px;background:var(--surf);border:1px solid var(--surfbd);padding:11px 12px;display:flex;gap:10px;align-items:flex-start}
+.pv .th{width:44px;height:44px;border-radius:11px;background:linear-gradient(135deg,#6B4A3A,#2C2F45);flex:0 0 auto}
+.pv .tt{font-family:'Bricolage Grotesque';font-weight:600;font-size:13px}
+.pv .ts{font-size:11px;color:var(--muted);margin-top:2px;line-height:1.4}
+.pv .to{font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:.8px;text-transform:uppercase;color:var(--tint);margin-top:5px}
+.send{height:47px;border-radius:13px;background:var(--prim);color:var(--fireText);display:flex;align-items:center;justify-content:center;gap:8px;font-family:'Bricolage Grotesque';font-weight:600;font-size:15px;position:relative;overflow:hidden;margin-top:12px}
+.send::after{content:"";position:absolute;left:0;top:0;bottom:0;width:38%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.5),transparent);transform:skewX(-18deg) translateX(-160%);animation:shine 4.5s ease-in-out infinite}
+@keyframes shine{0%,70%{transform:skewX(-18deg) translateX(-160%)}100%{transform:skewX(-18deg) translateX(420%)}}
+.quiet{text-align:center;font-size:12px;color:var(--muted);margin-top:10px}
+/* sheet */
+.scrim{position:absolute;inset:0;z-index:4;background:rgba(6,10,18,0.55)}
+.sheet{position:absolute;left:0;right:0;bottom:0;z-index:5;background:var(--bg);border:1px solid var(--glassbd);border-bottom:0;border-radius:26px 26px 0 0;padding:10px 18px 30px;display:flex;flex-direction:column;gap:12px;max-height:88%}
+.grab{width:40px;height:4px;border-radius:2px;background:var(--glassbd);margin:0 auto 2px}
+.stitle{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:19px;text-align:center}
+.ssub{font-size:11.5px;color:var(--muted);text-align:center;margin-top:-8px}
+.sbody{overflow:hidden;position:relative}
+.sbody::after{content:"";position:absolute;left:0;right:0;bottom:0;height:34px;background:linear-gradient(180deg,transparent,var(--bg))}
+.sfoot{display:flex;gap:10px}
+.sfoot .btn{flex:1;height:47px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-family:'Bricolage Grotesque';font-weight:600;font-size:15px;background:var(--glass);border:1px solid var(--glassbd);color:var(--muted)}
+.sfoot .btn.fill{background:var(--prim);color:var(--fireText);border-color:transparent;flex:2}
+/* steps rail (N3) */
+.rail{display:flex;gap:5px;margin-bottom:14px}
+.rail span{flex:1;height:4px;border-radius:2px;background:var(--glassbd);position:relative}
+.rail span.on{background:var(--tint)}
+.rail span.done{background:color-mix(in srgb,var(--tint) 55%,transparent)}
+.rail span::after{content:attr(data-n);position:absolute;top:8px;left:0;font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.rail span.on::after{color:var(--tint)}
+.steph{margin:18px 0 10px}
+.steph .t{font-family:'Bricolage Grotesque';font-weight:700;font-size:20px;letter-spacing:-.3px}
+.steph .s{font-size:12px;color:var(--muted);margin-top:3px}
+.dock{position:absolute;left:0;right:0;bottom:0;z-index:3;padding:12px 16px 26px;background:linear-gradient(180deg,transparent,var(--bg) 35%);display:flex;gap:10px}
+.dock .btn{height:47px;border-radius:13px;display:flex;align-items:center;justify-content:center;gap:8px;font-family:'Bricolage Grotesque';font-weight:600;font-size:15px;background:var(--glass);border:1px solid var(--glassbd);color:var(--muted);flex:1}
+.dock .btn.fill{background:var(--prim);color:var(--fireText);border-color:transparent;flex:2}
+.under{opacity:.5;filter:blur(1px)}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5"/></symbol>
+  <symbol id="i-people" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0113 0"/><circle cx="17" cy="9" r="2.8"/><path d="M16 15.5a5 5 0 015.5 4.5"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></symbol>
+  <symbol id="i-draft" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M14 3v6h6"/></symbol>
+  <symbol id="i-hist" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-photo" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><circle cx="8.5" cy="10" r="1.6"/><path d="M21 16l-5-5-8 8"/></symbol>
+  <symbol id="i-sq" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/></symbol>
+  <symbol id="i-ban" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="10" rx="2"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1"/></symbol>
+  <symbol id="i-lang" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0112 0v5l2 2H4l2-2z"/><path d="M10 20a2 2 0 004 0"/></symbol>
+  <symbol id="i-mega" viewBox="0 0 24 24"><path d="M3 10v4a1 1 0 001 1h3l6 4V5L7 9H4a1 1 0 00-1 1z"/><path d="M17 9a4 4 0 010 6"/></symbol>
+</svg>
+
+<h1>Notification Center <span>— the composer, three ways</span></h1>
+<p class="hint"><b>The two asks:</b> the Send To picker fills the screen on a big team, and the page needs breathing room / organisation. <em>N1</em> keeps one scrolling page but splits it into three glass cards and moves the audience into a sheet with a job-title pill cloud. <em>N2</em> puts the pill cloud right on the page (no sheet). <em>N3</em> turns the composer into the Content Kit's steps (Audience → Message → Extras → Review).<br>Pills use the onboarding chip grammar — ring + a fixed ○→✓ slot, never a solid fill — and every list caps at the sheet's 88 % and scrolls.</p>
+
+<div class="row">
+
+<!-- ================= N1 · sectioned glass ================= -->
+<div class="col">
+  <div class="concept"><b>N1</b> Sectioned glass <span class="ln"></span> one page · three cards · audience sheet</div>
+  <div class="phone">
+    <div class="glow"></div><div class="glow2"></div>
+    <div class="sb"><span>9:41</span><span class="mono">●●● ▲ ▮</span></div>
+    <div class="screen">
+      <div class="hdr"><div class="c38"><svg class="ic"><use href="#i-back"/></svg></div><div class="hleft"><div class="htitle">Notification Center</div><div class="eyebrow">Compose</div></div></div>
+      <div class="seg3"><span class="on"><svg class="ic"><use href="#i-send"/></svg>Compose</span><span><svg class="ic"><use href="#i-draft"/></svg>Drafts</span><span><svg class="ic"><use href="#i-hist"/></svg>History</span></div>
+
+      <div class="gcard">
+        <div class="eyeb">Audience <span class="ln"></span><small>3 of 12 titles</small></div>
+        <div class="srow"><div class="sq"><svg class="ic"><use href="#i-people"/></svg></div><div class="txt"><div class="tt">Servers, Bartenders +1</div><div class="ts">BY JOB TITLE · 18 PEOPLE</div></div><svg class="ic chev"><use href="#i-right"/></svg></div>
+        <div class="minis"><span>Server</span><span>Bartender</span><span>Host</span></div>
+      </div>
+
+      <div class="gcard">
+        <div class="eyeb">Message <span class="ln"></span></div>
+        <div class="lbl">Title <small>23/50</small></div>
+        <div class="inp"><b>Saturday pre-shift at 3:30</b></div>
+        <div class="lbl">Message <small>88/200</small></div>
+        <div class="ta">Quick menu walkthrough for the new Fall specials before doors. Grab a coffee, we'll be done by 4.<div class="hdl"><i></i></div></div>
+        <div class="fold"><svg class="ic"><use href="#i-lang"/></svg>Spanish translation<small>0 of 2 translated</small><svg class="ic"><use href="#i-down"/></svg></div>
+      </div>
+
+      <div class="gcard">
+        <div class="eyeb">Extras <span class="ln"></span><small>optional</small></div>
+        <div class="lbl" style="margin-top:0">Photo</div>
+        <div class="photo"><div class="ptile"><svg class="ic"><use href="#i-photo"/></svg>Add photo</div><div class="pside"><div class="seg2"><span class="on"><svg class="ic"><use href="#i-sq"/></svg>Square</span><span><svg class="ic"><use href="#i-ban"/></svg>Banner</span></div><div class="phint">Shows in the shade and on the notification's poster. Without one, your logo stands in.</div></div></div>
+        <div class="lbl">Opens to</div>
+        <div class="srow" style="height:44px"><div class="sq"><svg class="ic"><use href="#i-link"/></svg></div><div class="txt"><div class="tt" style="color:var(--muted);font-weight:500">Nothing — just the message</div></div><svg class="ic chev"><use href="#i-down"/></svg></div>
+        <div class="tog"><div class="txt"><div class="tt">Send push notification</div><div class="ts">Staff get a phone alert + it shows in their shade.</div></div><div class="sw on"><i></i></div></div>
+      </div>
+
+      <div class="eyeb" style="margin:2px 2px 8px">Preview <span class="ln"></span><small>as staff see it</small></div>
+      <div class="pv"><div class="th"></div><div><div class="tt">Saturday pre-shift at 3:30</div><div class="ts">Quick menu walkthrough for the new Fall specials before doors…</div><div class="to">To · Server · Bartender · Host</div></div></div>
+      <div class="send"><svg class="ic"><use href="#i-send"/></svg>Send to 18 people</div>
+      <div class="quiet">Save as draft</div>
+    </div>
+  </div>
+  <div class="bcap"><b>What changed:</b> the tall single card becomes Audience · Message · Extras, each a glass card with a mono eyebrow — the translation fold stays with the message, the photo + link + push live together under <b>Extras</b>, and the gap you wanted is the card seam. The Send To row shows who, how many, and the picked titles as mini chips.</div>
+</div>
+
+<!-- ================= N1 · the Send-to sheet ================= -->
+<div class="col">
+  <div class="concept"><b>N1</b> the Send to sheet <span class="ln"></span> all staff · pill cloud · scrolls</div>
+  <div class="phone">
+    <div class="glow"></div><div class="glow2"></div>
+    <div class="sb"><span>9:41</span><span class="mono">●●● ▲ ▮</span></div>
+    <div class="screen under">
+      <div class="hdr"><div class="c38"><svg class="ic"><use href="#i-back"/></svg></div><div class="hleft"><div class="htitle">Notification Center</div><div class="eyebrow">Compose</div></div></div>
+      <div class="seg3"><span class="on">Compose</span><span>Drafts</span><span>History</span></div>
+      <div class="gcard"><div class="eyeb">Audience <span class="ln"></span></div><div class="srow"><div class="sq"><svg class="ic"><use href="#i-people"/></svg></div><div class="txt"><div class="tt">Servers, Bartenders +1</div></div></div></div>
+      <div class="gcard"><div class="eyeb">Message <span class="ln"></span></div><div class="inp"><b>Saturday pre-shift at 3:30</b></div></div>
+    </div>
+    <div class="scrim"></div>
+    <div class="sheet">
+      <div class="grab"></div>
+      <div class="stitle">Send to</div>
+      <div class="ssub">Everyone, or pick the job titles</div>
+      <div class="sbody">
+        <div class="allrow"><div class="sq"><svg class="ic"><use href="#i-people"/></svg></div><div class="txt"><div class="tt">All staff</div><div class="ts">Everyone with notifications on · 41 people</div></div><div class="rad"></div></div>
+        <div class="eyeb">By job title <span class="ln"></span><small>12 titles</small></div>
+        <div class="cloud">
+          <span class="pill on"><span class="ck"><svg class="ic"><use href="#i-check"/></svg></span>Server</span>
+          <span class="pill on"><span class="ck"><svg class="ic"><use href="#i-check"/></svg></span>Bartender</span>
+          <span class="pill on"><span class="ck"><svg class="ic"><use href="#i-check"/></svg></span>Host</span>
+          <span class="pill"><span class="ck"></span>Busser</span>
+          <span class="pill"><span class="ck"></span>Runner</span>
+          <span class="pill"><span class="ck"></span>Lead Server</span>
+          <span class="pill"><span class="ck"></span>Chef</span>
+          <span class="pill"><span class="ck"></span>Kitchen</span>
+          <span class="pill"><span class="ck"></span>Bar Manager</span>
+          <span class="pill"><span class="ck"></span>Banquets</span>
+          <span class="pill"><span class="ck"></span>Banquet Captain</span>
+          <span class="pill"><span class="ck"></span>Manager</span>
+          <span class="pill"><span class="ck"></span>Dishwasher</span>
+          <span class="pill"><span class="ck"></span>Sous Chef</span>
+          <span class="pill"><span class="ck"></span>Expo</span>
+        </div>
+        <div class="countline"><b>3 selected</b> · 18 people</div>
+      </div>
+      <div class="sfoot"><div class="btn">Clear</div><div class="btn fill">Done</div></div>
+    </div>
+  </div>
+  <div class="bcap"><b>The sheet:</b> a real GlassSheet (swipes down like everything now) — All staff as one radio row, then every job title as a pill that wraps. Twenty titles still fit: the body scrolls under the 88 % cap and the footer stays pinned, so nothing ever fills the screen. Tapping a pill switches off All staff; Clear goes back to it.</div>
+</div>
+
+<!-- ================= N2 · inline cloud ================= -->
+<div class="col">
+  <div class="concept"><b>N2</b> Inline cloud <span class="ln"></span> no sheet · pills on the page · rules not cards</div>
+  <div class="phone">
+    <div class="glow"></div><div class="glow2"></div>
+    <div class="sb"><span>9:41</span><span class="mono">●●● ▲ ▮</span></div>
+    <div class="screen">
+      <div class="hdr"><div class="c38"><svg class="ic"><use href="#i-back"/></svg></div><div class="hleft"><div class="htitle">Notification Center</div><div class="eyebrow">Compose</div></div></div>
+      <div class="seg3"><span class="on"><svg class="ic"><use href="#i-send"/></svg>Compose</span><span><svg class="ic"><use href="#i-draft"/></svg>Drafts</span><span><svg class="ic"><use href="#i-hist"/></svg>History</span></div>
+
+      <div class="eyeb" style="margin-top:4px">Send to <span class="ln"></span><small>3 titles · 18 people</small></div>
+      <div class="cloud">
+        <span class="pill all"><svg class="ic p"><use href="#i-people"/></svg>All staff</span>
+        <span class="pill on"><span class="ck"><svg class="ic"><use href="#i-check"/></svg></span>Server</span>
+        <span class="pill on"><span class="ck"><svg class="ic"><use href="#i-check"/></svg></span>Bartender</span>
+        <span class="pill on"><span class="ck"><svg class="ic"><use href="#i-check"/></svg></span>Host</span>
+        <span class="pill"><span class="ck"></span>Busser</span>
+        <span class="pill"><span class="ck"></span>Runner</span>
+        <span class="pill"><span class="ck"></span>Lead Server</span>
+        <span class="pill more">+ 6 more</span>
+      </div>
+
+      <div class="eyeb" style="margin-top:16px">Message <span class="ln"></span></div>
+      <div class="lbl" style="margin-top:0">Title <small>23/50</small></div>
+      <div class="inp"><b>Saturday pre-shift at 3:30</b></div>
+      <div class="lbl">Message <small>88/200</small></div>
+      <div class="ta">Quick menu walkthrough for the new Fall specials before doors. Grab a coffee, we'll be done by 4.<div class="hdl"><i></i></div></div>
+      <div class="fold"><svg class="ic"><use href="#i-lang"/></svg>Spanish translation<small>0 of 2 translated</small><svg class="ic"><use href="#i-down"/></svg></div>
+
+      <div class="eyeb" style="margin-top:16px">Photo &amp; link <span class="ln"></span><small>optional</small></div>
+      <div class="two">
+        <div class="ptile" style="width:100%;height:92px"><svg class="ic"><use href="#i-photo"/></svg>Add photo</div>
+        <div><div class="seg2"><span class="on"><svg class="ic"><use href="#i-sq"/></svg>Square</span><span><svg class="ic"><use href="#i-ban"/></svg>Banner</span></div><div class="srow" style="height:40px;margin-top:8px"><div class="sq" style="width:26px;height:26px"><svg class="ic" style="width:12px;height:12px"><use href="#i-link"/></svg></div><div class="txt"><div class="tt" style="font-size:12px;color:var(--muted);font-weight:500">Opens to…</div></div></div></div>
+      </div>
+
+      <div class="eyeb" style="margin-top:16px">Delivery <span class="ln"></span></div>
+      <div class="tog" style="margin-top:0"><div class="txt"><div class="tt">Send push notification</div><div class="ts">Staff get a phone alert + it shows in their shade.</div></div><div class="sw on"><i></i></div></div>
+
+      <div class="send"><svg class="ic"><use href="#i-send"/></svg>Send to 18 people</div>
+      <div class="quiet">Save as draft</div>
+    </div>
+  </div>
+  <div class="bcap"><b>What changed:</b> no cards, no sheet — the page is four eyebrow rules (Send to · Message · Photo &amp; link · Delivery) with air between them, the Appearance page's grammar. Job titles are pills right on the page; a big team collapses to two rows plus <b>+ N more</b> that expands in place. Fastest to use, busiest to look at on a 20-title org.</div>
+</div>
+
+<!-- ================= N3 · steps ================= -->
+<div class="col">
+  <div class="concept"><b>N3</b> Steps <span class="ln"></span> the Content Kit rail · one thing per screen</div>
+  <div class="phone">
+    <div class="glow"></div><div class="glow2"></div>
+    <div class="sb"><span>9:41</span><span class="mono">●●● ▲ ▮</span></div>
+    <div class="screen">
+      <div class="hdr"><div class="c38"><svg class="ic"><use href="#i-back"/></svg></div><div class="hleft"><div class="htitle">New notification</div><div class="eyebrow">Step 1 of 4</div></div><div class="c38" style="font-size:11px;font-weight:600;width:auto;padding:0 11px">Drafts</div></div>
+      <div class="rail"><span class="on" data-n="Audience"></span><span data-n="Message"></span><span data-n="Extras"></span><span data-n="Review"></span></div>
+      <div class="steph"><div class="t">Who gets it?</div><div class="s">Everyone, or pick job titles. You can change this on Review.</div></div>
+      <div class="allrow"><div class="sq"><svg class="ic"><use href="#i-people"/></svg></div><div class="txt"><div class="tt">All staff</div><div class="ts">Everyone with notifications on · 41 people</div></div><div class="rad"></div></div>
+      <div class="search"><svg class="ic"><use href="#i-search"/></svg>Search job titles</div>
+      <div class="cloud">
+        <span class="pill on"><span class="ck"><svg class="ic"><use href="#i-check"/></svg></span>Server</span>
+        <span class="pill on"><span class="ck"><svg class="ic"><use href="#i-check"/></svg></span>Bartender</span>
+        <span class="pill on"><span class="ck"><svg class="ic"><use href="#i-check"/></svg></span>Host</span>
+        <span class="pill"><span class="ck"></span>Busser</span>
+        <span class="pill"><span class="ck"></span>Runner</span>
+        <span class="pill"><span class="ck"></span>Lead Server</span>
+        <span class="pill"><span class="ck"></span>Chef</span>
+        <span class="pill"><span class="ck"></span>Kitchen</span>
+        <span class="pill"><span class="ck"></span>Bar Manager</span>
+        <span class="pill"><span class="ck"></span>Banquets</span>
+        <span class="pill"><span class="ck"></span>Banquet Captain</span>
+        <span class="pill"><span class="ck"></span>Manager</span>
+        <span class="pill"><span class="ck"></span>Dishwasher</span>
+        <span class="pill"><span class="ck"></span>Sous Chef</span>
+        <span class="pill"><span class="ck"></span>Expo</span>
+      </div>
+      <div class="countline"><b>3 selected</b> · 18 people</div>
+      <div style="height:90px"></div>
+    </div>
+    <div class="dock"><div class="btn">Back</div><div class="btn fill">Next<svg class="ic"><use href="#i-right"/></svg></div></div>
+  </div>
+  <div class="bcap"><b>What changed:</b> the composer becomes the announcements editor's steps — Audience (this screen: All staff, a search field for big teams, the full pill cloud), Message (title · body · translation), Extras (photo · opens to · push), Review (the staff-facing preview + the audience line + Send). Consistent with the rest of Manage, the most taps.</div>
+</div>
+
+</div>
+
+<div class="notes">
+  <div class="note"><b>Why the picker filled the screen</b>Today the audience lives in a plain RN Modal with one row per job title and no height cap — twelve titles is already taller than the phone. All three concepts put the titles in a <em>wrapping pill cloud</em> (three to four per row) inside a container that caps and scrolls.</div>
+  <div class="note"><b>Pill grammar</b>Glass pill, ring in the theme tint when selected, a fixed ○→✓ slot on the left so the row never reflows; <em>All staff</em> is the radio at the top (N1 / N3) or the first pill (N2). The count line under the cloud always reads "N selected · M people" so the sender knows the reach before Send.</div>
+  <div class="note"><b>The breathing room</b>N1 fixes the Translation-to-Photo gap by making it a card seam (12 pt + the card's own padding); N2 by eyebrow rules with 16 pt above each; N3 by moving the photo to its own step. The Send button names the reach ("Send to 18 people") in all three.</div>
+  <div class="note"><b>Recommendation</b><em>N1</em> — it keeps the one-page flow you already use, the three cards give the page its order, and the sheet handles any team size without ever touching the page layout. N2 if you'd rather never open a sheet; N3 only if you want the composer to match the announcement editors step for step.</div>
+</div>
+</body>
+</html>

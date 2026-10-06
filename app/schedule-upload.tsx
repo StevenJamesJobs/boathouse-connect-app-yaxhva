@@ -38,6 +38,7 @@ import AmbientGlow from '@/components/AmbientGlow';
 import ScreenHeader from '@/components/ScreenHeader';
 import GlassCard from '@/components/GlassCard';
 import GlassSheet from '@/components/GlassSheet';
+import { SheetNoDragZone } from '@/components/sheetDismiss';
 import PremiumGate from '@/components/PremiumGate';
 import { IconSymbol } from '@/components/IconSymbol';
 import { SectionRule } from '@/components/tools/ToolsBits';
@@ -189,7 +190,8 @@ function DatePickSheet({
         </View>
       }
     >
-      <View style={[styles.spinnerWrap, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
+      {/* The native wheel owns its pan — fenced so a drag on it never pulls the sheet. */}
+      <SheetNoDragZone style={[styles.spinnerWrap, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
         {visible && (
           <DateTimePicker
             value={draft}
@@ -201,7 +203,7 @@ function DatePickSheet({
             style={styles.spinner}
           />
         )}
-      </View>
+      </SheetNoDragZone>
     </GlassSheet>
   );
 }

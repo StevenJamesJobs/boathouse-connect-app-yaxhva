@@ -249,10 +249,24 @@ export function TopBar({ onBack, eyebrow }: { onBack?: () => void; eyebrow?: str
 }
 
 /** Five thin segments with mono names — live one glowing, done ones ticked. */
-export function OnboardingRail({ steps, current, rightLabel }: { steps: string[]; current: number; rightLabel?: string }) {
+export function OnboardingRail({
+  steps,
+  current,
+  rightLabel,
+  onStepPress,
+  maxStep,
+}: {
+  steps: string[];
+  current: number;
+  rightLabel?: string;
+  /** s89: rail taps jump (the Content Kit rule) — a segment is pressable up to `maxStep` (default: the current step). */
+  onStepPress?: (step: number) => void;
+  maxStep?: number;
+}) {
   const colors = useThemeColors();
   const a = useOnbAccents();
   const { t } = useTranslation();
+  const reach = maxStep ?? current;
   return (
     <View style={styles.rail}>
       <View style={styles.railTop}>
@@ -264,16 +278,24 @@ export function OnboardingRail({ steps, current, rightLabel }: { steps: string[]
           const n = i + 1;
           const done = n < current;
           const now = n === current;
+          const pressable = !!onStepPress && n <= reach && !now;
           return (
-            <View key={name} style={styles.seg}>
-              <View style={[styles.segBar, { backgroundColor: now ? a.pop : done ? hexToRgba(a.pop, 0.55) : colors.hairline }]} />
+            <Pressable
+              key={name}
+              style={styles.seg}
+              disabled={!pressable}
+              onPress={pressable ? () => onStepPress?.(n) : undefined}
+              hitSlop={6}
+              accessibilityRole={pressable ? 'button' : undefined}
+            >
+              <View style={[styles.segBar, { backgroundColor: now ? a.pop : done || (n <= reach) ? hexToRgba(a.pop, 0.55) : colors.hairline }]} />
               <View style={styles.segLabelRow}>
                 {done && <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={8} color={colors.text} />}
                 <Text style={[styles.segLabel, { color: now ? a.pop : colors.textSecondary }, done && { color: colors.text, opacity: 0.75 }]} numberOfLines={1}>
                   {name}
                 </Text>
               </View>
-            </View>
+            </Pressable>
           );
         })}
       </View>

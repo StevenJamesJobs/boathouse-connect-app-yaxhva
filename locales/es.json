@@ -507,7 +507,6 @@
   },
   "notification_center": {
     "title": "Centro de Notificaciones",
-    "description": "Esta notificación se enviará a todos los empleados que tengan las notificaciones habilitadas.",
     "title_label": "Título",
     "message_label": "Mensaje",
     "opens_to": "Abre En",
@@ -583,20 +582,46 @@
     "audience_required": "Audiencia Requerida",
     "audience_required_message": "Por favor selecciona al menos un puesto de trabajo.",
     "send_error": "Error al enviar la notificación. Por favor intenta de nuevo.",
-    "card_title": "Enviar Notificación",
-    "send_to": "Enviar a",
     "all_staff": "Todo el Personal",
     "select_job_titles": "Selecciona puestos...",
     "n_job_titles_selected": "{{count}} puestos seleccionados",
     "by_job_title": "Por Puesto",
     "to_label": "Para:",
     "optional": "Opcional",
-    "done": "Listo",
     "hours_ago": "hace {{count}} h",
     "one_day_ago": "hace 1 día",
     "days_ago": "hace {{count}} días",
     "send_to_groups_one": "Enviar a 1 Grupo",
-    "send_to_groups_other": "Enviar a {{count}} Grupos"
+    "send_to_groups_other": "Enviar a {{count}} Grupos",
+    "type_notification": "Notificación",
+    "photo_label": "Foto (opcional)",
+    "photo_hint": "Se muestra en la bandeja de notificaciones y el detalle. Sin foto, se muestra el logo de tu restaurante.",
+    "photo_remove": "Quitar foto",
+    "photo_upload_error": "No se pudo subir la foto, así que no se envió nada. Revisa tu conexión e inténtalo de nuevo.",
+    "step_audience": "Destinatarios",
+    "step_message": "Mensaje",
+    "step_extras": "Extras",
+    "step_review": "Revisar",
+    "audience_heading": "¿Quién lo recibe?",
+    "audience_sub": "Todos, o elige puestos. Puedes cambiarlo en Revisar.",
+    "message_heading": "¿Qué dice?",
+    "message_sub": "Un título corto y el mensaje. El otro idioma puede completarse solo al enviar.",
+    "extras_heading": "¿Algo más?",
+    "extras_sub": "Una foto, adónde abre y si suena el teléfono — todo opcional.",
+    "review_heading": "¿Listo para enviar?",
+    "review_sub": "Esto es lo que verá el personal. Toca una línea para cambiarla.",
+    "all_staff_sub": "Todos los que tienen las notificaciones activadas",
+    "search_job_titles": "Buscar puestos",
+    "titles_selected": "{{count}} de {{total}} puestos seleccionados",
+    "no_titles_match": "Ningún puesto coincide",
+    "editing_draft": "Editando un borrador",
+    "review_audience": "Se envía a",
+    "review_photo": "Foto",
+    "review_photo_none": "Sin foto — se usa tu logotipo",
+    "review_push_on": "Alerta en el teléfono activada",
+    "review_push_off": "Silencioso — solo bandeja e insignia",
+    "review_translation_ready": "Ambos idiomas listos",
+    "review_translation_auto": "El otro idioma se completa al enviar"
   },
   "employee_home": {
     "good_morning": "Buenos Días",
@@ -1179,12 +1204,7 @@
     "search_placeholder": "Buscar por nombre, ingrediente o tipo de alcohol...",
     "all": "Todos",
     "no_results": "No se encontraron cócteles",
-    "no_results_hint": "Intenta ajustar tu búsqueda o filtro",
-    "alcohol_type": "Tipo de Alcohol",
-    "ingredients": "Ingredientes",
-    "procedure": "Procedimiento",
-    "glassware": "Cristalería",
-    "garnish": "Decoración"
+    "no_results_hint": "Intenta ajustar tu búsqueda o filtro"
   },
   "summer_libation_recipes": {
     "search_placeholder": "Buscar recetas...",
@@ -1197,13 +1217,7 @@
     "sangrias": "Sangrías",
     "low_abv": "Bajo Contenido de Alcohol",
     "no_abv": "Sin Alcohol",
-    "price": "Precio",
-    "category": "Categoría",
-    "glassware": "Cristalería",
-    "garnish": "Decoración",
-    "ingredients": "Ingredientes",
-    "procedure": "Procedimiento",
-    "no_ingredients": "Sin ingredientes listados"
+    "category": "Categoría"
   },
   "libation_recipes": {
     "search_placeholder": "Buscar recetas...",
@@ -1216,13 +1230,13 @@
     "sangrias": "Sangrías",
     "low_abv": "Bajo Contenido de Alcohol",
     "no_abv": "Sin Alcohol",
-    "price": "Precio",
     "category": "Categoría",
     "glassware": "Cristalería",
     "garnish": "Decoración",
     "ingredients": "Ingredientes",
     "procedure": "Procedimiento",
-    "no_ingredients": "Sin ingredientes listados"
+    "no_ingredients": "Sin ingredientes listados",
+    "yield": "Rendimiento"
   },
   "purees_syrups": {
     "search_placeholder": "Buscar recetas...",
@@ -1231,10 +1245,7 @@
     "check_back": "¡Vuelve más tarde para nuevas recetas de purés y almíbares!",
     "purees": "Purés",
     "simple_syrups": "Almíbares Simples",
-    "category": "Categoría",
-    "ingredients": "Ingredientes",
-    "procedure": "Procedimiento",
-    "no_ingredients": "Sin ingredientes listados"
+    "category": "Categoría"
   },
   "guides_training": {
     "title": "Guías y Capacitación",
@@ -1872,7 +1883,7 @@
     "theme_custom": "Personalizado",
     "tag_revived": "Revivido",
     "tag_new": "Nuevo",
-    "custom_tile_sub": "Elige tu propio acento sobre cualquier base",
+    "custom_tile_sub": "Elige tu propia paleta de colores y base",
     "custom_edit": "Editar",
     "custom_title": "Tu acento",
     "custom_subtitle": "Empieza desde un tema y luego desliza",
@@ -1897,7 +1908,9 @@
     "custom_base_onyx": "Ónix",
     "custom_base_slate": "Pizarra",
     "custom_base_ivory": "Marfil",
-    "custom_base_hint": "Elige tu base neutra y mira cómo cambia en la vista previa de abajo. Marfil mantiene la app clara en ambos modos."
+    "custom_base_hint": "Elige tu base neutra y mira cómo cambia en la vista previa de abajo. Marfil mantiene la app clara en ambos modos.",
+    "tiles_title": "Paleta de mosaicos en toda la app",
+    "tiles_sub": "Al activarlo, todos los mosaicos de la app usan la paleta de colores de tu tema en lugar del set de colores de MyResto."
   },
   "rewards_reviews_editor": {
     "gr_premium_screen_title": "Reseñas de Google",
@@ -3778,7 +3791,6 @@
     "tracker_empty": "Anota tu primer turno y esta página empieza a trabajar para ti: totales, por hora, % de propina y tus mejores noches.",
     "journal_day_double": "{{date}} — turno doble",
     "journal_day_total": "{{total}} · {{hours}} h",
-    "journal_add_shift": "Añadir turno del {{date}}",
     "journal_empty_title": "Nada anotado el {{date}}",
     "journal_empty_sub": "¿Trabajaste ese día? Toma unos 20 segundos.",
     "sub_hours": "{{n}}h",
@@ -3912,7 +3924,18 @@
     "house_save": "Guardar valores de la casa",
     "house_error_declare": "El % de declaración debe estar entre 0 y 100",
     "house_error_positions": "Cada posición necesita un nombre",
-    "house_error_generic": "No se pudo guardar — inténtalo de nuevo"
+    "house_error_generic": "No se pudo guardar — inténtalo de nuevo",
+    "entry_paycheck": "Cheque de pago",
+    "journal_add_shift_short": "Añadir turno",
+    "journal_add_paycheck": "Añadir cheque",
+    "log_paycheck_title": "Día de pago",
+    "log_paycheck_sub": "Cuenta en tu total semanal",
+    "log_paycheck_amount": "Monto del cheque",
+    "log_paycheck_hint": "Neto o bruto, lo que registres. Toca para escribir.",
+    "log_paycheck_note": "Periodo de pago, empleador, lo que sea",
+    "log_save_paycheck": "Añadir cheque",
+    "kpi_split_tips": "Propinas",
+    "kpi_split_paycheck": "Cheque"
   },
   "tools_page": {
     "assistant_bar": "Bar",

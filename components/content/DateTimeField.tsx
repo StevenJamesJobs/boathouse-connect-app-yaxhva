@@ -3,6 +3,7 @@ import { View, Text, Pressable, StyleSheet, Platform } from 'react-native';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { useTranslation } from 'react-i18next';
 import GlassSheet from '@/components/GlassSheet';
+import { SheetNoDragZone } from '@/components/sheetDismiss';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useIsDarkTheme } from '@/components/content/useIsDarkTheme';
@@ -142,7 +143,8 @@ export default function DateTimeField({
             </View>
           }
         >
-          <View style={styles.spinnerWrap}>
+          {/* The native wheel owns its pan — fenced so a drag on it never pulls the sheet. */}
+          <SheetNoDragZone style={styles.spinnerWrap}>
             <DateTimePicker
               value={draft}
               mode="datetime"
@@ -154,7 +156,7 @@ export default function DateTimeField({
               onValueChange={(_e, picked) => setDraft(picked)}
               style={styles.spinner}
             />
-          </View>
+          </SheetNoDragZone>
         </GlassSheet>
       )}
     </View>

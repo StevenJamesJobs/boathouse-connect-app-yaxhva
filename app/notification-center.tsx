@@ -7,17 +7,25 @@ import {
   TouchableOpacity,
   Pressable,
   TextInput,
-  Switch,
   Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Modal,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useFocusEffect } from "expo-router/react-navigation";
+import * as ImagePicker from 'expo-image-picker';
 import { IconSymbol } from '@/components/IconSymbol';
+import { SegControl, GlassToggle } from '@/components/content/FormKit';
+import { OnboardingRail, OnboardingDock } from '@/components/onboarding/OnboardingKit';
+import { StorageExpoImage } from '@/components/StorageImage';
+import ContentDetailModal from '@/components/ContentDetailModal';
+import { alpha } from '@/components/appearance/appearanceKit';
+import type { ThumbnailShape } from '@/components/content/CoverPhotoField';
+import { brokerUploadImage } from '@/utils/storageBroker';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 import { sendCustomNotification } from '@/utils/notificationHelpers';
@@ -92,7 +100,7 @@ export default function NotificationCenter() {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const { organizationId } = useOrganization();
+  const { organizationId, organization } = useOrganization();
   const styles = useMemo(() => createStyles(colors), [colors]);
   // Org-configured job titles (same source as the employee editor), so
   // org-added custom titles can be targeted. Values are the raw org title
@@ -127,6 +135,12 @@ export default function NotificationCenter() {
   const [showDestinationPicker, setShowDestinationPicker] = useState(false);
   const [sending, setSending] = useState(false);
   const [sendPush, setSendPush] = useState(true);
+  // Optional photo (s89 D1): the picked LOCAL uri is held until send, when it
+  // goes through the storage broker and the returned public URL rides the
+  // shade row's data + the push payload. Not part of drafts (a local uri
+  // does not survive the device's cache), so loading a draft clears it.
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [photoShape, setPhotoShape] = useState<ThumbnailShape>('square');
 
   // Message field auto-grow (mirrors the bartender recipe editors)
   const [bodyH, setBodyH] = useState(100);
@@ -135,13 +149,29 @@ export default function NotificationCenter() {
   // Audience targeting
   const [audienceMode, setAudienceMode] = useState<'all' | 'job_titles'>('all');
   const [selectedJobTitles, setSelectedJobTitles] = useState<string[]>([]);
-  const [showAudiencePicker, setShowAudiencePicker] = useState(false);
+  // s89 (Steve's N3 pick): the composer is four STEPS on the Compose leaf —
+  // Audience → Message → Extras → Review — the Content Kit's rail grammar.
+  // maxStep is how far the manager has been (rail taps jump back/forward
+  // within it); a loaded draft opens on Review with every step reachable.
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [maxStep, setMaxStep] = useState<1 | 2 | 3 | 4>(1);
+  const [titleQuery, setTitleQuery] = useState('');
+  // History → the sent notification's Poster (the shade's detail, read-only).
+  const [previewVisible, setPreviewVisible] = useState(false);
+  const [previewItem, setPreviewItem] = useState<{
+    title: string;
+    content: string;
+    thumbnailUrl: string | null;
+    thumbnailShape?: string;
+    meta: string | null;
+  } | null>(null);
 
   // History tab (s63c, Steve's design): two sub-views — Dismissed (the
   // restorable shade hide-list) and Recently Sent (read-only proof-of-send
   // record of composer sends, incl. per-row audience).
   const [activeTab, setActiveTab] = useState<'compose' | 'drafts' | 'history'>('compose');
-  const [historyTab, setHistoryTab] = useState<'dismissed' | 'sent'>('dismissed');
+  // Recently Sent is the default and sits on the left (Steve, s89 round 3).
+  const [historyTab, setHistoryTab] = useState<'dismissed' | 'sent'>('sent');
   const [dismissedItems, setDismissedItems] = useState<DismissedItem[]>([]);
   const [loadingDismissed, setLoadingDismissed] = useState(false);
   const [restoringId, setRestoringId] = useState<string | null>(null);
@@ -199,6 +229,11 @@ export default function NotificationCenter() {
     active: true,
   });
 
+  const goToStep = (n: 1 | 2 | 3 | 4) => {
+    setStep(n);
+    setMaxStep((m) => (n > m ? n : m));
+  };
+
   const jobTitleLabel = (v: string) => {
     const key = JOB_TITLE_LABEL_KEYS[v];
     return key ? t(key) : v;
@@ -245,8 +280,10 @@ export default function NotificationCenter() {
   useFocusEffect(
     useCallback(() => {
       if (activeTab === 'history') {
-        if (historyTab === 'sent') loadSent();
-        else loadDismissed();
+        // Both lists: a dismissed custom notification previews through its
+        // sent row (photo + body live there), so Sent loads alongside.
+        loadSent();
+        loadDismissed();
       } else if (activeTab === 'drafts') {
         loadDraftList();
       }
@@ -335,6 +372,11 @@ export default function NotificationCenter() {
     setSelectedJobTitles([]);
     setSendPush(true);
     setBodyDragH(0);
+    setPhotoUri(null);
+    setPhotoShape('square');
+    setTitleQuery('');
+    setStep(1);
+    setMaxStep(1);
   };
 
   // Save the CURRENT form as a device-local draft (upserts when a loaded
@@ -376,11 +418,61 @@ export default function NotificationCenter() {
     setSelectedJobTitles(draft.selectedJobTitles);
     setSendPush(draft.sendPush);
     setBodyDragH(0);
+    // Drafts carry no photo — a loaded draft starts without one.
+    setPhotoUri(null);
+    setPhotoShape('square');
     // New translation session so the section re-baselines against the
     // loaded values (pre-existing semantics), not the previous compose.
     sendSessionRef.current += 1;
     draftIdRef.current = draft.id;
+    // Edit opens on Review with every step reachable (the Content Kit rule).
+    setStep(4);
+    setMaxStep(4);
     setActiveTab('compose');
+  };
+
+  // The sent row's Poster — exactly what the staff shade opens, read-only.
+  const openSentPreview = (item: SentItem) => {
+    const d = item.data ?? {};
+    const targeted: string[] = Array.isArray(d.job_titles) ? d.job_titles : [];
+    const audience = targeted.length > 0
+      ? targeted.map(jobTitleLabel).join(', ')
+      : t('notification_center.all_staff');
+    const sentAt = item.created_at
+      ? new Date(item.created_at).toLocaleString(i18n.language === 'es' ? 'es' : 'en-US', {
+          month: 'short',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+        })
+      : null;
+    setPreviewItem({
+      title: (isSpanishAuthor && d.title_es) ? String(d.title_es) : item.title,
+      content: (isSpanishAuthor && d.body_es) ? String(d.body_es) : item.body,
+      thumbnailUrl: d.thumbnail_url ?? null,
+      thumbnailShape: d.thumbnail_shape ?? undefined,
+      meta: [item.sender_name, sentAt, `${t('notification_center.to_label')} ${audience}`, d.notificationSkipped === true ? t('notification_center.sent_silent') : null]
+        .filter(Boolean)
+        .join(' · ') || null,
+    });
+    setPreviewVisible(true);
+  };
+
+  // The system picker is launched DIRECTLY from the open screen (the
+  // CoverPhotoField pattern): a picker launched from a deferred action is the
+  // iOS path that silently drops. The crop follows the chosen shape.
+  const pickPhoto = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: photoShape === 'banner' ? [16, 9] : [1, 1],
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets?.[0]?.uri) setPhotoUri(result.assets[0].uri);
+    } catch (err) {
+      console.error('Image pick error:', err);
+    }
   };
 
   // "New Draft" must actually start FRESH — clearing the form and the
@@ -506,10 +598,34 @@ export default function NotificationCenter() {
         sendPush,
       };
 
+      // Photo (s89 D1): uploaded BEFORE the shade insert so the row and the
+      // push both carry the final public URL. A failed upload ABORTS the send
+      // with the form intact — the manager chose to attach it, so it is never
+      // dropped quietly (the `return` runs the finally, which re-arms Send).
+      let thumbnailUrl: string | null = null;
+      if (photoUri) {
+        thumbnailUrl = await brokerUploadImage('notification_image', photoUri, actorId);
+        if (!thumbnailUrl) {
+          Alert.alert(
+            t('notification_center.error_title'),
+            t('notification_center.photo_upload_error'),
+            [{ text: t('common.ok') }]
+          );
+          return;
+        }
+      }
+
+      // extraData rides BOTH the shade row's data (p_data) and the push
+      // payload's data — thumbnail_url is what the edge function renders as
+      // the Android thumbnail, thumbnail_shape is how the shade/detail crops it.
       const extraData: Record<string, any> = {};
       if (destination) extraData.destination = destination;
       if (audienceMode === 'job_titles' && selectedJobTitles.length > 0) {
         extraData.job_titles = selectedJobTitles;
+      }
+      if (thumbnailUrl) {
+        extraData.thumbnail_url = thumbnailUrl;
+        extraData.thumbnail_shape = photoShape;
       }
 
       // Insert the shade row so the broadcast shows in every staff member's
@@ -533,6 +649,9 @@ export default function NotificationCenter() {
             notificationSkipped: !sendPush,
             title_es: titleEsFinal || undefined,
             body_es: bodyEsFinal || undefined,
+            // get_my_notifications returns no sender column — the shade's
+            // detail draws its "sender · when" line from this snapshot.
+            sender_name: user?.name || undefined,
           },
         });
         if (shadeError) console.error('Failed to log notification:', shadeError);
@@ -689,8 +808,8 @@ export default function NotificationCenter() {
             style={[styles.tab, activeTab === 'history' && styles.tabOn]}
             onPress={() => {
               setActiveTab('history');
-              if (historyTab === 'sent') loadSent();
-              else loadDismissed();
+              loadSent();
+              loadDismissed();
             }}
           >
             <IconSymbol ios_icon_name="clock.arrow.circlepath" android_material_icon_name="history" size={14} color={activeTab === 'history' ? colors.text : colors.textSecondary} />
@@ -701,56 +820,140 @@ export default function NotificationCenter() {
         </View>
 
         {activeTab === 'compose' ? (
-          <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
-            <GlassCard variant="surface" radius={16} style={styles.card}>
-              <View style={styles.iconContainer}>
-                <IconSymbol
-                  ios_icon_name="megaphone.fill"
-                  android_material_icon_name="campaign"
-                  size={48}
-                  color={colors.primary}
-                />
+          /* Compose = four steps on this leaf (s89, Steve's N3 pick): the rail
+             under the tab capsule, one step per screen, Back/Next pinned in the
+             dock; Drafts and History are untouched. Review is the staff-facing
+             preview + one line per step (tap to jump) + Send. */
+          <View style={styles.stepShell}>
+            <OnboardingRail
+              steps={[
+                t('notification_center.step_audience'),
+                t('notification_center.step_message'),
+                t('notification_center.step_extras'),
+                t('notification_center.step_review'),
+              ]}
+              current={step}
+              maxStep={maxStep}
+              onStepPress={(n) => goToStep(n as 1 | 2 | 3 | 4)}
+              rightLabel={draftIdRef.current ? t('notification_center.editing_draft') : undefined}
+            />
+            <ScrollView
+              style={styles.content}
+              contentContainerStyle={styles.stepContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.stepHead}>
+                <Text style={styles.stepTitle}>
+                  {step === 1
+                    ? t('notification_center.audience_heading')
+                    : step === 2
+                      ? t('notification_center.message_heading')
+                      : step === 3
+                        ? t('notification_center.extras_heading')
+                        : t('notification_center.review_heading')}
+                </Text>
+                <Text style={styles.stepSub}>
+                  {step === 1
+                    ? t('notification_center.audience_sub')
+                    : step === 2
+                      ? t('notification_center.message_sub')
+                      : step === 3
+                        ? t('notification_center.extras_sub')
+                        : t('notification_center.review_sub')}
+                </Text>
               </View>
 
-              <Text style={styles.cardTitle}>
-                {t('notification_center.card_title')}
-              </Text>
+              {step === 1 && (
+                <>
+                  {/* All staff = the radio row at the top; any pill below switches
+                      the mode to job titles, the row brings it back. */}
+                  <Pressable
+                    style={[styles.allRow, audienceMode === 'all' && styles.allRowOn]}
+                    onPress={() => { setAudienceMode('all'); setSelectedJobTitles([]); }}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: audienceMode === 'all' }}
+                  >
+                    <View style={styles.allSq}>
+                      <IconSymbol ios_icon_name="person.2.fill" android_material_icon_name="group" size={16} color={colors.tint} />
+                    </View>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={styles.allTitle}>{t('notification_center.all_staff')}</Text>
+                      <Text style={styles.allSub}>{t('notification_center.all_staff_sub')}</Text>
+                    </View>
+                    <View style={[styles.radio, audienceMode === 'all' && styles.radioOn]}>
+                      {audienceMode === 'all' && (
+                        <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={11} color={colors.fireText} />
+                      )}
+                    </View>
+                  </Pressable>
 
-              <Text style={styles.cardDescription}>
-                {t('notification_center.description')}
-              </Text>
+                  <View style={styles.eyebRow}>
+                    <Text style={styles.eyeb}>{t('notification_center.by_job_title')}</Text>
+                    <View style={styles.eyebLine} />
+                    <Text style={styles.eyebCount}>
+                      {t('notification_center.titles_selected', { count: selectedJobTitles.length, total: pickerJobTitles.length })}
+                    </Text>
+                  </View>
 
-              {/* Audience Selector */}
-              <View style={styles.inputContainer}>
-                <View style={styles.inputHeader}>
-                  <Text style={styles.inputLabel}>{t('notification_center.send_to')}</Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.destinationSelector}
-                  onPress={() => setShowAudiencePicker(true)}
-                >
-                  <IconSymbol
-                    ios_icon_name="person.2.fill"
-                    android_material_icon_name="group"
-                    size={18}
-                    color={colors.primary}
-                  />
-                  <Text style={[
-                    styles.destinationSelectorText,
-                    audienceMode === 'job_titles' && selectedJobTitles.length === 0 && { color: colors.textSecondary },
-                  ]}>
-                    {getAudienceLabel()}
-                  </Text>
-                  <IconSymbol
-                    ios_icon_name="chevron.down"
-                    android_material_icon_name="expand-more"
-                    size={20}
-                    color={colors.textSecondary}
-                  />
-                </TouchableOpacity>
-              </View>
+                  {pickerJobTitles.length > 8 && (
+                    <View style={styles.searchField}>
+                      <IconSymbol ios_icon_name="magnifyingglass" android_material_icon_name="search" size={15} color={colors.textSecondary} />
+                      <TextInput
+                        style={styles.searchInput}
+                        value={titleQuery}
+                        onChangeText={setTitleQuery}
+                        placeholder={t('notification_center.search_job_titles')}
+                        placeholderTextColor={colors.textSecondary}
+                        autoCorrect={false}
+                        returnKeyType="search"
+                      />
+                      {!!titleQuery && (
+                        <Pressable onPress={() => setTitleQuery('')} hitSlop={8}>
+                          <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={16} color={colors.textSecondary} />
+                        </Pressable>
+                      )}
+                    </View>
+                  )}
 
-              {/* Title Input */}
+                  {jobTitlesLoading ? (
+                    <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 18 }} />
+                  ) : (
+                    <View style={styles.pillCloud}>
+                      {pickerJobTitles
+                        .filter((jt) => !titleQuery.trim() || jobTitleLabel(jt).toLowerCase().includes(titleQuery.trim().toLowerCase()))
+                        .map((jt) => {
+                          const on = audienceMode === 'job_titles' && selectedJobTitles.includes(jt);
+                          return (
+                            <Pressable
+                              key={jt}
+                              style={[styles.pill, on && styles.pillOn]}
+                              onPress={() => {
+                                setAudienceMode('job_titles');
+                                toggleJobTitle(jt);
+                              }}
+                              accessibilityRole="checkbox"
+                              accessibilityState={{ checked: on }}
+                            >
+                              <View style={[styles.pillCk, on && styles.pillCkOn]}>
+                                {on && <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={9} color={colors.fireText} />}
+                              </View>
+                              <Text style={[styles.pillText, on && styles.pillTextOn]} numberOfLines={1}>{jobTitleLabel(jt)}</Text>
+                            </Pressable>
+                          );
+                        })}
+                      {!!titleQuery.trim() &&
+                        pickerJobTitles.filter((jt) => jobTitleLabel(jt).toLowerCase().includes(titleQuery.trim().toLowerCase())).length === 0 && (
+                          <Text style={styles.emptyLine}>{t('notification_center.no_titles_match')}</Text>
+                        )}
+                    </View>
+                  )}
+                </>
+              )}
+
+              {step === 2 && (
+                <>
+{/* Title Input */}
               <View style={styles.inputContainer}>
                 <View style={styles.inputHeader}>
                   <Text style={styles.inputLabel}>
@@ -811,6 +1014,56 @@ export default function NotificationCenter() {
 
               {/* Bilingual authoring: other-language preview + translate + pencil */}
               {translation.element}
+
+                              </>
+              )}
+
+              {step === 3 && (
+                <>
+{/* Optional photo (s89 D1): one cover, square or banner, picked
+                  straight from this screen and uploaded on send. Without one
+                  the detail sheet draws the restaurant logo on a tinted board.
+                  (CoverPhotoField is not reused: it always renders the
+                  extra-photos rail, which a push has no use for.) */}
+              <View style={styles.inputContainer}>
+                <View style={styles.inputHeader}>
+                  <Text style={styles.inputLabel}>{t('notification_center.photo_label')}</Text>
+                </View>
+                <View style={styles.photoRow}>
+                  <Pressable
+                    style={[styles.photoTile, photoShape === 'banner' && styles.photoTileBanner, !photoUri && styles.photoTileEmpty]}
+                    onPress={pickPhoto}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('content_editor.add_photo')}
+                  >
+                    {photoUri ? (
+                      <Image source={{ uri: photoUri }} style={styles.photoImage} resizeMode="cover" />
+                    ) : (
+                      <View style={styles.photoEmptyInner}>
+                        <IconSymbol ios_icon_name="photo" android_material_icon_name="image" size={22} color={colors.primary} />
+                        <Text style={styles.photoEmptyText}>{t('content_editor.add_photo')}</Text>
+                      </View>
+                    )}
+                  </Pressable>
+                  <View style={styles.photoSide}>
+                    <SegControl<ThumbnailShape>
+                      value={photoShape}
+                      onChange={setPhotoShape}
+                      options={[
+                        { key: 'square', label: t('content_editor.shape_square'), iosIcon: 'square', androidIcon: 'crop-square' },
+                        { key: 'banner', label: t('content_editor.shape_banner'), iosIcon: 'rectangle', androidIcon: 'crop-16-9' },
+                      ]}
+                    />
+                    {!!photoUri && (
+                      <Pressable style={styles.photoRemove} onPress={() => setPhotoUri(null)} hitSlop={6}>
+                        <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={14} color={colors.textSecondary} />
+                        <Text style={styles.photoRemoveText}>{t('notification_center.photo_remove')}</Text>
+                      </Pressable>
+                    )}
+                  </View>
+                </View>
+                <Text style={styles.destinationHint}>{t('notification_center.photo_hint')}</Text>
+              </View>
 
               {/* Destination Picker */}
               <View style={styles.inputContainer}>
@@ -892,95 +1145,38 @@ export default function NotificationCenter() {
                 </TouchableOpacity>
               </Modal>
 
-              {/* Audience Picker Modal */}
-              <Modal
-                visible={showAudiencePicker}
-                transparent
-                animationType="fade"
-                onRequestClose={() => setShowAudiencePicker(false)}
-              >
-                <TouchableOpacity
-                  style={styles.pickerOverlay}
-                  activeOpacity={1}
-                  onPress={() => setShowAudiencePicker(false)}
-                >
-                  <View style={styles.pickerContainer}>
-                    <Text style={styles.pickerTitle}>{t('notification_center.send_to')}</Text>
-                    {/* All Staff option */}
-                    <TouchableOpacity
-                      style={[styles.pickerOption, audienceMode === 'all' && styles.pickerOptionSelected]}
-                      onPress={() => {
-                        setAudienceMode('all');
-                        setSelectedJobTitles([]);
-                        setShowAudiencePicker(false);
-                      }}
-                    >
-                      <View style={styles.audienceOptionRow}>
-                        <IconSymbol
-                          ios_icon_name="person.2.fill"
-                          android_material_icon_name="group"
-                          size={18}
-                          color={audienceMode === 'all' ? colors.primary : colors.textSecondary}
-                        />
-                        <Text style={[
-                          styles.pickerOptionText,
-                          audienceMode === 'all' && styles.pickerOptionTextSelected,
-                        ]}>
-                          {t('notification_center.all_staff')}
-                        </Text>
-                      </View>
-                      {audienceMode === 'all' && (
-                        <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={18} color={colors.primary} />
-                      )}
-                    </TouchableOpacity>
+                            {/* Push on/off — the glass toggle (never a native Switch inside
+                  anything that might sit in a Modal). */}
+              <View style={styles.pushRow}>
+                <View style={styles.pushText}>
+                  <Text style={styles.pushTitle}>{t('notification_center.push_toggle', 'Send push notification')}</Text>
+                  <Text style={styles.pushHint}>
+                    {sendPush
+                      ? t('notification_center.push_on_hint', 'Staff get a phone alert + it shows in their shade.')
+                      : t('notification_center.push_off_hint', 'Silent — shows in the shade + badge only, no phone alert.')}
+                  </Text>
+                </View>
+                <GlassToggle value={sendPush} onValueChange={setSendPush} />
+              </View>
+                </>
+              )}
 
-                    {/* Divider */}
-                    <View style={[styles.audienceDivider, { backgroundColor: colors.border }]} />
-                    <Text style={[styles.audienceSectionLabel, { color: colors.textSecondary }]}>{t('notification_center.by_job_title')}</Text>
-
-                    {/* Job title checkboxes */}
-                    {pickerJobTitles.map((jt) => {
-                      const isSelected = selectedJobTitles.includes(jt);
-                      return (
-                        <TouchableOpacity
-                          key={jt}
-                          style={[styles.pickerOption, isSelected && styles.pickerOptionSelected]}
-                          onPress={() => {
-                            setAudienceMode('job_titles');
-                            toggleJobTitle(jt);
-                          }}
-                        >
-                          <Text style={[
-                            styles.pickerOptionText,
-                            isSelected && styles.pickerOptionTextSelected,
-                          ]}>
-                            {jobTitleLabel(jt)}
-                          </Text>
-                          {isSelected && (
-                            <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={18} color={colors.primary} />
-                          )}
-                        </TouchableOpacity>
-                      );
-                    })}
-
-                    {/* Done button */}
-                    <TouchableOpacity
-                      style={[styles.audienceDoneBtn, { backgroundColor: colors.primary }]}
-                      onPress={() => setShowAudiencePicker(false)}
-                    >
-                      <Text style={styles.audienceDoneBtnText}>{t('notification_center.done')}</Text>
-                    </TouchableOpacity>
-                  </View>
-                </TouchableOpacity>
-              </Modal>
-
-              {/* Preview */}
+              {step === 4 && (
+                <>
+{/* Preview */}
               {((isSpanishAuthor ? titleEs : title) || (isSpanishAuthor ? bodyEs : body)) && (
                 <View style={styles.previewContainer}>
                   <Text style={styles.previewLabel}>
                     {t('notification_center.preview')}
                   </Text>
                   <View style={styles.previewCard}>
+                    {!!photoUri && (
+                      <Image
+                        source={{ uri: photoUri }}
+                        style={[styles.previewPhoto, photoShape === 'banner' && styles.previewPhotoBanner]}
+                        resizeMode="cover"
+                      />
+                    )}
                     {(isSpanishAuthor ? titleEs : title) && (
                       <Text style={styles.previewTitle}>
                         {isSpanishAuthor ? titleEs : title}
@@ -1000,51 +1196,76 @@ export default function NotificationCenter() {
                 </View>
               )}
 
-              {/* Silent send toggle */}
-              <View style={styles.toggleRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.inputLabel}>{t('notification_center.push_toggle', 'Send push notification')}</Text>
-                  <Text style={styles.toggleHint}>
-                    {sendPush
-                      ? t('notification_center.push_on_hint', 'Staff get a phone alert + it shows in their shade.')
-                      : t('notification_center.push_off_hint', 'Silent — shows in the shade + badge only, no phone alert.')}
-                  </Text>
-                </View>
-                <Switch
-                  value={sendPush}
-                  onValueChange={setSendPush}
-                  trackColor={{ true: colors.primary, false: colors.border }}
-                  thumbColor={colors.fireText}
-                />
+                            {/* One line per step — tap to jump (the Content Kit's Review grammar). */}
+              <View style={styles.reviewList}>
+                {([
+                  {
+                    key: 'audience',
+                    ios: 'person.2.fill', android: 'group',
+                    label: t('notification_center.review_audience'),
+                    value: getAudienceLabel(),
+                    sub: null as string | null,
+                    to: 1 as const,
+                  },
+                  {
+                    key: 'message',
+                    ios: 'text.bubble.fill', android: 'chat',
+                    label: t('notification_center.message_label'),
+                    value: (isSpanishAuthor ? titleEs : title).trim() || '—',
+                    sub: (titleEs.trim() && bodyEs.trim() && title.trim() && body.trim())
+                      ? t('notification_center.review_translation_ready')
+                      : t('notification_center.review_translation_auto'),
+                    to: 2 as const,
+                  },
+                  {
+                    key: 'photo',
+                    ios: 'photo', android: 'image',
+                    label: t('notification_center.review_photo'),
+                    value: photoUri
+                      ? (photoShape === 'banner' ? t('content_editor.shape_banner') : t('content_editor.shape_square'))
+                      : t('notification_center.review_photo_none'),
+                    sub: null as string | null,
+                    to: 3 as const,
+                  },
+                  {
+                    key: 'opens',
+                    ios: 'link', android: 'link',
+                    label: t('notification_center.opens_to'),
+                    value: destination
+                      ? (DESTINATION_OPTIONS.find((d) => d.value === destination)?.label ?? destination)
+                      : t('notification_center.opens_to_none'),
+                    sub: null as string | null,
+                    to: 3 as const,
+                  },
+                  {
+                    key: 'push',
+                    ios: 'bell.fill', android: 'notifications',
+                    label: t('notification_center.push_toggle', 'Send push notification'),
+                    value: sendPush ? t('notification_center.review_push_on') : t('notification_center.review_push_off'),
+                    sub: null as string | null,
+                    to: 3 as const,
+                  },
+                ]).map((line) => (
+                  <Pressable
+                    key={line.key}
+                    style={({ pressed }) => [styles.reviewLine, pressed && { opacity: 0.8 }]}
+                    onPress={() => goToStep(line.to)}
+                    accessibilityRole="button"
+                  >
+                    <View style={styles.reviewIcon}>
+                      <IconSymbol ios_icon_name={line.ios} android_material_icon_name={line.android} size={15} color={colors.tint} />
+                    </View>
+                    <View style={styles.reviewBody}>
+                      <Text style={styles.reviewLabel}>{line.label}</Text>
+                      <Text style={styles.reviewValue} numberOfLines={2}>{line.value}</Text>
+                      {!!line.sub && <Text style={styles.reviewSub} numberOfLines={1}>{line.sub}</Text>}
+                    </View>
+                    <Text style={styles.reviewEdit}>{t('common.edit')}</Text>
+                  </Pressable>
+                ))}
               </View>
 
-              {/* Send Button */}
-              <TouchableOpacity
-                style={[
-                  styles.sendButton,
-                  (!(isSpanishAuthor ? titleEs : title).trim() || !(isSpanishAuthor ? bodyEs : body).trim() || sending || (audienceMode === 'job_titles' && selectedJobTitles.length === 0)) && styles.sendButtonDisabled,
-                ]}
-                onPress={handleSendNotification}
-                disabled={!(isSpanishAuthor ? titleEs : title).trim() || !(isSpanishAuthor ? bodyEs : body).trim() || sending || (audienceMode === 'job_titles' && selectedJobTitles.length === 0)}
-              >
-                {sending ? (
-                  <ActivityIndicator color={colors.fireText} />
-                ) : (
-                  <>
-                    <IconSymbol
-                      ios_icon_name="paperplane.fill"
-                      android_material_icon_name="send"
-                      size={20}
-                      color={colors.fireText}
-                    />
-                    <Text style={styles.sendButtonText}>
-                      {audienceMode === 'all' ? t('notification_center.send_button') : t('notification_center.send_to_groups', { count: selectedJobTitles.length })}
-                    </Text>
-                  </>
-                )}
-              </TouchableOpacity>
-
-              {/* Save as Draft (secondary) — device-local, works offline.
+{/* Save as Draft (secondary) — device-local, works offline.
                   Enabled when ANY field holds text (either language), so a
                   draft loaded after a device-language switch stays savable. */}
               <TouchableOpacity
@@ -1078,8 +1299,37 @@ export default function NotificationCenter() {
                   {t('notification_center.preferences_hint')}
                 </Text>
               </View>
-            </GlassCard>
-          </ScrollView>
+                            </>
+              )}
+            </ScrollView>
+
+            <OnboardingDock
+              onBack={step > 1 ? () => setStep((step - 1) as 1 | 2 | 3 | 4) : undefined}
+              nextLabel={
+                step === 4
+                  ? (audienceMode === 'all'
+                      ? t('notification_center.send_button')
+                      : t('notification_center.send_to_groups', { count: selectedJobTitles.length }))
+                  : t('onboarding.next')
+              }
+              onNext={step === 4 ? handleSendNotification : () => goToStep((step + 1) as 1 | 2 | 3 | 4)}
+              nextIosIcon={step === 4 ? 'paperplane.fill' : undefined}
+              nextAndroidIcon={step === 4 ? 'send' : undefined}
+              nextLeading={step === 4}
+              loading={sending}
+              nextDisabled={
+                step === 1
+                  ? !(audienceMode === 'all' || selectedJobTitles.length > 0)
+                  : step === 2
+                    ? !((isSpanishAuthor ? titleEs : title).trim() && (isSpanishAuthor ? bodyEs : body).trim())
+                    : step === 4
+                      ? !((audienceMode === 'all' || selectedJobTitles.length > 0)
+                          && (isSpanishAuthor ? titleEs : title).trim()
+                          && (isSpanishAuthor ? bodyEs : body).trim())
+                      : false
+              }
+            />
+          </View>
         ) : activeTab === 'drafts' ? (
           /* Drafts Tab */
           <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
@@ -1159,19 +1409,19 @@ export default function NotificationCenter() {
               {/* Sub-tabs */}
               <View style={styles.subTabBar}>
                 <Pressable
-                  style={[styles.subTab, historyTab === 'dismissed' && styles.subTabOn]}
-                  onPress={() => { setHistoryTab('dismissed'); loadDismissed(); }}
-                >
-                  <Text style={[styles.subTabText, historyTab === 'dismissed' && { color: colors.text }]}>
-                    {t('notification_center.tab_dismissed_short')}
-                  </Text>
-                </Pressable>
-                <Pressable
                   style={[styles.subTab, historyTab === 'sent' && styles.subTabOn]}
                   onPress={() => { setHistoryTab('sent'); loadSent(); }}
                 >
                   <Text style={[styles.subTabText, historyTab === 'sent' && { color: colors.text }]}>
                     {t('notification_center.sent_tab')}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.subTab, historyTab === 'dismissed' && styles.subTabOn]}
+                  onPress={() => { setHistoryTab('dismissed'); loadDismissed(); }}
+                >
+                  <Text style={[styles.subTabText, historyTab === 'dismissed' && { color: colors.text }]}>
+                    {t('notification_center.tab_dismissed_short')}
                   </Text>
                 </Pressable>
               </View>
@@ -1213,8 +1463,23 @@ export default function NotificationCenter() {
                       const sentAt = item.created_at
                         ? `${new Date(item.created_at).toLocaleDateString(dateLocale)} ${new Date(item.created_at).toLocaleTimeString(dateLocale, { hour: '2-digit', minute: '2-digit' })}`
                         : '';
+                      const thumb: string | null = item.data?.thumbnail_url ?? null;
+                      const banner = item.data?.thumbnail_shape === 'banner';
                       return (
-                        <View key={item.id} style={[styles.historyItem, { borderColor: colors.surfaceBorder }]}>
+                        <TouchableOpacity
+                          key={item.id}
+                          style={[styles.historyItem, { borderColor: colors.surfaceBorder }]}
+                          onPress={() => openSentPreview(item)}
+                          activeOpacity={0.7}
+                          accessibilityRole="button"
+                        >
+                          {!!thumb && (
+                            <StorageExpoImage
+                              source={{ uri: thumb }}
+                              style={[styles.historyThumb, banner && styles.historyThumbBanner]}
+                              contentFit="cover"
+                            />
+                          )}
                           <View style={styles.historyItemContent}>
                             <View style={styles.historyItemTitleRow}>
                               <Text style={[styles.historyItemTitle, { color: colors.text }]} numberOfLines={1}>
@@ -1236,7 +1501,8 @@ export default function NotificationCenter() {
                               {item.sender_name ? ` · ${item.sender_name}` : ''}{sentAt ? ` · ${sentAt}` : ''}
                             </Text>
                           </View>
-                        </View>
+                          <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={16} color={colors.textSecondary} />
+                        </TouchableOpacity>
                       );
                     })
                   )}
@@ -1265,8 +1531,30 @@ export default function NotificationCenter() {
                   </Text>
                 </View>
               ) : (
-                dismissedItems.map((item) => (
-                  <View key={item.id} style={[styles.historyItem, { borderColor: colors.surfaceBorder }]}>
+                dismissedItems.map((item) => {
+                  // The sent row carries the body + photo; a dismissed custom
+                  // notification previews through it (older than the 40
+                  // recent sends → title + Restore only).
+                  const twin = item.notification_type === 'custom_notification'
+                    ? sentItems.find((sent) => sent.id === item.item_id) ?? null
+                    : null;
+                  const thumb: string | null = twin?.data?.thumbnail_url ?? null;
+                  const banner = twin?.data?.thumbnail_shape === 'banner';
+                  return (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={[styles.historyItem, { borderColor: colors.surfaceBorder }]}
+                    onPress={twin ? () => openSentPreview(twin) : undefined}
+                    disabled={!twin}
+                    activeOpacity={0.7}
+                  >
+                    {!!thumb && (
+                      <StorageExpoImage
+                        source={{ uri: thumb }}
+                        style={[styles.historyThumb, banner && styles.historyThumbBanner]}
+                        contentFit="cover"
+                      />
+                    )}
                     <View style={styles.historyItemContent}>
                       <View style={styles.historyItemTitleRow}>
                         <Text style={[styles.historyItemTitle, { color: colors.text }]} numberOfLines={1}>
@@ -1296,13 +1584,36 @@ export default function NotificationCenter() {
                         </>
                       )}
                     </TouchableOpacity>
-                  </View>
-                ))
+                  </TouchableOpacity>
+                  );
+                })
               )}
                 </>
               )}
             </GlassCard>
           </ScrollView>
+        )}
+
+        {previewItem && (
+          <ContentDetailModal
+            visible={previewVisible}
+            onClose={() => setPreviewVisible(false)}
+            title={previewItem.title}
+            content={previewItem.content}
+            thumbnailUrl={previewItem.thumbnailUrl}
+            thumbnailShape={previewItem.thumbnailShape}
+            kind="notification"
+            orgLogoUrl={organization.logo_url}
+            meta={previewItem.meta}
+            action={null}
+            colors={{
+              text: colors.text,
+              textSecondary: colors.textSecondary,
+              card: colors.card,
+              primary: colors.primary,
+              fireText: colors.fireText,
+            }}
+          />
         )}
       </View>
     </KeyboardAvoidingView>
@@ -1576,6 +1887,73 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     color: colors.textSecondary,
     marginTop: 6,
   },
+  // The photo field (CoverPhotoField's tile grammar, minus the extras rail):
+  // 96pt tile — 132 wide for a banner — beside the shape seg control.
+  photoRow: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'flex-start',
+  },
+  photoTile: {
+    width: 96,
+    height: 96,
+    borderRadius: 13,
+    overflow: 'hidden',
+    backgroundColor: colors.thumbPlaceholder,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photoTileBanner: {
+    width: 132,
+  },
+  // A full point of dashed border on purpose — RN draws sub-point dashes as near-solid.
+  photoTileEmpty: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: colors.primary + '8C',
+  },
+  photoEmptyInner: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  photoEmptyText: {
+    fontFamily: fonts.body.semibold,
+    fontSize: 10.5,
+    color: colors.primary,
+  },
+  photoImage: {
+    width: '100%',
+    height: '100%',
+  },
+  photoSide: {
+    flex: 1,
+    minWidth: 0,
+    gap: 10,
+  },
+  photoRemove: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    alignSelf: 'flex-start',
+    paddingVertical: 4,
+  },
+  photoRemoveText: {
+    fontFamily: fonts.body.semibold,
+    fontSize: 12.5,
+    color: colors.textSecondary,
+  },
+  // The picked photo in the preview card, cropped to the chosen shape.
+  previewPhoto: {
+    width: 56,
+    height: 56,
+    borderRadius: 10,
+    marginBottom: 10,
+    backgroundColor: colors.thumbPlaceholder,
+  },
+  previewPhotoBanner: {
+    width: 100,
+  },
   pickerOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
@@ -1753,4 +2131,127 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     fontSize: 13,
     fontFamily: fonts.display.semibold,
   },
+  // ── s89 steps (the Content Kit rail on a page) ──
+  stepShell: { flex: 1 },
+  // Runway under the pinned dock (OnboardingDock is absolute).
+  stepContent: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 140 },
+  stepHead: { marginBottom: 14, paddingHorizontal: 2 },
+  stepTitle: { fontFamily: fonts.display.bold, fontSize: 21, letterSpacing: -0.3, color: colors.text },
+  stepSub: { fontFamily: fonts.body.regular, fontSize: 12.5, lineHeight: 17, color: colors.textSecondary, marginTop: 4 },
+  allRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    minHeight: 54,
+    borderRadius: 14,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 14,
+  },
+  allRowOn: { borderColor: colors.tint, backgroundColor: alpha(colors.tint, 0.08) },
+  allSq: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: alpha(colors.tint, 0.14),
+    borderWidth: 1,
+    borderColor: alpha(colors.tint, 0.3),
+  },
+  allTitle: { fontFamily: fonts.display.semibold, fontSize: 14, color: colors.text },
+  allSub: { fontFamily: fonts.body.regular, fontSize: 11, color: colors.textSecondary, marginTop: 1 },
+  radio: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: colors.glassBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioOn: { backgroundColor: colors.tint, borderColor: colors.tint },
+  eyebRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10, paddingHorizontal: 1 },
+  eyeb: { fontFamily: fonts.mono.semibold, fontSize: 9, letterSpacing: 1.3, textTransform: 'uppercase', color: colors.tint },
+  eyebLine: { flex: 1, height: 1, backgroundColor: colors.hairline },
+  eyebCount: { fontFamily: fonts.mono.semibold, fontSize: 8.5, letterSpacing: 0.8, textTransform: 'uppercase', color: colors.textSecondary },
+  searchField: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: colors.glass,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    borderColor: colors.glassBorder,
+    paddingHorizontal: 12,
+    marginBottom: 10,
+  },
+  searchInput: { flex: 1, fontFamily: fonts.body.regular, fontSize: 13, color: colors.text, paddingVertical: 0 },
+  pillCloud: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  // The onboarding chip grammar: glass pill, tint ring when on, a FIXED ○→✓
+  // slot so a tick never reflows the row.
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    height: 34,
+    paddingLeft: 8,
+    paddingRight: 12,
+    borderRadius: 11,
+    backgroundColor: colors.glass,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+    maxWidth: '100%',
+  },
+  pillOn: { borderColor: colors.tint, backgroundColor: alpha(colors.tint, 0.1) },
+  pillCk: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: colors.glassBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pillCkOn: { backgroundColor: colors.tint, borderColor: colors.tint },
+  pillText: { fontFamily: fonts.body.medium, fontSize: 12.5, color: colors.text, flexShrink: 1 },
+  pillTextOn: { fontFamily: fonts.body.semibold },
+  emptyLine: { fontFamily: fonts.body.regular, fontSize: 12.5, color: colors.textSecondary, paddingVertical: 8 },
+  pushRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 14, paddingHorizontal: 2 },
+  pushText: { flex: 1, minWidth: 0 },
+  pushTitle: { fontFamily: fonts.display.semibold, fontSize: 13.5, color: colors.text },
+  pushHint: { fontFamily: fonts.body.regular, fontSize: 11, lineHeight: 15, color: colors.textSecondary, marginTop: 2 },
+  reviewList: { gap: 8, marginTop: 14 },
+  reviewLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderRadius: 13,
+    backgroundColor: colors.surface,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    borderColor: colors.surfaceBorder,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  reviewIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: alpha(colors.tint, 0.12),
+  },
+  reviewBody: { flex: 1, minWidth: 0 },
+  reviewLabel: { fontFamily: fonts.mono.semibold, fontSize: 8.5, letterSpacing: 1.1, textTransform: 'uppercase', color: colors.textSecondary },
+  reviewValue: { fontFamily: fonts.display.semibold, fontSize: 13.5, color: colors.text, marginTop: 2 },
+  reviewSub: { fontFamily: fonts.body.regular, fontSize: 11, color: colors.textSecondary, marginTop: 1 },
+  reviewEdit: { fontFamily: fonts.body.semibold, fontSize: 12, color: colors.tint },
+  // ── history thumbnails (the shade's photo, square or 16:9) ──
+  historyThumb: { width: 46, height: 46, borderRadius: 11, backgroundColor: colors.thumbPlaceholder, marginRight: 10 },
+  historyThumbBanner: { width: 64, height: 40 },
+
 });

@@ -6,6 +6,12 @@
  * shift (the doubles model: an entry belongs to a shift, the Journal rolls the
  * day up). Opened from the Journal with a day selected, it arrives PRE-DATED
  * to that day — the date row's arrows can still re-date it.
+ *
+ * PAYCHECK MODE (s89 "G", mockup S): the same sheet with `mode="paycheck"` —
+ * date row, the big number as the paycheck amount, one optional note, Save.
+ * Every shift-only row (import, sales, chips, weather, steppers, location,
+ * extra cash, the day's locked rows) stays out. Editing an entry opens in
+ * that entry's own kind, whatever `mode` the opener passed.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -27,6 +33,7 @@ import {
   SHIFT_SLOTS,
   WEATHER_KEYS,
   type CheckoutSnapshot,
+  type EntryKind,
   type ShiftEntry,
   type ShiftSlot,
   type WeatherKey,
@@ -35,6 +42,7 @@ import {
   deleteEntry,
   entriesForDay,
   entryTotalTips,
+  isPaycheck,
   makeEntryId,
   parseDateKey,
   saveEntry,
@@ -58,6 +66,7 @@ export default function LogShiftSheet({
   initialDate,
   allEntries,
   editEntry,
+  mode = 'shift',
   onClose,
   onSaved,
 }: {
@@ -72,12 +81,17 @@ export default function LogShiftSheet({
   allEntries: ShiftEntry[];
   /** Editing an existing entry instead of adding one. */
   editEntry?: ShiftEntry | null;
+  /** What a NEW entry is; an edited entry always opens as its own kind. */
+  mode?: EntryKind;
   onClose: () => void;
   onSaved: (entries: ShiftEntry[]) => void;
 }) {
   const { t, i18n } = useTranslation();
   const colors = useThemeColors();
   const accent = useTipsAccent();
+
+  const kind: EntryKind = editEntry ? (isPaycheck(editEntry) ? 'paycheck' : 'shift') : mode;
+  const paycheck = kind === 'paycheck';
 
   const [date, setDate] = useState(initialDate);
   const [tipsText, setTipsText] = useState('');
@@ -90,6 +104,7 @@ export default function LogShiftSheet({
   const [shift, setShift] = useState<ShiftSlot | null>(null);
   const [weather, setWeather] = useState<WeatherKey[]>([]);
   const [location, setLocation] = useState('');
+  const [note, setNote] = useState('');
   const [stash, setStash] = useState<CheckoutSnapshot | null>(null);
   const [imported, setImported] = useState(false);
   const [attachedCheckout, setAttachedCheckout] = useState<CheckoutSnapshot | null>(null);
@@ -108,6 +123,7 @@ export default function LogShiftSheet({
     setShift(editEntry?.shift ?? null);
     setWeather(editEntry?.weather ?? []);
     setLocation(editEntry?.location ?? '');
+    setNote(editEntry?.note ?? '');
     setImported(false);
     setAttachedCheckout(editEntry?.checkout ?? null);
   }, [visible, editEntry, initialDate]);
@@ -125,7 +141,7 @@ export default function LogShiftSheet({
     };
   }, [visible, todayKey]);
 
-  const importable = !editEntry && !imported && date === todayKey && stash !== null;
+  const importable = !paycheck && !editEntry && !imported && date === todayKey && stash !== null;
   const showManualFields = !importable;
 
   const stashFacts = useMemo(() => {
@@ -161,7 +177,8 @@ export default function LogShiftSheet({
   const shiftDate = (days: number) => setDate(dateKey(addDays(parseDateKey(date), days)));
 
   const tips = parseFloat(tipsText) || 0;
-  const canSave = tipsText.trim().length > 0;
+  // A shift may legitimately log $0; a paycheck without an amount is nothing.
+  const canSave = paycheck ? tips > 0 : tipsText.trim().length > 0;
 
   const handleSave = async () => {
     if (!canSave) return;
@@ -173,21 +190,33 @@ export default function LogShiftSheet({
       tips: 0,
       extraCashTips: 0,
     };
-    const entries = await saveEntry({
-      ...base,
-      date,
-      tips,
-      extraCashTips: parseFloat(extraCashText) || 0,
-      sales: parseFloat(salesText) || undefined,
-      tippedOut: parseFloat(tippedOutText) || undefined,
-      hours: hours || undefined,
-      tables: tables || undefined,
-      covers: covers || undefined,
-      shift: shift ?? undefined,
-      weather: weather.length ? weather : undefined,
-      location: location.trim() || undefined,
-      checkout: attachedCheckout ?? undefined,
-    });
+    const entries = await saveEntry(
+      paycheck
+        ? {
+            // The amount rides in `tips` so every rollup counts it unchanged.
+            ...base,
+            kind: 'paycheck',
+            date,
+            tips,
+            extraCashTips: 0,
+            note: note.trim() || undefined,
+          }
+        : {
+            ...base,
+            date,
+            tips,
+            extraCashTips: parseFloat(extraCashText) || 0,
+            sales: parseFloat(salesText) || undefined,
+            tippedOut: parseFloat(tippedOutText) || undefined,
+            hours: hours || undefined,
+            tables: tables || undefined,
+            covers: covers || undefined,
+            shift: shift ?? undefined,
+            weather: weather.length ? weather : undefined,
+            location: location.trim() || undefined,
+            checkout: attachedCheckout ?? undefined,
+          },
+    );
     onSaved(entries);
     onClose();
   };
@@ -213,21 +242,31 @@ export default function LogShiftSheet({
   };
 
   // Derived from the sheet's CURRENT date, so the arrows swap these rows too.
-  const others = entriesForDay(allEntries, date).filter((e) => e.id !== editEntry?.id);
-  const title = editEntry
-    ? t('tips_checkouts.log_edit_title')
-    : others.length > 0
-      ? t('tips_checkouts.log_add_title')
-      : t('tips_checkouts.log_title');
+  // Paycheck mode has no "double in progress": only the day's SHIFTS lock in.
+  const others = paycheck
+    ? []
+    : entriesForDay(allEntries, date).filter((e) => e.id !== editEntry?.id && !isPaycheck(e));
+  const title = paycheck
+    ? t('tips_checkouts.log_paycheck_title')
+    : editEntry
+      ? t('tips_checkouts.log_edit_title')
+      : others.length > 0
+        ? t('tips_checkouts.log_add_title')
+        : t('tips_checkouts.log_title');
 
-  const dateLabel = parseDateKey(date).toLocaleDateString(i18n.language === 'es' ? 'es' : 'en-US', {
+  const locale = i18n.language === 'es' ? 'es' : 'en-US';
+  const dateLabel = parseDateKey(date).toLocaleDateString(locale, {
     weekday: 'short',
     month: 'long',
     day: 'numeric',
   });
+  // "Fri Oct 2 · counts in your week total" — follows the arrows like the row.
+  const subtitle = paycheck
+    ? `${parseDateKey(date).toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric' })} · ${t('tips_checkouts.log_paycheck_sub')}`
+    : undefined;
 
   return (
-    <GlassSheet visible={visible} onClose={onClose} title={title}>
+    <GlassSheet visible={visible} onClose={onClose} title={title} subtitle={subtitle}>
       {/* Date row — pre-dated to the selected day, arrows re-date it. */}
       <View style={styles.dateRow}>
         <TouchableOpacity onPress={() => shiftDate(-1)} hitSlop={10} style={[styles.dateChip, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
@@ -255,8 +294,13 @@ export default function LogShiftSheet({
         </View>
       ))}
 
-      {/* The big number IS the field. */}
+      {/* The big number IS the field — tips, or the paycheck amount. */}
       <View style={styles.bigWrap}>
+        {paycheck && (
+          <Text style={[styles.bigUnder, styles.bigOver, { color: colors.textSecondary }]}>
+            {t('tips_checkouts.log_paycheck_amount')}
+          </Text>
+        )}
         <View style={[styles.bigLine, { borderBottomColor: `${accent}70` }]}>
           <Text style={[styles.bigCur, { color: colors.textSecondary }]}>$</Text>
           <TextInput
@@ -268,12 +312,32 @@ export default function LogShiftSheet({
             placeholderTextColor={colors.textSecondary}
           />
         </View>
-        <Text style={[styles.bigUnder, { color: colors.textSecondary }]}>
-          {t('tips_checkouts.log_tips_hint')}
-        </Text>
+        {paycheck ? (
+          <Text style={[styles.bigHint, { color: colors.textSecondary }]}>
+            {t('tips_checkouts.log_paycheck_hint')}
+          </Text>
+        ) : (
+          <Text style={[styles.bigUnder, { color: colors.textSecondary }]}>
+            {t('tips_checkouts.log_tips_hint')}
+          </Text>
+        )}
       </View>
 
-      {editEntry && (
+      {/* Paycheck mode: one optional note, then straight to Save. */}
+      {paycheck && (
+        <View style={[styles.locationField, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
+          <IconSymbol ios_icon_name="pencil" android_material_icon_name="edit" size={15} color={accent} />
+          <TextInput
+            style={[styles.locationInput, { color: colors.text }]}
+            value={note}
+            onChangeText={setNote}
+            placeholder={t('tips_checkouts.log_paycheck_note')}
+            placeholderTextColor={colors.textSecondary}
+          />
+        </View>
+      )}
+
+      {!paycheck && editEntry && (
         <View style={styles.fieldBlock}>
           <Text style={[styles.fieldLabel, { color: colors.text }]}>{t('tips_checkouts.save_extra_cash')}</Text>
           <MoneyField value={extraCashText} onChangeText={setExtraCashText} />
@@ -295,7 +359,7 @@ export default function LogShiftSheet({
         </TouchableOpacity>
       ) : null}
 
-      {showManualFields && (
+      {!paycheck && showManualFields && (
         <View style={styles.pairRow}>
           <View style={styles.pairCell}>
             <Text style={[styles.fieldLabel, { color: colors.text }]}>{t('tips_checkouts.log_sales')}</Text>
@@ -308,63 +372,68 @@ export default function LogShiftSheet({
         </View>
       )}
 
-      <View style={styles.fieldBlock}>
-        <Text style={[styles.fieldLabel, { color: colors.text }]}>{t('tips_checkouts.field_shift')}</Text>
-        <ChipRow
-          options={SHIFT_SLOTS.map((slot) => ({ key: slot, label: t(`tips_checkouts.shift_${slot}`) }))}
-          selectedKeys={shift ? [shift] : []}
-          onToggle={(key) => setShift(shift === key ? null : (key as ShiftSlot))}
-        />
-      </View>
+      {/* Everything below here is shift-only — paycheck mode skips to Save. */}
+      {!paycheck && (
+        <>
+          <View style={styles.fieldBlock}>
+            <Text style={[styles.fieldLabel, { color: colors.text }]}>{t('tips_checkouts.field_shift')}</Text>
+            <ChipRow
+              options={SHIFT_SLOTS.map((slot) => ({ key: slot, label: t(`tips_checkouts.shift_${slot}`) }))}
+              selectedKeys={shift ? [shift] : []}
+              onToggle={(key) => setShift(shift === key ? null : (key as ShiftSlot))}
+            />
+          </View>
 
-      <View style={styles.fieldBlock}>
-        <Text style={[styles.fieldLabel, { color: colors.text }]}>{t('tips_checkouts.field_weather')}</Text>
-        <ChipRow
-          options={WEATHER_KEYS.map((key) => ({
-            key,
-            label: t(`tips_checkouts.weather_${key}`),
-            iosIcon: WEATHER_ICONS[key].ios,
-            androidIcon: WEATHER_ICONS[key].android,
-          }))}
-          selectedKeys={weather}
-          onToggle={(key) =>
-            setWeather(
-              weather.includes(key as WeatherKey)
-                ? weather.filter((w) => w !== key)
-                : [...weather, key as WeatherKey],
-            )
-          }
-        />
-      </View>
+          <View style={styles.fieldBlock}>
+            <Text style={[styles.fieldLabel, { color: colors.text }]}>{t('tips_checkouts.field_weather')}</Text>
+            <ChipRow
+              options={WEATHER_KEYS.map((key) => ({
+                key,
+                label: t(`tips_checkouts.weather_${key}`),
+                iosIcon: WEATHER_ICONS[key].ios,
+                androidIcon: WEATHER_ICONS[key].android,
+              }))}
+              selectedKeys={weather}
+              onToggle={(key) =>
+                setWeather(
+                  weather.includes(key as WeatherKey)
+                    ? weather.filter((w) => w !== key)
+                    : [...weather, key as WeatherKey],
+                )
+              }
+            />
+          </View>
 
-      <View style={styles.trioRow}>
-        <View style={styles.trioCell}>
-          <Text style={[styles.fieldLabel, { color: colors.text }]}>{t('tips_checkouts.field_hours')}</Text>
-          <TipsStepper value={hours} step={0.5} onChange={setHours} />
-        </View>
-        <View style={styles.trioCell}>
-          <Text style={[styles.fieldLabel, { color: colors.text }]}>{t('tips_checkouts.field_tables')}</Text>
-          <TipsStepper value={tables} onChange={setTables} />
-        </View>
-        <View style={styles.trioCell}>
-          <Text style={[styles.fieldLabel, { color: colors.text }]}>{t('tips_checkouts.field_covers')}</Text>
-          <TipsStepper value={covers} onChange={setCovers} />
-        </View>
-      </View>
+          <View style={styles.trioRow}>
+            <View style={styles.trioCell}>
+              <Text style={[styles.fieldLabel, { color: colors.text }]}>{t('tips_checkouts.field_hours')}</Text>
+              <TipsStepper value={hours} step={0.5} onChange={setHours} />
+            </View>
+            <View style={styles.trioCell}>
+              <Text style={[styles.fieldLabel, { color: colors.text }]}>{t('tips_checkouts.field_tables')}</Text>
+              <TipsStepper value={tables} onChange={setTables} />
+            </View>
+            <View style={styles.trioCell}>
+              <Text style={[styles.fieldLabel, { color: colors.text }]}>{t('tips_checkouts.field_covers')}</Text>
+              <TipsStepper value={covers} onChange={setCovers} />
+            </View>
+          </View>
 
-      <View style={styles.fieldBlock}>
-        <Text style={[styles.fieldLabel, { color: colors.text }]}>{t('tips_checkouts.field_location')}</Text>
-        <View style={[styles.locationField, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
-          <IconSymbol ios_icon_name="mappin.and.ellipse" android_material_icon_name="place" size={15} color={colors.textSecondary} />
-          <TextInput
-            style={[styles.locationInput, { color: colors.text }]}
-            value={location}
-            onChangeText={setLocation}
-            placeholder={t('tips_checkouts.field_location_ph')}
-            placeholderTextColor={colors.textSecondary}
-          />
-        </View>
-      </View>
+          <View style={styles.fieldBlock}>
+            <Text style={[styles.fieldLabel, { color: colors.text }]}>{t('tips_checkouts.field_location')}</Text>
+            <View style={[styles.locationField, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
+              <IconSymbol ios_icon_name="mappin.and.ellipse" android_material_icon_name="place" size={15} color={colors.textSecondary} />
+              <TextInput
+                style={[styles.locationInput, { color: colors.text }]}
+                value={location}
+                onChangeText={setLocation}
+                placeholder={t('tips_checkouts.field_location_ph')}
+                placeholderTextColor={colors.textSecondary}
+              />
+            </View>
+          </View>
+        </>
+      )}
 
       <View style={styles.actionRow}>
         {editEntry && (
@@ -389,7 +458,11 @@ export default function LogShiftSheet({
           />
           <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={16} color="#FFFFFF" />
           <Text style={styles.saveText}>
-            {editEntry ? t('tips_checkouts.log_save_edit') : t('tips_checkouts.log_save')}
+            {editEntry
+              ? t('tips_checkouts.log_save_edit')
+              : paycheck
+                ? t('tips_checkouts.log_save_paycheck')
+                : t('tips_checkouts.log_save')}
           </Text>
         </TouchableOpacity>
       </View>
@@ -449,6 +522,10 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginTop: 6,
   },
+  // Paycheck mode: the mono eyebrow moves ABOVE the number (mockup S's
+  // "PAYCHECK AMOUNT"), and the under-line becomes a sentence-case hint.
+  bigOver: { marginTop: 0, marginBottom: 6 },
+  bigHint: { fontFamily: fonts.body.medium, fontSize: 10.5, marginTop: 6, textAlign: 'center' },
   importRow: {
     flexDirection: 'row',
     alignItems: 'center',

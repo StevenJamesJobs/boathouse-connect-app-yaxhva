@@ -26,6 +26,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
 import { IconSymbol } from '@/components/IconSymbol';
 import GlassSheet from '@/components/GlassSheet';
+import { SheetNoDragZone } from '@/components/sheetDismiss';
 import ShineButton from '@/components/quiz/ShineButton';
 import { QUIZ_VISUALS } from '@/components/quiz/quizVisuals';
 import { formatTime } from '@/utils/exam/examEngine';
@@ -284,25 +285,30 @@ export default function QuizComposer({
       <Text style={[styles.photoReadout, { color: visual.accent }]}>
         {t('exam_editor.photos_of', { x: photoCount, y: count, pct: photoPct })}
       </Text>
-      <View
-        style={styles.sliderHit}
-        onLayout={(e) => {
-          trackWidthRef.current = e.nativeEvent.layout.width;
-          setTrackWidth(e.nativeEvent.layout.width);
-        }}
-        {...pan.panHandlers}
-      >
-        <View style={[styles.sliderTrack, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
-          <View style={[styles.sliderFill, { width: thumbLeft, backgroundColor: visual.accent }]} />
-        </View>
+      {/* The slider owns its pan — fenced so, inside a swipe-to-dismiss sheet,
+          a drag that starts on it never pulls the sheet down
+          (components/sheetDismiss.tsx; an inert View on a plain screen). */}
+      <SheetNoDragZone>
         <View
-          pointerEvents="none"
-          style={[
-            styles.sliderThumb,
-            { left: Math.max(0, Math.min(trackWidth - 22, thumbLeft - 11)), backgroundColor: visual.accent },
-          ]}
-        />
-      </View>
+          style={styles.sliderHit}
+          onLayout={(e) => {
+            trackWidthRef.current = e.nativeEvent.layout.width;
+            setTrackWidth(e.nativeEvent.layout.width);
+          }}
+          {...pan.panHandlers}
+        >
+          <View style={[styles.sliderTrack, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
+            <View style={[styles.sliderFill, { width: thumbLeft, backgroundColor: visual.accent }]} />
+          </View>
+          <View
+            pointerEvents="none"
+            style={[
+              styles.sliderThumb,
+              { left: Math.max(0, Math.min(trackWidth - 22, thumbLeft - 11)), backgroundColor: visual.accent },
+            ]}
+          />
+        </View>
+      </SheetNoDragZone>
       <Text style={[styles.photoHint, { color: colors.textSecondary }]}>
         {t('exam_editor.photos_hint')}
       </Text>

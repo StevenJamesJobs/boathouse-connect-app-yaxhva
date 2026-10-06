@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, TextInput, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import GlassSheet from '@/components/GlassSheet';
+import { SheetBodyScrollView } from '@/components/sheetBodyScroll';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useIsDarkTheme } from '@/components/content/useIsDarkTheme';
@@ -188,7 +189,9 @@ export default function RecipientsSheet({ visible, onClose, people, groups, init
         </View>
       }
     >
-      <ScrollView
+      {/* The sheet's scroller — opted in to the swipe-down (at the top a
+          downward drag pulls the sheet; scrolled, it scrolls). */}
+      <SheetBodyScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
@@ -273,7 +276,7 @@ export default function RecipientsSheet({ visible, onClose, people, groups, init
         {everyoneElse.length === 0 && onGroups.every((g) => !g.memberIds.some((id) => { const p = byId.get(id); return !!p && matches(p); })) && (
           <Text style={[styles.empty, { color: colors.textSecondary }]}>{t('no_users_found')}</Text>
         )}
-      </ScrollView>
+      </SheetBodyScrollView>
     </GlassSheet>
   );
 }

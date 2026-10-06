@@ -16,10 +16,7 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import type { Database } from '@/app/integrations/supabase/types';
-import FormattedText from '@/components/FormattedText';
 import { StorageImage } from '@/components/StorageImage';
-import { useLanguage } from '@/contexts/LanguageContext';
-import { getLocalizedField } from '@/utils/translateContent';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMenuCategories } from '@/hooks/useMenuCategories';
 import { cocktailFedSubOptions, resolveRecipeSubId } from '@/utils/menuCategoryLabels';
@@ -27,7 +24,7 @@ import { isManagerOrOwner } from '@/utils/roles';
 import AmbientGlow from '@/components/AmbientGlow';
 import ScreenHeader from '@/components/ScreenHeader';
 import HeaderNavMenu from '@/components/HeaderNavMenu';
-import GlassHeroSheet from '@/components/GlassHeroSheet';
+import RecipeDetailSheet from '@/components/RecipeDetailSheet';
 import { useManagerPermissions } from '@/hooks/useManagerPermissions';
 import { RECIPE_TILE_SIZE } from '@/components/RecipeGridCard';
 import { fonts } from '@/constants/fonts';
@@ -59,7 +56,6 @@ const HERO_HEIGHT = 172;
 export default function SummerLibationRecipesScreen() {
   const router = useRouter();
   const { t } = useTranslation();
-  const { language } = useLanguage();
   const colors = useThemeColors();
   const { user } = useAuth();
   const isManager = isManagerOrOwner(user);
@@ -156,6 +152,13 @@ export default function SummerLibationRecipesScreen() {
   // Group recipes under their bound cocktail-fed subcategory (current names, in
   // the menu's subcategory order); featured recipes pin to the top of each group.
   const cocktailSubOptions = cocktailFedSubOptions(menuCats, t);
+  // The Poster's slate pill: the bound subcategory's current name, else the
+  // legacy category label (the same resolution the shelves group by).
+  const recipePillLabel = (r: LibationRecipe) => {
+    const subId = resolveRecipeSubId(menuCats, r);
+    const opt = subId ? cocktailSubOptions.find((o) => o.id === subId) : undefined;
+    return opt?.label ?? getCategoryLabel(r.category || 'Other');
+  };
   const recipesByCategory: Record<string, LibationRecipe[]> = {};
   const groupedIds = new Set<string>();
   for (const opt of cocktailSubOptions) {
@@ -390,79 +393,29 @@ export default function SummerLibationRecipesScreen() {
         </ScrollView>
       )}
 
-      {/* Recipe detail sheet — hero photo flush to the top edge, the
-          MenuItemDetailSheet continuity (Steve's smoke call). */}
-      <GlassHeroSheet
+      {/* Recipe detail — the shared recipe Poster (components/RecipeDetailSheet);
+          the deep link above lands here through openDetailModal. */}
+      <RecipeDetailSheet
         visible={showDetailModal}
         onClose={closeDetailModal}
-        hero={selectedRecipe?.thumbnail_url ? (
-          <>
-            <StorageImage
-              source={{ uri: getImageUrl(selectedRecipe.thumbnail_url) }}
-              style={styles.heroFill}
-              resizeMode="cover"
-            />
-            <LinearGradient
-              colors={['rgba(14,11,9,0)', 'rgba(14,11,9,0.92)']}
-              locations={[0.42, 0.94]}
-              style={StyleSheet.absoluteFill}
-              pointerEvents="none"
-            />
-          </>
-        ) : undefined}
-      >
-        <Text style={[styles.detailTitle, { color: colors.text }]}>{selectedRecipe?.name}</Text>
-
-        <View style={styles.detailTwoCol}>
-          <View style={styles.detailCol}>
-            <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('summer_libation_recipes.price')}</Text>
-            <View style={[styles.pricePill, { backgroundColor: colors.primary }]}>
-              <Text style={[styles.pricePillText, { color: colors.fireText }]}>{selectedRecipe?.price}</Text>
-            </View>
-          </View>
-          {!!selectedRecipe?.glassware && (
-            <View style={styles.detailCol}>
-              <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('summer_libation_recipes.glassware')}</Text>
-              <Text style={[styles.detailValue, { color: colors.text }]}>{selectedRecipe.glassware}</Text>
-            </View>
-          )}
-        </View>
-
-        {!!selectedRecipe?.garnish && (
-          <View style={styles.detailSection}>
-            <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('summer_libation_recipes.garnish')}</Text>
-            <Text style={[styles.detailValue, { color: colors.text }]}>{selectedRecipe.garnish}</Text>
-          </View>
-        )}
-
-        <View style={styles.detailSection}>
-          <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('summer_libation_recipes.ingredients')}</Text>
-          {selectedRecipe?.ingredients && selectedRecipe.ingredients.length > 0 ? (
-            selectedRecipe.ingredients.map((item, index) => (
-              <View
-                key={index}
-                style={[styles.ingredientRow, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}
-              >
-                <Text style={[styles.ingredientAmount, { color: colors.primary }]}>{item.amount}</Text>
-                <Text style={[styles.ingredientName, { color: colors.text }]}>{item.ingredient}</Text>
-              </View>
-            ))
-          ) : (
-            <Text style={[styles.noDataText, { color: colors.textSecondary }]}>{t('summer_libation_recipes.no_ingredients')}</Text>
-          )}
-        </View>
-
-        {!!selectedRecipe?.procedure && (
-          <View style={styles.detailSection}>
-            <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('summer_libation_recipes.procedure')}</Text>
-            <View style={[styles.procedureBox, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
-              <FormattedText style={[styles.procedureText, { color: colors.text }]}>
-                {getLocalizedField(selectedRecipe, 'procedure', language)}
-              </FormattedText>
-            </View>
-          </View>
-        )}
-      </GlassHeroSheet>
+        recipe={selectedRecipe ? {
+          name: selectedRecipe.name,
+          price: selectedRecipe.price,
+          glassware: selectedRecipe.glassware,
+          garnish: selectedRecipe.garnish,
+          ingredients: selectedRecipe.ingredients,
+          procedure: selectedRecipe.procedure,
+          procedure_es: selectedRecipe.procedure_es,
+          // Real thumbnails only — the Unsplash placeholder is a tile stand-in;
+          // the Poster shows its slate board instead.
+          thumbnail_url: selectedRecipe.thumbnail_url,
+          subcategoryLabel: recipePillLabel(selectedRecipe),
+        } : null}
+        editAction={isManager && selectedRecipe ? {
+          label: t('common.edit'),
+          onPress: () => router.push({ pathname: '/summer-libation-recipes-editor', params: { edit: selectedRecipe.name } } as any),
+        } : null}
+      />
     </View>
   );
 }
@@ -647,85 +600,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
     paddingVertical: 3,
     zIndex: 3,
-  },
-  // Detail sheet — the hero box/radii come from GlassHeroSheet; this just
-  // fills it.
-  heroFill: {
-    width: '100%',
-    height: '100%',
-  },
-  detailTitle: {
-    fontFamily: fonts.display.bold,
-    fontSize: 22,
-    letterSpacing: -0.3,
-    marginTop: 12,
-    marginBottom: 10,
-  },
-  detailTwoCol: {
-    flexDirection: 'row',
-    gap: 14,
-    marginBottom: 8,
-  },
-  detailCol: {
-    flex: 1,
-  },
-  detailSection: {
-    marginBottom: 8,
-  },
-  detailLabel: {
-    fontFamily: fonts.mono.semibold,
-    fontSize: 10,
-    letterSpacing: 1.1,
-    textTransform: 'uppercase',
-    marginBottom: 7,
-  },
-  detailValue: {
-    fontFamily: fonts.body.semibold,
-    fontSize: 14,
-  },
-  pricePill: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-  },
-  pricePillText: {
-    fontFamily: fonts.mono.semibold,
-    fontSize: 13,
-  },
-  ingredientRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 9,
-    paddingHorizontal: 11,
-    borderRadius: 11,
-    borderWidth: StyleSheet.hairlineWidth + 0.5,
-    marginBottom: 7,
-  },
-  ingredientAmount: {
-    fontFamily: fonts.mono.semibold,
-    fontSize: 11.5,
-    minWidth: 64,
-  },
-  ingredientName: {
-    fontFamily: fonts.body.regular,
-    fontSize: 13.5,
-    flex: 1,
-  },
-  noDataText: {
-    fontFamily: fonts.body.regular,
-    fontSize: 13,
-    fontStyle: 'italic',
-  },
-  procedureBox: {
-    borderRadius: 13,
-    borderWidth: StyleSheet.hairlineWidth + 0.5,
-    padding: 13,
-  },
-  procedureText: {
-    fontFamily: fonts.body.regular,
-    fontSize: 13.5,
-    lineHeight: 22,
   },
 });

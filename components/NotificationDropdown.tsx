@@ -34,8 +34,49 @@ const SOURCE_FETCH_LIMIT = 100;
 
 type NotificationType = 'announcement' | 'special_feature' | 'upcoming_event' | 'weekly_special' | 'custom_notification';
 
-type CustomNotifData = { destination?: string; exam_id?: string; notificationType?: string; targetUserId?: string; title_es?: string; body_es?: string } | null;
+type CustomNotifData = {
+  destination?: string;
+  exam_id?: string;
+  notificationType?: string;
+  targetUserId?: string;
+  title_es?: string;
+  body_es?: string;
+  // s89 D1: the composer's optional photo + who sent it (the RPC returns no
+  // sender column, so the composer snapshots the name into data).
+  thumbnail_url?: string;
+  thumbnail_shape?: string;
+  sender_name?: string;
+} | null;
 type CustomNotifRow = Omit<Database['public']['Functions']['get_my_notifications']['Returns'][number], 'data'> & { data: CustomNotifData };
+
+// The composer's "Opens to" destinations → the route the push deep-link takes
+// (mirrors NotificationContext's custom-destination switch, so a tap in the
+// detail sheet lands exactly where the banner tap does) and the label the
+// composer shows for each. The shade's own system rows (quizzes, approvals,
+// schedule, redemptions) are routed in handleItemPress before this is reached.
+const destinationRoute = (destination: string, portalPrefix: string): string | null => {
+  switch (destination) {
+    case 'messages': return '/messages';
+    case 'rewards': return `${portalPrefix}/rewards`;
+    case 'announcements':
+    case 'events':
+    case 'special_features': return portalPrefix;
+    case 'menus': return `${portalPrefix}/menus`;
+    case 'tools': return `${portalPrefix}/tools`;
+    case 'game_hub': return '/game-hub';
+    default: return null;
+  }
+};
+const DESTINATION_LABEL_KEYS: Record<string, string> = {
+  messages: 'notification_center.opens_to_messages',
+  announcements: 'notification_center.opens_to_announcements',
+  events: 'notification_center.opens_to_events',
+  special_features: 'notification_center.opens_to_features',
+  rewards: 'notification_center.opens_to_rewards',
+  menus: 'notification_center.opens_to_menus',
+  tools: 'notification_center.opens_to_tools',
+  game_hub: 'notification_center.opens_to_game_hub',
+};
 
 interface NotificationItem {
   id: string;
@@ -70,6 +111,10 @@ interface NotificationDropdownProps {
     priority?: string;
     link?: string | null;
     guideFile?: GuideFile | null;
+    /** s89 D1 — a general notification: logo board when no photo, sender line, destination chip. */
+    kind?: 'notification';
+    meta?: string | null;
+    action?: { label: string; onPress: () => void } | null;
   }) => void;
   isManager?: boolean;
 }
@@ -212,39 +257,10 @@ export default function NotificationDropdown({
         }
       }
 
-      // Weekly specials = items in the Weekly Specials category (resolved by
-      // system_key → follows renames) PLUS any item FEATURED via is_weekly_special
-      // (overlay). Featured-but-not-categorized items surface by their feature
-      // time (updated_at). Merge + dedupe by id.
-      const wsNames = await weeklySpecialsNames(user.id);
-      // RPC returns all matching active items; apply the recency sort + cap client-side.
-      const [byCatRpc, byFlagRpc] = await Promise.all([
-        supabase.rpc('get_menu_items', { p_actor_id: user.id, p_categories: wsNames }),
-        supabase.rpc('get_menu_items', { p_actor_id: user.id, p_weekly_special: true }),
-      ]);
-      const byCatSpecials = {
-        data: (byCatRpc.data || [])
-          .slice().sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')).slice(0, SOURCE_FETCH_LIMIT),
-      };
-      const byFlagSpecials = {
-        data: (byFlagRpc.data || [])
-          .slice().sort((a, b) => (b.updated_at || '').localeCompare(a.updated_at || '')).slice(0, SOURCE_FETCH_LIMIT),
-      };
-      const specialsById = new Map<string, any>();
-      for (const s of (byCatSpecials.data || [])) specialsById.set(s.id, { ...s, __ts: s.created_at });
-      for (const s of (byFlagSpecials.data || [])) {
-        if (!specialsById.has(s.id)) specialsById.set(s.id, { ...s, __ts: s.updated_at || s.created_at });
-      }
-      for (const s of specialsById.values()) {
-        items.push({
-          id: s.id,
-          type: 'weekly_special',
-          title: getLocalizedField(s, 'name', language),
-          subtitle: stripFormattingTags(getLocalizedField(s, 'description', language) || s.description || ''),
-          createdAt: s.__ts,
-          rawData: s,
-        });
-      }
+      // Weekly specials are NOT shade rows (s89, Steve's call): a new or
+      // newly-featured special only lights the Specials tab's dot on the
+      // Connect bar (useUnreadContent), which clears the moment the tab is
+      // viewed — weekly menu changes used to pile up here.
 
       // Fetch custom notifications (the role/target visibility matrix below is
       // now also enforced server-side; the loop's checks remain as belt-and-braces)
@@ -314,7 +330,10 @@ export default function NotificationDropdown({
             title: (language === 'es' && cn.data?.title_es) ? String(cn.data.title_es) : cn.title,
             subtitle: (language === 'es' && cn.data?.body_es) ? String(cn.data.body_es) : cn.body,
             createdAt: cn.created_at,
-            rawData: cn,
+            // The composer's photo lives in data.thumbnail_url; hoisting it to
+            // the row's top level lets the renderer's one thumbnail branch
+            // (rawData.thumbnail_url, the content tables' column) draw it.
+            rawData: { ...cn, thumbnail_url: cn.data?.thumbnail_url ?? null },
           });
         }
       }
@@ -358,15 +377,7 @@ export default function NotificationDropdown({
   const handleItemPress = (item: NotificationItem) => {
     const data = item.rawData;
 
-    if (item.type === 'weekly_special') {
-      const formatPrice = (price: string) => price.includes('$') ? price : `$${price}`;
-      onItemPress({
-        title: getLocalizedField(data, 'name', language),
-        content: `${getLocalizedField(data, 'description', language) || data.description || ''}\n\nPrice: ${formatPrice(data.price)}${data.is_gluten_free ? '\n• Gluten Free' : ''}${data.is_gluten_free_available ? '\n• Gluten Free Available' : ''}${data.is_vegetarian ? '\n• Vegetarian' : ''}${data.is_vegetarian_available ? '\n• Vegetarian Available' : ''}`,
-        thumbnailUrl: data.thumbnail_url,
-        thumbnailShape: data.thumbnail_shape,
-      });
-    } else if (item.type === 'custom_notification') {
+    if (item.type === 'custom_notification') {
       // Weekly quiz deep-link: route to the quizzes screen and record dismissal
       if (data.data?.destination === 'weekly-quizzes') {
         if (data.data?.exam_id && user?.id) {
@@ -420,9 +431,32 @@ export default function NotificationDropdown({
         router.push(`${portalPrefix}/rewards` as any);
         return;
       }
+      // A general notification (s89 D1): the detail sheet gets the photo (or
+      // the org logo when there is none), a "sender · when · opens to" line,
+      // and the destination as its one chip — the chip runs the same route the
+      // banner tap takes, after the sheet has closed (the modal defers it).
+      const d: NonNullable<CustomNotifData> = data.data ?? {};
+      const portalPrefix = (user?.role === 'manager' || user?.role === 'owner') ? '/(portal)/manager' : '/(portal)/employee';
+      const route = d.destination ? destinationRoute(d.destination, portalPrefix) : null;
+      const destinationLabel = route && d.destination && DESTINATION_LABEL_KEYS[d.destination]
+        ? t(DESTINATION_LABEL_KEYS[d.destination])
+        : null;
+      const sentAt = data.created_at
+        ? new Date(data.created_at).toLocaleString(language === 'es' ? 'es' : 'en-US', {
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+          })
+        : null;
       onItemPress({
-        title: (language === 'es' && data.data?.title_es) ? String(data.data.title_es) : data.title,
-        content: (language === 'es' && data.data?.body_es) ? String(data.data.body_es) : data.body,
+        title: (language === 'es' && d.title_es) ? String(d.title_es) : data.title,
+        content: (language === 'es' && d.body_es) ? String(d.body_es) : data.body,
+        thumbnailUrl: d.thumbnail_url ?? null,
+        thumbnailShape: d.thumbnail_shape ?? undefined,
+        kind: 'notification',
+        meta: [d.sender_name, sentAt, destinationLabel].filter(Boolean).join(' · ') || null,
+        action: route ? { label: t('content_detail.open'), onPress: () => router.push(route as any) } : null,
       });
     } else {
       // Mark per-item NEW state cleared when the user opens the detail modal from the shade.

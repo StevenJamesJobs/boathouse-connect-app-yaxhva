@@ -21,6 +21,8 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from "expo-router/react-navigation";
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useManagerPermissions } from '@/hooks/useManagerPermissions';
+import { useUnreadContent } from '@/hooks/useUnreadContent';
+import { useUnreadNotifications } from '@/hooks/useUnreadNotifications';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
@@ -679,6 +681,11 @@ export default function ManagerManageScreen() {
   const [activityOpen, setActivityOpen] = useState(false);
   const [notificationVisible, setNotificationVisible] = useState(false);
   const [weatherVisible, setWeatherVisible] = useState(false);
+  // The bell badge — the same two counts Welcome and Profile feed their header
+  // (unread notifications + new Today/Events content); Manage never had them
+  // (Steve's s89 device round). Opening the shade advances the cutoff.
+  const { count: notificationCount, markViewed: markNotificationsViewed } = useUnreadNotifications();
+  const { newContentCount } = useUnreadContent();
 
   // Notification-shade item → content detail (same modal as the Welcome page).
   const [detailVisible, setDetailVisible] = useState(false);
@@ -693,6 +700,11 @@ export default function ManagerManageScreen() {
     priority?: string;
     link?: string | null;
     guideFile?: any;
+    // s89 D1 (general notifications from the shade): typed off the modal's
+    // own props so the two can never drift.
+    kind?: React.ComponentProps<typeof ContentDetailModal>['kind'];
+    meta?: React.ComponentProps<typeof ContentDetailModal>['meta'];
+    action?: React.ComponentProps<typeof ContentDetailModal>['action'];
   } | null>(null);
   const openDetailModal = useCallback((item: NonNullable<typeof selectedItem>) => {
     setSelectedItem(item);
@@ -1233,7 +1245,12 @@ export default function ManagerManageScreen() {
         <View style={styles.headerPadding}>
           <WelcomeHeader
             onWeatherPress={() => setWeatherVisible(true)}
-            onNotificationPress={() => setNotificationVisible(true)}
+            onNotificationPress={() => {
+              setNotificationVisible(true);
+              markNotificationsViewed();
+            }}
+            notificationCount={notificationCount}
+            newContentCount={newContentCount}
           />
         </View>
       </View>
@@ -1279,6 +1296,10 @@ export default function ManagerManageScreen() {
           priority={selectedItem.priority}
           link={selectedItem.link}
           guideFile={selectedItem.guideFile}
+          kind={selectedItem.kind}
+          orgLogoUrl={organization.logo_url}
+          meta={selectedItem.meta}
+          action={selectedItem.action}
           colors={{
             text: colors.text,
             textSecondary: colors.textSecondary,

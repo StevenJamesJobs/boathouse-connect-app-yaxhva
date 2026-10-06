@@ -5,6 +5,7 @@
 import { FAMILY_ACCENTS, ASSISTANT_HUES, TILE_BG_ALPHA, TILE_BORDER_ALPHA } from '@/components/tools/toolsVisuals';
 import type { FavoriteAccent } from '@/config/favorites';
 import type { ThemeColorSet } from '@/styles/commonStyles';
+import type { TilePalette } from '@/contexts/ThemeContext';
 
 export type Scheme = 'light' | 'dark';
 
@@ -20,8 +21,19 @@ export const RED_HUE = { dark: '#EF4444', light: '#DC2626' } as const;
 
 export { TILE_BG_ALPHA, TILE_BORDER_ALPHA };
 
-/** Resolve a catalog accent to a hex for the scheme; 'tint' follows the theme. */
-export function favoriteAccent(accent: FavoriteAccent, colors: ThemeColorSet, scheme: Scheme): string {
+/**
+ * Resolve a catalog accent to a hex for the scheme; 'tint' follows the theme.
+ * `tilePalette` is the app-wide tile palette (ThemeContext, the Appearance toggle):
+ * under 'theme' every accent except 'gold' returns the theme tint — gold is the
+ * rewards / approvals signal and keeps its hue under either palette.
+ */
+export function favoriteAccent(
+  accent: FavoriteAccent,
+  colors: ThemeColorSet,
+  scheme: Scheme,
+  tilePalette: TilePalette = 'myresto',
+): string {
+  if (tilePalette === 'theme' && accent !== 'gold') return colors.tint;
   switch (accent) {
     case 'tint': return colors.tint;
     case 'azure': return AZURE_HUE[scheme];

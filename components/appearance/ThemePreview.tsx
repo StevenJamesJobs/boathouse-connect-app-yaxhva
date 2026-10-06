@@ -3,25 +3,41 @@ import { View, Text, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAppTheme } from '@/contexts/ThemeContext';
 import { fonts } from '@/constants/fonts';
 import type { ThemeColorSet } from '@/styles/commonStyles';
 import { alpha } from '@/components/appearance/appearanceKit';
+import {
+  toolsFamilyAccent,
+  TILE_BG_ALPHA,
+  TILE_BORDER_ALPHA,
+  type FamilyKey,
+} from '@/components/tools/toolsVisuals';
 
 interface ThemePreviewProps {
   /** The colour set to paint with — a preset's light/dark set or a derived custom one. */
   palette: ThemeColorSet;
   /** Optional accessibility label ("Moonstone · Dark"). */
   label?: string;
+  /**
+   * Append the 2×2 mini Tools tiles (s89) so the page shows the app-wide tile palette
+   * toggle's effect. Only the Appearance screen passes it — its palette prop IS the live
+   * theme, so the tiles may read the live tilePalette / resolvedMode from ThemeContext.
+   */
+  showTiles?: boolean;
 }
 
 /**
  * The honest miniature (mockup `.pv`): a mini hero card, seg, event card,
  * button pair and tab strip painted ENTIRELY from the palette passed in — never
  * the live theme — so previewing a non-active theme shows what you would get.
+ * The optional mini tiles are the one exception: their accents come from
+ * toolsFamilyAccent with the live tile palette in force (that is what they prove).
  */
-export default function ThemePreview({ palette: p, label }: ThemePreviewProps) {
+export default function ThemePreview({ palette: p, label, showTiles = false }: ThemePreviewProps) {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const { resolvedMode, tilePalette } = useAppTheme();
 
   const fullName = (user?.name || '').trim();
   const firstName = fullName.split(/\s+/)[0] || '';
@@ -33,6 +49,17 @@ export default function ThemePreview({ palette: p, label }: ThemePreviewProps) {
     .join('');
 
   const tint18 = alpha(p.tint, 0.18);
+
+  // The four Tools families the toggle recolours (rewards stays gold, so it is not here).
+  // Sample values are literal; the tile names are the Tools page titles.
+  const miniTiles: { family: FamilyKey; label: string; value: string }[] = showTiles
+    ? [
+        { family: 'game', label: t('employee_tools.game_hub'), value: `${t('tools_page.game_rank_prefix')} #4` },
+        { family: 'quiz', label: t('employee_tools.weekly_quizzes'), value: t('tools_page.quiz_big', { count: 1 }) },
+        { family: 'tips', label: t('tips_checkouts.title'), value: '$412' },
+        { family: 'guides', label: t('employee_tools.guides_training'), value: t('tools_page.guides_big', { count: 24 }) },
+      ]
+    : [];
 
   return (
     <View
@@ -140,6 +167,40 @@ export default function ThemePreview({ palette: p, label }: ThemePreviewProps) {
           </View>
         ))}
       </View>
+
+      {/* Mini Tools tiles (s89): the CommandTile wash (accent at the kit alphas) in the
+          accent the live tile palette resolves — flipping the toggle recolours these the
+          way it recolours the Tools page. */}
+      {miniTiles.length > 0 && (
+        <View style={styles.tiles}>
+          {[miniTiles.slice(0, 2), miniTiles.slice(2)].map((row, ri) => (
+            <View key={ri} style={styles.tilesRow}>
+              {row.map((tile) => {
+                const acc = toolsFamilyAccent(tile.family, resolvedMode, p, tilePalette);
+                return (
+                  <View
+                    key={tile.family}
+                    style={[
+                      styles.tile,
+                      {
+                        backgroundColor: alpha(acc, TILE_BG_ALPHA[resolvedMode]),
+                        borderColor: alpha(acc, TILE_BORDER_ALPHA[resolvedMode]),
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.tileLabel, { color: acc }]} numberOfLines={1}>
+                      {tile.label}
+                    </Text>
+                    <Text style={[styles.tileValue, { color: p.text }]} numberOfLines={1}>
+                      {tile.value}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          ))}
+        </View>
+      )}
     </View>
   );
 }
@@ -206,4 +267,19 @@ const styles = StyleSheet.create({
   tabs: { flexDirection: 'row', padding: 3, gap: 3, borderRadius: 10, borderWidth: 1 },
   tab: { flex: 1, height: 18, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
   tabDot: { width: 6, height: 6, borderRadius: 3 },
+  tiles: { gap: 7 },
+  tilesRow: { flexDirection: 'row', gap: 7 },
+  tile: {
+    flex: 1,
+    minWidth: 0,
+    height: 48,
+    borderRadius: 11,
+    borderWidth: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 9,
+    justifyContent: 'flex-end',
+    gap: 2,
+  },
+  tileLabel: { fontFamily: fonts.mono.medium, fontSize: 8, letterSpacing: 0.6, textTransform: 'uppercase' },
+  tileValue: { fontFamily: fonts.body.semibold, fontSize: 10.5 },
 });

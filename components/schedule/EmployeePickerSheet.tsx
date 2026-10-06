@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, FlatList, ActivityIndicator, TextInput } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ActivityIndicator, TextInput } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import GlassSheet from '@/components/GlassSheet';
+import { SheetBodyFlatList } from '@/components/sheetBodyScroll';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useAuth } from '@/contexts/AuthContext';
@@ -33,7 +34,9 @@ export interface EmployeePickerSheetProps {
  * search + the org directory, filtered to a job title when the shift has one.
  * scroll={false}: the FlatList is the only scroller (a list inside GlassSheet's
  * ScrollView would fight it), sized with an explicit max height + flexShrink so
- * it can never collapse to zero inside the content-sized sheet body.
+ * it can never collapse to zero inside the content-sized sheet body. It is a
+ * SheetBodyFlatList so the s89 swipe-down still reads it: at the top of the
+ * list a downward drag pulls the sheet, scrolled it scrolls.
  */
 export default function EmployeePickerSheet({
   visible,
@@ -143,7 +146,7 @@ export default function EmployeePickerSheet({
         {loading ? (
           <ActivityIndicator color={colors.primary} style={{ marginVertical: 24 }} />
         ) : (
-          <FlatList
+          <SheetBodyFlatList
             data={filtered}
             keyExtractor={(r) => r.id}
             renderItem={renderItem}

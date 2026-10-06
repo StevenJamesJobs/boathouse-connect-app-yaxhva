@@ -10,13 +10,14 @@ import {
   Dimensions,
   ActivityIndicator,
   Image,
-  Animated,
-  PanResponder,
   Platform,
   Linking,
 } from 'react-native';
+import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import Reanimated from 'react-native-reanimated';
 import { WebView } from 'react-native-webview';
 import { IconSymbol } from '@/components/IconSymbol';
+import { SheetHeaderZone, SheetNoDragZone, useSheetDismiss } from '@/components/sheetDismiss';
 import { useTranslation } from 'react-i18next';
 import { useOrganization } from '../contexts/OrganizationContext';
 import HourlyForecastChart, { HourlyPoint } from '@/components/HourlyForecastChart';
@@ -64,8 +65,6 @@ interface WeatherDetailModalProps {
 }
 
 const WEATHER_API_KEY = '6e3db8832cf34a5bbc5182329251711';
-const SCREEN_HEIGHT = Dimensions.get('window').height;
-const DISMISS_THRESHOLD = 120;
 
 // Neutralize the Windy embed's geolocation request so it never prompts for the
 // device's location (the map already centers on the coordinates we pass in). Runs
@@ -110,42 +109,16 @@ export default function WeatherDetailModal({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // ─── Pull-down-to-dismiss ─────────────────────────────────────────────────
-  const translateY = useRef(new Animated.Value(0)).current;
-  const dragDismissing = useRef(false);
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        return gestureState.dy > 4 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx);
-      },
-      onPanResponderMove: (_, gestureState) => {
-        if (gestureState.dy > 0) {
-          translateY.setValue(gestureState.dy);
-        }
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dy > DISMISS_THRESHOLD) {
-          dragDismissing.current = true;
-          Animated.timing(translateY, {
-            toValue: SCREEN_HEIGHT,
-            duration: 250,
-            useNativeDriver: true,
-          }).start(() => {
-            onClose();
-          });
-        } else {
-          Animated.spring(translateY, {
-            toValue: 0,
-            useNativeDriver: true,
-            tension: 80,
-            friction: 10,
-          }).start();
-        }
-      },
-    })
-  ).current;
+  // ─── Swipe-down-to-dismiss ────────────────────────────────────────────────
+  // The GlassHeroSheet mechanism (components/sheetDismiss.tsx): the handle
+  // strip always drags; the body drags while its scroll is at the top. A drag
+  // dismissal is animated by the pan itself, so the Modal then closes with
+  // animationType 'none' (dragDismissingRef) instead of sliding out twice.
+  const dragDismissingRef = useRef(false);
+  const { gesture, bodyNative, shellStyle, trackBodyScroll, reset, contextValue, SheetDismissProvider } = useSheetDismiss({
+    onClose,
+    dragDismissingRef,
+    enabled: true, bodyTracked: true });
 
   useEffect(() => {
     if (visible) {
@@ -324,24 +297,25 @@ export default function WeatherDetailModal({
     <Modal
       visible={visible}
       transparent={true}
-      animationType={dragDismissing.current ? 'none' : 'slide'}
+      animationType={dragDismissingRef.current ? 'none' : 'slide'}
       onRequestClose={onClose}
-      onShow={() => {
-        translateY.setValue(0);
-        dragDismissing.current = false;
-      }}
+      onShow={reset}
     >
-      <View style={styles.modalOverlay}>
+      {/* A Modal is its own native hierarchy — the pan needs a root of its own. */}
+      <GestureHandlerRootView style={styles.modalOverlay}>
         <TouchableOpacity
           style={styles.modalBackdrop}
           activeOpacity={1}
           onPress={onClose}
         />
-        <Animated.View style={[styles.modalContent, { backgroundColor: colors.card, height: screenHeight * 0.85, transform: [{ translateY }] }]}>
-          {/* Drag Handle */}
-          <View {...panResponder.panHandlers} style={styles.dragHandleArea}>
+        <SheetDismissProvider value={contextValue}>
+          <GestureDetector gesture={gesture}>
+            {/* The drag translate rides this shell (Reanimated, UI thread). */}
+            <Reanimated.View style={[styles.modalContent, { backgroundColor: colors.card, height: screenHeight * 0.85 }, shellStyle]}>
+          {/* Drag Handle — the always-draggable header zone */}
+          <SheetHeaderZone style={styles.dragHandleArea}>
             <View style={[styles.dragHandle, { backgroundColor: colors.border || colors.textSecondary }]} />
-          </View>
+          </SheetHeaderZone>
 
           {/* Close Button */}
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
@@ -353,11 +327,16 @@ export default function WeatherDetailModal({
             />
           </TouchableOpacity>
 
-          {/* Content */}
+          {/* Content — reports its offset so the body drags only at the top;
+              no rubber-band for an at-top pull to fight. */}
+          <GestureDetector gesture={bodyNative}>
           <ScrollView
             style={styles.scrollView}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
+            onScroll={trackBodyScroll}
+            scrollEventThrottle={32}
+            bounces={false}
           >
               {loading ? (
                 <View style={styles.loadingContainer}>
@@ -475,7 +454,8 @@ export default function WeatherDetailModal({
                         <Text style={[styles.radarSubtitle, { color: colors.textSecondary }]}>
                           {t('weather.radar_hint')}
                         </Text>
-                        <View style={[styles.radarImageWrapper, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '20' }]}>
+                        {/* The map owns its pan — fenced so a drag on it never pulls the sheet. */}
+                        <SheetNoDragZone style={[styles.radarImageWrapper, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '20' }]}>
                           {Platform.OS === 'web' ? (
                             <TouchableOpacity
                               style={styles.radarWebFallback}
@@ -509,7 +489,7 @@ export default function WeatherDetailModal({
                               )}
                             />
                           )}
-                        </View>
+                        </SheetNoDragZone>
                       </View>
                     )}
 
@@ -593,8 +573,11 @@ export default function WeatherDetailModal({
                 </>
               )}
             </ScrollView>
-        </Animated.View>
-        </View>
+          </GestureDetector>
+            </Reanimated.View>
+          </GestureDetector>
+        </SheetDismissProvider>
+      </GestureHandlerRootView>
     </Modal>
   );
 }

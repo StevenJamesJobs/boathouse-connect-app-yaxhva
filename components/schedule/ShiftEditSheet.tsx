@@ -3,6 +3,7 @@ import { View, Text, Pressable, StyleSheet, Platform, Alert, ScrollView } from '
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { useTranslation } from 'react-i18next';
 import GlassSheet from '@/components/GlassSheet';
+import { SheetNoDragZone } from '@/components/sheetDismiss';
 import GlassActionSheet from '@/components/GlassActionSheet';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -371,7 +372,8 @@ export default function ShiftEditSheet({
             </View>
           }
         >
-          <View style={[styles.spinnerWrap, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
+          {/* The native wheel owns its pan — fenced so a drag on it never pulls the sheet. */}
+          <SheetNoDragZone style={[styles.spinnerWrap, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
             {!!ios && (
               <DateTimePicker
                 value={draft}
@@ -384,7 +386,7 @@ export default function ShiftEditSheet({
                 style={styles.spinner}
               />
             )}
-          </View>
+          </SheetNoDragZone>
         </GlassSheet>
       )}
     </GlassSheet>

@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Poster Menu Recipes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{min-height:100vh;display:flex;flex-direction:column;align-items:center;gap:14px;padding:24px 12px 60px;background:#0C0D11;color:#D6D9DE;font-family:'Inter','SF Pro Text',system-ui,sans-serif}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+h1{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:22px;letter-spacing:-0.3px;color:#F4F6F8}
+h1 span{color:#F99861}
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center;max-width:1100px}
+.grp{display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);padding:6px;border-radius:16px}
+.gl2{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:#6E7681;margin:0 4px 0 6px}
+.tb{background:rgba(255,255,255,0.06);color:#D6D9DE;border:1px solid rgba(255,255,255,0.10);border-radius:11px;padding:7px 11px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:.18s}
+.tb:hover{background:rgba(255,255,255,0.12)}
+.tb.on{background:#F4F6F8;color:#15171C;border-color:#F4F6F8}
+.hint{color:#6E7681;font-size:11.5px;font-family:'JetBrains Mono',monospace;text-align:center;max-width:980px;line-height:1.7}
+.hint b{color:#AEB4BD;font-weight:600}
+.hint em{font-style:normal;color:#2FBF8F}
+.row{display:flex;flex-wrap:wrap;gap:18px;justify-content:center;align-items:flex-start;max-width:1800px}
+.col{display:flex;flex-direction:column;gap:10px;align-items:center}
+.concept{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:#6E7681;display:flex;align-items:center;gap:8px;width:392px}
+.concept b{color:#F99861}
+.concept .ln{flex:1;height:1px;background:rgba(255,255,255,0.08)}
+.bcap{width:392px;font-size:11px;color:#8A9098;line-height:1.55;font-style:italic}
+.bcap b{font-style:normal;color:#D6D9DE;font-weight:600}
+.notes{max-width:1100px;width:100%;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;margin-top:6px}
+.note{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:12px 14px;font-size:11.5px;line-height:1.55;color:#AEB4BD}
+.note b{display:block;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:#F99861;margin-bottom:5px}
+.note em{font-style:normal;color:#F4F6F8;font-weight:600}
+
+/* ---------- phone shell + palettes (the content-detail kit, Moonstone added) ---------- */
+.phone{
+  --bg:#141724; --text:#F4F2EE; --muted:#9C9BA6; --fireText:#1F2334; --tint:#F99861;
+  --glass:rgba(255,255,255,0.07); --glassbd:rgba(255,255,255,0.12); --surf:rgba(255,255,255,0.045); --surfbd:rgba(255,255,255,0.09); --hair:rgba(255,255,255,0.07);
+  --glowA:rgba(249,152,97,0.28); --glowB:rgba(120,140,210,0.16); --scrim:rgba(6,10,18,0.55); --thumb:#232841; --sheetbg:#1C2030; --nav:rgba(20,23,36,0.42);
+  --gold:#F5B942; --bad:#EF4444; --ember:#FFB07A; --ok:#10A56F; --slate:#4A5568;
+  position:relative;width:392px;height:840px;background:var(--bg);border-radius:46px;border:1px solid #2A2E3A;overflow:hidden;
+  box-shadow:0 40px 90px -30px rgba(0,0,0,0.8);display:flex;flex-direction:column;color:var(--text)}
+.phone.t-moon-l{--bg:#F2F3F6;--text:#1F2334;--muted:#6B6F80;--fireText:#FFFFFF;--tint:#E8792F;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.66);--surfbd:rgba(0,0,0,0.07);--hair:rgba(0,0,0,0.07);--glowA:rgba(232,121,47,0.16);--glowB:rgba(31,35,52,0.10);--scrim:rgba(20,24,32,0.35);--thumb:#D9DBE3;--sheetbg:#F7F7FA;--nav:rgba(255,255,255,0.5);--gold:#B7791F;--ok:#087A52}
+.phone.t-ocean-d{--bg:#1A2332;--text:#FFFFFF;--muted:#A8B8D8;--fireText:#0A1422;--tint:#5DA0E5;--glass:rgba(255,255,255,0.07);--glassbd:rgba(255,255,255,0.13);--surf:rgba(255,255,255,0.05);--surfbd:rgba(255,255,255,0.10);--hair:rgba(255,255,255,0.08);--glowA:rgba(74,144,226,0.32);--glowB:rgba(16,185,129,0.13);--thumb:#2A3A50;--sheetbg:#222E40;--nav:rgba(26,35,50,0.42)}
+.phone.t-ocean-l{--bg:#E8F4F8;--text:#1A3A52;--muted:#4A6B7C;--fireText:#FFFFFF;--tint:#1976D2;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.7);--surfbd:rgba(13,71,161,0.10);--hair:rgba(13,71,161,0.08);--glowA:rgba(25,118,210,0.18);--glowB:rgba(5,150,105,0.13);--scrim:rgba(10,30,50,0.35);--thumb:#CFE0EA;--sheetbg:#F3F9FC;--nav:rgba(255,255,255,0.52);--gold:#B7791F;--ok:#087A52}
+.glow{position:absolute;top:-120px;right:-80px;width:360px;height:320px;border-radius:50%;background:radial-gradient(circle,var(--glowA),transparent 66%);z-index:0;pointer-events:none}
+.glow2{position:absolute;top:-70px;left:-90px;width:300px;height:280px;border-radius:50%;background:radial-gradient(circle,var(--glowB),transparent 68%);z-index:0;pointer-events:none}
+.sb{position:relative;z-index:3;display:flex;justify-content:space-between;align-items:center;padding:16px 30px 4px;font-size:13px;font-weight:600;font-family:'JetBrains Mono',monospace;color:var(--text)}
+.under{position:absolute;inset:0;z-index:1;padding:64px 16px 0;display:flex;flex-direction:column;gap:10px;opacity:.9}
+.under .eyeb{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:1.6px;text-transform:uppercase;color:var(--tint)}
+.under h2{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:26px;letter-spacing:-0.4px;color:var(--text)}
+.under .ucard{height:66px;border-radius:16px;background:var(--surf);border:1px solid var(--surfbd)}
+.scrim{position:absolute;inset:0;z-index:4;background:var(--scrim)}
+.ic{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+.mono{font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums}
+.disp{font-family:'Bricolage Grotesque',system-ui,sans-serif}
+
+/* painted stand-in photos */
+.ph{position:relative;background:
+  radial-gradient(120% 80% at 20% 10%,rgba(255,196,120,.55),transparent 55%),
+  radial-gradient(90% 70% at 80% 80%,rgba(120,30,20,.9),transparent 60%),
+  radial-gradient(60% 50% at 60% 30%,rgba(255,110,60,.85),transparent 60%),
+  linear-gradient(160deg,#9C2E1F,#4A1410 70%,#2A0C0A)}
+.ph.p2{background:
+  radial-gradient(100% 70% at 70% 20%,rgba(160,230,255,.6),transparent 55%),
+  radial-gradient(80% 60% at 20% 90%,rgba(10,70,110,.95),transparent 60%),
+  linear-gradient(200deg,#2C8DB0,#0F3E5C 70%,#071F31)}
+.ph.p3{background:
+  radial-gradient(90% 70% at 30% 20%,rgba(255,236,160,.75),transparent 55%),
+  radial-gradient(70% 60% at 80% 85%,rgba(150,90,10,.9),transparent 60%),
+  linear-gradient(170deg,#E0A03A,#8A5210 70%,#4A2B08)}
+.ph.cocktail{background:
+  radial-gradient(70% 60% at 50% 35%,rgba(255,120,80,.95),transparent 60%),
+  radial-gradient(60% 50% at 50% 70%,rgba(255,60,90,.9),transparent 62%),
+  radial-gradient(100% 80% at 10% 100%,rgba(40,10,30,.95),transparent 60%),
+  linear-gradient(180deg,#2B1020,#120812)}
+.ph.cocktail::after{content:"";position:absolute;left:50%;top:14%;width:34%;height:62%;transform:translateX(-50%);border-radius:50% 50% 46% 46%/40% 40% 60% 60%;background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,210,170,.22) 40%,rgba(255,110,90,.55));border:1px solid rgba(255,255,255,.35);box-shadow:inset 0 0 40px rgba(255,255,255,.08)}
+.ph::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(115deg,rgba(255,255,255,.035) 0 2px,transparent 2px 7px);mix-blend-mode:overlay;pointer-events:none}
+/* wine: a portrait bottle contained on WHITE */
+.wine{background:#FFFFFF;display:flex;align-items:flex-end;justify-content:center}
+.wine .bottle{width:64px;height:84%;border-radius:12px 12px 10px 10px;background:linear-gradient(180deg,#1C2A22 0%,#1C2A22 18%,#5A1F2B 18%,#5A1F2B 100%);position:relative;margin-bottom:0}
+.wine .bottle::before{content:"";position:absolute;left:50%;top:0;width:22px;height:18%;transform:translateX(-50%);background:#1C2A22;border-radius:8px 8px 0 0}
+.wine .bottle::after{content:"";position:absolute;left:8px;right:8px;top:48%;height:30%;background:#F1E7D2;border-radius:3px}
+
+/* the sheet — GlassHeroSheet (GlassCard glass r26 intensity 32, androidBaseAlpha .98) */
+.sheet{position:absolute;left:0;right:0;bottom:0;z-index:5;height:88%;display:flex;flex-direction:column;
+  background:color-mix(in srgb,var(--sheetbg) 94%,transparent);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  border:1px solid var(--glassbd);border-bottom:0;border-radius:26px 26px 0 0;overflow:hidden;color:var(--text)}
+.grab{width:40px;height:4px;border-radius:2px;background:var(--glassbd);margin:10px auto 8px;flex:0 0 auto}
+.grab.over{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:6;background:rgba(255,255,255,.55);box-shadow:0 1px 3px rgba(0,0,0,.35);margin:0}
+.foot{flex:0 0 auto;padding:9px 18px 30px;display:flex;gap:11px;border-top:1px solid var(--hair)}
+.closebtn{flex:1;height:47px;border-radius:13px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:15px;color:var(--muted)}
+
+/* ================= THE POSTER (locked s81 grammar) ================= */
+.poster{height:46%;flex:0 0 auto;position:relative;overflow:hidden}
+.poster .car{position:absolute;inset:0}
+.poster .track{display:flex;height:100%;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none}
+.poster .track::-webkit-scrollbar{display:none}
+.poster .slide{flex:0 0 100%;height:100%;scroll-snap-align:start;position:relative}
+.poster .cnt{position:absolute;top:12px;right:12px;z-index:3;background:rgba(8,10,14,.55);color:#fff;border-radius:13px;padding:4px 10px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;backdrop-filter:blur(6px)}
+.dots{position:absolute;left:0;right:0;top:22px;z-index:3;display:flex;justify-content:center;gap:6px;pointer-events:none}
+.dots i{width:6px;height:6px;border-radius:3px;background:rgba(255,255,255,.45)}
+.dots i.on{width:18px;background:#fff}
+.poster .scr{position:absolute;inset:0;z-index:2;background:linear-gradient(to top,rgba(14,11,9,.96) 0%,rgba(14,11,9,.62) 28%,rgba(14,11,9,.05) 60%);pointer-events:none}
+.poster .board{position:absolute;inset:0;--bc:var(--slate);background:linear-gradient(160deg,var(--bc),color-mix(in srgb,var(--bc) 55%,#0A1020))}
+.poster .board.cat{--bc:#2E8B57}
+/* the notification poster: org logo on a primary-tinted board */
+.poster .logoboard{position:absolute;inset:0;background:linear-gradient(160deg,color-mix(in srgb,var(--tint) 70%,#1F2334),color-mix(in srgb,var(--tint) 30%,#0A1020));display:flex;align-items:center;justify-content:center}
+.poster .logoboard .logo{width:46%;aspect-ratio:1.6;border-radius:18px;background:#F4F2EE;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;box-shadow:0 10px 30px rgba(0,0,0,.35);transform:translateY(-22px)}
+.poster .logoboard .logo b{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:800;font-size:17px;letter-spacing:-0.3px;color:#1F2334;line-height:1}
+.poster .logoboard .logo small{font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:2px;color:#6B6F80;text-transform:uppercase}
+.meta{display:flex;align-items:center;gap:8px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.3px;color:var(--muted)}
+.meta .av{width:22px;height:22px;border-radius:11px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:var(--text)}
+.poster .wine{position:absolute;inset:0}
+.poster .wine::after{content:"";position:absolute;inset:0;background:linear-gradient(to top,rgba(14,11,9,.88) 0%,rgba(14,11,9,.35) 32%,transparent 58%)}
+/* the title block — pulled over the hero */
+.into{position:relative;z-index:3;margin-top:-118px;padding:0 20px 14px;color:#fff}
+.into .line{display:flex;align-items:center;gap:7px;margin-bottom:9px;flex-wrap:wrap}
+.into .h{color:#fff;font-size:30px;line-height:1.02;letter-spacing:-0.6px;font-weight:800;font-family:'Bricolage Grotesque',system-ui,sans-serif;text-shadow:0 1px 2px rgba(0,0,0,.35);text-wrap:balance}
+.into .sub{margin-top:8px;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.3px;color:#F1E7DC;opacity:.9}
+/* pills */
+.pill{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:7px;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#fff;line-height:1.4}
+.pill.slate{background:var(--slate)}
+.pill.gold{background:#F5B942;color:#1F1A10}
+.pill.price{background:var(--tint);color:var(--fireText);font-size:15px;font-weight:700;letter-spacing:.2px;padding:5px 12px;border-radius:9px;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.pill.price.on-photo{margin-left:auto}
+.pill.ghost{background:rgba(20,16,14,.55);border:1px solid rgba(255,255,255,.16);color:var(--ember);backdrop-filter:blur(6px)}
+.pill.sub{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.2);color:#fff;backdrop-filter:blur(6px)}
+/* the glass details panel */
+.panel{position:relative;z-index:3;flex:1;background:var(--nav);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);border-top:1px solid var(--glassbd);border-radius:22px 22px 0 0;padding:16px 18px 24px;display:flex;flex-direction:column;gap:12px;overflow:hidden}
+.phone.t-moon-l .panel,.phone.t-ocean-l .panel{background:rgba(255,255,255,.55)}
+.acts{display:flex;gap:8px}
+.act{flex:1;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;gap:8px;background:var(--glass);border:1px solid var(--glassbd);font-size:13.5px;font-weight:600;color:var(--text);min-width:0}
+.act.t{background:var(--tint);border-color:var(--tint);color:var(--fireText)}
+.act.t .ic{color:var(--fireText)}
+.act .m{font-family:'JetBrains Mono',monospace;font-size:10px;opacity:.85}
+.tags{display:flex;gap:6px;flex-wrap:wrap}
+.tag{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 9px;border-radius:8px;background:var(--surf);border:1px solid var(--surfbd);font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;letter-spacing:.6px;color:var(--muted)}
+.tag.ok{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 35%,transparent)}
+.tag.gold{color:var(--gold);border-color:color-mix(in srgb,var(--gold) 40%,transparent)}
+.desc{font-size:15px;line-height:23px;color:var(--muted)}
+.desc b{color:var(--text);font-weight:600}
+.sec{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);font-weight:600;display:flex;align-items:center;gap:8px;margin-top:2px}
+.sec i{flex:1;height:1px;background:var(--hair)}
+/* facts strip (price in the panel variant) */
+.facts{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:var(--surf);border:1px solid var(--surfbd)}
+.facts .k{font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);font-weight:600}
+.facts .v{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:800;font-size:22px;color:var(--tint);letter-spacing:-0.4px;line-height:1}
+.facts .cell{display:flex;flex-direction:column;gap:3px;min-width:0}
+.facts .cell.r{margin-left:auto;align-items:flex-end}
+.facts .redeem{margin-left:auto;height:38px;padding:0 14px;border-radius:11px;background:var(--tint);color:var(--fireText);display:flex;align-items:center;gap:7px;font-weight:700;font-size:13px}
+/* recipe facts: glassware · garnish */
+.rfacts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.rf{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:13px;background:var(--surf);border:1px solid var(--surfbd);min-width:0}
+.rf .sq{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--tint) 16%,transparent);border:1px solid color-mix(in srgb,var(--tint) 30%,transparent);color:var(--tint);flex:0 0 auto}
+.rf .txt{display:flex;flex-direction:column;gap:2px;min-width:0}
+.rf .k{font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);font-weight:600}
+.rf .v{font-size:13.5px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ing{display:flex;flex-direction:column;gap:6px}
+.ing .r{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;background:var(--surf);border:1px solid var(--surfbd)}
+.ing .amt{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--tint);width:54px;flex:0 0 auto}
+.ing .nm{font-size:14px;font-weight:500;color:var(--text)}
+.proc{padding:12px 13px;border-radius:13px;background:var(--surf);border:1px solid var(--surfbd);font-size:14px;line-height:21px;color:var(--text)}
+.proc ol{padding-left:18px;display:flex;flex-direction:column;gap:4px}
+/* collapsed (scrolled) state: hero pinned, wash over it, panel risen */
+.collapsed .poster{height:46%}
+.collapsed .wash{position:absolute;inset:0;z-index:2;backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);background:rgba(14,11,9,.55)}
+.collapsed .into{margin-top:-300px}
+.collapsed .panel{flex:1}
+.fade{position:absolute;left:0;right:0;bottom:0;height:120px;z-index:9;background:linear-gradient(to top,color-mix(in srgb,var(--sheetbg) 94%,transparent),transparent);pointer-events:none}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-gift" viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M5 12v9h14v-9M12 8c-2-3-5-3-5-1s3 1 5 1zm0 0c2-3 5-3 5-1s-3 1-5 1z"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 19V5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2zm0 0a2 2 0 0 0 2 2h13"/></symbol>
+  <symbol id="i-glass" viewBox="0 0 24 24"><path d="M8 3h8l-1 7a3 3 0 0 1-6 0zM12 13v7M8 21h8"/></symbol>
+  <symbol id="i-leaf" viewBox="0 0 24 24"><path d="M5 20c0-8 5-14 14-15-1 9-7 14-14 15zM5 20c3-5 6-8 10-10"/></symbol>
+  <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M4 20h4l10-10-4-4L4 16zM13 7l4 4"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+</svg>
+
+<h1>The Poster for Menu items &amp; Recipes <span>— B2</span></h1>
+<div class="toolbar">
+  <div class="grp"><span class="gl2">Theme</span>
+    <button class="tb on" data-theme="">Moonstone dark</button><button class="tb" data-theme="t-moon-l">Moonstone light</button><button class="tb" data-theme="t-ocean-d">Ocean dark</button><button class="tb" data-theme="t-ocean-l">Ocean light</button></div>
+</div>
+<p class="hint">One shell for everything: the s81 Poster (GlassHeroSheet, hero ≈46 %, title set INTO the photo, pills only, photo pager, blur wash + title block + glass panel sliding over the pinned hero). <b>P1 / P2</b> are the two ways to carry a menu item's price and Redeem — pick one. <b>R</b> is the recipe poster (Bartender Assistant, Menu 1/2 recipes, Cocktails A–Z, purées). <b>N</b> is the no-photo board most menu items will show. <b>W</b> keeps the wine rule (contain on white). <em>Photos page sideways; the dots + "1 / 3" only appear with extra photos (B3).</em></p>
+
+<div class="row">
+
+<!-- ===== P1 ===== -->
+<div class="col">
+  <div class="concept"><b>P1</b> Menu item · price pill on the photo<span class="ln"></span></div>
+  <div class="phone">
+    <div class="glow"></div><div class="glow2"></div>
+    <div class="sb"><span>9:41</span><span>●●● ▲ ▮</span></div>
+    <div class="under"><div class="eyeb">MyResto Test · Dinner</div><h2>Menu</h2><div class="ucard"></div><div class="ucard"></div><div class="ucard"></div></div>
+    <div class="scrim"></div>
+    <div class="sheet">
+      <div class="grab over"></div>
+      <div class="poster">
+        <div class="car"><div class="track"><div class="slide ph"></div><div class="slide ph p3"></div><div class="slide ph p2"></div></div></div>
+        <div class="dots"><i class="on"></i><i></i><i></i></div><div class="cnt">1 / 3</div>
+        <div class="scr"></div>
+      </div>
+      <div class="into">
+        <div class="line"><span class="pill slate">Sandwiches</span><span class="pill gold">★ Special</span><span class="pill price on-photo">$18</span></div>
+        <div class="h">Lobster Roll, Connecticut style</div>
+      </div>
+      <div class="panel">
+        <div class="acts"><div class="act t"><svg class="ic"><use href="#i-gift"/></svg>Redeem <span class="m">· 40 Bucks</span></div><div class="act"><svg class="ic"><use href="#i-book"/></svg>View Recipe</div></div>
+        <div class="tags"><span class="tag ok">GF</span><span class="tag">LUNCH · DINNER</span></div>
+        <div class="desc">Warm butter-poached lobster on a griddled brioche split-top, <b>sea-salt chips</b>, house pickles. Ask about the cold mayo version.</div>
+        <div class="sec">Pairs with<i></i></div>
+        <div class="desc" style="font-size:13.5px">Albariño · Pilsner · the Dock Spritz</div>
+      </div>
+      <div class="fade"></div>
+      <div class="foot"><div class="closebtn">Close</div></div>
+    </div>
+  </div>
+  <div class="bcap">Pills on the photo: <b>subcategory on slate</b> (the no-badge fixed-dark, never the theme tint — category colours stay underline + card-fade only), the gold ★ Special chip when flagged, and the <b>price as a tint pill at the right</b>. The panel opens with the one row of two 44pt chips (Redeem · View Recipe), then tags, description.</div>
+</div>
+
+<!-- ===== P2 ===== -->
+<div class="col">
+  <div class="concept"><b>P2</b> Menu item · price in the panel<span class="ln"></span></div>
+  <div class="phone">
+    <div class="glow"></div><div class="glow2"></div>
+    <div class="sb"><span>9:41</span><span>●●● ▲ ▮</span></div>
+    <div class="under"><div class="eyeb">MyResto Test · Dinner</div><h2>Menu</h2><div class="ucard"></div><div class="ucard"></div><div class="ucard"></div></div>
+    <div class="scrim"></div>
+    <div class="sheet">
+      <div class="grab over"></div>
+      <div class="poster">
+        <div class="car"><div class="track"><div class="slide ph"></div><div class="slide ph p3"></div><div class="slide ph p2"></div></div></div>
+        <div class="dots"><i class="on"></i><i></i><i></i></div><div class="cnt">1 / 3</div>
+        <div class="scr"></div>
+      </div>
+      <div class="into">
+        <div class="line"><span class="pill slate">Sandwiches</span><span class="pill gold">★ Special</span></div>
+        <div class="h">Lobster Roll, Connecticut style</div>
+      </div>
+      <div class="panel">
+        <div class="facts"><div class="cell"><span class="k">Price</span><span class="v">$18</span></div><div class="cell" style="margin-left:14px"><span class="k">Serves</span><span class="v" style="font-size:14px;color:var(--text);margin-top:3px">Lunch · Dinner</span></div><div class="redeem"><svg class="ic"><use href="#i-gift"/></svg>Redeem</div></div>
+        <div class="acts" style="margin-top:-2px"><div class="act"><svg class="ic"><use href="#i-book"/></svg>View Recipe</div></div>
+        <div class="tags"><span class="tag ok">GF</span></div>
+        <div class="desc">Warm butter-poached lobster on a griddled brioche split-top, <b>sea-salt chips</b>, house pickles. Ask about the cold mayo version.</div>
+      </div>
+      <div class="fade"></div>
+      <div class="foot"><div class="closebtn">Close</div></div>
+    </div>
+  </div>
+  <div class="bcap">Photo keeps ONLY the kind pills (the stricter reading of the Poster rule). The panel's first row is a <b>facts strip</b>: PRICE as 22pt display in tint, the serve-at line, and Redeem as a 38pt button at the right. View Recipe drops to its own chip row only when the item is recipe-fed.</div>
+</div>
+
+<!-- ===== P1 collapsed ===== -->
+<div class="col">
+  <div class="concept"><b>P1 ↑</b> scrolled · title block over the pinned hero<span class="ln"></span></div>
+  <div class="phone collapsed">
+    <div class="glow"></div><div class="glow2"></div>
+    <div class="sb"><span>9:41</span><span>●●● ▲ ▮</span></div>
+    <div class="under"><div class="eyeb">MyResto Test · Dinner</div><h2>Menu</h2><div class="ucard"></div><div class="ucard"></div><div class="ucard"></div></div>
+    <div class="scrim"></div>
+    <div class="sheet">
+      <div class="grab over"></div>
+      <div class="poster">
+        <div class="car"><div class="track"><div class="slide ph"></div></div></div>
+        <div class="wash"></div>
+      </div>
+      <div class="into">
+        <div class="line"><span class="pill slate">Sandwiches</span><span class="pill gold">★ Special</span><span class="pill price on-photo">$18</span></div>
+        <div class="h">Lobster Roll, Connecticut style</div>
+      </div>
+      <div class="panel">
+        <div class="acts"><div class="act t"><svg class="ic"><use href="#i-gift"/></svg>Redeem <span class="m">· 40 Bucks</span></div><div class="act"><svg class="ic"><use href="#i-book"/></svg>View Recipe</div></div>
+        <div class="tags"><span class="tag ok">GF</span><span class="tag">LUNCH · DINNER</span></div>
+        <div class="desc">Warm butter-poached lobster on a griddled brioche split-top, <b>sea-salt chips</b>, house pickles. Ask about the cold mayo version. Comes with a lemon wedge and Old Bay on the side.</div>
+        <div class="sec">Pairs with<i></i></div>
+        <div class="desc" style="font-size:13.5px">Albariño · Pilsner · the Dock Spritz</div>
+        <div class="sec">Allergens<i></i></div>
+        <div class="desc" style="font-size:13.5px">Shellfish · Dairy · Gluten (brioche)</div>
+      </div>
+      <div class="fade"></div>
+      <div class="foot"><div class="closebtn">Close</div></div>
+    </div>
+  </div>
+  <div class="bcap">Long descriptions: the photo stays <b>pinned</b> while the title block + panel slide up over it under the blur wash (by 32 % of the hero). Scroll back = full photo. Pull-down from rest dismisses — this is where the app-wide swipe-to-dismiss (E) lands too.</div>
+</div>
+
+<!-- ===== R ===== -->
+<div class="col">
+  <div class="concept"><b>R</b> Recipe · Bartender Assistant<span class="ln"></span></div>
+  <div class="phone">
+    <div class="glow"></div><div class="glow2"></div>
+    <div class="sb"><span>9:41</span><span>●●● ▲ ▮</span></div>
+    <div class="under"><div class="eyeb">Bartender Assistant · Menu 1</div><h2>Libations</h2><div class="ucard"></div><div class="ucard"></div><div class="ucard"></div></div>
+    <div class="scrim"></div>
+    <div class="sheet">
+      <div class="grab over"></div>
+      <div class="poster">
+        <div class="car"><div class="track"><div class="slide ph cocktail"></div><div class="slide ph p3"></div></div></div>
+        <div class="dots"><i class="on"></i><i></i></div><div class="cnt">1 / 2</div>
+        <div class="scr"></div>
+      </div>
+      <div class="into">
+        <div class="line"><span class="pill slate">Signature Cocktails</span><span class="pill price on-photo">$14</span></div>
+        <div class="h">Dockside Paloma</div>
+      </div>
+      <div class="panel">
+        <div class="rfacts">
+          <div class="rf"><div class="sq"><svg class="ic"><use href="#i-glass"/></svg></div><div class="txt"><span class="k">Glassware</span><span class="v">Highball, salt rim</span></div></div>
+          <div class="rf"><div class="sq"><svg class="ic"><use href="#i-leaf"/></svg></div><div class="txt"><span class="k">Garnish</span><span class="v">Grapefruit wheel</span></div></div>
+        </div>
+        <div class="sec">Ingredients<i></i></div>
+        <div class="ing">
+          <div class="r"><span class="amt">2 oz</span><span class="nm">Blanco tequila</span></div>
+          <div class="r"><span class="amt">¾ oz</span><span class="nm">Fresh lime</span></div>
+          <div class="r"><span class="amt">½ oz</span><span class="nm">Agave syrup</span></div>
+          <div class="r"><span class="amt">Top</span><span class="nm">Grapefruit soda</span></div>
+        </div>
+        <div class="sec">Procedure<i></i></div>
+        <div class="proc"><ol><li>Salt half the rim.</li><li>Shake tequila, lime, agave with ice.</li><li>Strain over fresh ice, top with soda.</li></ol></div>
+      </div>
+      <div class="fade"></div>
+      <div class="foot"><div class="closebtn">Close</div></div>
+    </div>
+  </div>
+  <div class="bcap">Same shell: subcategory pill + price pill into the photo (cocktail thumbs are 1:1, so the hero <b>cover-crops</b> a square — no blurred backdrop needed). Panel = the glassware · garnish pair (the "when row" slot of the content Poster), ingredient rows (amount in tint mono), the procedure box. Managers get an <b>Edit</b> chip row above the facts.</div>
+</div>
+
+<!-- ===== N ===== -->
+<div class="col">
+  <div class="concept"><b>N</b> Menu item · no photo (the hue board)<span class="ln"></span></div>
+  <div class="phone">
+    <div class="glow"></div><div class="glow2"></div>
+    <div class="sb"><span>9:41</span><span>●●● ▲ ▮</span></div>
+    <div class="under"><div class="eyeb">MyResto Test · Lunch</div><h2>Menu</h2><div class="ucard"></div><div class="ucard"></div><div class="ucard"></div></div>
+    <div class="scrim"></div>
+    <div class="sheet">
+      <div class="grab over"></div>
+      <div class="poster" style="height:30%">
+        <div class="board cat"></div>
+        <div class="scr"></div>
+      </div>
+      <div class="into">
+        <div class="line"><span class="pill slate">Salads</span><span class="pill price on-photo">$15</span></div>
+        <div class="h">Chopped Harbor Salad</div>
+      </div>
+      <div class="panel">
+        <div class="acts"><div class="act t"><svg class="ic"><use href="#i-gift"/></svg>Redeem <span class="m">· 30 Bucks</span></div></div>
+        <div class="tags"><span class="tag ok">GF</span><span class="tag ok">V</span><span class="tag">LUNCH</span></div>
+        <div class="desc">Romaine, cucumber, cherry tomato, chickpeas, feta, red onion, oregano vinaigrette. Add chicken +6, shrimp +9.</div>
+      </div>
+      <div class="fade"></div>
+      <div class="foot"><div class="closebtn">Close</div></div>
+    </div>
+  </div>
+  <div class="bcap">Most menu items ship without a photo. The Poster's no-photo state: a <b>30 % board in the item's category colour</b> (your pick — Salads is green here) carrying the same pills + title. No grey slab, no empty hero.</div>
+</div>
+
+<!-- ===== NTF ===== -->
+<div class="col">
+  <div class="concept"><b>NTF</b> Notification · org logo fallback (D1)<span class="ln"></span></div>
+  <div class="phone">
+    <div class="glow"></div><div class="glow2"></div>
+    <div class="sb"><span>9:41</span><span>●●● ▲ ▮</span></div>
+    <div class="under"><div class="eyeb">Robinson Ale House</div><h2>Welcome</h2><div class="ucard"></div><div class="ucard"></div><div class="ucard"></div></div>
+    <div class="scrim"></div>
+    <div class="sheet">
+      <div class="grab over"></div>
+      <div class="poster" style="height:36%">
+        <div class="logoboard"><div class="logo"><b>ROBINSON</b><small>Ale House</small></div></div>
+        <div class="scr"></div>
+      </div>
+      <div class="into">
+        <div class="line"><span class="pill slate">Notification</span></div>
+        <div class="h">Saturday is going to be slammed</div>
+      </div>
+      <div class="panel">
+        <div class="meta"><span class="av">SE</span>Steven Eccles · Today 9:12 AM · Opens Schedule</div>
+        <div class="desc">Regatta weekend plus two private parties. Please check your Saturday shifts and pick up anything open on the board. Family meal is at 3:30 both days.</div>
+        <div class="acts"><div class="act t">Open Schedule</div></div>
+      </div>
+      <div class="fade"></div>
+      <div class="foot"><div class="closebtn">Close</div></div>
+    </div>
+  </div>
+  <div class="bcap">A general push with no photo attached: instead of the grey slab, a <b>36 % board tinted from the theme primary</b> with the org's logo centred (contain, ~46 % wide, the Memory-card-back grammar; monogram when there is no logo). "Notification" pill + title into the board; the panel carries the sender line, the body and the "Opens to" destination as the one action chip. With a photo attached it is the ordinary Poster.</div>
+</div>
+
+<!-- ===== W ===== -->
+<div class="col">
+  <div class="concept"><b>W</b> Wine · contain on white<span class="ln"></span></div>
+  <div class="phone">
+    <div class="glow"></div><div class="glow2"></div>
+    <div class="sb"><span>9:41</span><span>●●● ▲ ▮</span></div>
+    <div class="under"><div class="eyeb">MyResto Test · Wine</div><h2>Menu</h2><div class="ucard"></div><div class="ucard"></div><div class="ucard"></div></div>
+    <div class="scrim"></div>
+    <div class="sheet">
+      <div class="grab over" style="background:rgba(0,0,0,.35)"></div>
+      <div class="poster">
+        <div class="wine"><div class="bottle"></div></div>
+      </div>
+      <div class="into">
+        <div class="line"><span class="pill slate">Red · Rioja</span><span class="pill price on-photo">$14 / $52</span></div>
+        <div class="h">Muga Reserva 2019</div>
+      </div>
+      <div class="panel">
+        <div class="tags"><span class="tag">GLASS $14</span><span class="tag">BOTTLE $52</span></div>
+        <div class="desc">Tempranillo-led blend, 24 months in oak. Dried cherry, tobacco, vanilla. <b>Pairs</b> with the lamb chops and the mushroom flatbread.</div>
+      </div>
+      <div class="fade"></div>
+      <div class="foot"><div class="closebtn">Close</div></div>
+    </div>
+  </div>
+  <div class="bcap">Wine keeps the standing rule: bottle cut-outs render <b>contain on a WHITE ground</b>, never cover-cropped. The scrim is heavier at the foot so the white title still reads; the grab goes dark over white. Glass + bottle prices ride one pill.</div>
+</div>
+
+</div>
+
+<div class="notes">
+  <div class="note"><b>Build shape</b>Extract the Poster shell out of <em>ContentDetailModal</em> into <em>components/PosterSheet.tsx</em> (hero pager + wash + title block + panel + runway + Close, `onPullDown`), then three thin consumers: ContentDetailModal, a rewritten <em>MenuItemDetailSheet</em> (drops its hand-mirrored shell + PanResponder) and ONE new <em>RecipeDetailSheet</em> replacing the five inline sheets (bartender-assistant, libation-recipes, summer-libation-recipes, cocktails-az, puree-syrup-recipes).</div>
+  <div class="note"><b>Multi-photo (B3)</b>The pager is already in the shell. Extras for menu items + recipes mean widening <em>content_images</em>'s CHECK + `replace_content_images` / `get_content_images` to the new types, queuing extras in the item/recipe/2→1/upload delete paths, and reusing <em>CoverPhotoField</em>'s rail in MenuItemEditSheet + the two libation editors. Contained, but its own block.</div>
+  <div class="note"><b>Kept from today</b>Redeem (Bucks), View Recipe deep link, the eyebrow (becomes the subcategory pill), GF/V, lunch/dinner flags, `editAction` for managers ("Open Recipes Editor"), wine contain-on-white, square vs banner thumbs (banner = contain over its own blurred copy, as the content Poster does).</div>
+</div>
+
+<script>
+const phones=[...document.querySelectorAll('.phone')];
+document.querySelectorAll('[data-theme]').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('[data-theme]').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+  phones.forEach(p=>{p.classList.remove('t-moon-l','t-ocean-d','t-ocean-l');if(b.dataset.theme)p.classList.add(b.dataset.theme);});
+}));
+document.querySelectorAll('.poster .track').forEach(tr=>{
+  const dots=tr.closest('.poster').querySelectorAll('.dots i');const cnt=tr.closest('.poster').querySelector('.cnt');
+  tr.addEventListener('scroll',()=>{const i=Math.round(tr.scrollLeft/tr.clientWidth);dots.forEach((d,k)=>d.classList.toggle('on',k===i));if(cnt)cnt.textContent=(i+1)+' / '+dots.length;},{passive:true});
+});
+</script>
+</body>
+</html>

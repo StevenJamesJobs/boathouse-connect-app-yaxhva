@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, TextInput, Pressable, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import GlassSheet, { useSheetHandoff } from '@/components/GlassSheet';
+import { SheetBodyFlatList } from '@/components/sheetBodyScroll';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -118,7 +119,9 @@ export default function GuidePickerSheet({ visible, onClose, actorId, onPick }: 
           <Text style={styles.emptyText}>{t('content_editor.pick_guide_empty')}</Text>
         </View>
       ) : (
-        <FlatList
+        // The sheet's scroller — opted in to the swipe-down (at the top a
+        // downward drag pulls the sheet; scrolled, it scrolls).
+        <SheetBodyFlatList
           data={rows}
           keyExtractor={(r) => r.key}
           style={styles.list}

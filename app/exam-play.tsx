@@ -22,12 +22,13 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
-  SafeAreaView,
   ScrollView,
   BackHandler,
   AppState,
   Alert,
+  useWindowDimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import GlassBlur from '@/components/GlassBlur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -83,6 +84,12 @@ function fmtBucks(n: number): string {
 export default function ExamPlayScreen() {
   const router = useRouter();
   const colors = useThemeColors();
+  // Plain-View root, like picture-this-play — NOT the core SafeAreaView, which
+  // on iOS writes all four safe-area insets into its padding and left a sliver
+  // beside the full-bleed hero (s89 C1). The status-bar / home-indicator
+  // clearance is applied by hand, and the hero takes the window width outright.
+  const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
   const { resolvedMode } = useAppTheme();
   const { t, i18n } = useTranslation();
   const isSpanish = i18n.language === 'es';
@@ -552,9 +559,9 @@ export default function ExamPlayScreen() {
 
   if (phase === 'loading' || !examState) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
         <ActivityIndicator size="large" color={visual.accent} style={{ marginTop: 100 }} />
-      </SafeAreaView>
+      </View>
     );
   }
 
@@ -571,8 +578,11 @@ export default function ExamPlayScreen() {
       urgency === 'red' ? '#EF4444' : urgency === 'amber' ? '#F59E0B' : colors.text;
 
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        <ScrollView contentContainerStyle={styles.introContent} showsVerticalScrollIndicator={false}>
+      <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+        <ScrollView
+          contentContainerStyle={[styles.introContent, { paddingBottom: 24 + insets.bottom }]}
+          showsVerticalScrollIndicator={false}
+        >
           {isPreview && (
             <View style={styles.previewPill}>
               <IconSymbol ios_icon_name="eye" android_material_icon_name="visibility" size={11} color="#F59E0B" />
@@ -651,7 +661,7 @@ export default function ExamPlayScreen() {
             <Text style={[styles.cancelText, { color: colors.textSecondary }]}>{t('exam_play.cancel_link')}</Text>
           </TouchableOpacity>
         </ScrollView>
-      </SafeAreaView>
+      </View>
     );
   }
 
@@ -667,7 +677,12 @@ export default function ExamPlayScreen() {
     const doneRained = !isPreview && results.totalBucksAwarded >= 1;
     const doneConfetti = !doneRained && donePct > 50;
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View
+        style={[
+          styles.container,
+          { backgroundColor: colors.background, paddingTop: insets.top, paddingBottom: insets.bottom },
+        ]}
+      >
         {doneRained && <MoneyRain />}
         {doneConfetti && (
           <GameConfetti visual={{ accent: visual.accent, gradient: visual.gradient }} count={70} />
@@ -704,7 +719,7 @@ export default function ExamPlayScreen() {
             onPress={handleViewResults}
           />
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
@@ -844,7 +859,7 @@ export default function ExamPlayScreen() {
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
       {/* Slim header — deliberately NO back control: a live quiz is locked in. */}
       <View style={styles.playHeader}>
         <View style={styles.playHeaderSpacer} />
@@ -867,11 +882,16 @@ export default function ExamPlayScreen() {
         </View>
       )}
 
-      <ScrollView contentContainerStyle={styles.playContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: 28 + insets.bottom }}
+        showsVerticalScrollIndicator={false}
+      >
         {currentQuestion && (
           <>
-            {/* ── The full-bleed hero (PT geometry) ── */}
-            <View style={[styles.hero, hasPhoto ? styles.heroPhoto : styles.heroBoard]}>
+            {/* ── The full-bleed hero (PT geometry) — sized to the window width
+                outright (aspectRatio still sets the height), so no ancestor
+                inset can leave a sliver at the right edge (s89 C1). ── */}
+            <View style={[styles.hero, { width: windowWidth }, hasPhoto ? styles.heroPhoto : styles.heroBoard]}>
               {hasPhoto ? (
                 <StorageImage
                   source={{ uri: currentQuestion.question_image_url! }}
@@ -979,7 +999,7 @@ export default function ExamPlayScreen() {
           </>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -987,7 +1007,9 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
 
   // ── Intro / threshold ──
-  introContent: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 20, paddingVertical: 24 },
+  // paddingBottom is inline (24 + insets.bottom): the plain-View root no longer
+  // pads the home-indicator edge, so the scroll content clears it itself.
+  introContent: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 20, paddingTop: 24 },
   previewPill: {
     alignSelf: 'center',
     flexDirection: 'row',
@@ -1075,9 +1097,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#F59E0B',
   },
   previewStripText: { fontFamily: fonts.mono.semibold, fontSize: 9.5, letterSpacing: 1, color: '#FFFFFF' },
-  playContent: { paddingBottom: 28 },
+  // (play scroll content pads its bottom inline: 28 + insets.bottom)
 
-  // ── Hero (full-bleed, PT geometry: no side margins, console on top edge) ──
+  // ── Hero (full-bleed, PT geometry: no side margins, console on top edge).
+  //    Its width is set inline to the window width — an explicit size rather
+  //    than a stretch, so nothing above it can narrow it (s89 C1). ──
   hero: { overflow: 'hidden', marginBottom: 14 },
   heroPhoto: { aspectRatio: 0.96, backgroundColor: '#241A14' },
   heroBoard: { aspectRatio: 1.25 },

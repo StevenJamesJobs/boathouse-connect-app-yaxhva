@@ -17,7 +17,7 @@ import { useFocusEffect } from "expo-router/react-navigation";
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { eventFallsOnDate } from '@/utils/dateUtils';
-import { dateKey, entryTotalTips, loadEntries, startOfWeek } from '@/utils/tips/journal';
+import { dateKey, entryTotalTips, isPaycheck, loadEntries, startOfWeek } from '@/utils/tips/journal';
 
 const REVIEWS_SEEN_KEY = '@tools_reviews_seen:v1';
 const EXAM_TYPES = ['server', 'bartender', 'host'] as const;
@@ -105,6 +105,8 @@ export function useToolsPageData(opts: { manager: boolean; includeTips: boolean 
       ).length;
 
       // Tips — this calendar week (the Tracker's own startOfWeek), device-only.
+      // The total is all-in (a paycheck's amount sits in `tips`); the shift
+      // count and "logged tonight?" skip paychecks — a payday is not a shift.
       let weekTotal = 0;
       let weekShifts = 0;
       let hasEntryToday = false;
@@ -113,11 +115,12 @@ export function useToolsPageData(opts: { manager: boolean; includeTips: boolean 
         const weekStartKey = dateKey(startOfWeek(today));
         const todayKey = dateKey(today);
         for (const entry of entries) {
+          const paycheck = isPaycheck(entry);
           if (entry.date >= weekStartKey) {
             weekTotal += entryTotalTips(entry);
-            weekShifts += 1;
+            if (!paycheck) weekShifts += 1;
           }
-          if (entry.date === todayKey) hasEntryToday = true;
+          if (entry.date === todayKey && !paycheck) hasEntryToday = true;
         }
       }
 

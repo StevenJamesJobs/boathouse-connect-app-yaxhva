@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
 import GlassSheet from '@/components/GlassSheet';
+import { SheetBodyScrollView } from '@/components/sheetBodyScroll';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useIsDarkTheme } from '@/components/content/useIsDarkTheme';
@@ -45,7 +46,9 @@ interface StepSheetProps {
  * the Steps for all three"). Title + steps rail + footer are PINNED; only the
  * current pane scrolls. Built on GlassSheet with `scroll={false}` so the rail
  * can sit above a body ScrollView of our own — the shrinkable-viewport /
- * unshrinkable-content pair GlassSheet documents.
+ * unshrinkable-content pair GlassSheet documents. That body is a
+ * SheetBodyScrollView, so the s89 swipe-down still works from the top of the
+ * pane (components/sheetBodyScroll.tsx).
  *
  * Rail taps and Back jump freely; Next advances. The sheet owns no form state.
  */
@@ -160,15 +163,17 @@ export default function StepSheet({
         })}
       </View>
 
-      {/* The pane. Viewport shrinks, content does not (GlassSheet's rule). */}
-      <ScrollView
+      {/* The pane. Viewport shrinks, content does not (GlassSheet's rule).
+          Opted in to the swipe-down: at the top of the pane a downward drag
+          pulls the sheet; scrolled, it scrolls. */}
+      <SheetBodyScrollView
         style={styles.paneScroll}
         contentContainerStyle={styles.paneContent}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
         {children}
-      </ScrollView>
+      </SheetBodyScrollView>
     </GlassSheet>
   );
 }

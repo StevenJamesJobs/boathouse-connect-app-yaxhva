@@ -9,11 +9,14 @@ import {
   Platform,
   KeyboardAvoidingView,
 } from 'react-native';
+import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import Reanimated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import GlassCard from '@/components/GlassCard';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { fonts } from '@/constants/fonts';
+import { SheetHeaderZone, useSheetDismiss } from '@/components/sheetDismiss';
 
 // `Modal.onDismiss` is the exact "the sheet is gone" signal, but RN fires it on
 // iOS ONLY — so the timer is what actually runs the action on Android and merely
@@ -115,6 +118,12 @@ interface GlassSheetProps {
    * uses it to sequence the presentation — see GlassActionSheet.
    */
   onDismiss?: () => void;
+  /**
+   * s89: swipe-down-to-dismiss (see components/sheetDismiss.tsx). On by
+   * default; the escape hatch for a sheet whose body is one big vertical
+   * control. Prefer fencing the control with <SheetNoDragZone> instead.
+   */
+  dragToDismiss?: boolean;
 }
 
 /**
@@ -132,6 +141,12 @@ interface GlassSheetProps {
  * Uses `animationType="slide"` + a separate Pressable scrim, matching the
  * rewards-editor / redeem-settings family (the MultiSelectField family fades
  * instead — two conventions exist; a screen should not mix them).
+ *
+ * s89: the whole sheet swipes down to dismiss (header always; body while its
+ * scroll is at the top). A host that scrolls its own body (`scroll={false}`)
+ * opts that scrollable in with `useSheetBodyScroll()`; vertical controls fence
+ * themselves with `<SheetNoDragZone>`. The Modal animates the open; a drag
+ * dismissal is animated by us, so the Modal closes with animationType 'none'.
  */
 export default function GlassSheet({
   visible,
@@ -146,6 +161,7 @@ export default function GlassSheet({
   footer,
   onDismiss,
   fill = false,
+  dragToDismiss = true,
 }: GlassSheetProps) {
   const colors = useThemeColors();
   // The sheet is anchored to the bottom edge, so its last row lands under the
@@ -156,65 +172,96 @@ export default function GlassSheet({
   const insets = useSafeAreaInsets();
   const bottomPad = Math.max(20, insets.bottom + 12, Platform.OS === 'android' ? 36 : 0);
 
+  const dragDismissingRef = useRef(false);
+  const { gesture, bodyNative, shellStyle, trackBodyScroll, reset, contextValue, SheetDismissProvider } = useSheetDismiss({
+    onClose,
+    dragDismissingRef,
+    enabled: dragToDismiss,
+    bodyTracked: scroll,
+  });
+
   return (
     <Modal
       visible={visible}
-      animationType="slide"
+      animationType={dragDismissingRef.current ? 'none' : 'slide'}
       transparent
       onRequestClose={onClose}
       onDismiss={onDismiss}
+      onShow={reset}
       statusBarTranslucent
     >
       <KeyboardAvoidingView
         style={styles.wrap}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <Pressable style={styles.scrim} onPress={onClose} />
-        <GlassCard
-          variant="glass"
-          androidBaseAlpha={0.98}
-          radius={26}
-          intensity={32}
-          style={[styles.sheet, { paddingBottom: bottomPad }, fill && styles.sheetFill]}
-        >
-          <View style={[styles.grab, { backgroundColor: colors.glassBorder }]} />
-          <View style={[styles.titleRow, !!subtitle && styles.titleRowTight]}>
-            {titleLeading}
-            <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
-              {title}
-            </Text>
-            {headerAction}
-            <Pressable onPress={onClose} style={styles.close}>
-              <IconSymbol
-                ios_icon_name="xmark"
-                android_material_icon_name="close"
-                size={20}
-                color={colors.textSecondary}
-              />
-            </Pressable>
-          </View>
+        {/* A Modal is its own native hierarchy — the pan needs a root of its own. */}
+        <GestureHandlerRootView style={styles.wrap}>
+          <Pressable style={styles.scrim} onPress={onClose} />
+          <SheetDismissProvider value={contextValue}>
+            <GestureDetector gesture={gesture}>
+              {/* The drag translate rides this OUTER shell (GlassCard has no
+                  forwardRef); the shell owns the 88% cap, the card shrinks inside. */}
+              <Reanimated.View style={[styles.shell, fill && styles.shellFill, shellStyle]}>
+                <GlassCard
+                  variant="glass"
+                  androidBaseAlpha={0.98}
+                  radius={26}
+                  intensity={32}
+                  style={[styles.sheet, { paddingBottom: bottomPad }, fill && styles.sheetFill]}
+                >
+                  <SheetHeaderZone>
+                    <View style={[styles.grab, { backgroundColor: colors.glassBorder }]} />
+                    <View style={[styles.titleRow, !!subtitle && styles.titleRowTight]}>
+                      {titleLeading}
+                      <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
+                        {title}
+                      </Text>
+                      {headerAction}
+                      <Pressable onPress={onClose} style={styles.close}>
+                        <IconSymbol
+                          ios_icon_name="xmark"
+                          android_material_icon_name="close"
+                          size={20}
+                          color={colors.textSecondary}
+                        />
+                      </Pressable>
+                    </View>
 
-          {!!subtitle && (
-            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{subtitle}</Text>
-          )}
+                    {!!subtitle && (
+                      <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{subtitle}</Text>
+                    )}
 
-          {pinnedHeader}
+                    {pinnedHeader}
+                  </SheetHeaderZone>
 
-          {scroll ? (
-            <ScrollView
-              style={styles.bodyScroll}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.bodyContent}
-            >
-              {children}
-            </ScrollView>
-          ) : (
-            <View style={[styles.body, fill && styles.bodyFill]}>{children}</View>
-          )}
+                  {scroll ? (
+                    // The body's native scroll runs simultaneously with the
+                    // dismiss pan (see sheetDismiss.tsx) — without the
+                    // detector the scroll view's recognizer wins every touch.
+                    <GestureDetector gesture={bodyNative}>
+                      <ScrollView
+                        style={styles.bodyScroll}
+                        keyboardShouldPersistTaps="handled"
+                        showsVerticalScrollIndicator={false}
+                        contentContainerStyle={styles.bodyContent}
+                        // The dismiss pan takes an at-top pull; no rubber-band to fight it.
+                        bounces={false}
+                        onScroll={trackBodyScroll}
+                        scrollEventThrottle={32}
+                      >
+                        {children}
+                      </ScrollView>
+                    </GestureDetector>
+                  ) : (
+                    <View style={[styles.body, fill && styles.bodyFill]}>{children}</View>
+                  )}
 
-          {footer}
-        </GlassCard>
+                  {footer}
+                </GlassCard>
+              </Reanimated.View>
+            </GestureDetector>
+          </SheetDismissProvider>
+        </GestureHandlerRootView>
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -223,6 +270,13 @@ export default function GlassSheet({
 const styles = StyleSheet.create({
   wrap: { flex: 1, justifyContent: 'flex-end' },
   scrim: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(6,10,18,0.55)' },
+  // The shell owns the cap; it is shrinkable against the KAV wrap's DEFINITE
+  // height (maxHeight alone does not give Yoga a constraint context to shrink
+  // children under) — this is what lets bodyScroll's flexShrink actually bound
+  // the viewport when a sheet's content is taller than the cap, keyboard open
+  // included.
+  shell: { maxHeight: '88%', flexShrink: 1 },
+  shellFill: { height: '88%' },
   sheet: {
     // Top corners only — the sheet is flush to the bottom edge.
     borderBottomLeftRadius: 0,
@@ -232,14 +286,9 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     // Overridden per-render with the safe-area inset; kept as the floor.
     paddingBottom: 20,
-    maxHeight: '88%',
-    // Shrinkable against the KAV wrap's DEFINITE height (maxHeight alone does
-    // not give Yoga a constraint context to shrink children under) — this is
-    // what lets bodyScroll's flexShrink actually bound the viewport when a
-    // sheet's content is taller than the cap, keyboard open included.
     flexShrink: 1,
   },
-  sheetFill: { height: '88%' },
+  sheetFill: { flex: 1 },
   bodyFill: { flex: 1 },
   grab: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 10 },
   titleRow: {
@@ -263,7 +312,7 @@ const styles = StyleSheet.create({
   close: { width: 44, height: 44, alignItems: 'flex-end', justifyContent: 'center' },
   subtitle: { fontFamily: fonts.body.regular, fontSize: 13, lineHeight: 18, marginBottom: 12 },
   // flexShrink:1 on the SCROLLVIEW (RN defaults it to 0): when a sheet's body
-  // is taller than GlassCard's `maxHeight: '88%'`, the unshrinkable ScrollView
+  // is taller than the shell's `maxHeight: '88%'`, the unshrinkable ScrollView
   // used to take its full content height and get CLIPPED by the card's
   // overflow:'hidden' — contentSize equalled the view's height, so there was
   // nothing to scroll, just the iOS rubber-band (the s69 Add/Edit form was the
@@ -279,7 +328,7 @@ const styles = StyleSheet.create({
   // to the content.
   bodyContent: { gap: 9, paddingBottom: 4 },
   // flexShrink:1 (RN defaults it to 0) so the non-scroll body can give height
-  // back under GlassCard's `maxHeight: '88%'`. Without it the negative free
+  // back under the shell's `maxHeight: '88%'`. Without it the negative free
   // space stops here and never reaches a child that CAN shrink — a nested drag
   // list would simply be clipped, since GlassCard is overflow:'hidden'.
   body: { gap: 9, paddingBottom: 4, flexShrink: 1 },

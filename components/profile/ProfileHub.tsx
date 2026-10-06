@@ -446,6 +446,10 @@ export default function ProfileHub() {
           priority={selectedItem.priority}
           link={selectedItem.link}
           guideFile={selectedItem.guideFile}
+          kind={selectedItem.kind}
+          orgLogoUrl={organization?.logo_url}
+          meta={selectedItem.meta}
+          action={selectedItem.action}
           colors={{ text: colors.text, textSecondary: colors.textSecondary, card: colors.card, primary: colors.primary, fireText: colors.fireText }}
         />
       )}

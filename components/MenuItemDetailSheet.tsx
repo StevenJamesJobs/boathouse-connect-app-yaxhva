@@ -1,33 +1,16 @@
-import React, { useRef } from 'react';
-import {
-  View,
-  Text,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Animated,
-  PanResponder,
-  Dimensions,
-  Platform,
-} from 'react-native';
+import React, { useMemo } from 'react';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
-import GlassCard from '@/components/GlassCard';
+import PosterSheet, { PosterPill, POSTER_SLATE } from '@/components/PosterSheet';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useSheetHandoff } from '@/components/GlassSheet';
 import FormattedText from '@/components/FormattedText';
-import { StorageExpoImage } from '@/components/StorageImage';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getLocalizedField } from '@/utils/translateContent';
 import { fonts } from '@/constants/fonts';
 import type { DietKey } from '@/components/MenuFilterSheet';
 
 export type { DietKey } from '@/components/MenuFilterSheet';
-
-const SCREEN_HEIGHT = Dimensions.get('window').height;
-const DISMISS_THRESHOLD = 120;
 
 /**
  * The structured shape MenuDisplay hands this sheet — the retirement of
@@ -54,6 +37,8 @@ export interface MenuItemForDetail {
   unique_selling_points?: string | null;
   unique_selling_points_es?: string | null;
   is_active: boolean;
+  /** On the weekly-specials list → the gold ★ pill on the photo. */
+  is_weekly_special?: boolean;
   dietary: Record<DietKey, boolean>;
 }
 
@@ -62,7 +47,11 @@ export interface MenuItemDetailSheetProps {
   onClose: () => void;
   colors: any;
   item: MenuItemForDetail | null;
-  /** Which menu the item lives on — '' on a single-menu org (dropped from the eyebrow). */
+  /**
+   * Which menu the item lives on — '' on a single-menu org. Carried in the
+   * lane contract; the Poster has no eyebrow (the subcategory lives in the
+   * pill), so this sheet does not render it.
+   */
   menuLabel: string;
   categoryLabel: string;
   subcategoryLabel?: string | null;
@@ -74,23 +63,28 @@ export interface MenuItemDetailSheetProps {
    * reads only isWine today.
    */
   isLibations: boolean;
-  /** null hides the button — MenuDisplay owns the whole gating chain. */
+  /** null hides the chip — MenuDisplay owns the whole gating chain. */
   redeem: { label: string; onPress: () => void } | null;
   /**
-   * Optional second footer button (label passed in pre-translated — this sheet
-   * stays i18n-agnostic about it). Used by the menu EDITOR's recipe-fed
+   * Optional editor-side action chip (label passed in pre-translated — this
+   * sheet stays i18n-agnostic about it). Used by the menu EDITOR's recipe-fed
    * libations cards: view the item here, jump to its Recipes Editor from the
-   * button. The press navigates, so it runs through the sheet's dismissal
+   * chip. The press navigates, so it runs through the sheet's dismissal
    * handoff — never in the same commit as the close.
    */
   editAction?: { label: string; onPress: () => void } | null;
   /**
    * s87: "View Recipe" for recipe-fed libations, shown to viewers who may open
-   * the Bartender Assistant (MenuDisplay gates it). Rides the price row: on a
-   * photo it sits top-left over the scrim (literal white — the ember rule), on
-   * the plain sheet it sits left of the price chip. Navigates → deferred.
+   * the Bartender Assistant (MenuDisplay gates it). A glass chip in the
+   * panel's action row. Navigates → deferred.
    */
   recipe?: { label: string; onPress: () => void } | null;
+  /**
+   * The item's category colour — the no-photo board's hue (mockup N: "a 30%
+   * board in the item's category colour", never a grey slab). Null/omitted →
+   * PosterSheet's default slate.
+   */
+  categoryColor?: string | null;
 }
 
 // Same normalization as MenuDisplay's card price.
@@ -113,85 +107,62 @@ const DIET_CHIPS: { key: DietKey; abbrevKey: string; labelKey: string }[] = [
   { key: 'nos', abbrevKey: 'dietary.nos_abbrev', labelKey: 'dietary.nos' },
 ];
 
+// ─── Photo-ink literals ──────────────────────────────────────────────────────
+// The pills sit INTO the photo (or the hue board) over the Poster's fixed-dark
+// scrim, never on a themed surface — the rulebook's ember rule — so they take
+// literals, not theme tokens.
+//
+// The ★ Special pill is the menu kit's gold (MenuItemCards' SPECIAL_GOLD,
+// which is module-private there) in its on-photo form: the kit's own banner
+// pill takes the dark-theme gold as a literal for exactly this reason, and
+// the locked mockup (.pill.gold) draws it fixed #F5B942 with dark ink.
+const SPECIAL_GOLD_ON_PHOTO = '#F5B942';
+const SPECIAL_INK = '#1F1A10';
+// Dark ink on the warm tint price pill — it must not follow the theme's
+// fireText (white in the light themes).
+const PRICE_INK = '#14171E';
+
 /**
- * The menu item detail sheet — the approved mockup's hero treatment on the
- * GlassSheet shell language.
+ * The menu item detail sheet — the s89 "Poster for menu items" (mockup
+ * design-mockups/poster-menu-recipes.html, frame P1, Steve's pick), composed
+ * from the shared <PosterSheet>.
  *
- * ⚠️ Deliberately NOT composed from <GlassSheet>: GlassSheet unconditionally
- * renders its grab handle + title row ABOVE the body, and the whole point here
- * is the hero photo flush to the sheet's top edge (the body escapes the shell
- * padding with margins matching GlassSheet's exact 10/18 padding). So, like
- * ContentDetailModal, this mirrors the shell byte-for-byte — same scrim,
- * GlassCard variant="glass" radius 26 intensity 32, same paddings, the same
- * Android bottomPad floor and 88% height cap — and adds the drag-to-dismiss
- * PanResponder riding the grab handle.
+ * The photo takes ~46% of the window with the pills SET INTO IT over the
+ * scrim — the subcategory (else category) pill on slate, the gold ★ Special
+ * pill when the item is a weekly special, and the bigger tint price pill at
+ * the right — then the 30pt white title. No photo → PosterSheet draws a
+ * board in the item's category colour. Wine keeps the standing rule: bottle
+ * cut-outs CONTAIN on a white ground, never cover-cropped (`containOnWhite`);
+ * banner thumbs contain over their own blurred copy, square ones cover-crop.
+ *
+ * The panel opens with ONE row of 44pt action chips — Redeem (filled
+ * primary, gift), View Recipe (glass, wineglass), the editor's Open Recipes
+ * Editor (glass, pencil) — then the diet chips, the description, and the
+ * wine extras (location, the 3-up pricing cells, tasting notes, selling
+ * points), with the allergen note last.
+ *
+ * PosterSheet / GlassHeroSheet own the sheet, the grab handle, the scrim, the
+ * pinned-photo collapse and the swipe-to-dismiss. Navigation chips (recipe,
+ * editAction) run through useSheetHandoff's `defer` — PosterSheet exposes no
+ * Modal onDismiss, so the hook's timer fallback fires the deferred action
+ * after the dismissal, never in the same commit as the close.
  */
 export default function MenuItemDetailSheet({
   visible,
   onClose,
   colors,
   item,
-  menuLabel,
   categoryLabel,
   subcategoryLabel,
   isWine,
   redeem,
   editAction,
   recipe,
+  categoryColor,
 }: MenuItemDetailSheetProps) {
   const { t } = useTranslation();
   const { language } = useLanguage();
-  // editAction navigates after the sheet closes — a presentation/navigation in
-  // the same commit as a Modal dismissal is the freeze class this codebase
-  // keeps re-finding (defer + Modal onDismiss BOTH, per the GlassSheet rules).
-  const { defer, onDismiss } = useSheetHandoff(onClose);
-  // The sheet is anchored to the bottom edge, so its last row lands under the
-  // Android nav dock / iOS home indicator without this. Same expression as
-  // GlassSheet, including the Android floor — a Modal does not always report
-  // the nav-bar inset.
-  const insets = useSafeAreaInsets();
-  const bottomPad = Math.max(20, insets.bottom + 12, Platform.OS === 'android' ? 36 : 0);
-
-  // ─── Pull-down-to-dismiss (the ContentDetailModal recipe, unchanged) ──────
-  const translateY = useRef(new Animated.Value(0)).current;
-  const dragDismissing = useRef(false);
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        // Only capture downward vertical gestures from the handle area
-        return gestureState.dy > 4 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx);
-      },
-      onPanResponderMove: (_, gestureState) => {
-        // Only allow downward movement
-        if (gestureState.dy > 0) {
-          translateY.setValue(gestureState.dy);
-        }
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dy > DISMISS_THRESHOLD) {
-          dragDismissing.current = true;
-          // Animate off screen then close — don't reset translateY until modal reopens
-          Animated.timing(translateY, {
-            toValue: SCREEN_HEIGHT,
-            duration: 250,
-            useNativeDriver: true,
-          }).start(() => {
-            onClose();
-          });
-        } else {
-          // Snap back
-          Animated.spring(translateY, {
-            toValue: 0,
-            useNativeDriver: true,
-            tension: 80,
-            friction: 10,
-          }).start();
-        }
-      },
-    })
-  ).current;
+  const { defer } = useSheetHandoff(onClose);
 
   // ─── Derived content (all guarded — `item` is null while nothing is open) ─
   const name = item ? getLocalizedField(item, 'name', language) : '';
@@ -200,17 +171,33 @@ export default function MenuItemDetailSheet({
   const flavor = item ? getLocalizedField(item, 'flavor_profile', language).trim() : '';
   const usp = item ? getLocalizedField(item, 'unique_selling_points', language).trim() : '';
 
-  const heroUrl = item?.thumbnail_url || null;
-  // Menu · Category · Subcategory — this line replaces the old blob's
-  // Availability/Category/Subcategory tail. Empty parts (single-menu org,
-  // no subcategory) drop out.
-  const eyebrow = [menuLabel, categoryLabel, subcategoryLabel]
-    .filter((p): p is string => !!p && !!p.trim())
-    .join(' · ');
-  const priceText = item && item.price.trim() ? formatPrice(item.price.trim()) : null;
-  // The Redeem button carries the price; the tint chip appears only without it.
-  const showPriceChip = !redeem && !!priceText;
+  const images = useMemo<string[]>(() => (item?.thumbnail_url ? [item.thumbnail_url] : []), [item?.thumbnail_url]);
 
+  // ─── The pill row set into the photo ──────────────────────────────────────
+  // Subcategory when the item has one, else its category.
+  const kindLabel = subcategoryLabel?.trim() || categoryLabel.trim();
+  const isSpecial = !!item?.is_weekly_special;
+  // Wine leads with the by-the-glass price (the pricing cells carry the rest).
+  const rawPrice = item ? (isWine ? item.glass_price?.trim() || item.price.trim() : item.price.trim()) : '';
+  const priceText = rawPrice ? formatPrice(rawPrice) : null;
+  const hasPills = !!kindLabel || isSpecial || !!priceText;
+
+  const pills = hasPills ? (
+    <>
+      {!!kindLabel && <PosterPill label={kindLabel} color={POSTER_SLATE} />}
+      {isSpecial && (
+        <PosterPill label={`★ ${t('menu_display.special')}`} color={SPECIAL_GOLD_ON_PHOTO} textColor={SPECIAL_INK} />
+      )}
+      {!!priceText && (
+        // Pushed to the row's right edge (the mockup's .pill.price.on-photo).
+        <View style={styles.pricePillSlot}>
+          <PosterPill label={priceText} tone="price" color={colors.tint} textColor={PRICE_INK} />
+        </View>
+      )}
+    </>
+  ) : undefined;
+
+  // ─── Panel sections ───────────────────────────────────────────────────────
   const dietChips = item ? DIET_CHIPS.filter((d) => item.dietary[d.key]) : [];
 
   type PriceRow = { key: string; labelKey: string; value: string; member?: boolean };
@@ -229,420 +216,188 @@ export default function MenuItemDetailSheet({
       });
   }
 
-  const redeemButton = redeem ? (
-    <Pressable
-      onPress={redeem.onPress}
-      style={[styles.redeemBtn, { backgroundColor: colors.primary }]}
-    >
-      <Text style={[styles.redeemLabel, { color: colors.fireText }]}>{redeem.label}</Text>
-    </Pressable>
-  ) : null;
-
-  const priceChip = showPriceChip ? (
-    <View style={[styles.priceChip, { backgroundColor: colors.tint }]}>
-      {/* Dark ink literal from the mockup: the chip sits on the warm tint over a
-          photo, so it must not follow the theme's fireText (white in light mode). */}
-      <Text style={styles.priceChipText}>{priceText}</Text>
-    </View>
-  ) : null;
-
-  const recipeChip = (onPhoto: boolean) =>
-    recipe ? (
-      <Pressable
-        onPress={() => defer(recipe.onPress)}
-        hitSlop={6}
-        style={[
-          styles.recipeChip,
-          onPhoto
-            ? { backgroundColor: 'rgba(255,255,255,0.16)', borderColor: 'rgba(255,255,255,0.32)' }
-            : { backgroundColor: colors.glass, borderColor: colors.glassBorder },
-        ]}
-      >
-        <IconSymbol ios_icon_name="wineglass.fill" android_material_icon_name="local-bar" size={13} color={onPhoto ? '#FFFFFF' : colors.tint} />
-        <Text style={[styles.recipeChipText, { color: onPhoto ? '#FFFFFF' : colors.text }]} numberOfLines={1}>{recipe.label}</Text>
-      </Pressable>
-    ) : null;
-
-  // Title, description and the structured sections — shared by the hero and
-  // no-hero layouts.
-  const body = (
-    <>
-      <Text style={[styles.title, { color: colors.text }]}>{name}</Text>
-      {isWine && !!location && (
-        <Text style={[styles.location, { color: colors.textSecondary }]} numberOfLines={1}>
-          📍 {location}
-        </Text>
-      )}
-      {!!description && (
-        // ⚠️ No fontFamily here, same as ContentDetailModal: FormattedText
-        // renders authored <b>/<i> via fontWeight/fontStyle on nested Text, and
-        // constants/fonts.ts warns fontWeight is unreliable with custom
-        // families — pinning Inter would flatten authors' bold runs.
-        <FormattedText style={[styles.desc, { color: colors.textSecondary }]}>
-          {description}
-        </FormattedText>
-      )}
-
-      {dietChips.length > 0 && (
-        <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
-            {t('menu_detail.dietary')}
-          </Text>
-          <View style={styles.chipsWrap}>
-            {dietChips.map((d) => (
-              <View
-                key={d.key}
-                style={[
-                  styles.dietChip,
-                  // 16% fill / 34% border of the badge blue (the mockup's
-                  // color-mix values); colors.blue is a 6-digit hex in all four
-                  // palettes, so the alpha-suffix idiom applies.
-                  { backgroundColor: colors.blue + '29', borderColor: colors.blue + '57' },
-                ]}
-              >
-                <Text style={[styles.dietAbbrev, { color: colors.blueText }]}>{t(d.abbrevKey)}</Text>
-                <Text style={[styles.dietLabel, { color: colors.blueText }]}>{t(d.labelKey)}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-      )}
-
-      {priceRows.length > 0 && (
-        <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
-            {t('menu_detail.pricing')}
-          </Text>
-          {/* Compact 3-up cells, not full-width stacked rows — the stacked
-              version spanned the whole sheet and ate vertical space (Steve's
-              smoke call). Label above value, side by side. */}
-          <View style={styles.priceCells}>
-            {priceRows.map((row) => (
-              <View
-                key={row.key}
-                style={[
-                  styles.priceCell,
-                  { backgroundColor: colors.surface, borderColor: colors.surfaceBorder },
-                ]}
-              >
-                <Text
-                  style={[styles.priceCellLabel, { color: colors.textSecondary }]}
-                  numberOfLines={1}
-                >
-                  {t(row.labelKey)}
-                </Text>
-                {/* blueText (not blue) for the member price — blue is the badge
-                    BACKGROUND token and goes near-invisible as text in dark. */}
-                <Text
-                  style={[styles.priceCellValue, { color: row.member ? colors.blueText : colors.primary }]}
-                  numberOfLines={1}
-                >
-                  {formatPrice(row.value.trim())}
-                </Text>
-              </View>
-            ))}
-          </View>
-        </View>
-      )}
-
-      {!!flavor && (
-        <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
-            {t('menu_detail.tasting_notes')}
-          </Text>
-          <FormattedText style={[styles.sectionBody, { color: colors.textSecondary }]}>
-            {flavor}
-          </FormattedText>
-        </View>
-      )}
-
-      {!!usp && (
-        <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
-            {t('menu_detail.selling_points')}
-          </Text>
-          <FormattedText style={[styles.sectionBody, { color: colors.textSecondary }]}>
-            {usp}
-          </FormattedText>
-        </View>
-      )}
-    </>
-  );
+  const hasActions = !!redeem || !!recipe || !!editAction;
 
   return (
-    <Modal
+    <PosterSheet
       visible={visible}
-      animationType={dragDismissing.current ? 'none' : 'slide'}
-      transparent
-      onRequestClose={onClose}
-      onDismiss={onDismiss}
-      statusBarTranslucent
-      onShow={() => {
-        translateY.setValue(0);
-        dragDismissing.current = false;
-      }}
+      onClose={onClose}
+      images={images}
+      imageShape={item?.thumbnail_shape ?? null}
+      containOnWhite={isWine}
+      boardColor={categoryColor}
+      pills={pills}
+      title={name}
     >
-      <View style={styles.wrap}>
-        <Pressable style={styles.scrim} onPress={onClose} />
-        {/* The drag translate stays on this OUTER view — GlassCard is a plain
-            function component (no forwardRef), so it cannot be wrapped by
-            Animated.createAnimatedComponent. The shell owns the 88% cap; the
-            card shrinks inside it. */}
-        <Animated.View style={[styles.shell, { transform: [{ translateY }] }]}>
-          <GlassCard
-            variant="glass"
-            radius={26}
-            intensity={32}
-            style={[styles.sheet, { paddingBottom: bottomPad }]}
-          >
-            {item && (
-              <>
-                {!heroUrl && (
-                  // No photo → the grab handle keeps its normal GlassSheet
-                  // position above the body. The pan handlers ride it.
-                  <View {...panResponder.panHandlers} style={styles.dragArea}>
-                    <View style={[styles.grab, { backgroundColor: colors.glassBorder }]} />
-                  </View>
-                )}
-
-                <ScrollView
-                  // The body escapes the shell's padding (10 top / 18 horizontal —
-                  // GlassSheet's exact values) so the hero can sit flush to the
-                  // sheet's top edge, then the content container pads the normal
-                  // sections back in. A negative top margin ON the hero itself
-                  // would land above scroll offset 0 and be clipped.
-                  style={[styles.scroll, !!heroUrl && styles.scrollWithHero]}
-                  contentContainerStyle={styles.scrollContent}
-                  showsVerticalScrollIndicator={false}
-                >
-                  {!!heroUrl && (
-                    <View style={[styles.hero, { backgroundColor: isWine ? '#FFFFFF' : colors.thumbPlaceholder }]}>
-                      {/* Wine bottles are portrait cut-outs — contain on a WHITE
-                          ground (Steve's smoke call: labels/bottles are shot on
-                          white, so the contained image reads as one continuous
-                          edge-to-edge photo). NEVER cover-crop them. */}
-                      <StorageExpoImage
-                        source={heroUrl}
-                        style={styles.heroImage}
-                        contentFit={isWine ? 'contain' : 'cover'}
-                      />
-                      {/* Bottom scrim so the eyebrow/redeem stay legible on any
-                          photo — fixed warm-dark literals from the mockup, not
-                          theme tokens (the photo is the background). */}
-                      <LinearGradient
-                        colors={['rgba(14,11,9,0)', 'rgba(14,11,9,0.92)']}
-                        locations={[0.42, 0.94]}
-                        style={StyleSheet.absoluteFill}
-                        pointerEvents="none"
-                      />
-                      {!!eyebrow && (
-                        <Text
-                          style={[
-                            styles.heroEyebrow,
-                            // Photo-anchored literal (the mockup's dark-theme
-                            // ember): the scrim under it is fixed dark, and
-                            // colors.ember goes DARK in the light themes.
-                            { color: '#FFB07A' },
-                            // Redeem shares the bottom edge — cap the eyebrow so
-                            // they sit side by side; otherwise let it run wide.
-                            redeem ? styles.heroEyebrowCapped : styles.heroEyebrowWide,
-                          ]}
-                          numberOfLines={1}
-                        >
-                          {eyebrow}
-                        </Text>
-                      )}
-                      {priceChip && <View style={styles.heroPriceSlot}>{priceChip}</View>}
-                      {recipe && <View style={styles.heroRecipeSlot}>{recipeChip(true)}</View>}
-                      {redeemButton && <View style={styles.heroRedeemSlot}>{redeemButton}</View>}
-                    </View>
-                  )}
-
-                  {!heroUrl && (!!eyebrow || !!priceChip || !!redeemButton || !!recipe) && (
-                    // Without a hero the overlays still need a home: the same
-                    // eyebrow + price-chip-or-Redeem, folded into one row.
-                    <View style={styles.metaRow}>
-                      {!!eyebrow && (
-                        <Text
-                          style={[styles.metaEyebrow, { color: colors.ember }]}
-                          numberOfLines={1}
-                        >
-                          {eyebrow}
-                        </Text>
-                      )}
-                      {recipeChip(false)}
-                      {redeemButton ?? priceChip}
-                    </View>
-                  )}
-
-                  {body}
-                </ScrollView>
-
-                {!!heroUrl && (
-                  // The grab handle floats OVER the photo — pinned at the sheet
-                  // (not scroll) level so drag-to-dismiss stays reachable after
-                  // the body scrolls. At rest it sits exactly where the mockup
-                  // draws it: 10pt down, centered.
-                  <View {...panResponder.panHandlers} style={styles.dragStrip}>
-                    <View style={styles.grabOver} />
-                  </View>
-                )}
-
-                <View>
-                  <Text style={[styles.allergenNote, { color: colors.textSecondary }]}>
-                    {t('menu_detail.allergen_note')}
-                  </Text>
-                  <View style={styles.footerRow}>
-                    <Pressable
-                      style={[
-                        styles.closeBtn,
-                        { backgroundColor: colors.glass, borderColor: colors.glassBorder },
-                      ]}
-                      onPress={onClose}
-                    >
-                      <Text style={[styles.closeLabel, { color: colors.textSecondary }]}>
-                        {t('common.close')}
-                      </Text>
-                    </Pressable>
-                    {!!editAction && (
-                      <Pressable
-                        style={[
-                          styles.closeBtn,
-                          { backgroundColor: colors.primary, borderColor: colors.primary },
-                        ]}
-                        onPress={() => defer(editAction.onPress)}
-                      >
-                        <Text style={[styles.closeLabel, { color: colors.fireText }]} numberOfLines={1}>
-                          {editAction.label}
-                        </Text>
-                      </Pressable>
-                    )}
-                  </View>
-                </View>
-              </>
+      {/* One column, one rhythm: the stack's gap spaces every block, so
+          whichever block comes first sits flush under the panel's padding. */}
+      <View style={styles.stack}>
+        {hasActions && (
+          <View style={styles.actsRow}>
+            {!!redeem && (
+              <Pressable
+                onPress={redeem.onPress}
+                style={[styles.act, { backgroundColor: colors.primary, borderColor: colors.primary }]}
+              >
+                <IconSymbol ios_icon_name="gift.fill" android_material_icon_name="card-giftcard" size={16} color={colors.fireText} />
+                <Text style={[styles.actLabel, { color: colors.fireText }]} numberOfLines={1}>{redeem.label}</Text>
+              </Pressable>
             )}
-          </GlassCard>
-        </Animated.View>
+            {!!recipe && (
+              <Pressable
+                onPress={() => defer(recipe.onPress)}
+                style={[styles.act, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
+              >
+                <IconSymbol ios_icon_name="wineglass.fill" android_material_icon_name="local-bar" size={15} color={colors.tint} />
+                <Text style={[styles.actLabel, { color: colors.text }]} numberOfLines={1}>{recipe.label}</Text>
+              </Pressable>
+            )}
+            {!!editAction && (
+              <Pressable
+                onPress={() => defer(editAction.onPress)}
+                style={[styles.act, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
+              >
+                <IconSymbol ios_icon_name="pencil" android_material_icon_name="edit" size={15} color={colors.tint} />
+                <Text style={[styles.actLabel, { color: colors.text }]} numberOfLines={1}>{editAction.label}</Text>
+              </Pressable>
+            )}
+          </View>
+        )}
+
+        {dietChips.length > 0 && (
+          <View>
+            <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
+              {t('menu_detail.dietary')}
+            </Text>
+            <View style={styles.chipsWrap}>
+              {dietChips.map((d) => (
+                <View
+                  key={d.key}
+                  style={[
+                    styles.dietChip,
+                    // 16% fill / 34% border of the badge blue (the mockup's
+                    // color-mix values); colors.blue is a 6-digit hex in all four
+                    // palettes, so the alpha-suffix idiom applies.
+                    { backgroundColor: colors.blue + '29', borderColor: colors.blue + '57' },
+                  ]}
+                >
+                  <Text style={[styles.dietAbbrev, { color: colors.blueText }]}>{t(d.abbrevKey)}</Text>
+                  <Text style={[styles.dietLabel, { color: colors.blueText }]}>{t(d.labelKey)}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {!!description && (
+          // ⚠️ No fontFamily here, same as ContentDetailModal: FormattedText
+          // renders authored <b>/<i> via fontWeight/fontStyle on nested Text, and
+          // constants/fonts.ts warns fontWeight is unreliable with custom
+          // families — pinning Inter would flatten authors' bold runs.
+          <FormattedText style={[styles.desc, { color: colors.textSecondary }]}>
+            {description}
+          </FormattedText>
+        )}
+
+        {isWine && !!location && (
+          <Text style={[styles.location, { color: colors.textSecondary }]} numberOfLines={1}>
+            📍 {location}
+          </Text>
+        )}
+
+        {priceRows.length > 0 && (
+          <View>
+            <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
+              {t('menu_detail.pricing')}
+            </Text>
+            {/* Compact 3-up cells, not full-width stacked rows — the stacked
+                version spanned the whole sheet and ate vertical space (Steve's
+                smoke call). Label above value, side by side. */}
+            <View style={styles.priceCells}>
+              {priceRows.map((row) => (
+                <View
+                  key={row.key}
+                  style={[
+                    styles.priceCell,
+                    { backgroundColor: colors.surface, borderColor: colors.surfaceBorder },
+                  ]}
+                >
+                  <Text
+                    style={[styles.priceCellLabel, { color: colors.textSecondary }]}
+                    numberOfLines={1}
+                  >
+                    {t(row.labelKey)}
+                  </Text>
+                  {/* blueText (not blue) for the member price — blue is the badge
+                      BACKGROUND token and goes near-invisible as text in dark. */}
+                  <Text
+                    style={[styles.priceCellValue, { color: row.member ? colors.blueText : colors.primary }]}
+                    numberOfLines={1}
+                  >
+                    {formatPrice(row.value.trim())}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {!!flavor && (
+          <View>
+            <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
+              {t('menu_detail.tasting_notes')}
+            </Text>
+            <FormattedText style={[styles.sectionBody, { color: colors.textSecondary }]}>
+              {flavor}
+            </FormattedText>
+          </View>
+        )}
+
+        {!!usp && (
+          <View>
+            <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
+              {t('menu_detail.selling_points')}
+            </Text>
+            <FormattedText style={[styles.sectionBody, { color: colors.textSecondary }]}>
+              {usp}
+            </FormattedText>
+          </View>
+        )}
+
+        <Text style={[styles.allergenNote, { color: colors.textSecondary }]}>
+          {t('menu_detail.allergen_note')}
+        </Text>
       </View>
-    </Modal>
+    </PosterSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { flex: 1, justifyContent: 'flex-end' },
-  scrim: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(6,10,18,0.55)' },
-  // Layout box + the animated transform only; all fill/blur/border/radius live
-  // on the GlassCard inside. maxHeight here (against the full-height wrap) so
-  // the card's flexShrink has a real bound to shrink against.
-  shell: { maxHeight: '88%' },
-  sheet: {
-    // Top corners only — the sheet is flush to the bottom edge.
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-    borderBottomWidth: 0,
-    paddingHorizontal: 18,
-    paddingTop: 10,
-    // Overridden per-render with the safe-area inset; kept as the floor.
-    paddingBottom: 20,
-    flexShrink: 1,
-  },
-  // No-hero grab handle — GlassSheet's grab, with the drag target's padding.
-  dragArea: { alignItems: 'center', paddingBottom: 10 },
-  grab: { width: 40, height: 4, borderRadius: 2 },
-  // Hero-mode handle: white-on-photo literal from the mockup (theme-blind on
-  // purpose — it always sits on an image), with a soft shadow for dark photos.
-  dragStrip: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 34,
-    alignItems: 'center',
-    zIndex: 4,
-  },
-  grabOver: {
-    marginTop: 10,
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.55)',
-    boxShadow: '0px 1px 3px rgba(0,0,0,0.35)',
-  },
-  scroll: {
-    // Escape the sheet's 18pt side padding; scrollContent restores it. This is
-    // what lets the hero (with its own -18 margins) bleed to the card's edges.
-    marginHorizontal: -18,
-    flexGrow: 0,
-    flexShrink: 1,
-  },
-  // Hero mode also cancels the sheet's 10pt top padding so the photo is flush
-  // to the top edge.
-  scrollWithHero: { marginTop: -10 },
-  scrollContent: { paddingHorizontal: 18, paddingBottom: 4 },
-  hero: {
-    marginHorizontal: -18,
-    height: 196,
-    borderTopLeftRadius: 26,
-    borderTopRightRadius: 26,
-    overflow: 'hidden',
-    flexShrink: 0,
-  },
-  heroImage: { ...StyleSheet.absoluteFill },
-  heroEyebrow: {
-    position: 'absolute',
-    left: 14,
-    bottom: 16,
-    zIndex: 2,
-    fontFamily: fonts.mono.semibold,
-    fontSize: 9,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
-  heroEyebrowCapped: { maxWidth: '52%' },
-  heroEyebrowWide: { right: 14 },
-  heroPriceSlot: { position: 'absolute', top: 12, right: 14, zIndex: 2 },
-  heroRecipeSlot: { position: 'absolute', top: 12, left: 14, zIndex: 2 },
-  recipeChip: { flexDirection: 'row', alignItems: 'center', gap: 5, height: 28, paddingHorizontal: 10, borderRadius: 9, borderWidth: 1 },
-  recipeChipText: { fontFamily: fonts.display.semibold, fontSize: 12 },
-  heroRedeemSlot: { position: 'absolute', right: 14, bottom: 12, zIndex: 3 },
-  priceChip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  // Mockup literal: dark ink on the warm tint chip, independent of theme.
-  priceChipText: { fontFamily: fonts.mono.semibold, fontSize: 14, color: '#14171E' },
-  redeemBtn: {
-    height: 38,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    boxShadow: '0px 4px 14px rgba(0,0,0,0.4)',
-  },
-  redeemLabel: { fontFamily: fonts.display.semibold, fontSize: 13.5 },
-  metaRow: {
+  // ── on the photo ──
+  pricePillSlot: { marginLeft: 'auto' },
+
+  // ── the panel ──
+  stack: { gap: 13 },
+  // The mockup's .acts / .act: one row, every chip 44pt and equal width.
+  actsRow: { flexDirection: 'row', gap: 8 },
+  act: {
+    flex: 1,
+    minWidth: 0,
+    height: 44,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
+    justifyContent: 'center',
+    gap: 7,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
   },
-  metaEyebrow: {
-    flexShrink: 1,
-    fontFamily: fonts.mono.semibold,
-    fontSize: 9,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
-  title: {
-    fontFamily: fonts.display.bold,
-    fontSize: 22,
-    lineHeight: 25,
-    letterSpacing: -0.4,
-    marginTop: 12,
-  },
+  actLabel: { flexShrink: 1, fontFamily: fonts.display.semibold, fontSize: 13.5 },
+  // ⚠️ No fontFamily — see the FormattedText note at the render site.
+  desc: { fontSize: 14, lineHeight: 21 },
   // Mono per the mockup, no italic — no italic instance of any bundled family
   // exists, and fontStyle is unreliable with custom families (constants/fonts).
-  location: { fontFamily: fonts.mono.medium, fontSize: 11, marginTop: 6 },
-  // ⚠️ No fontFamily — see the FormattedText note at the render site.
-  desc: { fontSize: 13.5, lineHeight: 20, marginTop: 7 },
-  section: { marginTop: 13 },
+  location: { fontFamily: fonts.mono.medium, fontSize: 11 },
   sectionLabel: {
     fontFamily: fonts.mono.semibold,
     fontSize: 10,
@@ -685,20 +440,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 16,
     textAlign: 'center',
-    marginTop: 12,
+    marginTop: 2,
   },
-  // One child (Close alone) fills the row exactly as the old full-width
-  // button did; with an editAction the two split it Cancel/Save-style.
-  footerRow: { flexDirection: 'row', gap: 11 },
-  closeBtn: {
-    flex: 1,
-    marginTop: 9,
-    height: 47,
-    borderRadius: 13,
-    borderWidth: StyleSheet.hairlineWidth + 0.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-  },
-  closeLabel: { fontFamily: fonts.body.semibold, fontSize: 15 },
 });

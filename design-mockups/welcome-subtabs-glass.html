@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Welcome Sub-tabs Glass</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600;700&display=swap">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{min-height:100vh;display:flex;flex-direction:column;align-items:center;gap:14px;padding:26px 12px 60px;background:#0C0D11;color:#D6D9DE;font-family:'Inter',system-ui,sans-serif}
+h1{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:22px;letter-spacing:-0.3px;color:#F4F6F8}
+h1 span{color:#F99861}
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center;max-width:1100px}
+.grp{display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);padding:6px;border-radius:16px}
+.gl2{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:#6E7681;margin:0 4px 0 6px}
+.tb{background:rgba(255,255,255,0.06);color:#D6D9DE;border:1px solid rgba(255,255,255,0.10);border-radius:11px;padding:7px 11px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:.18s}
+.tb:hover{background:rgba(255,255,255,0.12)}
+.tb.on{background:#F4F6F8;color:#15171C;border-color:#F4F6F8}
+.hint{color:#6E7681;font-size:11.5px;font-family:'JetBrains Mono',monospace;text-align:center;max-width:960px;line-height:1.7}
+.hint b{color:#AEB4BD;font-weight:600}
+.hint em{font-style:normal;color:#2FBF8F}
+.row{display:flex;flex-wrap:wrap;gap:18px;justify-content:center;align-items:flex-start;max-width:1700px}
+.col{display:flex;flex-direction:column;gap:10px;align-items:center}
+.concept{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:#6E7681;display:flex;align-items:center;gap:8px;width:380px}
+.concept b{color:#F99861}
+.concept .ln{flex:1;height:1px;background:rgba(255,255,255,0.08)}
+.bcap{width:380px;font-size:11px;color:#8A9098;line-height:1.55;font-style:italic}
+.bcap b{font-style:normal;color:#D6D9DE;font-weight:600}
+.notes{max-width:1100px;width:100%;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;margin-top:6px}
+.note{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:12px 14px;font-size:11.5px;line-height:1.55;color:#AEB4BD}
+.note b{display:block;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:#F99861;margin-bottom:5px}
+.note em{font-style:normal;color:#F4F6F8;font-weight:600}
+
+/* ---------- phone + palettes (Moonstone default) ---------- */
+.phone{
+  --bg:#141724; --text:#F4F2EE; --muted:#9C9BA6; --fire:#F99861; --ember:#A7ABBC; --blue:#36B0C9; --bluetext:#7FD3E4; --fireText:#1F2334; --tint:#F99861;
+  --glass:rgba(255,255,255,0.07); --glassbd:rgba(255,255,255,0.12); --surf:rgba(255,255,255,0.05); --surfbd:rgba(255,255,255,0.09); --hair:rgba(255,255,255,0.07);
+  --card:#1E2233; --thumbbg:#232841; --glowA:rgba(249,152,97,0.30); --glowB:rgba(120,140,210,0.18);
+  position:relative;width:380px;height:760px;background:var(--bg);border-radius:48px;border:1px solid #2A2D3A;
+  box-shadow:0 22px 60px rgba(0,0,0,0.5);overflow:hidden;color:var(--text);display:flex;flex-direction:column}
+.phone.t-moon-l{--bg:#F2F3F6;--text:#1F2334;--muted:#6B6F80;--fire:#E8792F;--ember:#7A7F92;--blue:#1390A8;--bluetext:#0E6E80;--fireText:#FFFFFF;--tint:#E8792F;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.88);--surf:rgba(255,255,255,0.66);--surfbd:rgba(0,0,0,0.07);--hair:rgba(0,0,0,0.07);--card:#FFFFFF;--thumbbg:#D8DAE3;--glowA:rgba(232,121,47,0.18);--glowB:rgba(31,35,52,0.10)}
+.phone.t-ocean-d{--bg:#1A2332;--text:#FFFFFF;--muted:#A8B8D8;--fire:#4A90E2;--ember:#6BADE8;--blue:#5DADE2;--bluetext:#BFE3F7;--fireText:#0A1422;--tint:#5DA0E5;--glassbd:rgba(255,255,255,0.13);--surfbd:rgba(255,255,255,0.10);--hair:rgba(255,255,255,0.08);--card:#243246;--thumbbg:#2C3E50;--glowA:rgba(74,144,226,0.30);--glowB:rgba(93,173,226,0.15)}
+.phone.t-ocean-l{--bg:#E8F4F8;--text:#1A3A52;--muted:#4A6B7C;--fire:#1976D2;--ember:#1565C0;--blue:#42A5F5;--bluetext:#0D47A1;--fireText:#FFFFFF;--tint:#1976D2;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.7);--surfbd:rgba(13,71,161,0.10);--hair:rgba(13,71,161,0.08);--card:#FFFFFF;--thumbbg:#CFE4EC;--glowA:rgba(25,118,210,0.16);--glowB:rgba(66,165,245,0.12)}
+.phone *{box-sizing:border-box}
+.glow{position:absolute;top:-90px;right:-60px;width:300px;height:250px;border-radius:50%;background:radial-gradient(circle,var(--glowA),transparent 66%);z-index:0;pointer-events:none}
+.glow2{position:absolute;top:-50px;left:-70px;width:220px;height:200px;border-radius:50%;background:radial-gradient(circle,var(--glowB),transparent 68%);z-index:0;pointer-events:none}
+.glow3{position:absolute;top:300px;left:-80px;width:260px;height:260px;border-radius:50%;background:radial-gradient(circle,var(--glowA),transparent 66%);opacity:.55;z-index:0;pointer-events:none}
+.sb{position:relative;z-index:3;display:flex;justify-content:space-between;align-items:center;padding:14px 28px 6px;font-size:13px;font-weight:600;font-family:'JetBrains Mono',monospace;flex:0 0 auto}
+
+/* chrome: header + connect bar (fixed) */
+.chrome{position:relative;z-index:7;flex:0 0 auto}
+.head{margin:2px 14px 0;padding:12px 14px;border-radius:20px;background:var(--glass);border:1px solid var(--glassbd);backdrop-filter:blur(18px) saturate(1.4);-webkit-backdrop-filter:blur(18px) saturate(1.4)}
+.greet{font-family:'Bricolage Grotesque';font-size:19px;font-weight:700;letter-spacing:-0.4px;margin-bottom:11px;padding-left:2px}
+.greet b{color:var(--fire)}
+.hrow{display:flex;align-items:center;gap:9px}
+.av{width:42px;height:42px;border-radius:50%;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;font-family:'Bricolage Grotesque';flex-shrink:0}
+.who{flex:1;min-width:0}
+.who .nm{font-family:'Bricolage Grotesque';font-size:14px;font-weight:700}
+.who .jt{font-size:10px;color:var(--muted);font-family:'JetBrains Mono';text-transform:uppercase;letter-spacing:0.5px;margin-top:1px}
+.gl{position:relative;height:36px;border-radius:12px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;justify-content:center;color:var(--text);font-size:13px;padding:0 10px;gap:4px;font-family:'JetBrains Mono';font-weight:600}
+.gl svg{width:17px;height:17px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.gl .dot{position:absolute;top:-5px;right:-5px;min-width:16px;height:16px;border-radius:8px;background:var(--blue);color:#06222B;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 3px;border:2px solid var(--bg)}
+.connect{display:flex;align-items:center;gap:6px;margin:12px 14px 0;padding:4px;border-radius:14px;background:var(--surf);border:1px solid var(--surfbd);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+.tab{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;height:34px;border-radius:10px;font-size:13px;font-weight:600;font-family:'Bricolage Grotesque';color:var(--muted);position:relative}
+.tab.io{flex:0 0 38px}
+.tab.on{background:var(--fire);color:var(--fireText)}
+.tab svg{width:16px;height:16px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.tab .td{position:absolute;top:4px;right:10px;width:6px;height:6px;border-radius:50%;background:var(--blue)}
+
+/* the scrolling leaf */
+.leaf{position:relative;z-index:2;flex:1;overflow-y:auto;scrollbar-width:none}
+.leaf::-webkit-scrollbar{display:none}
+.band{padding:8px 14px 2px}
+
+/* ===== the pinned sub-tab bar — transparent at rest, backdrop on scroll ===== */
+.substick{position:sticky;top:0;z-index:6;padding:8px 14px 9px;transition:.15s}
+.substick::before{content:"";position:absolute;inset:0;z-index:-1;opacity:0;transition:opacity .15s;
+  backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  background:linear-gradient(to bottom,color-mix(in srgb,var(--bg) var(--w1),transparent),color-mix(in srgb,var(--bg) var(--w2),transparent) 25%,color-mix(in srgb,var(--bg) var(--w2),transparent));
+  border-bottom:1px solid var(--hair)}
+.substick.scrolled::before{opacity:1}
+.phone{--w1:22%;--w2:46%}
+.phone.wash-heavy{--w1:50%;--w2:78%}
+/* OLD (for the before frame): a solid bar */
+.substick.old{background:var(--bg);box-shadow:0 4px 8px -4px rgba(0,0,0,.25)}
+.substick.old::before{display:none}
+
+/* the glass capsule (View All's segmentCapsule / SegControl grammar) */
+.seg{display:flex;gap:3px;padding:3px;border-radius:12px;background:var(--glass);border:1px solid var(--glassbd)}
+.seg div{flex:1;text-align:center;padding:9px 8px;border-radius:9px;font-size:12.5px;font-weight:600;font-family:'Bricolage Grotesque';color:var(--muted);position:relative;display:flex;align-items:center;justify-content:center;gap:6px}
+.seg div.on{background:var(--fire);color:var(--fireText)}
+.seg .nd{width:7px;height:7px;border-radius:50%;background:#EF4444;display:inline-block}
+/* OLD capsule (system font, no border, r10/r8, surface) */
+.seg.old{background:var(--card);border:0;border-radius:10px;padding:4px;gap:4px}
+.seg.old div{font-family:system-ui,-apple-system,sans-serif;font-size:14px;border-radius:8px;padding:10px 12px}
+
+.subpad{padding:11px 14px 140px}
+.banner{position:relative;border-radius:18px;overflow:hidden;margin-bottom:11px;height:150px;background:var(--thumbbg)}
+.banner.ph{background:radial-gradient(120% 80% at 20% 10%,rgba(255,196,120,.55),transparent 55%),radial-gradient(90% 70% at 80% 80%,rgba(120,30,20,.9),transparent 60%),radial-gradient(60% 50% at 60% 30%,rgba(255,110,60,.85),transparent 60%),linear-gradient(160deg,#9C2E1F,#4A1410 70%,#2A0C0A)}
+.banner.p2{background:radial-gradient(100% 70% at 70% 20%,rgba(160,230,255,.6),transparent 55%),radial-gradient(80% 60% at 20% 90%,rgba(10,70,110,.95),transparent 60%),linear-gradient(200deg,#2C8DB0,#0F3E5C 70%,#071F31)}
+.banner::after{content:"";position:absolute;inset:0;background:linear-gradient(to top,rgba(14,11,9,0.93) 8%,rgba(14,11,9,0.05) 64%)}
+.btag{position:absolute;top:11px;left:11px;z-index:2;background:rgba(20,16,14,0.55);border:1px solid rgba(255,255,255,0.16);color:#FFB07A;font-family:'JetBrains Mono';font-size:9px;font-weight:600;letter-spacing:1px;padding:3px 8px;border-radius:7px;text-transform:uppercase;backdrop-filter:blur(6px)}
+.btag.ev{background:#3B82F6;border-color:#3B82F6;color:#fff}
+.btag.ent{background:#7C5CE0;border-color:#7C5CE0;color:#fff}
+.bbody{position:absolute;left:14px;right:14px;bottom:12px;z-index:2;color:#F4F2EE}
+.bbody h3{font-family:'Bricolage Grotesque';font-weight:700;font-size:19px;letter-spacing:-0.3px;line-height:1.1}
+.bbody p{margin-top:4px;font-size:11.5px;color:#D7D0C6;line-height:1.35}
+.bbody .tm{margin-top:5px;font-family:'JetBrains Mono';font-size:9.5px;color:#FFB07A}
+.card{display:flex;gap:11px;align-items:flex-start;background:var(--surf);border:1px solid var(--surfbd);border-radius:16px;padding:11px;margin-bottom:11px}
+.card .th{width:62px;height:62px;border-radius:12px;flex-shrink:0;background:var(--thumbbg)}
+.card .bd{flex:1;min-width:0}
+.card h3{font-family:'Bricolage Grotesque';font-weight:600;font-size:14px;line-height:1.2;display:flex;gap:6px;align-items:center}
+.card p{margin-top:4px;font-size:11.5px;color:var(--muted);line-height:1.4}
+.card .tm{margin-top:5px;font-family:'JetBrains Mono';font-size:9.5px;color:var(--tint)}
+.new{background:#EF4444;color:#fff;font-size:8px;font-weight:600;padding:2px 5px;border-radius:5px;font-family:'JetBrains Mono';letter-spacing:.8px}
+
+/* ===== calendar strip (WeeklyCalendarStrip geometry: 16 outer + 8 inner) ===== */
+.calwrap{margin:8px 16px 0;padding:8px 8px 4px;border-radius:12px}
+.calwrap.old{background:var(--card);box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.calwrap.glass{border-radius:17px;background:var(--surf);border:1px solid var(--surfbd);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);padding:12px 8px 8px}
+.calwrap.bare{background:transparent;padding:8px 0 4px}
+.calhead{display:flex;justify-content:space-between;align-items:center;margin:0 4px 9px}
+.calmonth{font-family:'Bricolage Grotesque';font-size:15px;font-weight:700}
+.viewall{display:flex;align-items:center;gap:2px;color:var(--fire);font-size:12.5px;font-weight:700;font-family:'Bricolage Grotesque'}
+.weekrow{display:flex;align-items:center;gap:1px;margin-bottom:2px}
+.warrow{color:var(--fire);font-size:15px;padding:2px;opacity:.85;font-family:'JetBrains Mono'}
+.week{flex:1;display:flex;gap:4px}
+.wd{flex:1;text-align:center;padding:5px 0 9px;border-radius:12px;background:var(--surf);border:1px solid var(--surfbd)}
+.wd .dn{font-size:9px;color:var(--muted);font-family:'JetBrains Mono';text-transform:uppercase}
+.wd .dc{position:relative;width:26px;height:26px;margin:2px auto 0;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono';font-weight:700;font-size:13px}
+.wd .dc i{position:absolute;bottom:-5px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:2px;background:var(--blue)}
+.wd.today .dc{border:2px solid var(--fire);color:var(--fire)}
+.wd.sel{background:var(--fire);border-color:var(--fire)}
+.wd.sel .dn,.wd.sel .dc{color:var(--fireText)}
+.eventsseg{padding:10px 14px 9px}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+</svg>
+
+<h1>Welcome sub-tabs &amp; Events calendar <span>— glass</span></h1>
+<div class="toolbar">
+  <div class="grp"><span class="gl2">Theme</span>
+    <button class="tb on" data-theme="">Moonstone dark</button><button class="tb" data-theme="t-moon-l">Moonstone light</button><button class="tb" data-theme="t-ocean-d">Ocean dark</button><button class="tb" data-theme="t-ocean-l">Ocean light</button></div>
+  <div class="grp"><span class="gl2">Pinned wash</span>
+    <button class="tb on" data-wash="light">Lighter 22→46%</button><button class="tb" data-wash="heavy">Today's Menu 50→78%</button></div>
+</div>
+<p class="hint"><b>Frame 1</b> is the current look for reference. <b>Frames 2–3</b> are the Today tab: the solid bar is gone — the capsule sits on the glow at rest and grows a blur backdrop only once cards scroll under it (<em>scroll the leaf in frame 3 to watch it switch on at 6pt, exactly like the Menu's category tabs</em>). The “Pinned wash” toggle previews the lighter wash I'm proposing for the Menu's sticky category tabs too (B1) so both get judged together. <b>Frames 4–5</b> are the Events tab's calendar: V1 wraps the strip in the View-All glass card, V2 lays the tiles straight on the glow (the Roster grammar).</p>
+
+<div class="row">
+
+<!-- ===== 0 · BEFORE ===== -->
+<div class="col">
+  <div class="concept"><b>0</b> Today · current (solid bar, system font)<span class="ln"></span></div>
+  <div class="phone">
+    <div class="glow"></div><div class="glow2"></div><div class="glow3"></div>
+    <div class="sb"><span>9:41</span><span>●●● ▲ ▮</span></div>
+    <div class="chrome">
+      <div class="head"><div class="greet">Good morning, <b>Steve</b> 👋</div>
+        <div class="hrow"><div class="av">SE</div><div class="who"><div class="nm">Steven Eccles</div><div class="jt">Owner · MyResto Test</div></div>
+          <div class="gl"><svg><use href="#i-sun"/></svg>72°</div><div class="gl"><svg><use href="#i-bell"/></svg><span class="dot">3</span></div></div></div>
+      <div class="connect"><div class="tab io"><svg><use href="#i-clock"/></svg></div><div class="tab on">Today</div><div class="tab">Events<span class="td"></span></div><div class="tab">Specials<span class="td"></span></div></div>
+    </div>
+    <div class="leaf">
+      <div class="band"></div>
+      <div class="substick old"><div class="seg old"><div class="on">Announcements</div><div>Special Features <span class="nd"></span></div></div></div>
+      <div class="subpad">
+        <div class="banner ph"><span class="btag">Important</span><div class="bbody"><h3>Holiday hours this weekend</h3><p>We open at noon Saturday and Sunday for the regatta crowd.</p><div class="tm">TODAY · 9:12 AM</div></div></div>
+        <div class="card"><div class="th"></div><div class="bd"><h3>New POS buttons <span class="new">NEW</span></h3><p>The happy-hour modifiers moved to the second page. Ask a manager if you can't find one.</p><div class="tm">YESTERDAY</div></div></div>
+        <div class="card"><div class="th"></div><div class="bd"><h3>Staff meal reminder</h3><p>Order before 3:30 so the kitchen can batch it with the family meal.</p><div class="tm">MON</div></div></div>
+        <div class="card"><div class="th"></div><div class="bd"><h3>Patio heaters on</h3><p>Lighters are in the host stand drawer.</p><div class="tm">SUN</div></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="bcap">The locked mockup's <b>.substick</b> painted the theme background behind the capsule — the app copied it faithfully. That is the bar Steve sees.</div>
+</div>
+
+<!-- ===== 1 · TODAY AT REST ===== -->
+<div class="col">
+  <div class="concept"><b>1</b> Today · at rest (no bar)<span class="ln"></span></div>
+  <div class="phone">
+    <div class="glow"></div><div class="glow2"></div><div class="glow3"></div>
+    <div class="sb"><span>9:41</span><span>●●● ▲ ▮</span></div>
+    <div class="chrome">
+      <div class="head"><div class="greet">Good morning, <b>Steve</b> 👋</div>
+        <div class="hrow"><div class="av">SE</div><div class="who"><div class="nm">Steven Eccles</div><div class="jt">Owner · MyResto Test</div></div>
+          <div class="gl"><svg><use href="#i-sun"/></svg>72°</div><div class="gl"><svg><use href="#i-bell"/></svg><span class="dot">3</span></div></div></div>
+      <div class="connect"><div class="tab io"><svg><use href="#i-clock"/></svg></div><div class="tab on">Today</div><div class="tab">Events<span class="td"></span></div><div class="tab">Specials<span class="td"></span></div></div>
+    </div>
+    <div class="leaf">
+      <div class="band"></div>
+      <div class="substick"><div class="seg"><div class="on">Announcements</div><div>Special Features <span class="nd"></span></div></div></div>
+      <div class="subpad">
+        <div class="banner ph"><span class="btag">Important</span><div class="bbody"><h3>Holiday hours this weekend</h3><p>We open at noon Saturday and Sunday for the regatta crowd.</p><div class="tm">TODAY · 9:12 AM</div></div></div>
+        <div class="card"><div class="th"></div><div class="bd"><h3>New POS buttons <span class="new">NEW</span></h3><p>The happy-hour modifiers moved to the second page. Ask a manager if you can't find one.</p><div class="tm">YESTERDAY</div></div></div>
+        <div class="card"><div class="th"></div><div class="bd"><h3>Staff meal reminder</h3><p>Order before 3:30 so the kitchen can batch it with the family meal.</p><div class="tm">MON</div></div></div>
+        <div class="card"><div class="th"></div><div class="bd"><h3>Patio heaters on</h3><p>Lighters are in the host stand drawer.</p><div class="tm">SUN</div></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="bcap">Capsule = View All Events' <b>segmentCapsule</b> grammar: glass fill + glassBorder hairline, r12 / p3 / gap 3, Bricolage 12.5 semibold, primary fill + fireText when active, the 7pt red unread dot inline. Nothing behind it.</div>
+</div>
+
+<!-- ===== 2 · TODAY SCROLLED ===== -->
+<div class="col">
+  <div class="concept"><b>2</b> Today · scrolled (pinned, blur backdrop)<span class="ln"></span></div>
+  <div class="phone">
+    <div class="glow"></div><div class="glow2"></div><div class="glow3"></div>
+    <div class="sb"><span>9:41</span><span>●●● ▲ ▮</span></div>
+    <div class="chrome">
+      <div class="head"><div class="greet">Good morning, <b>Steve</b> 👋</div>
+        <div class="hrow"><div class="av">SE</div><div class="who"><div class="nm">Steven Eccles</div><div class="jt">Owner · MyResto Test</div></div>
+          <div class="gl"><svg><use href="#i-sun"/></svg>72°</div><div class="gl"><svg><use href="#i-bell"/></svg><span class="dot">3</span></div></div></div>
+      <div class="connect"><div class="tab io"><svg><use href="#i-clock"/></svg></div><div class="tab on">Today</div><div class="tab">Events<span class="td"></span></div><div class="tab">Specials<span class="td"></span></div></div>
+    </div>
+    <div class="leaf" data-prescroll="150">
+      <div class="band"></div>
+      <div class="substick"><div class="seg"><div class="on">Announcements</div><div>Special Features <span class="nd"></span></div></div></div>
+      <div class="subpad">
+        <div class="banner ph"><span class="btag">Important</span><div class="bbody"><h3>Holiday hours this weekend</h3><p>We open at noon Saturday and Sunday for the regatta crowd.</p><div class="tm">TODAY · 9:12 AM</div></div></div>
+        <div class="card"><div class="th"></div><div class="bd"><h3>New POS buttons <span class="new">NEW</span></h3><p>The happy-hour modifiers moved to the second page. Ask a manager if you can't find one.</p><div class="tm">YESTERDAY</div></div></div>
+        <div class="card"><div class="th"></div><div class="bd"><h3>Staff meal reminder</h3><p>Order before 3:30 so the kitchen can batch it with the family meal.</p><div class="tm">MON</div></div></div>
+        <div class="card"><div class="th"></div><div class="bd"><h3>Patio heaters on</h3><p>Lighters are in the host stand drawer.</p><div class="tm">SUN</div></div></div>
+        <div class="card"><div class="th"></div><div class="bd"><h3>Linen pickup moved</h3><p>Thursday instead of Wednesday this week.</p><div class="tm">SAT</div></div></div>
+        <div class="card"><div class="th"></div><div class="bd"><h3>Wine training</h3><p>Rioja flight with the rep, 3 PM in the private room.</p><div class="tm">FRI</div></div></div>
+        <div class="card"><div class="th"></div><div class="bd"><h3>Parking</h3><p>Use the marina lot on regatta days.</p><div class="tm">THU</div></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="bcap">Scrolled: the capsule pins and a <b>GlassBlur 18 + background wash + hairline</b> backdrop fades in over 150 ms (the MenuCategoryTabs recipe, driven by the leaf's scrollY). Cards blur under it; the glow still reads through the wash.</div>
+</div>
+
+<!-- ===== 3 · EVENTS V1 ===== -->
+<div class="col">
+  <div class="concept"><b>3</b> Events · calendar V1 (View-All glass card)<span class="ln"></span></div>
+  <div class="phone">
+    <div class="glow"></div><div class="glow2"></div><div class="glow3"></div>
+    <div class="sb"><span>9:41</span><span>●●● ▲ ▮</span></div>
+    <div class="chrome">
+      <div class="head"><div class="greet">Good morning, <b>Steve</b> 👋</div>
+        <div class="hrow"><div class="av">SE</div><div class="who"><div class="nm">Steven Eccles</div><div class="jt">Owner · MyResto Test</div></div>
+          <div class="gl"><svg><use href="#i-sun"/></svg>72°</div><div class="gl"><svg><use href="#i-bell"/></svg><span class="dot">3</span></div></div></div>
+      <div class="connect"><div class="tab io"><svg><use href="#i-clock"/></svg></div><div class="tab">Today</div><div class="tab on">Events</div><div class="tab">Specials<span class="td"></span></div></div>
+    </div>
+    <div class="leaf">
+      <div class="calwrap glass">
+        <div class="calhead"><div class="calmonth">October 2026</div><div class="viewall">View all ›</div></div>
+        <div class="weekrow"><div class="warrow">‹</div><div class="week">
+          <div class="wd"><div class="dn">Mon</div><div class="dc">5</div></div><div class="wd today"><div class="dn">Tue</div><div class="dc">6<i></i></div></div><div class="wd"><div class="dn">Wed</div><div class="dc">7</div></div><div class="wd"><div class="dn">Thu</div><div class="dc">8<i></i></div></div><div class="wd"><div class="dn">Fri</div><div class="dc">9<i></i></div></div><div class="wd"><div class="dn">Sat</div><div class="dc">10<i></i></div></div><div class="wd"><div class="dn">Sun</div><div class="dc">11</div></div>
+        </div><div class="warrow">›</div></div>
+      </div>
+      <div class="substick eventsseg"><div class="seg"><div class="on">Events</div><div>Entertainment <span class="nd"></span></div></div></div>
+      <div class="subpad">
+        <div class="banner p2"><span class="btag ev">Event</span><div class="bbody"><h3>Crab Boil Weekend</h3><p>Three nights on the dock, live band Saturday.</p><div class="tm">FRI OCT 9 · 5:00 PM → SUN OCT 11</div></div></div>
+        <div class="card"><div class="th"></div><div class="bd"><h3>Oyster Hour <span class="new">NEW</span></h3><p>Dollar oysters at the raw bar, Tuesday to Thursday.</p><div class="tm">TUE OCT 6 · 4:00 PM</div></div></div>
+        <div class="card"><div class="th"></div><div class="bd"><h3>Regatta brunch</h3><p>Harbor-side seating opens at 10.</p><div class="tm">SAT OCT 10 · 10:00 AM</div></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="bcap">Strip passes <b>card: 'transparent' + edgeToEdge</b> and sits inside <b>GlassCard variant="surface" radius 17</b> — byte-for-byte the All Upcoming Events grammar (s81's one geometry: 16 outer + 8 inner). The solid card and its drop shadow are gone.</div>
+</div>
+
+<!-- ===== 4 · EVENTS V2 ===== -->
+<div class="col">
+  <div class="concept"><b>4</b> Events · calendar V2 (bare, on the glow)<span class="ln"></span></div>
+  <div class="phone">
+    <div class="glow"></div><div class="glow2"></div><div class="glow3"></div>
+    <div class="sb"><span>9:41</span><span>●●● ▲ ▮</span></div>
+    <div class="chrome">
+      <div class="head"><div class="greet">Good morning, <b>Steve</b> 👋</div>
+        <div class="hrow"><div class="av">SE</div><div class="who"><div class="nm">Steven Eccles</div><div class="jt">Owner · MyResto Test</div></div>
+          <div class="gl"><svg><use href="#i-sun"/></svg>72°</div><div class="gl"><svg><use href="#i-bell"/></svg><span class="dot">3</span></div></div></div>
+      <div class="connect"><div class="tab io"><svg><use href="#i-clock"/></svg></div><div class="tab">Today</div><div class="tab on">Events</div><div class="tab">Specials<span class="td"></span></div></div>
+    </div>
+    <div class="leaf">
+      <div class="calwrap bare">
+        <div class="calhead"><div class="calmonth">October 2026</div><div class="viewall">View all ›</div></div>
+        <div class="weekrow"><div class="warrow">‹</div><div class="week">
+          <div class="wd"><div class="dn">Mon</div><div class="dc">5</div></div><div class="wd today"><div class="dn">Tue</div><div class="dc">6<i></i></div></div><div class="wd"><div class="dn">Wed</div><div class="dc">7</div></div><div class="wd"><div class="dn">Thu</div><div class="dc">8<i></i></div></div><div class="wd"><div class="dn">Fri</div><div class="dc">9<i></i></div></div><div class="wd"><div class="dn">Sat</div><div class="dc">10<i></i></div></div><div class="wd"><div class="dn">Sun</div><div class="dc">11</div></div>
+        </div><div class="warrow">›</div></div>
+      </div>
+      <div class="substick eventsseg"><div class="seg"><div class="on">Events</div><div>Entertainment <span class="nd"></span></div></div></div>
+      <div class="subpad">
+        <div class="banner p2"><span class="btag ev">Event</span><div class="bbody"><h3>Crab Boil Weekend</h3><p>Three nights on the dock, live band Saturday.</p><div class="tm">FRI OCT 9 · 5:00 PM → SUN OCT 11</div></div></div>
+        <div class="card"><div class="th"></div><div class="bd"><h3>Oyster Hour <span class="new">NEW</span></h3><p>Dollar oysters at the raw bar, Tuesday to Thursday.</p><div class="tm">TUE OCT 6 · 4:00 PM</div></div></div>
+        <div class="card"><div class="th"></div><div class="bd"><h3>Regatta brunch</h3><p>Harbor-side seating opens at 10.</p><div class="tm">SAT OCT 10 · 10:00 AM</div></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="bcap">The Roster grammar (s83): no wrapper at all — the surface tiles are the only glass, straight on the AmbientGlow. Lightest; the capsule under it becomes the first "edge".</div>
+</div>
+
+</div>
+
+<div class="notes">
+  <div class="note"><b>What changes in code</b><em>components/PortalHome.tsx</em> only: <code>substick</code> loses its background + shadow and gains the MenuCategoryTabs backdrop (opacity from <code>todayScrollY</code> / <code>eventsScrollY</code> crossing 6pt); both capsules move to the glass grammar; the Events capsule gets its own <code>onLayout</code> (today it borrows the Today one's height). The calendar passes <code>card: 'transparent'</code> + <code>edgeToEdge</code> (+ the GlassCard wrapper in V1).</div>
+  <div class="note"><b>Android</b>GlassBlur can't blur on Android (s85) — the pinned backdrop paints <em>colors.card at 0.97</em> there, so Android keeps a frosted near-opaque bar when pinned and is transparent at rest. Same as the Menu today.</div>
+  <div class="note"><b>Pinned wash (also B1)</b>The Menu's category tabs use the heavy 50→78% wash, which reads as a solid bar on the phone. The <em>Lighter 22→46%</em> setting is the proposal for both: the blur keeps the chips legible over scrolling cards, the glow stays visible. Final alpha gets judged on the device.</div>
+</div>
+
+<script>
+const phones=[...document.querySelectorAll('.phone')];
+document.querySelectorAll('[data-theme]').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('[data-theme]').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+  phones.forEach(p=>{p.classList.remove('t-moon-l','t-ocean-d','t-ocean-l');if(b.dataset.theme)p.classList.add(b.dataset.theme);});
+}));
+document.querySelectorAll('[data-wash]').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('[data-wash]').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+  phones.forEach(p=>p.classList.toggle('wash-heavy',b.dataset.wash==='heavy'));
+}));
+document.querySelectorAll('.leaf').forEach(leaf=>{
+  const bar=leaf.querySelector('.substick');
+  const sync=()=>{ if(bar) bar.classList.toggle('scrolled', leaf.scrollTop>6); };
+  leaf.addEventListener('scroll',sync,{passive:true});
+  if(leaf.dataset.prescroll){ requestAnimationFrame(()=>{ leaf.scrollTop=+leaf.dataset.prescroll; sync(); }); }
+  sync();
+});
+</script>
+</body>
+</html>

@@ -16,8 +16,8 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
-  SafeAreaView,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { StorageImage } from '@/components/StorageImage';
@@ -59,6 +59,10 @@ interface QuestionReview {
 export default function ExamResultsScreen() {
   const router = useRouter();
   const colors = useThemeColors();
+  // Plain-View root with the status-bar clearance applied by hand (the core
+  // SafeAreaView pads all four edges on iOS — the quiz family dropped it in
+  // s89 C1, see exam-play).
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { organization } = useOrganization();
   const currencyName = organization.reward_currency_name;
@@ -188,9 +192,9 @@ export default function ExamResultsScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
         <ActivityIndicator size="large" color={visual.accent} style={{ marginTop: 100 }} />
-      </SafeAreaView>
+      </View>
     );
   }
 
@@ -236,8 +240,8 @@ export default function ExamResultsScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 40 + insets.bottom }]}>
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
           {rained && <MoneyRain />}
           {confetti && <GameConfetti visual={{ accent: visual.accent, gradient: visual.gradient }} count={70} />}
@@ -382,13 +386,15 @@ export default function ExamResultsScreen() {
           </View>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  scrollContent: { paddingHorizontal: 14, paddingTop: 16, paddingBottom: 40 },
+  // paddingBottom is inline (40 + insets.bottom): the plain-View root no longer
+  // pads the home-indicator edge, so the scroll content clears it itself.
+  scrollContent: { paddingHorizontal: 14, paddingTop: 16 },
 
   card: {
     borderRadius: 20,

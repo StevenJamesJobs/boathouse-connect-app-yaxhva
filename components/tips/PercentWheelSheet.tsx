@@ -7,6 +7,10 @@
  * The wheel lives in its own sheet (not inline in the row): a nested vertical
  * ScrollView inside the page scroll fights for the pan on Android, and the
  * sheet gives the wheel a fixed, snappable viewport instead.
+ *
+ * s89 swipe-down: the body is deliberately NOT wired (the wheel IS the body —
+ * a picker, not a list) and the wheel is fenced with <SheetNoDragZone>, so
+ * the sheet dismisses from its header only (components/sheetDismiss.tsx).
  */
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -21,6 +25,7 @@ import {
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import GlassSheet from '@/components/GlassSheet';
+import { SheetNoDragZone } from '@/components/sheetDismiss';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useTipsAccent } from '@/components/tips/useTipsAccent';
 import { TIP_OUT_WHEEL_STEPS, formatPct } from '@/utils/tips/checkoutMath';
@@ -97,7 +102,9 @@ export default function PercentWheelSheet({
         </TouchableOpacity>
       }
     >
-      <View style={styles.wheelWrap}>
+      {/* The wheel owns its vertical pan — fenced so a drag that starts on it
+          never pulls the sheet down. */}
+      <SheetNoDragZone style={styles.wheelWrap}>
         <View
           pointerEvents="none"
           style={[
@@ -132,7 +139,7 @@ export default function PercentWheelSheet({
             );
           })}
         </ScrollView>
-      </View>
+      </SheetNoDragZone>
 
       <View style={styles.customRow}>
         <Text style={[styles.customLabel, { color: colors.textSecondary }]}>
