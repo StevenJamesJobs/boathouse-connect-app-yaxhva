@@ -1,0 +1,1170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kitchen Assistant</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap">
+<style>
+/* s91 — Kitchen Assistant & Editor. House mockup scaffold (libations-ai-upload / bartender-assistant-redesign): one phone,
+   Frame + Palette toolbars, the glass tokens per palette. Frame 5 turns the phone sideways (the book reader). */
+:root{color-scheme:dark}
+*{box-sizing:border-box;margin:0;padding:0}
+body{min-height:100vh;display:flex;flex-direction:column;align-items:center;gap:14px;padding-block:24px 60px;padding-inline:12px;background:#0C0D11;color:#D6D9DE;
+  font-family:'Inter','SF Pro Text',system-ui,sans-serif}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+.toolbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:center;max-width:900px}
+.grp{display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);padding:6px;border-radius:16px}
+.gl2{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:#6E7681;margin:0 4px 0 6px}
+.tb{background:rgba(255,255,255,0.06);color:#D6D9DE;border:1px solid rgba(255,255,255,0.10);border-radius:11px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:.18s}
+.tb:hover{background:rgba(255,255,255,0.12)}
+.tb.on{background:#F4F6F8;color:#15171C;border-color:#F4F6F8}
+.tb:focus-visible{outline:2px solid #FF7A2F;outline-offset:2px}
+.hint{color:#6E7681;font-size:11.5px;font-family:'JetBrains Mono',ui-monospace,monospace;text-align:center;max-width:700px;line-height:1.7}
+.hint b{color:#AEB4BD;font-weight:600}
+.subbar{display:none;gap:6px;flex-wrap:wrap;justify-content:center}
+.subbar.on{display:flex}
+
+.phone{
+  --bg:#181B21; --text:#F4F6F8; --muted:#9AA1A8; --blue:#8FA0AC; --bluetext:#CDD8DF; --fireText:#1A1E24; --tint:#FF7A2F;
+  --glass:rgba(255,255,255,0.07); --glassbd:rgba(255,255,255,0.12); --surf:rgba(255,255,255,0.045); --surfbd:rgba(255,255,255,0.09); --hair:rgba(255,255,255,0.07);
+  --thumbbg:#252A31; --glowA:rgba(230,234,238,0.12); --glowB:rgba(255,122,47,0.10); --danger:#E74C3C; --scrim:rgba(6,10,18,0.55); --card:#1F232A;
+  --need:#F5B942; --needink:#2A1F05; --ok:#10A56F; --okink:#06281C; --slate:#4A5568; --flame:#FF6B1A; --page:rgba(255,255,255,0.05);
+  position:relative;width:392px;max-width:100%;height:840px;background:var(--bg);border-radius:46px;border:1px solid #2A2E36;overflow:hidden;
+  box-shadow:0 40px 90px -30px rgba(0,0,0,0.8);transition:background .3s;display:flex;flex-direction:column;color:var(--text)}
+.phone.t-mono-l{--bg:#ECECEE;--text:#22262C;--muted:#6E747C;--blue:#7E8A94;--bluetext:#2A313C;--fireText:#FFFFFF;--tint:#EC6A1E;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.66);--surfbd:rgba(0,0,0,0.07);--hair:rgba(0,0,0,0.07);--thumbbg:#D8D8DC;--glowA:rgba(58,66,80,0.10);--glowB:rgba(236,106,30,0.12);--danger:#C0392B;--scrim:rgba(6,10,18,0.35);--card:#F7F7F8;--need:#B7791F;--needink:#FFFFFF;--ok:#087A52;--okink:#FFFFFF;--flame:#E8590C;--page:rgba(255,255,255,0.72)}
+.phone.t-ocean-d{--bg:#1A2332;--text:#FFFFFF;--muted:#A8B8D8;--blue:#5DADE2;--bluetext:#BFE3F7;--fireText:#0A1422;--tint:#5DA0E5;--glass:rgba(255,255,255,0.07);--glassbd:rgba(255,255,255,0.13);--surf:rgba(255,255,255,0.05);--surfbd:rgba(255,255,255,0.10);--hair:rgba(255,255,255,0.08);--thumbbg:#2C3E50;--glowA:rgba(74,144,226,0.32);--glowB:rgba(93,173,226,0.16);--card:#233041;--page:rgba(255,255,255,0.055)}
+.phone.t-ocean-l{--bg:#E8F4F8;--text:#1A3A52;--muted:#4A6B7C;--blue:#42A5F5;--bluetext:#0D47A1;--fireText:#FFFFFF;--tint:#1976D2;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.7);--surfbd:rgba(13,71,161,0.10);--hair:rgba(13,71,161,0.08);--thumbbg:#CFE4EC;--glowA:rgba(25,118,210,0.18);--glowB:rgba(66,165,245,0.13);--danger:#C0392B;--scrim:rgba(6,10,18,0.35);--card:#F3F9FC;--need:#B7791F;--needink:#FFFFFF;--ok:#087A52;--okink:#FFFFFF;--flame:#E8590C;--page:rgba(255,255,255,0.74)}
+/* frame 5: the phone turned sideways */
+.phone.land{width:840px;height:392px;border-radius:40px}
+.phone.land .sb{display:none}
+.phone.land .screen{padding:0}
+
+.glow{position:absolute;top:-120px;right:-80px;width:360px;height:320px;border-radius:50%;background:radial-gradient(circle,var(--glowA),transparent 66%);z-index:0;pointer-events:none}
+.glow2{position:absolute;top:-70px;left:-90px;width:300px;height:280px;border-radius:50%;background:radial-gradient(circle,var(--glowB),transparent 68%);z-index:0;pointer-events:none}
+.sb{position:relative;z-index:3;display:flex;justify-content:space-between;align-items:center;padding:16px 30px 4px;font-size:13px;font-weight:600;font-family:'JetBrains Mono',ui-monospace,monospace}
+.screen{position:relative;z-index:2;flex:1;overflow-y:auto;overflow-x:hidden;padding:0 0 40px;scrollbar-width:none;display:flex;flex-direction:column}
+.screen::-webkit-scrollbar{display:none}
+.design{display:none;padding:6px 16px 0;animation:fade .35s ease;flex:1;flex-direction:column}
+.design.on{display:flex}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.bcap{font-size:10.5px;color:var(--muted);font-style:italic;margin:10px 2px 10px;line-height:1.5}
+
+.ic{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+.gcard{background:var(--glass);border:1px solid var(--glassbd);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.scard{background:var(--surf);border:1px solid var(--surfbd)}
+.c38{width:38px;height:38px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;background:var(--glass);border:1px solid var(--glassbd);color:var(--text);cursor:pointer}
+.hdr{display:flex;align-items:center;gap:8px;margin:2px 0 12px}
+.hsp{width:38px;flex:0 0 auto}
+.hmid{flex:1;text-align:center;min-width:0}
+.eyebrow{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;letter-spacing:1.6px;text-transform:uppercase;color:var(--tint);font-weight:600}
+.htitle{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:700;font-size:19px;letter-spacing:-0.3px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.navpill{display:inline-flex;align-items:center;gap:4px;padding:6px 10px;border-radius:16px;font-size:12.5px;font-weight:700;color:var(--tint);background:color-mix(in srgb,var(--tint) 11%,transparent);cursor:pointer;white-space:nowrap;flex:0 0 auto}
+.navpill .ic{width:14px;height:14px}
+.navpill .chev{width:11px;height:11px}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+.disp{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif}
+.zlabel{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px;margin:14px 2px 10px}
+.zlabel .ln{flex:1;height:1px;background:var(--hair)}
+.cpill{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;font-weight:600;color:var(--bluetext);background:color-mix(in srgb,var(--blue) 20%,transparent);padding:2px 8px;border-radius:9px;white-space:nowrap}
+.needpill{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:7.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--needink);background:var(--need);padding:3px 6px;border-radius:6px;white-space:nowrap}
+.okpill{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:7.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--okink);background:var(--ok);padding:3px 6px;border-radius:6px;white-space:nowrap}
+.statline{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;letter-spacing:.4px;text-align:center;color:var(--muted);margin-bottom:12px}
+
+/* food photo stand-ins */
+.ph{background:linear-gradient(135deg,#8A4A1E,#3B1E0C)}
+.ph.pa{background:linear-gradient(135deg,#D08A3A,#6B3A12)}       /* scallops */
+.ph.pb{background:linear-gradient(135deg,#4F7A3A,#1F3A16)}       /* greens */
+.ph.pc{background:linear-gradient(135deg,#B8442A,#4A1A10)}       /* tomato */
+.ph.pd{background:linear-gradient(135deg,#5A2A22,#2A110E)}       /* steak */
+.ph.pe{background:linear-gradient(135deg,#6B4A32,#2B1C12)}       /* cocoa */
+.ph.pf{background:linear-gradient(135deg,#C9A36A,#6E4F2A)}       /* bread */
+.ph.pg{background:linear-gradient(135deg,#3E6E7C,#15303A)}       /* seafood */
+.ph.phh{background:linear-gradient(135deg,#9A7A2A,#4A3610)}      /* butter */
+
+/* ---- hub (frames 1) ---- */
+.tilerow{display:flex;gap:8px;margin-bottom:10px}
+.ptile{flex:1;min-width:0;border-radius:14px;padding:10px 9px;display:flex;flex-direction:column;gap:8px;background:var(--surf);border:1px solid var(--surfbd)}
+.ptile.off{opacity:.78}
+.ptile .top{display:flex;align-items:center;gap:5px;font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:600;font-size:12px;min-width:0}
+.ptile .top span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ptile .top .ic{color:var(--tint);width:15px;height:15px}
+.nowpill{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:6.5px;font-weight:700;letter-spacing:.5px;color:var(--fireText);background:var(--tint);padding:2px 4px;border-radius:5px;margin-left:auto;flex:0 0 auto}
+.ptile .foot{display:flex;align-items:center;gap:6px}
+.ring{position:relative;width:36px;height:36px;flex:0 0 auto}
+.ring svg{width:100%;height:100%}
+.ring svg{transform:rotate(-90deg)}
+.ring .rlab{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;font-weight:700;color:var(--tint)}
+.ring.zero .rlab{color:var(--muted)}
+.ptile .stat b{display:block;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11.5px;font-weight:600}
+.ptile .stat span{font-size:9px;color:var(--muted);white-space:nowrap}
+.grid{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px 0}
+.gtile{width:48.5%;border-radius:14px;padding:12px;min-height:104px;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;background:var(--surf);border:1px solid var(--surfbd)}
+.gtile .toprow{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
+.ichip{width:34px;height:34px;border-radius:11px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;background:color-mix(in srgb,var(--tint) 13%,transparent);color:var(--tint)}
+.peek{display:flex}
+.peek span{width:32px;height:32px;border-radius:10px;border:1.5px solid var(--bg);margin-left:-9px}
+.peek span:first-child{margin-left:0}
+.gtile .nm{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:600;font-size:13.5px;line-height:1.2}
+.gtile .ct{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;color:var(--muted);margin-top:3px}
+.gtile .ct b{color:var(--need);font-weight:600}
+.gtile.wide{width:100%;min-height:0;flex-direction:row;align-items:center;gap:12px;padding:12px 13px;background:color-mix(in srgb,var(--tint) 9%,transparent);border-color:color-mix(in srgb,var(--tint) 24%,transparent)}
+.gtile.wide .bd{flex:1;min-width:0}
+.chevr{width:14px;height:14px;color:var(--muted);flex:0 0 auto}
+
+/* ---- the book page (frame 2 + the editor's host page) ---- */
+.srow{display:flex;align-items:center;gap:9px;padding:0 12px;height:42px;border-radius:14px;margin-bottom:10px;background:var(--glass);border:1px solid var(--glassbd)}
+.srow .ic{color:var(--muted);width:16px;height:16px}
+.srow span{flex:1;font-size:13.5px;color:var(--muted)}
+.srow .bolt{width:26px;height:26px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--tint) 14%,transparent);color:var(--tint)}
+.srow .bolt .ic{color:var(--tint);width:13px;height:13px}
+.cats{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:10px;margin:0 -16px;padding-left:16px;padding-right:16px}
+.cats::-webkit-scrollbar{display:none}
+.cat{flex:0 0 auto;padding:7px 12px;border-radius:11px;font-size:12.5px;font-weight:600;background:var(--glass);border:1px solid var(--glassbd);color:var(--text);position:relative}
+.cat::after{content:'';position:absolute;left:12px;right:12px;bottom:3px;height:2px;border-radius:1px;background:var(--cc,var(--tint));opacity:.9}
+.cat.on{background:var(--cc,var(--tint));color:#fff;border-color:transparent}
+.cat.on::after{display:none}
+.subs{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:12px;margin:0 -16px;padding-left:16px;padding-right:16px}
+.subs::-webkit-scrollbar{display:none}
+.sub{flex:0 0 auto;height:30px;padding:0 11px;border-radius:9px;font-size:12px;font-weight:600;display:inline-flex;align-items:center;background:var(--surf);border:1px solid var(--surfbd);color:var(--muted)}
+.sub.on{color:var(--text);box-shadow:inset 0 -2px 0 var(--cc,var(--tint))}
+.rgrid{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px 0}
+.rcard{width:48.5%;aspect-ratio:1;border-radius:13px;overflow:hidden;position:relative;border:1px solid var(--glassbd);cursor:pointer}
+.rcard .scrim{position:absolute;left:0;right:0;bottom:0;height:62%;background:linear-gradient(to bottom,transparent,rgba(8,10,14,0.32),rgba(8,10,14,0.86))}
+.rcard .nm{position:absolute;left:9px;right:9px;bottom:8px;font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:600;font-size:13.5px;line-height:1.2;color:#fff}
+.rcard .meta{display:block;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;color:#FFB07A;margin-top:2px;font-weight:600}
+.phone.t-ocean-d .rcard .meta,.phone.t-ocean-l .rcard .meta{color:#BFE3F7}
+.rcard .tag{position:absolute;top:8px;right:8px}
+.rcard.empty{background:var(--surf)}
+.rcard.empty .nm{color:var(--text)}
+.rcard.empty .meta{color:var(--muted)}
+.rcard.empty .scrim{display:none}
+.rcard.empty .ph{position:absolute;inset:0;opacity:.5}
+.rlist .rrow{display:flex;align-items:center;gap:11px;padding:9px 10px;border-radius:13px;margin-bottom:8px;background:var(--surf);border:1px solid var(--surfbd)}
+.rlist .th{width:52px;height:52px;border-radius:11px;flex:0 0 auto}
+.rlist .bd{flex:1;min-width:0}
+.rlist .nm{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:600;font-size:14px}
+.rlist .mt{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;color:var(--muted);margin-top:3px}
+
+/* ---- the Poster (frame 3) ---- */
+.poster{position:absolute;inset:0;z-index:40;display:flex;flex-direction:column;background:var(--bg)}
+.poster .hero{height:46%;flex:0 0 auto;position:relative;overflow:hidden}
+.poster .hero .ph{position:absolute;inset:0}
+.poster .hero .hscrim{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,0.15),transparent 35%,rgba(10,10,14,0.55) 75%,var(--bg))}
+.poster .grab{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:40px;height:4px;border-radius:2px;background:rgba(255,255,255,0.55)}
+.poster .dots{position:absolute;top:22px;left:50%;transform:translateX(-50%);display:flex;gap:4px}
+.poster .dots i{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,0.45)}
+.poster .dots i.on{background:#fff}
+.poster .tblock{position:absolute;left:18px;right:18px;bottom:14px}
+.pills{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;align-items:center}
+.pill{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;font-weight:600;letter-spacing:.4px;padding:4px 8px;border-radius:7px;background:var(--slate);color:#fff;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pill.gold{background:#F5B942;color:#1F1A10}
+.pill.price{margin-left:auto;background:var(--tint);color:var(--fireText);font-size:14px;max-width:none}
+.ptitle{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:700;font-size:30px;letter-spacing:-0.6px;line-height:1.02;color:#fff;text-shadow:0 2px 14px rgba(0,0,0,0.4)}
+.panel{flex:1;margin-top:-22px;border-radius:22px 22px 0 0;padding:14px 16px 30px;background:color-mix(in srgb,var(--bg) 88%,var(--text) 12%);border-top:1px solid var(--glassbd);overflow-y:auto;scrollbar-width:none;position:relative;z-index:2}
+.panel::-webkit-scrollbar{display:none}
+.actrow{display:flex;gap:8px;margin-bottom:12px;align-items:center}
+.cap{display:flex;padding:3px;gap:3px;border-radius:12px;background:var(--glass);border:1px solid var(--glassbd);flex:1}
+.cap span{flex:1;text-align:center;padding:9px 6px;border-radius:9px;font-size:12px;font-weight:600;color:var(--muted);display:inline-flex;align-items:center;justify-content:center;gap:5px}
+.cap span .ic{width:13px;height:13px}
+.cap span.on{background:var(--tint);color:var(--fireText)}
+.cap.sm span{padding:6px 6px;font-size:11px}
+.achip{height:44px;width:44px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;background:var(--glass);border:1px solid var(--glassbd);color:var(--text);flex:0 0 auto}
+.achip.on{color:var(--tint)}
+.achip.wide{width:auto;padding:0 13px;gap:7px;font-size:13px;font-weight:600}
+.achip.wide .ic{color:var(--flame)}
+.keep{display:inline-flex;align-items:center;gap:5px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin:0 2px 12px}
+.keep .ic{width:11px;height:11px;color:var(--ok)}
+.facts{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:10px}
+.fact{border-radius:12px;padding:8px 6px;text-align:center;background:var(--surf);border:1px solid var(--surfbd);min-width:0}
+.fact .k{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:7.5px;letter-spacing:.9px;text-transform:uppercase;color:var(--muted)}
+.fact .v{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:700;font-size:13px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fact .u{font-size:9px;color:var(--muted)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+.chip{font-size:11px;font-weight:600;padding:5px 9px;border-radius:9px;background:var(--surf);border:1px solid var(--surfbd);display:inline-flex;align-items:center;gap:5px}
+.chip .ic{width:12px;height:12px}
+.chip.al{background:color-mix(in srgb,var(--danger) 12%,transparent);border-color:color-mix(in srgb,var(--danger) 30%,transparent)}
+.chip.st{background:color-mix(in srgb,var(--flame) 12%,transparent);border-color:color-mix(in srgb,var(--flame) 30%,transparent);color:var(--text)}
+.chip.st .ic{color:var(--flame)}
+.sech{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);margin:14px 2px 8px;display:flex;align-items:center;gap:8px}
+.sech .ln{flex:1;height:1px;background:var(--hair)}
+.ing{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--hair);font-size:13.5px}
+.ing .am{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;color:var(--tint);width:64px;flex:0 0 auto;font-weight:600}
+.ing .pr{color:var(--muted);font-size:12px}
+.step{display:flex;gap:11px;padding:12px 0;border-bottom:1px solid var(--hair)}
+.step .n{width:28px;height:28px;border-radius:9px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;font-weight:700;background:color-mix(in srgb,var(--tint) 14%,transparent);color:var(--tint)}
+.step .bd{flex:1;min-width:0}
+.step .t{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:600;font-size:15px;margin-bottom:3px}
+.step .x{font-size:13.5px;line-height:1.5;color:var(--text)}
+.pg{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:9px}
+.pg .ph{aspect-ratio:1;border-radius:10px;border:1px solid var(--glassbd)}
+.pg.two{grid-template-columns:1fr 1fr}
+.pg.two .ph{aspect-ratio:1.6}
+.note{border-radius:13px;padding:12px 13px;background:var(--surf);border:1px solid var(--surfbd);font-size:13px;line-height:1.5;margin-top:4px}
+.note b{display:block;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;font-weight:600}
+
+/* ---- sheets ---- */
+.ovl{position:absolute;inset:0;z-index:50;display:none;flex-direction:column;justify-content:flex-end}
+.ovl.show{display:flex}
+.ovl .scr{position:absolute;inset:0;background:var(--scrim)}
+.sheet{position:relative;z-index:2;border-radius:26px 26px 0 0;padding:10px 18px 26px;max-height:92%;overflow-y:auto;scrollbar-width:none;
+  background:color-mix(in srgb,var(--bg) 90%,var(--text) 10%);box-shadow:0 -18px 44px rgba(0,0,0,0.25);animation:up .32s cubic-bezier(.32,.72,.28,1)}
+.sheet::-webkit-scrollbar{display:none}
+.sheet.tall{height:92%;display:flex;flex-direction:column;padding-bottom:0;overflow:hidden}
+.sheet.tall .sbody{flex:1;overflow-y:auto;scrollbar-width:none;padding-bottom:12px}
+.sheet.tall .sbody::-webkit-scrollbar{display:none}
+@keyframes up{from{transform:translateY(60px);opacity:0}to{transform:none;opacity:1}}
+.grabber{width:40px;height:4px;border-radius:2px;background:var(--hair);margin:2px auto 14px;flex:0 0 auto}
+.shead{display:flex;align-items:flex-start;gap:10px;margin-bottom:12px}
+.shead .t{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:700;font-size:18px;letter-spacing:-0.3px;flex:1}
+.shead .s{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.45}
+.xbtn{width:30px;height:30px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;background:var(--glass);border:1px solid var(--glassbd);color:var(--muted);cursor:pointer;flex:0 0 auto}
+.arow{display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:13px;margin-bottom:8px;font-size:14.5px;font-weight:600;background:var(--surf);border:1px solid var(--surfbd);cursor:pointer}
+.arow .ic{color:var(--tint);width:17px;height:17px}
+.arow .sub{font-size:11px;color:var(--muted);font-weight:400;margin-top:1px}
+.arow .bd{flex:1;min-width:0}
+.arow.lock{opacity:.62}
+.arow.lock .ic{color:var(--muted)}
+.trow{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:13px;margin:4px 0 8px;background:var(--glass);border:1px solid var(--glassbd);font-size:13.5px;font-weight:600}
+.trow .bd{flex:1}
+.trow .sub{font-size:11px;color:var(--muted);font-weight:400;margin-top:1px}
+.tog{width:44px;height:26px;border-radius:13px;background:var(--tint);position:relative;flex:0 0 auto}
+.tog::after{content:'';position:absolute;top:3px;right:3px;width:20px;height:20px;border-radius:50%;background:#fff}
+.tog.off{background:var(--glassbd)}
+.tog.off::after{right:auto;left:3px}
+
+/* ---- steps view (frame 4) ---- */
+.stepsv{position:absolute;inset:0;z-index:40;display:flex;flex-direction:column;background:var(--bg);padding:52px 18px 20px}
+.stepsv .top{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.stepsv .prog{flex:1}
+.stepsv .prog .l{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;display:flex;justify-content:space-between}
+.stepsv .prog .l b{color:var(--tint)}
+.segs{display:flex;gap:4px}
+.segs i{flex:1;height:4px;border-radius:2px;background:var(--glassbd)}
+.segs i.d{background:var(--tint)}
+.segs i.c{background:var(--tint);opacity:.55}
+.stepsv .body{flex:1;overflow:hidden;display:flex;flex-direction:column}
+.stepsv .eb{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:1.6px;text-transform:uppercase;color:var(--tint);font-weight:600;margin-bottom:6px}
+.stepsv h2{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:700;font-size:27px;letter-spacing:-0.5px;line-height:1.08;margin-bottom:12px;text-wrap:balance}
+.stepsv p{font-size:17px;line-height:1.5}
+.stepsv .pg{margin-top:14px}
+.bigrow{display:flex;gap:10px;margin-top:14px}
+.big{flex:1;height:64px;border-radius:18px;display:inline-flex;align-items:center;justify-content:center;gap:9px;font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:700;font-size:17px;background:var(--glass);border:1px solid var(--glassbd)}
+.big.go{flex:1.6;background:var(--tint);color:var(--fireText);border-color:transparent;box-shadow:0 10px 30px -12px color-mix(in srgb,var(--tint) 70%,transparent)}
+.big .ic{width:20px;height:20px}
+.tiphint{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:.6px;text-align:center;color:var(--muted);margin-top:10px}
+.tapzone{position:absolute;top:120px;bottom:120px;right:0;width:34%;border-left:1px dashed color-mix(in srgb,var(--tint) 45%,transparent);background:linear-gradient(to right,transparent,color-mix(in srgb,var(--tint) 7%,transparent));display:flex;align-items:center;justify-content:flex-end;padding-right:12px;pointer-events:none}
+.tapzone span{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;letter-spacing:1px;text-transform:uppercase;color:var(--tint);writing-mode:vertical-rl;opacity:.8}
+
+/* ---- the book reader (frame 5, landscape) ---- */
+.book{position:absolute;inset:0;z-index:40;display:flex;flex-direction:column;padding:16px 22px 14px;background:var(--bg)}
+.book .bar{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.book .bar .cap{flex:0 0 auto;width:220px}
+.spread{flex:1;display:flex;gap:0;position:relative;min-height:0}
+.pagel,.pager{flex:1;min-width:0;border:1px solid var(--surfbd);background:var(--page);padding:16px 18px 30px;position:relative;overflow:hidden;display:flex;flex-direction:column}
+.pagel{border-radius:16px 3px 3px 16px;box-shadow:inset -14px 0 24px -16px rgba(0,0,0,0.45)}
+.pager{border-radius:3px 16px 16px 3px;box-shadow:inset 14px 0 24px -16px rgba(0,0,0,0.45)}
+.gut{width:2px;background:linear-gradient(to bottom,transparent,rgba(0,0,0,0.5),transparent);flex:0 0 auto}
+.pno{position:absolute;bottom:9px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1px;color:var(--muted)}
+.pagel .pno{left:18px}
+.pager .pno{right:18px}
+.page .eb,.pagel .eb,.pager .eb{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1.6px;text-transform:uppercase;color:var(--tint);font-weight:600;margin-bottom:6px}
+.pagel h2,.pager h2{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:700;font-size:24px;letter-spacing:-0.5px;line-height:1.05;margin-bottom:10px;text-wrap:balance}
+.pagel p,.pager p{font-size:14.5px;line-height:1.5;max-width:62ch}
+.pager .pg{margin-top:0;flex:1;grid-template-rows:1fr 1fr;gap:8px}
+.pager .pg .ph{aspect-ratio:auto;height:100%;border-radius:12px}
+.pagel.cover{padding:0;border-color:transparent}
+.pagel.cover .ph{position:absolute;inset:0}
+.pagel.cover .hscrim{position:absolute;inset:0;background:linear-gradient(to top,rgba(8,10,14,0.88),rgba(8,10,14,0.2) 55%,transparent)}
+.pagel.cover .tblock{position:absolute;left:16px;right:16px;bottom:16px}
+.pagel.cover .ptitle{font-size:28px}
+.pager .facts{grid-template-columns:repeat(3,1fr);margin-bottom:8px}
+.pager .ing{padding:6px 0;font-size:12.5px}
+.pager .ing .am{width:54px;font-size:11px}
+.edge{position:absolute;top:50%;transform:translateY(-50%);width:28px;height:52px;border-radius:9px;display:flex;align-items:center;justify-content:center;background:var(--glass);border:1px solid var(--glassbd);color:var(--muted)}
+.edge.l{left:-6px}.edge.r{right:-6px}
+.edge .ic{width:14px;height:14px}
+.bookfoot{display:flex;justify-content:center;align-items:center;gap:7px;margin-top:9px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+.bookfoot .dd{display:flex;gap:4px}
+.bookfoot .dd i{width:5px;height:5px;border-radius:50%;background:var(--glassbd)}
+.bookfoot .dd i.on{background:var(--tint)}
+/* rotate prompt */
+.rot{position:absolute;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:28px;background:var(--scrim);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.rotcard{width:100%;border-radius:24px;padding:26px 20px 20px;text-align:center;background:color-mix(in srgb,var(--bg) 86%,var(--text) 14%);border:1px solid var(--glassbd);box-shadow:0 30px 60px -20px rgba(0,0,0,0.6)}
+.rotico{width:84px;height:84px;margin:0 auto 14px;position:relative}
+.rotico .ph1{position:absolute;left:28px;top:6px;width:28px;height:52px;border-radius:7px;border:2.5px solid var(--text);opacity:.35}
+.rotico .ph2{position:absolute;left:10px;top:30px;width:64px;height:30px;border-radius:7px;border:2.5px solid var(--tint);animation:rot 2.6s ease-in-out infinite;transform-origin:center}
+@keyframes rot{0%,20%{transform:rotate(-90deg)}50%,80%{transform:rotate(0)}100%{transform:rotate(-90deg)}}
+.rotcard h3{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:700;font-size:21px;letter-spacing:-0.4px;margin-bottom:6px}
+.rotcard p{font-size:13px;line-height:1.5;color:var(--muted);margin-bottom:16px}
+.ckrow{display:flex;align-items:center;justify-content:center;gap:9px;font-size:13px;font-weight:600;margin-bottom:14px}
+.ck{width:22px;height:22px;border-radius:7px;border:1.5px solid var(--glassbd);display:inline-flex;align-items:center;justify-content:center;background:var(--glass)}
+.ck.on{background:var(--tint);border-color:var(--tint);color:var(--fireText)}
+.ck .ic{width:13px;height:13px}
+.cta{height:47px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:700;font-size:15px;background:var(--tint);color:var(--fireText)}
+.lnk{display:block;margin-top:12px;font-size:12.5px;font-weight:600;color:var(--tint)}
+
+/* ---- editor (frame 6) ---- */
+.rail{display:flex;gap:5px;margin:0 0 14px}
+.rail div{flex:1;text-align:center}
+.rail i{display:block;height:3px;border-radius:2px;background:var(--glassbd);margin-bottom:5px}
+.rail div.done i{background:var(--ok)}
+.rail div.live i{background:var(--tint)}
+.rail span{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted)}
+.rail div.live span{color:var(--tint);font-weight:700}
+.rail div.done span{color:var(--text)}
+.fl{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);margin:10px 2px 6px;display:flex;align-items:center;gap:6px}
+.fl em{font-style:normal;color:var(--tint)}
+.inp{height:43px;border-radius:12px;padding:0 13px;display:flex;align-items:center;gap:9px;font-size:14px;background:var(--glass);border:1px solid var(--glassbd)}
+.inp.ta{height:auto;min-height:74px;align-items:flex-start;padding:11px 13px;line-height:1.45}
+.inp .ph-t{color:var(--muted)}
+.inp .ic{width:15px;height:15px;color:var(--muted);margin-left:auto}
+.inp .mini{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8px;letter-spacing:.7px;text-transform:uppercase;color:var(--bluetext);background:color-mix(in srgb,var(--blue) 20%,transparent);padding:3px 6px;border-radius:6px;margin-left:auto}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.strip{display:flex;gap:8px;margin-bottom:4px}
+.strip .ph,.strip .add{width:74px;height:74px;border-radius:13px;position:relative;flex:0 0 auto}
+.strip .ph{border:1px solid var(--glassbd)}
+.strip .add{border:1.5px dashed var(--glassbd);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--muted);font-family:'JetBrains Mono',ui-monospace,monospace;font-size:7.5px;letter-spacing:.6px;text-transform:uppercase}
+.strip .cov{position:absolute;left:5px;bottom:5px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:7px;font-weight:700;letter-spacing:.7px;color:#1F1A10;background:#F5B942;padding:2px 5px;border-radius:5px}
+.strip.sm .ph,.strip.sm .add{width:58px;height:58px;border-radius:11px}
+.pick{display:flex;gap:6px;flex-wrap:wrap}
+.pick span{font-size:12px;font-weight:600;padding:7px 10px;border-radius:10px;background:var(--glass);border:1px solid var(--glassbd);display:inline-flex;align-items:center;gap:6px;color:var(--text)}
+.pick span .slot{width:14px;height:14px;border-radius:50%;border:1.5px solid var(--glassbd);display:inline-flex;align-items:center;justify-content:center}
+.pick span.on{border-color:var(--tint);box-shadow:inset 0 0 0 1px var(--tint)}
+.pick span.on .slot{border-color:var(--tint);background:var(--tint);color:var(--fireText)}
+.pick span .slot .ic{width:9px;height:9px}
+.scard.stepc{border-radius:15px;padding:12px 12px 12px;margin-bottom:10px}
+.stepc .sh{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.stepc .sh .n{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:var(--tint);font-weight:700;flex:1}
+.stepc .sh .ic{width:15px;height:15px;color:var(--muted)}
+.stepc .inp{margin-bottom:8px}
+.addstep{height:47px;border-radius:14px;border:1.5px dashed var(--glassbd);display:flex;align-items:center;justify-content:center;gap:7px;font-size:13.5px;font-weight:600;color:var(--tint);margin-bottom:6px}
+.addstep .ic{width:15px;height:15px}
+.dock{display:flex;gap:8px;padding:10px 0 20px;border-top:1px solid var(--hair);flex:0 0 auto;background:color-mix(in srgb,var(--bg) 90%,var(--text) 10%)}
+.dock .b{flex:1;height:47px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:700;font-size:15px;background:var(--glass);border:1px solid var(--glassbd)}
+.dock .b.go{background:var(--tint);color:var(--fireText);border-color:transparent;flex:1.4}
+.rev{border-radius:16px;overflow:hidden;background:var(--surf);border:1px solid var(--surfbd);margin-bottom:10px}
+.rev .rh{height:120px;position:relative}
+.rev .rh .ph{position:absolute;inset:0}
+.rev .rh .hscrim{position:absolute;inset:0;background:linear-gradient(to top,rgba(8,10,14,0.85),transparent 70%)}
+.rev .rh .tb2{position:absolute;left:12px;right:12px;bottom:10px}
+.rev .rh .ptitle{font-size:20px}
+.rev .facts{grid-template-columns:repeat(5,1fr);padding:10px 10px 4px;margin:0}
+.rline{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--hair);font-size:13px}
+.rline:last-child{border-bottom:0}
+.rline .st{width:18px;height:18px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;background:color-mix(in srgb,var(--ok) 18%,transparent);color:var(--ok)}
+.rline .st.em{background:color-mix(in srgb,var(--need) 18%,transparent);color:var(--need)}
+.rline .st .ic{width:11px;height:11px}
+.rline .bd{flex:1;min-width:0}
+.rline .m{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;color:var(--muted)}
+.rline .ed{font-size:12px;font-weight:700;color:var(--tint)}
+
+/* ---- checklists (frame 7) ---- */
+.prog2{display:flex;align-items:center;gap:12px;padding:12px 13px;border-radius:14px;margin-bottom:12px;background:var(--surf);border:1px solid var(--surfbd)}
+.prog2 .ring{width:46px;height:46px}
+.prog2 b{display:block;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:13px}
+.prog2 span{font-size:11px;color:var(--muted)}
+.catc{border-radius:15px;overflow:hidden;background:var(--surf);border:1px solid var(--surfbd);margin-bottom:10px}
+.catc .ch{display:flex;align-items:center;gap:9px;padding:11px 12px;border-bottom:1px solid var(--hair)}
+.catc .ch .nm{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:600;font-size:14px;flex:1}
+.catc .ch .ct{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;color:var(--muted)}
+.catc .ch .ic{width:15px;height:15px;color:var(--muted)}
+.att{display:flex;align-items:center;gap:9px;margin:9px 12px 3px;padding:9px 10px;border-radius:12px;background:color-mix(in srgb,var(--blue) 12%,transparent);border:1px solid color-mix(in srgb,var(--blue) 28%,transparent);font-size:12.5px;font-weight:600}
+.att .ic{width:15px;height:15px;color:var(--blue)}
+.att .bd{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.att .sub{display:block;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;color:var(--muted);font-weight:500;margin-top:1px}
+.att .dl{width:30px;height:30px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;background:var(--glass);border:1px solid var(--glassbd);flex:0 0 auto}
+.att .dl .ic{color:var(--text);width:13px;height:13px}
+.item{display:flex;align-items:center;gap:11px;padding:11px 12px;border-bottom:1px solid var(--hair);font-size:13.5px}
+.item:last-child{border-bottom:0}
+.item .ck{width:24px;height:24px;border-radius:8px}
+.item.done{color:var(--muted);text-decoration:line-through}
+.item .gr{color:var(--muted)}
+.item .gr .ic{width:14px;height:14px}
+.item .bd{flex:1}
+.item .dots{color:var(--muted)}
+.item .dots .ic{width:14px;height:14px}
+.additem{display:flex;align-items:center;gap:8px;padding:11px 12px;color:var(--tint);font-size:13px;font-weight:600}
+.additem .ic{width:14px;height:14px}
+.atiles{display:flex;gap:8px;margin:9px 12px 4px}
+.atile{flex:1;height:56px;border-radius:12px;border:1.5px dashed var(--glassbd);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;font-weight:600;color:var(--muted)}
+.atile .ic{width:15px;height:15px;color:var(--tint)}
+.attx{width:26px;height:26px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;background:var(--glass);border:1px solid var(--glassbd);color:var(--muted);flex:0 0 auto}
+.attx .ic{width:12px;height:12px;color:var(--muted)}
+
+/* ---- job & access (frame 8) ---- */
+.tabs{display:flex;gap:5px;overflow-x:auto;scrollbar-width:none;margin:0 -16px 12px;padding:0 16px 2px}
+.tabs::-webkit-scrollbar{display:none}
+.tabs span{flex:0 0 auto;padding:8px 12px;border-radius:11px;font-size:12.5px;font-weight:600;color:var(--muted);background:var(--glass);border:1px solid var(--glassbd)}
+.tabs span.on{background:var(--tint);color:var(--fireText);border-color:transparent}
+.secttl{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:700;font-size:16px;margin:6px 2px 4px}
+.sechint{font-size:12px;color:var(--muted);line-height:1.45;margin:0 2px 12px}
+.asst{border-radius:15px;background:var(--surf);border:1px solid var(--surfbd);margin-bottom:10px;overflow:hidden}
+.asst .ah{display:flex;align-items:center;gap:11px;padding:12px 13px}
+.asst .ah .ichip{width:36px;height:36px}
+.asst .ah .ichip.k{background:color-mix(in srgb,var(--flame) 14%,transparent);color:var(--flame)}
+.asst .ah .ichip.b{background:rgba(93,160,229,0.14);color:#5DA0E5}
+.asst .ah .ichip.h{background:rgba(124,92,224,0.14);color:#9A86E8}
+.asst .ah .bd{flex:1;min-width:0}
+.asst .ah .nm{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:600;font-size:14.5px}
+.asst .ah .mt{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;color:var(--muted);margin-top:2px}
+.asst .ab{padding:0 13px 13px;border-top:1px solid var(--hair)}
+.asst .fl{margin-top:12px}
+.asst .pick span{font-size:12px}
+.asst .sm{font-size:11px;color:var(--muted);line-height:1.45;margin-top:8px}
+</style>
+</head>
+<body>
+
+<svg style="display:none" aria-hidden="true"><defs>
+<symbol id="i-back" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
+<symbol id="i-chevr" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+<symbol id="i-chevl" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></symbol>
+<symbol id="i-chevd" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+<symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></symbol>
+<symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></symbol>
+<symbol id="i-people" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><circle cx="17" cy="9" r="2.6"/><path d="M2.5 20a6.5 6.5 0 0113 0M14.5 20a5 5 0 017-3.5"/></symbol>
+<symbol id="i-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></symbol>
+<symbol id="i-fork" viewBox="0 0 24 24"><path d="M7 3v7a3 3 0 006 0V3M10 3v18M17 3c-2 2-2 6-2 8h2v10"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-leaf" viewBox="0 0 24 24"><path d="M4 20C6 10 12 5 21 4c-1 9-6 15-16 16z"/><path d="M4 20c4-4 7-7 10-9"/></symbol>
+<symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></symbol>
+<symbol id="i-pencil" viewBox="0 0 24 24"><path d="M4 20l4-1 10-10-3-3L5 16z"/><path d="M13 7l3 3"/></symbol>
+<symbol id="i-sunrise" viewBox="0 0 24 24"><path d="M3 17h18M5 13a7 7 0 0114 0M12 3v4M4.9 7.9l1.6 1.6M19.1 7.9l-1.6 1.6"/></symbol>
+<symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 019.5 4a8 8 0 1010.5 10.5z"/></symbol>
+<symbol id="i-run" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></symbol>
+<symbol id="i-drag" viewBox="0 0 24 24"><path d="M4 8h16M4 12h16M4 16h16"/></symbol>
+<symbol id="i-dots" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4-4"/></symbol>
+<symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></symbol>
+<symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 22c4.4 0 7-3 7-7 0-3.5-2-5.5-3.5-8-1 2.5-2 3-2.5 3C13 7 12.5 4 10 2c.5 4-3 5.5-4.4 9.4C4.5 15 6.5 22 12 22z"/></symbol>
+<symbol id="i-pot" viewBox="0 0 24 24"><path d="M4 10h16v6a4 4 0 01-4 4H8a4 4 0 01-4-4z"/><path d="M2 10h20M8 6c0-2 1-2 1-3M12 6c0-2 1-2 1-3M16 6c0-2 1-2 1-3"/></symbol>
+<symbol id="i-cake" viewBox="0 0 24 24"><path d="M4 13h16v7H4zM6 13V9h12v4M12 9V5M12 5c-1-1-1-2 0-3 1 1 1 2 0 3z"/></symbol>
+<symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"/></symbol>
+<symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20s-7-4.6-7-10a4 4 0 017-2.5A4 4 0 0119 10c0 5.4-7 10-7 10z"/></symbol>
+<symbol id="i-share" viewBox="0 0 24 24"><path d="M12 15V4M7 9l5-5 5 5"/><path d="M5 14v5a1 1 0 001 1h12a1 1 0 001-1v-5"/></symbol>
+<symbol id="i-doc" viewBox="0 0 24 24"><path d="M14 2H7a2 2 0 00-2 2v16a2 2 0 002 2h10a2 2 0 002-2V7z"/><path d="M14 2v5h5M8 13h8M8 17h5"/></symbol>
+<symbol id="i-down" viewBox="0 0 24 24"><path d="M12 4v12M6 10l6 6 6-6M4 20h16"/></symbol>
+<symbol id="i-book" viewBox="0 0 24 24"><path d="M3 5h7a2 2 0 012 2v13a2 2 0 00-2-2H3zM21 5h-7a2 2 0 00-2 2v13a2 2 0 012-2h7z"/></symbol>
+<symbol id="i-scroll" viewBox="0 0 24 24"><path d="M6 4h12v16H6z"/><path d="M9 8h6M9 12h6M9 16h4"/></symbol>
+<symbol id="i-steps" viewBox="0 0 24 24"><path d="M9 6h12M9 12h12M9 18h12"/><path d="M3 6h2M3 12h2M3 18h2"/></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></symbol>
+<symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V4M6 10l6-6 6 6"/><path d="M4 20h16"/></symbol>
+<symbol id="i-grad" viewBox="0 0 24 24"><path d="M2 9l10-4 10 4-10 4z"/><path d="M6 11v5c0 1.5 3 3 6 3s6-1.5 6-3v-5"/></symbol>
+<symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 3l10 18H2z"/><path d="M12 10v4M12 17.5v.5"/></symbol>
+<symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1z"/><circle cx="12" cy="13" r="3.4"/></symbol>
+<symbol id="i-gift" viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="4"/><path d="M5 12v8h14v-8M12 8v12M12 8c-2 0-4-1-4-3a2 2 0 014 0c0-1 2-2 4 0 0 2-2 3-4 3z"/></symbol>
+</defs></svg>
+
+<div class="toolbar">
+  <div class="grp"><span class="gl2">Frame</span>
+    <button class="tb on" data-c="f1">1 · Hub</button>
+    <button class="tb" data-c="f2">2 · A menu's book</button>
+    <button class="tb" data-c="f3">3 · Recipe · Scroll</button>
+    <button class="tb" data-c="f4">4 · Steps</button>
+    <button class="tb" data-c="f5">5 · Book reader</button>
+    <button class="tb" data-c="f6">6 · Editor</button>
+    <button class="tb" data-c="f7">7 · Checklists</button>
+    <button class="tb" data-c="f8">8 · Job &amp; Access</button>
+    <button class="tb" data-c="f9">9 · Saved</button>
+  </div>
+  <div class="grp"><span class="gl2">Palette</span>
+    <button class="tb on" data-t="">Mono·D</button>
+    <button class="tb" data-t="t-mono-l">Mono·L</button>
+    <button class="tb" data-t="t-ocean-d">Ocean·D</button>
+    <button class="tb" data-t="t-ocean-l">Ocean·L</button>
+  </div>
+</div>
+<div class="subbar on" id="sub-f1">
+  <div class="grp"><span class="gl2">Who's looking</span>
+    <button class="tb on" data-r="cook">Line cook · view</button>
+    <button class="tb" data-r="chef">Head Chef · recipe editor</button>
+    <button class="tb" data-r="om">Owner / Manager</button>
+  </div>
+  <div class="grp"><span class="gl2">Saved tile</span>
+    <button class="tb on" data-sv="some">5 saved · above the books</button>
+    <button class="tb" data-sv="none">Nothing saved yet</button>
+  </div>
+  <div class="grp"><button class="tb" data-open="navovl">Open the To Editor sheet</button></div>
+</div>
+<div class="subbar" id="sub-f2">
+  <div class="grp"><span class="gl2">Layout</span>
+    <button class="tb on" data-v="grid">Grid · the bar's recipe cards</button>
+    <button class="tb" data-v="list">Rows · the menu editor's</button>
+  </div>
+</div>
+<div class="subbar" id="sub-f3">
+  <div class="grp"><span class="gl2">Moment</span>
+    <button class="tb on" data-p="recipe">The recipe</button>
+    <button class="tb" data-p="pick">First open · pick a view</button>
+    <button class="tb" data-p="menu">From the Menu item's Poster</button>
+  </div>
+</div>
+<div class="subbar" id="sub-f4">
+  <div class="grp"><span class="gl2">Step</span>
+    <button class="tb on" data-s="mid">Step 3 of 7</button>
+    <button class="tb" data-s="last">Last step · plate it</button>
+  </div>
+</div>
+<div class="subbar" id="sub-f5">
+  <div class="grp"><span class="gl2">Spread</span>
+    <button class="tb on" data-b="cover">Cover · facts</button>
+    <button class="tb" data-b="step">A step</button>
+    <button class="tb" data-b="rotate">The rotate prompt</button>
+  </div>
+</div>
+<div class="subbar" id="sub-f6">
+  <div class="grp"><span class="gl2">Page</span>
+    <button class="tb" data-e="basics">Basics</button>
+    <button class="tb" data-e="details">Details</button>
+    <button class="tb on" data-e="steps">Steps</button>
+    <button class="tb" data-e="review">Review</button>
+  </div>
+</div>
+<div class="subbar" id="sub-f7">
+  <div class="grp"><span class="gl2">Side</span>
+    <button class="tb on" data-k="user">Kitchen staff</button>
+    <button class="tb" data-k="editor">Editor</button>
+  </div>
+</div>
+<div class="subbar" id="sub-f9">
+  <div class="grp"><span class="gl2">Sort</span>
+    <button class="tb on" data-sort="book">By book</button>
+    <button class="tb" data-sort="recent">Recent · one grid</button>
+  </div>
+</div>
+<div class="subbar" id="sub-f8">
+  <div class="grp"><span class="gl2">Expanded</span>
+    <button class="tb on" data-j="kitchen">Kitchen Assistant</button>
+    <button class="tb" data-j="bar">Bartender Assistant</button>
+  </div>
+</div>
+<p class="hint" id="hintline"></p>
+
+<div class="phone" id="phone">
+  <div class="glow"></div><div class="glow2"></div>
+  <div class="sb"><span>9:41</span><span>▦ ⌁ ▮</span></div>
+  <div class="screen" id="screen">
+
+  <!-- ============ F1 · HUB ============ -->
+  <div class="design on" id="f1">
+    <div class="hdr"><span class="c38"><svg class="ic"><use href="#i-back"/></svg></span><div class="hmid"><div class="htitle">Kitchen Assistant</div></div>
+      <span class="hsp" id="f1-nav-none"></span>
+      <span class="navpill" id="f1-nav-chef" style="display:none"><svg class="ic"><use href="#i-pencil"/></svg>To Editor</span>
+      <span class="navpill" id="f1-nav-om" style="display:none" data-open="navovl"><svg class="ic"><use href="#i-pencil"/></svg>To Editor<svg class="ic chev"><use href="#i-chevd"/></svg></span>
+    </div>
+    <div class="zlabel">Checklists<span class="ln"></span></div>
+    <div class="tilerow">
+      <div class="ptile"><div class="top"><svg class="ic"><use href="#i-sunrise"/></svg><span>Opening</span><span class="nowpill">NOW</span></div>
+        <div class="foot"><div class="ring"><svg width="40" height="40" viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" fill="none" stroke="var(--glassbd)" stroke-width="4"/><circle cx="20" cy="20" r="16" fill="none" stroke="var(--tint)" stroke-width="4" stroke-dasharray="100.5" stroke-dashoffset="38" stroke-linecap="round"/></svg><div class="rlab">62%</div></div><div class="stat"><b>8 / 13</b><span>today</span></div></div></div>
+      <div class="ptile off"><div class="top"><svg class="ic"><use href="#i-run"/></svg><span>Running</span></div>
+        <div class="foot"><div class="ring zero"><svg width="40" height="40" viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" fill="none" stroke="var(--glassbd)" stroke-width="4"/></svg><div class="rlab">0%</div></div><div class="stat"><b>0 / 6</b><span>today</span></div></div></div>
+      <div class="ptile off"><div class="top"><svg class="ic"><use href="#i-moon"/></svg><span>Closing</span></div>
+        <div class="foot"><div class="ring zero"><svg width="40" height="40" viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" fill="none" stroke="var(--glassbd)" stroke-width="4"/></svg><div class="rlab">0%</div></div><div class="stat"><b>0 / 9</b><span>today</span></div></div></div>
+    </div>
+    <div class="gtile wide" id="f1-saved-top" style="margin-top:2px"><span class="ichip"><svg class="ic"><use href="#i-bookmark"/></svg></span><div class="bd"><div class="nm">Saved Recipes</div><div class="ct">5 saved · 1 no longer on the menu</div></div><span class="peek"><span class="ph pa"></span><span class="ph phh"></span><span class="ph pe"></span></span><svg class="ic chevr"><use href="#i-chevr"/></svg></div>
+    <div class="zlabel">Recipes<span class="ln"></span></div>
+    <div class="grid">
+      <div class="gtile"><div class="toprow"><span class="ichip"><svg class="ic"><use href="#i-leaf"/></svg></span><span class="peek"><span class="ph pa"></span><span class="ph pb"></span><span class="ph pd"></span></span></div><div><div class="nm">Fall Recipes</div><div class="ct" id="f1-ct1">42 recipes</div></div></div>
+      <div class="gtile"><div class="toprow"><span class="ichip"><svg class="ic"><use href="#i-sun"/></svg></span><span class="peek"><span class="ph pg"></span><span class="ph pc"></span><span class="ph pb"></span></span></div><div><div class="nm">Summer Recipes</div><div class="ct" id="f1-ct2">38 recipes</div></div></div>
+      <div class="gtile"><div class="toprow"><span class="ichip"><svg class="ic"><use href="#i-star"/></svg></span><span class="peek"><span class="ph pc"></span><span class="ph pa"></span></span></div><div><div class="nm">Specials</div><div class="ct">4 recipes · this week</div></div></div>
+      <div class="gtile"><div class="toprow"><span class="ichip"><svg class="ic"><use href="#i-pot"/></svg></span><span class="peek"><span class="ph phh"></span><span class="ph pb"></span><span class="ph pc"></span></span></div><div><div class="nm">Prep &amp; Components</div><div class="ct">16 recipes · 6 groups</div></div></div>
+      <div class="gtile"><div class="toprow"><span class="ichip"><svg class="ic"><use href="#i-cake"/></svg></span><span class="peek"><span class="ph pe"></span><span class="ph pf"></span></span></div><div><div class="nm">Desserts &amp; Baked Goods</div><div class="ct">7 recipes · 4 groups</div></div></div>
+      <div class="gtile"><div class="toprow"><span class="ichip"><svg class="ic"><use href="#i-people"/></svg></span><span class="peek"><span class="ph pd"></span><span class="ph pb"></span><span class="ph pg"></span></span></div><div><div class="nm">Banquets &amp; Buffets</div><div class="ct">11 recipes · 5 groups</div></div></div>
+      <div class="gtile wide" id="f1-saved-empty" style="display:none;background:var(--surf);border-color:var(--surfbd);border-style:dashed"><span class="ichip" style="background:var(--glass);color:var(--muted)"><svg class="ic"><use href="#i-bookmark"/></svg></span><div class="bd"><div class="nm" style="color:var(--muted)">Save your first recipe</div><div class="ct">Tap the bookmark on any recipe · saved recipes stay even when they leave the menu</div></div></div>
+    </div>
+    <p class="bcap" id="f1cap"></p>
+  </div>
+
+  <!-- ============ F2 · A MENU'S BOOK ============ -->
+  <div class="design" id="f2">
+    <div class="hdr"><span class="c38"><svg class="ic"><use href="#i-back"/></svg></span><div class="hmid"><div class="eyebrow">Kitchen Assistant</div><div class="htitle">Fall Recipes</div></div><span class="navpill"><svg class="ic"><use href="#i-pencil"/></svg>To Editor</span></div>
+    <div class="srow"><svg class="ic"><use href="#i-search"/></svg><span>Search Fall recipes</span><span class="bolt"><svg class="ic"><use href="#i-bolt"/></svg></span></div>
+    <div class="cats">
+      <span class="cat" style="--cc:#E0A040">Breakfast</span>
+      <span class="cat on" style="--cc:#C0504A">Dinner</span>
+      <span class="cat" style="--cc:#5DA0E5">Soup</span>
+      <span class="cat" style="--cc:#7CB36A">Salads</span>
+      <span class="cat" style="--cc:#B27CD6">Sandwiches</span>
+      <span class="cat" style="--cc:#F5B942">Featured Specials</span>
+    </div>
+    <div class="subs" style="--cc:#C0504A">
+      <span class="sub">All</span><span class="sub">Starters</span><span class="sub">Raw Bar</span><span class="sub on">Entrees</span><span class="sub">Pasta</span><span class="sub">Sides</span>
+    </div>
+    <div class="statline">ENTREES · 9 ITEMS · 3 NEED RECIPES</div>
+    <div class="rgrid" id="f2-grid">
+      <div class="rcard"><div class="ph pa" style="position:absolute;inset:0"></div><div class="scrim"></div><span class="tag okpill">Ready</span><div class="nm">Pan-Seared Scallops<span class="meta">SAUTÉ · 15 + 8 MIN</span></div></div>
+      <div class="rcard"><div class="ph pd" style="position:absolute;inset:0"></div><div class="scrim"></div><div class="nm">Braised Short Rib<span class="meta">BRAISE · 3 HR</span></div></div>
+      <div class="rcard empty"><div class="ph pg"></div><span class="tag needpill">Needs recipe</span><div class="nm">Miso Glazed Salmon<span class="meta">FROM THE FALL MENU</span></div></div>
+      <div class="rcard"><div class="ph pc" style="position:absolute;inset:0"></div><div class="scrim"></div><div class="nm">Chicken Parm<span class="meta">GRILL · 30 MIN</span></div></div>
+      <div class="rcard empty"><span class="tag needpill">Needs recipe</span><div class="nm">Steak Frites<span class="meta">FROM THE FALL MENU · NO PHOTO</span></div></div>
+      <div class="rcard"><div class="ph phh" style="position:absolute;inset:0"></div><div class="scrim"></div><span class="tag pill gold" style="position:absolute;top:8px;right:8px">★ Special</span><div class="nm">Brown Butter Gnocchi<span class="meta">SAUTÉ · 20 MIN</span></div></div>
+    </div>
+    <div class="rlist" id="f2-list" style="display:none">
+      <div class="rrow"><span class="th ph pa"></span><div class="bd"><div class="nm">Pan-Seared Scallops</div><div class="mt">SAUTÉ · 15 + 8 MIN · 7 STEPS</div></div><span class="okpill">Ready</span><svg class="ic chevr"><use href="#i-chevr"/></svg></div>
+      <div class="rrow"><span class="th ph pd"></span><div class="bd"><div class="nm">Braised Short Rib</div><div class="mt">BRAISE · 3 HR · 9 STEPS</div></div><svg class="ic chevr"><use href="#i-chevr"/></svg></div>
+      <div class="rrow"><span class="th ph pg" style="opacity:.5"></span><div class="bd"><div class="nm">Miso Glazed Salmon</div><div class="mt">FROM THE FALL MENU · NAME + PHOTO ONLY</div></div><span class="needpill">Needs recipe</span><svg class="ic chevr"><use href="#i-chevr"/></svg></div>
+      <div class="rrow"><span class="th ph pc"></span><div class="bd"><div class="nm">Chicken Parm</div><div class="mt">GRILL · 30 MIN · 6 STEPS</div></div><svg class="ic chevr"><use href="#i-chevr"/></svg></div>
+      <div class="rrow"><span class="th" style="background:var(--thumbbg)"></span><div class="bd"><div class="nm">Steak Frites</div><div class="mt">FROM THE FALL MENU · NO PHOTO</div></div><span class="needpill">Needs recipe</span><svg class="ic chevr"><use href="#i-chevr"/></svg></div>
+      <div class="rrow"><span class="th ph phh"></span><div class="bd"><div class="nm">Brown Butter Gnocchi</div><div class="mt">★ SPECIAL · SAUTÉ · 20 MIN</div></div><svg class="ic chevr"><use href="#i-chevr"/></svg></div>
+    </div>
+    <p class="bcap">The menu's own chrome, verbatim: search row with Jolt, the category chips with their menu colours, the subcategory pills. Every Fall item is already here (fed once from the menu); items the chef hasn't written up yet wear a gold <b>Needs recipe</b> chip and open to the facts the menu gave them.</p>
+  </div>
+
+  <!-- ============ F3 · RECIPE · SCROLL ============ -->
+  <div class="design" id="f3">
+    <!-- the host page underneath is the Fall book (f2), redrawn lightly -->
+    <div class="hdr"><span class="c38"><svg class="ic"><use href="#i-back"/></svg></span><div class="hmid"><div class="eyebrow">Kitchen Assistant</div><div class="htitle">Fall Recipes</div></div><span class="hsp"></span></div>
+    <div class="srow"><svg class="ic"><use href="#i-search"/></svg><span>Search Fall recipes</span></div>
+    <div class="rgrid">
+      <div class="rcard"><div class="ph pa" style="position:absolute;inset:0"></div><div class="scrim"></div><div class="nm">Pan-Seared Scallops<span class="meta">SAUTÉ · 15 + 8 MIN</span></div></div>
+      <div class="rcard"><div class="ph pd" style="position:absolute;inset:0"></div><div class="scrim"></div><div class="nm">Braised Short Rib<span class="meta">BRAISE · 3 HR</span></div></div>
+      <div class="rcard empty"><div class="ph pg"></div><span class="tag needpill">Needs recipe</span><div class="nm">Miso Glazed Salmon<span class="meta">FROM THE FALL MENU</span></div></div>
+      <div class="rcard"><div class="ph pc" style="position:absolute;inset:0"></div><div class="scrim"></div><div class="nm">Chicken Parm<span class="meta">GRILL · 30 MIN</span></div></div>
+    </div>
+  </div>
+
+  <!-- ============ F4 · STEPS ============ -->
+  <div class="design" id="f4"></div>
+  <!-- ============ F5 · BOOK ============ -->
+  <div class="design" id="f5"></div>
+
+  <!-- ============ F6 · EDITOR (host page) ============ -->
+  <div class="design" id="f6">
+    <div class="hdr"><span class="c38"><svg class="ic"><use href="#i-back"/></svg></span><div class="hmid"><div class="eyebrow">Kitchen Editor</div><div class="htitle">Fall Recipes</div></div><span class="navpill"><svg class="ic"><use href="#i-person"/></svg>To User</span></div>
+    <div class="srow"><svg class="ic"><use href="#i-search"/></svg><span>Search Fall recipes</span></div>
+    <div class="statline">ENTREES · 9 ITEMS · 3 NEED RECIPES · NO ＋ HERE</div>
+    <div class="rlist">
+      <div class="rrow"><span class="th ph pa"></span><div class="bd"><div class="nm">Pan-Seared Scallops</div><div class="mt">7 STEPS · 11 PHOTOS</div></div><span class="okpill">Ready</span><svg class="ic chevr"><use href="#i-dots"/></svg></div>
+      <div class="rrow"><span class="th ph pg" style="opacity:.5"></span><div class="bd"><div class="nm">Miso Glazed Salmon</div><div class="mt">FED FROM THE MENU · WRITE IT UP</div></div><span class="needpill">Needs recipe</span><svg class="ic chevr"><use href="#i-dots"/></svg></div>
+    </div>
+    <p class="bcap">A menu book has no ＋: its items come from the Menu Editor and only the Menu Editor. The ＋ lives in Prep &amp; Components, Desserts &amp; Baked Goods and Banquets &amp; Buffets, where recipe editors add their own.</p>
+  </div>
+
+  <!-- ============ F7 · CHECKLISTS ============ -->
+  <div class="design" id="f7">
+    <div class="hdr"><span class="c38"><svg class="ic"><use href="#i-back"/></svg></span><div class="hmid"><div class="eyebrow" id="f7-eb">Kitchen Assistant</div><div class="htitle">Opening Checklist</div></div><span class="navpill" id="f7-nav"><svg class="ic"><use href="#i-pencil"/></svg>To Editor</span></div>
+    <!-- user side -->
+    <div id="f7-user">
+      <div class="prog2"><div class="ring"><svg width="46" height="46" viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" fill="none" stroke="var(--glassbd)" stroke-width="4"/><circle cx="20" cy="20" r="16" fill="none" stroke="var(--tint)" stroke-width="4" stroke-dasharray="100.5" stroke-dashoffset="38" stroke-linecap="round"/></svg><div class="rlab">62%</div></div><div><b>8 of 13 done</b><span>Tuesday · resets at 4 AM</span></div><span class="nowpill" style="margin-left:auto">NOW</span></div>
+      <div class="catc">
+        <div class="ch"><span class="nm">Monday Morning Prep</span><span class="ct">1 / 3</span><svg class="ic"><use href="#i-chevd"/></svg></div>
+        <div class="att"><svg class="ic"><use href="#i-doc"/></svg><div class="bd">Monday prep sheet.pdf<span class="sub">PDF · 2 PAGES · TAP TO VIEW</span></div><span class="dl"><svg class="ic"><use href="#i-down"/></svg></span></div>
+        <div class="item done"><span class="ck on"><svg class="ic"><use href="#i-check"/></svg></span><div class="bd">Pull proteins for the week</div></div>
+        <div class="item"><span class="ck"></span><div class="bd">Run the par sheet · walk-in &amp; low boys</div></div>
+        <div class="item"><span class="ck"></span><div class="bd">Label &amp; date everything from Sunday</div></div>
+      </div>
+      <div class="catc">
+        <div class="ch"><span class="nm">Line Setup</span><span class="ct">4 / 6</span><svg class="ic"><use href="#i-chevd"/></svg></div>
+        <div class="item done"><span class="ck on"><svg class="ic"><use href="#i-check"/></svg></span><div class="bd">Fire the flat top &amp; grill</div></div>
+        <div class="item done"><span class="ck on"><svg class="ic"><use href="#i-check"/></svg></span><div class="bd">Fill the sauté station · 6 pans, oil, butter</div></div>
+        <div class="item"><span class="ck"></span><div class="bd">Temp the low boys · log it</div></div>
+        <div class="item"><span class="ck"></span><div class="bd">Sanitizer buckets at every station</div></div>
+      </div>
+      <p class="bcap">Same checklist grammar as the Host and Bar assistants: categories, tap-to-check items, the day's progress on top. New in the kitchen set: a category can carry <b>a file</b> (the Monday prep sheet) — tap to view, the square downloads. A line cook checks the prep off here and reads the sheet from the same card.</p>
+    </div>
+    <!-- editor side -->
+    <div id="f7-editor" style="display:none">
+      <div class="statline">OPENING · 2 CATEGORIES · 9 ITEMS</div>
+      <div class="catc">
+        <div class="ch"><svg class="ic"><use href="#i-drag"/></svg><span class="nm">Monday Morning Prep</span><svg class="ic"><use href="#i-dots"/></svg></div>
+        <div class="fl" style="margin:10px 12px 0">Attachments <em>· up to 3</em></div>
+        <div class="att"><svg class="ic"><use href="#i-doc"/></svg><div class="bd">Monday prep sheet.pdf<span class="sub">PDF · 184 KB</span></div><span class="attx"><svg class="ic"><use href="#i-x"/></svg></span></div>
+        <div class="atiles"><div class="atile"><svg class="ic"><use href="#i-grad"/></svg>From Guides &amp; Training</div><div class="atile"><svg class="ic"><use href="#i-upload"/></svg>Upload a file</div></div>
+        <div class="item"><span class="gr"><svg class="ic"><use href="#i-drag"/></svg></span><div class="bd">Pull proteins for the week</div><span class="dots"><svg class="ic"><use href="#i-dots"/></svg></span></div>
+        <div class="item"><span class="gr"><svg class="ic"><use href="#i-drag"/></svg></span><div class="bd">Run the par sheet · walk-in &amp; low boys</div><span class="dots"><svg class="ic"><use href="#i-dots"/></svg></span></div>
+        <div class="item"><span class="gr"><svg class="ic"><use href="#i-drag"/></svg></span><div class="bd">Label &amp; date everything from Sunday</div><span class="dots"><svg class="ic"><use href="#i-dots"/></svg></span></div>
+        <div class="additem"><svg class="ic"><use href="#i-plus"/></svg>Add an item</div>
+      </div>
+      <div class="catc">
+        <div class="ch"><svg class="ic"><use href="#i-drag"/></svg><span class="nm">Line Setup</span><span class="ct">6 items</span><svg class="ic"><use href="#i-dots"/></svg></div>
+      </div>
+      <div class="addstep"><svg class="ic"><use href="#i-plus"/></svg>Add a category</div>
+      <p class="bcap">The editor is the Bar checklist editor plus one block per category: <b>Attachments</b> — the s80 two-tile picker (From Guides &amp; Training · Upload a file; PDF or image, 20 MB), chips with ✕. A Head Chef with the recipe-editor grant can edit these lists too — they're the kitchen's.</p>
+    </div>
+  </div>
+
+  <!-- ============ F9 · SAVED ============ -->
+  <div class="design" id="f9">
+    <div class="hdr"><span class="c38"><svg class="ic"><use href="#i-back"/></svg></span><div class="hmid"><div class="eyebrow">Kitchen Assistant</div><div class="htitle">Saved Recipes</div></div><span class="hsp"></span></div>
+    <div class="srow"><svg class="ic"><use href="#i-search"/></svg><span>Search your saved recipes</span></div>
+    <div class="cap" style="margin-bottom:12px" id="f9-cap"><span class="on" data-sortcap="book">By book</span><span data-sortcap="recent">Recent</span><span data-sortcap="az">A–Z</span></div>
+    <div id="f9-book">
+      <div class="zlabel"><svg class="ic" style="width:12px;height:12px;color:var(--tint)"><use href="#i-leaf"/></svg>Fall Recipes<span class="ln"></span>2</div>
+      <div class="rgrid">
+        <div class="rcard"><div class="ph pa" style="position:absolute;inset:0"></div><div class="scrim"></div><div class="nm">Pan-Seared Scallops<span class="meta">DINNER › ENTREES</span></div></div>
+        <div class="rcard"><div class="ph phh" style="position:absolute;inset:0"></div><div class="scrim"></div><div class="nm">Brown Butter Gnocchi<span class="meta">★ SPECIAL · ENTREES</span></div></div>
+      </div>
+      <div class="zlabel"><svg class="ic" style="width:12px;height:12px;color:var(--tint)"><use href="#i-pot"/></svg>Prep &amp; Components<span class="ln"></span>2</div>
+      <div class="rgrid">
+        <div class="rcard"><div class="ph pb" style="position:absolute;inset:0"></div><div class="scrim"></div><div class="nm">Chive Oil<span class="meta">GARNISHES · 5 DAYS</span></div></div>
+        <div class="rcard"><div class="ph pf" style="position:absolute;inset:0"></div><div class="scrim"></div><div class="nm">Veal Stock<span class="meta">STOCKS &amp; BASES · 12 HR</span></div></div>
+      </div>
+      <div class="zlabel"><svg class="ic" style="width:12px;height:12px;color:var(--muted)"><use href="#i-bookmark"/></svg>No longer on the menu<span class="ln"></span>1</div>
+      <div class="rgrid">
+        <div class="rcard"><div class="ph pe" style="position:absolute;inset:0;opacity:.75"></div><div class="scrim"></div><span class="tag pill" style="position:absolute;top:8px;right:8px;max-width:none">Off the menu</span><div class="nm">Summer Peach Crisp<span class="meta">WAS · SUMMER › DESSERTS</span></div></div>
+      </div>
+    </div>
+    <div id="f9-recent" style="display:none">
+      <div class="statline">5 SAVED · NEWEST FIRST</div>
+      <div class="rgrid">
+        <div class="rcard"><div class="ph pb" style="position:absolute;inset:0"></div><div class="scrim"></div><div class="nm">Chive Oil<span class="meta">PREP · GARNISHES</span></div></div>
+        <div class="rcard"><div class="ph pa" style="position:absolute;inset:0"></div><div class="scrim"></div><div class="nm">Pan-Seared Scallops<span class="meta">FALL · ENTREES</span></div></div>
+        <div class="rcard"><div class="ph pe" style="position:absolute;inset:0;opacity:.75"></div><div class="scrim"></div><span class="tag pill" style="position:absolute;top:8px;right:8px;max-width:none">Off the menu</span><div class="nm">Summer Peach Crisp<span class="meta">WAS · SUMMER › DESSERTS</span></div></div>
+        <div class="rcard"><div class="ph phh" style="position:absolute;inset:0"></div><div class="scrim"></div><div class="nm">Brown Butter Gnocchi<span class="meta">FALL · ENTREES</span></div></div>
+        <div class="rcard"><div class="ph pf" style="position:absolute;inset:0"></div><div class="scrim"></div><div class="nm">Veal Stock<span class="meta">PREP · STOCKS &amp; BASES</span></div></div>
+      </div>
+    </div>
+    <p class="bcap">Saved = your own folder (stored on your account, so it follows you to any device). Grouped by the book each recipe lives in, same large tiles; search on top; sort by book, newest or A–Z. Recipes whose item left the menu gather under <b>No longer on the menu</b> with a slate pill — still readable, still yours, until you unsave them.</p>
+  </div>
+
+  <!-- ============ F8 · JOB & ACCESS ============ -->
+  <div class="design" id="f8">
+    <div class="hdr"><span class="c38"><svg class="ic"><use href="#i-back"/></svg></span><div class="hmid"><div class="htitle">Organization Settings</div></div><span class="hsp"></span></div>
+    <div class="tabs"><span>Branding</span><span>Menu</span><span class="on">Jobs &amp; Tools</span><span>Schedule</span><span>Games</span></div>
+    <div class="secttl">Tools &amp; Assistants</div>
+    <p class="sechint">Turn a tool on, then pick which job titles can see it. Owners and managers always see everything.</p>
+    <div class="asst">
+      <div class="ah"><span class="ichip b"><svg class="ic"><use href="#i-fork"/></svg></span><div class="bd"><div class="nm">Bartender Assistant</div><div class="mt" id="f8-bar-mt">4 TITLES CAN SEE IT · 1 CAN EDIT</div></div><span class="tog"></span></div>
+      <div class="ab" id="f8-bar-body" style="display:none">
+        <div class="fl">Who can see it</div>
+        <div class="pick"><span class="on"><i class="slot"><svg class="ic"><use href="#i-check"/></svg></i>Bartender</span><span class="on"><i class="slot"><svg class="ic"><use href="#i-check"/></svg></i>Lead Bartender</span><span class="on"><i class="slot"><svg class="ic"><use href="#i-check"/></svg></i>Barback</span><span class="on"><i class="slot"><svg class="ic"><use href="#i-check"/></svg></i>Server</span><span><i class="slot"></i>Host</span><span><i class="slot"></i>Chef</span></div>
+        <div class="fl">Who can edit recipes <em>· new</em></div>
+        <div class="pick"><span class="on"><i class="slot"><svg class="ic"><use href="#i-check"/></svg></i>Lead Bartender</span><span><i class="slot"></i>Bartender</span><span><i class="slot"></i>Barback</span></div>
+        <p class="sm">Recipe editors open the Bartender Editor to add and change recipes and checklists. They don't get Manager powers — no Menu Categories, no Edit Menu, no AI uploads.</p>
+      </div>
+    </div>
+    <div class="asst">
+      <div class="ah"><span class="ichip k"><svg class="ic"><use href="#i-flame"/></svg></span><div class="bd"><div class="nm">Kitchen Assistant</div><div class="mt">4 TITLES CAN SEE IT · 2 CAN EDIT</div></div><span class="tog"></span></div>
+      <div class="ab" id="f8-kit-body">
+        <div class="fl">Who can see it</div>
+        <div class="pick"><span class="on"><i class="slot"><svg class="ic"><use href="#i-check"/></svg></i>Chef</span><span class="on"><i class="slot"><svg class="ic"><use href="#i-check"/></svg></i>Line Cook</span><span class="on"><i class="slot"><svg class="ic"><use href="#i-check"/></svg></i>Prep Cook</span><span class="on"><i class="slot"><svg class="ic"><use href="#i-check"/></svg></i>Runner</span><span><i class="slot"></i>Busser</span><span><i class="slot"></i>Server</span><span><i class="slot"></i>Host</span><span><i class="slot"></i>Bartender</span></div>
+        <div class="fl">Who can edit recipes <em>· new</em></div>
+        <div class="pick"><span class="on"><i class="slot"><svg class="ic"><use href="#i-check"/></svg></i>Head Chef</span><span class="on"><i class="slot"><svg class="ic"><use href="#i-check"/></svg></i>Sous Chef</span><span><i class="slot"></i>Chef</span><span><i class="slot"></i>Line Cook</span><span><i class="slot"></i>Prep Cook</span></div>
+        <p class="sm">Recipe editors open the Kitchen Editor to add and change recipes and the kitchen checklists. They don't get Manager powers — no Menu Categories, no Edit Menu, no uploads. A title must be able to see the assistant before it can edit it.</p>
+      </div>
+    </div>
+    <div class="asst">
+      <div class="ah"><span class="ichip h"><svg class="ic"><use href="#i-people"/></svg></span><div class="bd"><div class="nm">Host Assistant</div><div class="mt">3 TITLES CAN SEE IT</div></div><span class="tog"></span></div>
+    </div>
+    <div class="asst">
+      <div class="ah"><span class="ichip"><svg class="ic"><use href="#i-gift"/></svg></span><div class="bd"><div class="nm">Check-out Calculator</div><div class="mt">OFF</div></div><span class="tog off"></span></div>
+    </div>
+    <p class="bcap">Jobs &amp; Tools › Tools &amp; Assistants, as today, with one new row inside the Bar and Kitchen cards: <b>Who can edit recipes</b>. Same chip grammar as "Who can see it" (ring + fixed ✓ slot). The grant is per job title; the server checks it on every write.</p>
+  </div>
+
+  </div><!-- /screen -->
+
+  <!-- ===== overlays shared by frames ===== -->
+  <!-- To Editor sheet (f1, owner/manager) -->
+  <div class="ovl" id="navovl"><div class="scr" data-close="navovl"></div>
+    <div class="sheet"><div class="grabber"></div>
+      <div class="shead"><div><div class="t">Kitchen Assistant</div><div class="s">Where to next</div></div><span class="xbtn" data-close="navovl"><svg class="ic"><use href="#i-x"/></svg></span></div>
+      <div class="arow"><svg class="ic"><use href="#i-pencil"/></svg><div class="bd">To Editor<div class="sub">Recipes and the kitchen checklists</div></div><svg class="ic chevr"><use href="#i-chevr"/></svg></div>
+      <div class="arow" id="nav-cats"><svg class="ic"><use href="#i-grid"/></svg><div class="bd">Menu Categories<div class="sub">The menu's categories feed the books</div></div><svg class="ic chevr"><use href="#i-chevr"/></svg></div>
+      <div class="arow" id="nav-menu"><svg class="ic"><use href="#i-fork"/></svg><div class="bd">Edit Menu<div class="sub">New items flow into the kitchen books</div></div><svg class="ic chevr"><use href="#i-chevr"/></svg></div>
+      <p class="bcap" style="margin-top:4px">Owners/managers get all three rows (the Bar hub's sheet, minus Upload — recipe scanning is a 1.1 feature). A Head Chef with only the recipe grant gets a plain <b>To Editor</b> chip and no sheet.</p>
+    </div>
+  </div>
+
+  <!-- the view picker (f3 · first open) -->
+  <div class="ovl" id="pickovl"><div class="scr"></div>
+    <div class="sheet"><div class="grabber"></div>
+      <div class="shead"><div><div class="t">Pan-Seared Scallops</div><div class="s">How do you want to read it?</div></div><span class="xbtn"><svg class="ic"><use href="#i-x"/></svg></span></div>
+      <div class="arow"><svg class="ic"><use href="#i-scroll"/></svg><div class="bd">Scroll<div class="sub">The whole recipe on one page</div></div><svg class="ic chevr"><use href="#i-chevr"/></svg></div>
+      <div class="arow"><svg class="ic"><use href="#i-steps"/></svg><div class="bd">Steps<div class="sub">One step at a time · big type · tap to go on</div></div><svg class="ic chevr"><use href="#i-chevr"/></svg></div>
+      <div class="arow"><svg class="ic"><use href="#i-book"/></svg><div class="bd">Book<div class="sub">Turn your phone sideways · swipe the pages</div></div><svg class="ic chevr"><use href="#i-chevr"/></svg></div>
+      <div class="trow"><div class="bd">Remember my choice<div class="sub">Open recipes this way from now on · change it any time inside a recipe</div></div><span class="tog off"></span></div>
+    </div>
+  </div>
+
+  <!-- the Poster · Scroll view (f3) -->
+  <div class="poster" id="poster" style="display:none">
+    <div class="hero"><div class="ph pa"></div><div class="hscrim"></div><div class="grab"></div><div class="dots"><i class="on"></i><i></i><i></i></div>
+      <div class="tblock">
+        <div class="pills"><span class="pill">Dinner › Entrees</span><span class="pill gold">★ Special</span><span class="pill price" id="po-price" style="display:none">$34</span></div>
+        <div class="ptitle">Pan-Seared Scallops</div>
+      </div>
+    </div>
+    <div class="panel">
+      <!-- recipe mode -->
+      <div id="po-recipe">
+        <div class="actrow">
+          <div class="cap"><span class="on"><svg class="ic"><use href="#i-scroll"/></svg>Scroll</span><span><svg class="ic"><use href="#i-steps"/></svg>Steps</span><span><svg class="ic"><use href="#i-book"/></svg>Book</span></div>
+          <span class="achip on"><svg class="ic"><use href="#i-bookmark"/></svg></span>
+          <span class="achip"><svg class="ic"><use href="#i-share"/></svg></span>
+        </div>
+        <div class="keep"><svg class="ic"><use href="#i-eye"/></svg>Screen stays on while you read</div>
+        <div class="facts">
+          <div class="fact"><div class="k">Yield</div><div class="v">4</div><div class="u">plates</div></div>
+          <div class="fact"><div class="k">Portion</div><div class="v">3</div><div class="u">scallops</div></div>
+          <div class="fact"><div class="k">Prep</div><div class="v">15</div><div class="u">min</div></div>
+          <div class="fact"><div class="k">Cook</div><div class="v">8</div><div class="u">min</div></div>
+          <div class="fact"><div class="k">Shelf</div><div class="v">2</div><div class="u">days</div></div>
+        </div>
+        <div class="chips"><span class="chip st"><svg class="ic"><use href="#i-flame"/></svg>Sauté station</span><span class="chip al"><svg class="ic"><use href="#i-warn"/></svg>Shellfish</span><span class="chip al"><svg class="ic"><use href="#i-warn"/></svg>Dairy</span></div>
+        <div class="sech">Ingredients<span class="ln"></span>7</div>
+        <div class="ing"><span class="am">12 ea</span><span>U-10 dry scallops <span class="pr">· side muscle off</span></span></div>
+        <div class="ing"><span class="am">2 tbsp</span><span>Grapeseed oil</span></div>
+        <div class="ing"><span class="am">3 tbsp</span><span>Butter <span class="pr">· cold, cubed</span></span></div>
+        <div class="ing"><span class="am">1 ea</span><span>Lemon <span class="pr">· juice</span></span></div>
+        <div class="ing"><span class="am">4 oz</span><span>Sweet corn purée <span class="pr">· Prep &amp; Components</span></span></div>
+        <div class="ing"><span class="am">to taste</span><span>Kosher salt, white pepper</span></div>
+        <div class="ing"><span class="am">garnish</span><span>Chive oil, micro cilantro</span></div>
+        <div class="sech">Steps<span class="ln"></span>7</div>
+        <div class="step"><span class="n">1</span><div class="bd"><div class="t">Dry the scallops</div><div class="x">Pat dry on towels, 10 minutes uncovered in the low boy. Season both faces right before they hit the pan.</div>
+          <div class="pg"><span class="ph pa"></span><span class="ph pg"></span><span class="ph phh"></span><span class="ph pf"></span></div></div></div>
+        <div class="step"><span class="n">2</span><div class="bd"><div class="t">Heat the pan</div><div class="x">Carbon steel, high heat, oil until it just shimmers. No smoke.</div></div></div>
+        <div class="step"><span class="n">3</span><div class="bd"><div class="t">Sear the scallops</div><div class="x">Place flat side down, clockwise from 12. 90 seconds untouched. Flip in the same order, 45 seconds.</div>
+          <div class="pg two"><span class="ph pa"></span><span class="ph pd"></span></div></div></div>
+        <div class="step"><span class="n">4</span><div class="bd"><div class="t">Baste</div><div class="x">Kill the heat, add the butter, tilt and baste 30 seconds. Lemon off heat.</div></div></div>
+        <div class="step" style="border-bottom:0"><span class="n">7</span><div class="bd"><div class="t">Plate</div><div class="x">Purée swoosh at 9 o'clock, three scallops seared side up, chive oil, micro.</div>
+          <div class="pg two"><span class="ph pa"></span><span class="ph pb"></span></div></div></div>
+        <div class="sech">Plating notes<span class="ln"></span></div>
+        <div class="note"><b>Plate · 10" coupe, warm</b>Wipe the rim. Purée first, scallops next, oil last so it doesn't bleed into the purée.</div>
+      </div>
+      <!-- menu poster mode -->
+      <div id="po-menu" style="display:none">
+        <div class="actrow"><span class="achip wide"><svg class="ic"><use href="#i-flame"/></svg>View Recipe</span><span class="achip wide" style="flex:1;justify-content:center"><svg class="ic" style="color:var(--tint)"><use href="#i-gift"/></svg>Redeem</span></div>
+        <p style="font-size:14px;line-height:1.55;margin-bottom:12px">Three U-10 scallops seared hard in brown butter over sweet corn purée, chive oil and micro cilantro.</p>
+        <div class="chips"><span class="chip">GF</span><span class="chip">Dairy</span><span class="chip">Shellfish</span></div>
+        <p class="bcap">This is the Menu tab's own item Poster (s89, P1). The <b>View Recipe</b> chip appears only for people who can see the Kitchen Assistant — a cook on the Menu tab jumps straight into the kitchen recipe, picks a view, reads. Servers never see the chip.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Steps view (f4) -->
+  <div class="stepsv" id="stepsv" style="display:none">
+    <div class="top"><span class="c38"><svg class="ic"><use href="#i-x"/></svg></span>
+      <div class="prog"><div class="l"><span><b id="st-eb">Step 3</b> of 7</span><span>Pan-Seared Scallops</span></div><div class="segs" id="st-segs"><i class="d"></i><i class="d"></i><i class="c"></i><i></i><i></i><i></i><i></i></div></div>
+      <div class="cap sm" style="flex:0 0 auto;width:auto"><span><svg class="ic"><use href="#i-scroll"/></svg></span><span class="on"><svg class="ic"><use href="#i-steps"/></svg></span><span><svg class="ic"><use href="#i-book"/></svg></span></div>
+    </div>
+    <div class="body" id="st-mid">
+      <div class="eb">Sauté · 90 sec + 45 sec</div>
+      <h2>Sear the scallops</h2>
+      <p>Place flat side down, clockwise from 12 o'clock so you know the order. Leave them alone for <b>90 seconds</b>. Flip in the same order, <b>45 seconds</b> on the second side.</p>
+      <div class="pg"><span class="ph pa"></span><span class="ph pd"></span><span class="ph phh"></span><span class="ph pg"></span></div>
+    </div>
+    <div class="body" id="st-last" style="display:none">
+      <div class="eb">Plate · 10" coupe, warm</div>
+      <h2>Plate it</h2>
+      <p>Purée swoosh at 9 o'clock. Three scallops seared side up, leaning on the purée. Chive oil last, micro cilantro on each scallop. Wipe the rim.</p>
+      <div class="pg two"><span class="ph pa"></span><span class="ph pb"></span></div>
+      <div class="chips" style="margin-top:14px"><span class="chip al"><svg class="ic"><use href="#i-warn"/></svg>Shellfish</span><span class="chip al"><svg class="ic"><use href="#i-warn"/></svg>Dairy</span></div>
+    </div>
+    <div class="tapzone" id="st-tap"><span>tap to go on</span></div>
+    <div class="bigrow" id="st-btn-mid"><span class="big"><svg class="ic"><use href="#i-chevl"/></svg>Back</span><span class="big go">Next step<svg class="ic"><use href="#i-chevr"/></svg></span></div>
+    <div class="bigrow" id="st-btn-last" style="display:none"><span class="big"><svg class="ic"><use href="#i-chevl"/></svg>Back</span><span class="big go"><svg class="ic"><use href="#i-check"/></svg>Done</span></div>
+    <div class="tiphint">SCREEN STAYS ON · SWIPE OR TAP THE RIGHT EDGE</div>
+  </div>
+
+  <!-- Book reader (f5) -->
+  <div class="book" id="book" style="display:none">
+    <div class="bar"><span class="c38" style="width:34px;height:34px"><svg class="ic"><use href="#i-x"/></svg></span>
+      <div style="flex:1;min-width:0"><div class="eyebrow">Fall Recipes · Dinner › Entrees</div><div class="htitle" style="font-size:16px">Pan-Seared Scallops</div></div>
+      <div class="keep" style="margin:0 10px 0 0"><svg class="ic"><use href="#i-eye"/></svg>Screen on</div>
+      <div class="cap sm"><span><svg class="ic"><use href="#i-scroll"/></svg>Scroll</span><span><svg class="ic"><use href="#i-steps"/></svg>Steps</span><span class="on"><svg class="ic"><use href="#i-book"/></svg>Book</span></div>
+    </div>
+    <!-- cover spread -->
+    <div class="spread" id="bk-cover">
+      <div class="pagel cover"><div class="ph pa"></div><div class="hscrim"></div>
+        <div class="tblock"><div class="pills"><span class="pill">Dinner › Entrees</span><span class="pill gold">★ Special</span></div><div class="ptitle">Pan-Seared Scallops</div></div>
+        <span class="pno" style="color:rgba(255,255,255,.6)">COVER</span></div>
+      <div class="gut"></div>
+      <div class="pager">
+        <div class="eb">At a glance</div>
+        <div class="facts">
+          <div class="fact"><div class="k">Yield</div><div class="v">4 plates</div></div>
+          <div class="fact"><div class="k">Portion</div><div class="v">3 scallops</div></div>
+          <div class="fact"><div class="k">Station</div><div class="v">Sauté</div></div>
+          <div class="fact"><div class="k">Prep</div><div class="v">15 min</div></div>
+          <div class="fact"><div class="k">Cook</div><div class="v">8 min</div></div>
+          <div class="fact"><div class="k">Shelf</div><div class="v">2 days</div></div>
+        </div>
+        <div class="chips" style="margin-bottom:8px"><span class="chip al"><svg class="ic"><use href="#i-warn"/></svg>Shellfish</span><span class="chip al"><svg class="ic"><use href="#i-warn"/></svg>Dairy</span></div>
+        <div class="eb">Ingredients · 7</div>
+        <div class="ing"><span class="am">12 ea</span><span>U-10 dry scallops</span></div>
+        <div class="ing"><span class="am">2 tbsp</span><span>Grapeseed oil</span></div>
+        <div class="ing"><span class="am">3 tbsp</span><span>Butter, cold</span></div>
+        <div class="ing"><span class="am">4 oz</span><span>Sweet corn purée</span></div>
+        <span class="pno">2</span>
+      </div>
+      <span class="edge r"><svg class="ic"><use href="#i-chevr"/></svg></span>
+    </div>
+    <!-- step spread -->
+    <div class="spread" id="bk-step" style="display:none">
+      <div class="pagel">
+        <div class="eb">Step 3 of 7 · Sauté</div>
+        <h2>Sear the scallops</h2>
+        <p>Place flat side down, clockwise from 12 o'clock so you know the order. Leave them alone for 90 seconds. Flip in the same order, 45 seconds on the second side.</p>
+        <p style="margin-top:10px;color:var(--muted);font-size:13px">Chef's note: if the pan smokes before the scallops go in, start over. Grey scallops never crust.</p>
+        <span class="pno">7</span>
+      </div>
+      <div class="gut"></div>
+      <div class="pager">
+        <div class="pg"><span class="ph pa"></span><span class="ph pd"></span><span class="ph phh"></span><span class="ph pg"></span></div>
+        <span class="pno">8</span>
+      </div>
+      <span class="edge l"><svg class="ic"><use href="#i-chevl"/></svg></span>
+      <span class="edge r"><svg class="ic"><use href="#i-chevr"/></svg></span>
+    </div>
+    <div class="bookfoot"><span>Cover</span><div class="dd" id="bk-dots"><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><span>Plating</span></div>
+  </div>
+
+  <!-- the rotate prompt (f5 · portrait phone) -->
+  <div class="rot" id="rot" style="display:none">
+    <div class="rotcard">
+      <div class="rotico"><div class="ph1"></div><div class="ph2"></div></div>
+      <h3>Turn your phone sideways</h3>
+      <p>Book view reads like a real recipe book — steps on the left, photos on the right. Swipe to turn the pages.</p>
+      <div class="ckrow"><span class="ck on"><svg class="ic"><use href="#i-check"/></svg></span>Got it, don't show this again</div>
+      <div class="cta">Open the book</div>
+      <span class="lnk">Read in Steps view instead</span>
+    </div>
+  </div>
+
+  <!-- the recipe editor sheet (f6) -->
+  <div class="ovl" id="editovl"><div class="scr"></div>
+    <div class="sheet tall"><div class="grabber"></div>
+      <div class="shead" style="margin-bottom:10px"><div><div class="t">Pan-Seared Scallops</div><div class="s">Fall › Dinner › Entrees · fed from the menu</div></div><span class="xbtn"><svg class="ic"><use href="#i-x"/></svg></span></div>
+      <div class="rail" id="ed-rail">
+        <div data-rs="basics" class="done"><i></i><span>Basics</span></div>
+        <div data-rs="details" class="done"><i></i><span>Details</span></div>
+        <div data-rs="ingredients" class="done"><i></i><span>Ingredients</span></div>
+        <div data-rs="steps" class="live"><i></i><span>Steps</span></div>
+        <div data-rs="review"><i></i><span>Review</span></div>
+      </div>
+      <div class="sbody">
+        <!-- BASICS -->
+        <div id="ed-basics" style="display:none">
+          <div class="fl">Cover <em>· from the menu</em></div>
+          <div class="strip"><span class="ph pa"><span class="cov">★ MENU</span><span class="cov" style="left:auto;right:5px;background:var(--glass);color:var(--muted)"><svg class="ic" style="width:9px;height:9px"><use href="#i-lock"/></svg></span></span><span class="ph pd"></span><span class="ph pg"></span><span class="add"><svg class="ic"><use href="#i-camera"/></svg>Add</span></div>
+          <p class="bcap" style="margin:6px 2px 2px">The cover is the menu item's photo and stays locked here; the recipe's own extra photos (up to 3 more) are the chef's.</p>
+          <div class="fl">Name</div>
+          <div class="inp" style="color:var(--muted)">Pan-Seared Scallops<span class="mini">From the menu</span><svg class="ic" style="margin-left:8px"><use href="#i-lock"/></svg></div>
+          <div class="fl">Where it lives</div>
+          <div class="inp"><svg class="ic" style="margin:0;color:var(--tint)"><use href="#i-leaf"/></svg>Fall Recipes<span class="mini">Linked</span></div>
+          <div class="two" style="margin-top:8px"><div class="inp" style="color:var(--muted)">Dinner<svg class="ic"><use href="#i-lock"/></svg></div><div class="inp" style="color:var(--muted)">Entrees<svg class="ic"><use href="#i-lock"/></svg></div></div>
+          <p class="bcap" style="margin:6px 2px 2px">Name, cover and placement belong to the Menu Editor (owners / managers). Recipe editors add everything below. A recipe started in Prep &amp; Components picks its own name, cover and group here instead.</p>
+          <div class="fl">Description <em>· optional</em></div>
+          <div class="inp ta"><span class="ph-t">What the dish is, for the cook who's never made it. The menu's description is a starting point.</span></div>
+        </div>
+        <!-- DETAILS -->
+        <div id="ed-details" style="display:none">
+          <div class="fl">Yield &amp; portions</div>
+          <div class="two"><div class="inp">4 <span class="ph-t" style="margin-left:4px">plates</span></div><div class="inp">3 <span class="ph-t" style="margin-left:4px">scallops / plate</span></div></div>
+          <div class="fl">Time</div>
+          <div class="two"><div class="inp"><svg class="ic" style="margin:0"><use href="#i-clock"/></svg>Prep <b style="margin-left:auto">15 min</b></div><div class="inp"><svg class="ic" style="margin:0"><use href="#i-flame"/></svg>Cook <b style="margin-left:auto">8 min</b></div></div>
+          <div class="fl">Station</div>
+          <div class="pick"><span><i class="slot"></i>Grill</span><span class="on"><i class="slot"><svg class="ic"><use href="#i-check"/></svg></i>Sauté</span><span><i class="slot"></i>Fry</span><span><i class="slot"></i>Pantry</span><span><i class="slot"></i>Pastry</span><span><i class="slot"></i>Prep</span><span><i class="slot"></i>Expo</span></div>
+          <div class="fl">Shelf life</div>
+          <div class="inp">2 days <span class="ph-t" style="margin-left:6px">· purée 4 days</span></div>
+          <div class="fl">Allergens</div>
+          <div class="pick"><span class="on"><i class="slot"><svg class="ic"><use href="#i-check"/></svg></i>Shellfish</span><span class="on"><i class="slot"><svg class="ic"><use href="#i-check"/></svg></i>Dairy</span><span><i class="slot"></i>Gluten</span><span><i class="slot"></i>Egg</span><span><i class="slot"></i>Tree nuts</span><span><i class="slot"></i>Peanuts</span><span><i class="slot"></i>Soy</span><span><i class="slot"></i>Fish</span><span><i class="slot"></i>Sesame</span></div>
+          <p class="bcap" style="margin:6px 2px 2px">Allergens go <b>both ways</b>: Gluten, Dairy, Egg and Nuts are the menu item's own dietary flags, so ticking them here updates the Menu tab and Menu Editor at once (and the Menu Editor updates here). Shellfish, Fish, Soy and Sesame live on the recipe only.</p>
+          <div class="fl">Plating notes</div>
+          <div class="inp ta">10" coupe, warm. Wipe the rim. Purée first, scallops next, oil last so it doesn't bleed into the purée.</div>
+        </div>
+        <!-- STEPS -->
+        <div id="ed-steps">
+          <div class="scard stepc"><div class="sh"><svg class="ic"><use href="#i-drag"/></svg><span class="n">Step 1</span><svg class="ic"><use href="#i-dots"/></svg></div>
+            <div class="inp">Dry the scallops</div>
+            <div class="inp ta">Pat dry on towels, 10 minutes uncovered in the low boy. Season both faces right before they hit the pan.</div>
+            <div class="strip sm"><span class="ph pa"></span><span class="ph pg"></span><span class="ph phh"></span><span class="ph pf"></span></div>
+          </div>
+          <div class="scard stepc"><div class="sh"><svg class="ic"><use href="#i-drag"/></svg><span class="n">Step 2</span><svg class="ic"><use href="#i-dots"/></svg></div>
+            <div class="inp">Heat the pan</div>
+            <div class="inp ta">Carbon steel, high heat, oil until it just shimmers. No smoke.</div>
+            <div class="strip sm"><span class="add"><svg class="ic"><use href="#i-camera"/></svg>Photo</span></div>
+          </div>
+          <div class="scard stepc" style="border-color:color-mix(in srgb,var(--tint) 40%,transparent)"><div class="sh"><svg class="ic"><use href="#i-drag"/></svg><span class="n">Step 3</span><svg class="ic"><use href="#i-dots"/></svg></div>
+            <div class="inp"><span class="ph-t">Give the step a short title</span></div>
+            <div class="inp ta"><span class="ph-t">What the cook does. Times, temps, the tell that it's done.</span></div>
+            <div class="strip sm"><span class="add"><svg class="ic"><use href="#i-camera"/></svg>Photo</span></div>
+          </div>
+          <div class="addstep"><svg class="ic"><use href="#i-plus"/></svg>Step 4</div>
+          <p class="bcap" style="margin:4px 2px 8px">Each step: title, what to do, up to 4 photos. Drag the grabber to reorder; ⋯ duplicates or removes. The dotted button always says the next number.</p>
+        </div>
+        <!-- REVIEW -->
+        <div id="ed-review" style="display:none">
+          <div class="rev"><div class="rh"><div class="ph pa"></div><div class="hscrim"></div><div class="tb2"><div class="pills" style="margin-bottom:5px"><span class="pill">Dinner › Entrees</span></div><div class="ptitle">Pan-Seared Scallops</div></div></div>
+            <div class="facts"><div class="fact"><div class="k">Yield</div><div class="v">4</div></div><div class="fact"><div class="k">Portion</div><div class="v">3</div></div><div class="fact"><div class="k">Prep</div><div class="v">15m</div></div><div class="fact"><div class="k">Cook</div><div class="v">8m</div></div><div class="fact"><div class="k">Shelf</div><div class="v">2d</div></div></div>
+            <div class="rline"><span class="st"><svg class="ic"><use href="#i-check"/></svg></span><div class="bd">Basics<div class="m">3 PHOTOS · LINKED TO THE FALL MENU</div></div><span class="ed">Edit</span></div>
+            <div class="rline"><span class="st"><svg class="ic"><use href="#i-check"/></svg></span><div class="bd">Details<div class="m">SAUTÉ · SHELLFISH, DAIRY · PLATING NOTES</div></div><span class="ed">Edit</span></div>
+            <div class="rline"><span class="st"><svg class="ic"><use href="#i-check"/></svg></span><div class="bd">Ingredients<div class="m">7 LINES</div></div><span class="ed">Edit</span></div>
+            <div class="rline"><span class="st em"><svg class="ic"><use href="#i-warn"/></svg></span><div class="bd">Steps<div class="m">3 STEPS · STEP 3 HAS NO TEXT YET</div></div><span class="ed">Edit</span></div>
+          </div>
+          <div class="trow"><div class="bd">Spanish copy<div class="sub">Translate the steps and notes when you save · edit later</div></div><span class="tog"></span></div>
+          <p class="bcap" style="margin:4px 2px 8px">Review = the Poster's top as a preview plus one line per page (ember where something's missing — the s80 grammar). Save publishes to the book; kitchen staff see it on their next open.</p>
+        </div>
+      </div>
+      <div class="dock" id="ed-dock"><span class="b" id="ed-back">Back</span><span class="b go" id="ed-next">Review</span></div>
+    </div>
+  </div>
+
+</div><!-- /phone -->
+
+<script>
+(function(){
+  var phone=document.getElementById('phone');
+  function all(s,fn){[].slice.call(document.querySelectorAll(s)).forEach(fn)}
+  function el(id){return document.getElementById(id)}
+  function show(id,on){ var n=el(id); if(n) n.style.display=on?'':'none'; }
+  var HINTS={
+    f1:'<b>1</b> · The hub = the Bar hub\'s grammar: three checklist rings (the kitchen\'s own lists), then the Recipes grid — one book per menu (the org\'s menu names), Specials, Prep &amp; Components, Desserts &amp; Baked Goods, Banquets &amp; Buffets, and a wide Saved tile. Switch who\'s looking: the header chip changes.',
+    f2:'<b>2</b> · Inside "Fall Recipes": the Menu tab\'s chrome verbatim (search + Jolt, category chips in the menu colours, subcategory pills). Every menu item is already here, fed once. Toggle grid vs rows.',
+    f3:'<b>3</b> · Open a recipe: the first time, a picker (Scroll · Steps · Book, with Remember). Scroll = the Poster (the s89 kit) with a mode capsule, Save and Share, a facts strip, allergen chips, ingredients, numbered steps with 2×2 photos, plating notes. The third moment shows the Menu item\'s Poster with its View Recipe chip.',
+    f4:'<b>4</b> · Steps view, portrait: one step per screen, a 7-segment progress bar, big type, the step\'s photos, two 64-pt buttons and a tap zone on the right edge. The screen stays awake.',
+    f5:'<b>5</b> · Book view, landscape: a two-page spread — cover + at-a-glance first, then one step per spread (text left, 2×2 photos right), plating last. A quick swipe anywhere turns the page (the arrows stay for a tap). The third state is the one-time rotate prompt.',
+    f6:'<b>6</b> · The editor: a stepped sheet (the s80 StepSheet grammar) — Basics · Details · Ingredients · Steps · Review. Menu-fed recipes keep the menu\'s name, cover and placement until the chef changes them. The dock is Back + Next / Review / Save.',
+    f7:'<b>7</b> · The kitchen\'s own Opening / Running / Closing lists, the Host &amp; Bar grammar — plus files on a category (the prep-sheet idea). Toggle staff vs editor.',
+    f9:'<b>9</b> · The Saved page: your own folder, grouped by book (or one grid, newest first), search on top. Items that left the menu gather at the end with an Off the menu pill.',
+    f8:'<b>8</b> · Org Settings › Jobs &amp; Tools › Tools &amp; Assistants: the Kitchen and Bar cards gain a second chip row, <b>Who can edit recipes</b>. Those titles get the Editor without Manager powers.'
+  };
+  var frame='f1';
+  function resetOverlays(){
+    ['navovl','pickovl','editovl'].forEach(function(id){ el(id).classList.remove('show'); });
+    ['poster','stepsv','book','rot'].forEach(function(id){ show(id,false); });
+    phone.classList.remove('land');
+  }
+  function showFrame(f){
+    frame=f;
+    all('[data-c]',function(x){x.classList.toggle('on',x.getAttribute('data-c')===f)});
+    all('.design',function(d){d.classList.toggle('on',d.id===f)});
+    all('.subbar',function(s){s.classList.toggle('on',s.id==='sub-'+f)});
+    el('hintline').innerHTML=HINTS[f];
+    el('screen').scrollTop=0;
+    resetOverlays();
+    if(f==='f3') setMoment(moment);
+    if(f==='f4') setStep(stepState);
+    if(f==='f5') setBook(bookState);
+    if(f==='f6') { el('editovl').classList.add('show'); setPage(page); }
+    if(f==='f1') setRole(role);
+  }
+  all('[data-c]',function(b){b.addEventListener('click',function(){ showFrame(b.getAttribute('data-c')); })});
+
+  /* overlays by data attrs */
+  all('[data-open]',function(b){b.addEventListener('click',function(e){ e.stopPropagation(); el(b.getAttribute('data-open')).classList.add('show'); })});
+  all('[data-close]',function(b){b.addEventListener('click',function(){ el(b.getAttribute('data-close')).classList.remove('show'); })});
+
+  /* f1 · role */
+  var role='cook';
+  function setRole(r){
+    role=r;
+    all('[data-r]',function(x){x.classList.toggle('on',x.getAttribute('data-r')===r)});
+    show('f1-nav-none', r==='cook'); show('f1-nav-chef', r==='chef'); show('f1-nav-om', r==='om');
+    show('nav-cats', r==='om'); show('nav-menu', r==='om');
+    el('f1-ct1').innerHTML = r==='cook' ? '42 recipes' : '42 recipes · <b>9 need recipes</b>';
+    el('f1-ct2').innerHTML = r==='cook' ? '38 recipes' : '38 recipes · <b>12 need recipes</b>';
+    el('f1cap').innerHTML = r==='cook'
+      ? 'A line cook sees exactly this — no editor chip. The rail only shows the Kitchen Assistant to job titles the owner ticked in Jobs &amp; Access. Tiles read "N recipes"; Specials follows the menu\'s ★ items; Saved is theirs.'
+      : r==='chef'
+      ? 'A Head Chef with the new <b>Who can edit recipes</b> grant: a plain To Editor chip (no sheet, no Menu Categories / Edit Menu rows) and the "need recipes" counts in gold so they know where to write next.'
+      : 'Owner / manager: the Bar hub\'s HeaderNavMenu — To Editor · Menu Categories · Edit Menu (no Upload row: recipe scanning is a 1.1 feature). Tap the chip to open the sheet.';
+  }
+  all('[data-r]',function(b){b.addEventListener('click',function(){ setRole(b.getAttribute('data-r')); })});
+
+  /* f1 · saved tile */
+  all('[data-sv]',function(b){b.addEventListener('click',function(){
+    all('[data-sv]',function(x){x.classList.remove('on')}); b.classList.add('on');
+    var some=b.getAttribute('data-sv')==='some'; show('f1-saved-top',some); show('f1-saved-empty',!some);
+  })});
+  /* f9 · sort */
+  function setSort(k){
+    all('[data-sort]',function(x){x.classList.toggle('on',x.getAttribute('data-sort')===k)});
+    all('[data-sortcap]',function(x){x.classList.toggle('on',x.getAttribute('data-sortcap')===(k==='book'?'book':'recent'))});
+    show('f9-book',k==='book'); show('f9-recent',k!=='book');
+  }
+  all('[data-sort]',function(b){b.addEventListener('click',function(){ setSort(b.getAttribute('data-sort')); })});
+  all('[data-sortcap]',function(b){b.addEventListener('click',function(){ var k=b.getAttribute('data-sortcap'); setSort(k==='book'?'book':'recent'); })});
+
+  /* f2 · layout */
+  all('[data-v]',function(b){b.addEventListener('click',function(){
+    all('[data-v]',function(x){x.classList.remove('on')}); b.classList.add('on');
+    var g=b.getAttribute('data-v')==='grid'; show('f2-grid',g); show('f2-list',!g);
+  })});
+
+  /* f3 · moment */
+  var moment='recipe';
+  function setMoment(m){
+    moment=m;
+    all('[data-p]',function(x){x.classList.toggle('on',x.getAttribute('data-p')===m)});
+    el('pickovl').classList.toggle('show', m==='pick');
+    show('poster', m!=='pick');
+    show('po-recipe', m==='recipe'); show('po-menu', m==='menu'); show('po-price', m==='menu');
+  }
+  all('[data-p]',function(b){b.addEventListener('click',function(){ setMoment(b.getAttribute('data-p')); })});
+
+  /* f4 · step */
+  var stepState='mid';
+  function setStep(s){
+    stepState=s;
+    all('[data-s]',function(x){x.classList.toggle('on',x.getAttribute('data-s')===s)});
+    show('stepsv',true);
+    var last=s==='last';
+    show('st-mid',!last); show('st-last',last); show('st-btn-mid',!last); show('st-btn-last',last); show('st-tap',!last);
+    el('st-eb').textContent = last?'Step 7':'Step 3';
+    var segs=el('st-segs').children; for(var i=0;i<segs.length;i++){ segs[i].className = last ? (i<6?'d':'c') : (i<2?'d':(i===2?'c':'')); }
+  }
+  all('[data-s]',function(b){b.addEventListener('click',function(){ setStep(b.getAttribute('data-s')); })});
+
+  /* f5 · book */
+  var bookState='cover';
+  function setBook(s){
+    bookState=s;
+    all('[data-b]',function(x){x.classList.toggle('on',x.getAttribute('data-b')===s)});
+    var rotate=s==='rotate';
+    phone.classList.toggle('land',!rotate);
+    show('book',!rotate); show('rot',rotate);
+    /* behind the prompt: the Fall book page */
+    if(rotate){ all('.design',function(d){d.classList.toggle('on',d.id==='f2')}); } else { all('.design',function(d){d.classList.toggle('on',d.id==='f5')}); }
+    show('bk-cover', s==='cover'); show('bk-step', s==='step');
+    var dots=el('bk-dots').children; for(var i=0;i<dots.length;i++){ dots[i].className = (s==='cover'? i===0 : i===3) ? 'on' : ''; }
+  }
+  all('[data-b]',function(b){b.addEventListener('click',function(){ setBook(b.getAttribute('data-b')); })});
+
+  /* f6 · page */
+  var page='steps', ORDER=['basics','details','ingredients','steps','review'];
+  function setPage(p){
+    page=p;
+    all('[data-e]',function(x){x.classList.toggle('on',x.getAttribute('data-e')===p)});
+    ['basics','details','steps','review'].forEach(function(k){ show('ed-'+k, k===p); });
+    var idx=ORDER.indexOf(p);
+    all('#ed-rail div',function(d,i){ d.className = i<idx?'done':(i===idx?'live':''); });
+    el('ed-next').textContent = p==='review' ? 'Save recipe' : (p==='steps' ? 'Review' : 'Next');
+    el('ed-back').style.visibility = p==='basics' ? 'hidden' : '';
+  }
+  all('[data-e]',function(b){b.addEventListener('click',function(){ setPage(b.getAttribute('data-e')); })});
+  el('ed-next').addEventListener('click',function(){ var i=ORDER.indexOf(page); if(page==='ingredients') i=2; var n=ORDER[Math.min(i+1,4)]; if(n==='ingredients') n='steps'; setPage(n); });
+  el('ed-back').addEventListener('click',function(){ var i=ORDER.indexOf(page); var n=ORDER[Math.max(i-1,0)]; if(n==='ingredients') n='details'; setPage(n); });
+
+  /* f7 · side */
+  all('[data-k]',function(b){b.addEventListener('click',function(){
+    all('[data-k]',function(x){x.classList.remove('on')}); b.classList.add('on');
+    var u=b.getAttribute('data-k')==='user'; show('f7-user',u); show('f7-editor',!u);
+    el('f7-eb').textContent = u?'Kitchen Assistant':'Kitchen Editor';
+    el('f7-nav').innerHTML = u ? '<svg class="ic"><use href="#i-pencil"/></svg>To Editor' : '<svg class="ic"><use href="#i-person"/></svg>To User';
+  })});
+
+  /* f8 · expanded */
+  all('[data-j]',function(b){b.addEventListener('click',function(){
+    all('[data-j]',function(x){x.classList.remove('on')}); b.classList.add('on');
+    var k=b.getAttribute('data-j')==='kitchen'; show('f8-kit-body',k); show('f8-bar-body',!k);
+  })});
+
+  /* palette */
+  all('[data-t]',function(b){b.addEventListener('click',function(){
+    all('[data-t]',function(x){x.classList.remove('on')}); b.classList.add('on');
+    var land=phone.classList.contains('land');
+    phone.className='phone '+b.getAttribute('data-t')+(land?' land':'');
+  })});
+
+  showFrame('f1');
+})();
+</script>
+</body>
+</html>

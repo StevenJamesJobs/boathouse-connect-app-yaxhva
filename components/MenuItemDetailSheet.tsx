@@ -80,7 +80,7 @@ export interface MenuItemDetailSheetProps {
    * the Bartender Assistant (MenuDisplay gates it). A glass chip in the
    * panel's action row. Navigates → deferred.
    */
-  recipe?: { label: string; onPress: () => void } | null;
+  recipe?: { label: string; onPress: () => void; icon?: { ios: string; android: string } } | null;
   /**
    * The item's category colour — the no-photo board's hue (mockup N: "a 30%
    * board in the item's category colour", never a grey slab). Null/omitted →
@@ -256,7 +256,7 @@ export default function MenuItemDetailSheet({
                 onPress={() => defer(recipe.onPress)}
                 style={[styles.act, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
               >
-                <IconSymbol ios_icon_name="wineglass.fill" android_material_icon_name="local-bar" size={15} color={colors.tint} />
+                <IconSymbol ios_icon_name={(recipe.icon?.ios ?? 'wineglass.fill') as any} android_material_icon_name={(recipe.icon?.android ?? 'local-bar') as any} size={15} color={colors.tint} />
                 <Text style={[styles.actLabel, { color: colors.text }]} numberOfLines={1}>{recipe.label}</Text>
               </Pressable>
             )}

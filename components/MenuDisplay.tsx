@@ -45,6 +45,8 @@ import MenuItemDetailSheet, { type MenuItemForDetail } from '@/components/MenuIt
 import { MenuItemSquareCard, MenuItemBannerCard } from '@/components/MenuItemCards';
 import MenuFilterSheet, { type DietKey } from '@/components/MenuFilterSheet';
 import MenuSheet from '@/components/MenuSheet';
+import { fetchKitchenRecipeForItem } from '@/hooks/useKitchenRecipes';
+import { useKitchenRecipeOpener } from '@/components/kitchen/KitchenRecipeOpener';
 
 interface MenuItem {
   id: string;
@@ -491,6 +493,12 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
   // s87: the "View Recipe" chip on recipe-fed libations — only for viewers who may
   // open the Bartender Assistant (managers, or the assistant's job titles).
   const { canSee: canSeeTool } = useToolVisibility();
+  // s91: the "View Recipe" chip on an ordinary (non-libation, non-wine) item
+  // whose kitchen recipe exists — for viewers who may open the Kitchen
+  // Assistant. Resolved per open (one RPC), keyed by the item id so a stale
+  // answer never rides onto the next item; the opener's node renders once below.
+  const [kitchenRecipe, setKitchenRecipe] = useState<{ itemId: string; recipeId: string } | null>(null);
+  const { openRecipe: openKitchenRecipe, node: kitchenRecipeNode } = useKitchenRecipeOpener();
   const { settings: redemptionSettings } = useRedemptionSettings();
   const { perms: managerPerms, reload: reloadPerms } = useManagerPermissions();
   const router = useRouter();
@@ -946,6 +954,14 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
   const openDetailSheet = (item: MenuItem) => {
     setSelectedMenuItem(item);
     setDetailSheetVisible(true);
+    setKitchenRecipe(null);
+    // Kitchen recipe lookup: never for libations (recipe-fed `lr-`/`slr-` rows
+    // included) or wine, and only when the viewer can see the Kitchen Assistant.
+    const isLib = catOf(item.category)?.system_key === 'cat.libations' || /^(slr|lr)-/.test(item.id);
+    if (!user?.id || isLib || isWineName(item.category) || !canSeeTool('kitchen')) return;
+    fetchKitchenRecipeForItem(user.id, item.id)
+      .then((row) => { if (row) setKitchenRecipe({ itemId: item.id, recipeId: row.id }); })
+      .catch((e) => console.error('[MenuDisplay] kitchen recipe lookup failed', e));
   };
 
   // s87 Jolt deep link: `?openItem=<id>&ts=<nonce>` lands on the item's page and
@@ -1347,7 +1363,17 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     // recipes page with that recipe's sheet already up (the sheet defers the
     // press through its dismissal handoff).
     const recipeMatch = item.id.match(/^(slr|lr)-(.+)$/);
-    const recipe = recipeMatch && canSeeTool('bartender')
+    // s91: the kitchen recipe behind an ordinary item (resolved in openDetailSheet).
+    const kitchenHit = !recipeMatch && kitchenRecipe && kitchenRecipe.itemId === item.id && canSeeTool('kitchen')
+      ? kitchenRecipe.recipeId
+      : null;
+    const recipe = kitchenHit
+      ? {
+          label: t('menu_detail.view_recipe'),
+          icon: { ios: 'fork.knife', android: 'restaurant' },
+          onPress: () => openKitchenRecipe(kitchenHit),
+        }
+      : recipeMatch && canSeeTool('bartender')
       ? {
           label: t('menu_detail.view_recipe'),
           onPress: () => {
@@ -1603,6 +1629,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
         recipe={detailCtx.recipe}
         categoryColor={detailCtx.categoryColor}
       />
+      {kitchenRecipeNode}
 
       {/* The ⚙ Menu sheet — managers/owners only (employees never see the chip) */}
       {showActionChips && user && (

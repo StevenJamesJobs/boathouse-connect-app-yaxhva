@@ -13,7 +13,8 @@ import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
-import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
+import { useRequireEditorRoute } from '@/hooks/useRequireEditorRoute';
+import { isManagerOrOwner } from '@/utils/roles';
 import { supabase } from '@/app/integrations/supabase/client';
 import type { Database } from '@/app/integrations/supabase/types';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -86,7 +87,7 @@ const TRASH_RED = '#E53935';
 // previous subcategory.
 
 export default function SummerLibationRecipesEditorScreen() {
-  useRequireManagerRoute();
+  useRequireEditorRoute('bartender');
   const router = useRouter();
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
@@ -543,6 +544,8 @@ export default function SummerLibationRecipesEditorScreen() {
 
   const screenTitle = organization?.menu_2_name ? `${organization.menu_2_name} ${t('libation_editor.title')}` : t('summer_libation_editor.title');
   const canEditCategories = user?.role === 'owner' || perms.editCategories;
+  // s91: a granted recipe editor (not a manager) sees only To User on the sheet.
+  const isManager = isManagerOrOwner(user);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -564,7 +567,7 @@ export default function SummerLibationRecipesEditorScreen() {
                 androidIcon: 'person',
                 onPress: () => router.replace('/summer-libation-recipes'),
               },
-              {
+              ...(isManager ? [{
                 key: 'cats',
                 label: t('menu_sheet.edit_categories'),
                 iosIcon: 'square.grid.2x2',
@@ -586,7 +589,7 @@ export default function SummerLibationRecipesEditorScreen() {
                 iosIcon: 'sparkles',
                 androidIcon: 'auto-awesome',
                 onPress: () => setUploadVisible(true),
-              },
+              }] : []),
             ]}
           />
         }
@@ -837,7 +840,7 @@ export default function SummerLibationRecipesEditorScreen() {
           translationElement={translation.element}
         />
       </GlassSheet>
-      <LibationUploadSheet visible={uploadVisible} onClose={() => setUploadVisible(false)} defaultSlot={2} />
+      {isManager && <LibationUploadSheet visible={uploadVisible} onClose={() => setUploadVisible(false)} defaultSlot={2} />}
     </View>
   );
 }

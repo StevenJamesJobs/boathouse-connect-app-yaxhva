@@ -101,6 +101,7 @@ export type Database = {
       }
       bartender_checklist_categories: {
         Row: {
+          attachments: Json
           checklist_type: string
           created_at: string | null
           display_order: number | null
@@ -111,6 +112,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          attachments?: Json
           checklist_type: string
           created_at?: string | null
           display_order?: number | null
@@ -121,6 +123,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          attachments?: Json
           checklist_type?: string
           created_at?: string | null
           display_order?: number | null
@@ -193,6 +196,7 @@ export type Database = {
       }
       checklist_categories: {
         Row: {
+          attachments: Json
           checklist_type: string
           created_at: string | null
           display_order: number | null
@@ -203,6 +207,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          attachments?: Json
           checklist_type: string
           created_at?: string | null
           display_order?: number | null
@@ -213,6 +218,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          attachments?: Json
           checklist_type?: string
           created_at?: string | null
           display_order?: number | null
@@ -1071,6 +1077,279 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      kitchen_checklist_categories: {
+        Row: {
+          attachments: Json
+          checklist_type: string
+          created_at: string
+          display_order: number
+          id: string
+          is_active: boolean
+          name: string
+          name_es: string | null
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          attachments?: Json
+          checklist_type: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          name: string
+          name_es?: string | null
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          attachments?: Json
+          checklist_type?: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          name?: string
+          name_es?: string | null
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      kitchen_checklist_items: {
+        Row: {
+          category_id: string
+          created_at: string
+          display_order: number
+          id: string
+          is_active: boolean
+          organization_id: string
+          text: string
+          text_es: string | null
+          updated_at: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          organization_id: string
+          text: string
+          text_es?: string | null
+          updated_at?: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          organization_id?: string
+          text?: string
+          text_es?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      kitchen_recipe_groups: {
+        Row: {
+          created_at: string
+          display_order: number
+          id: string
+          is_active: boolean
+          name: string
+          name_es: string | null
+          organization_id: string
+          section: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          name: string
+          name_es?: string | null
+          organization_id: string
+          section: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          name?: string
+          name_es?: string | null
+          organization_id?: string
+          section?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      kitchen_recipe_saves: {
+        Row: {
+          created_at: string
+          organization_id: string
+          recipe_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          organization_id: string
+          recipe_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          organization_id?: string
+          recipe_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      kitchen_recipes: {
+        Row: {
+          allergens: string[]
+          category: string | null
+          cook_minutes: number | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          description_es: string | null
+          display_order: number
+          group_id: string | null
+          id: string
+          images: Json
+          ingredients: Json
+          is_active: boolean
+          is_special: boolean
+          menu_active: boolean
+          menu_item_id: string | null
+          name: string
+          name_es: string | null
+          off_menu_at: string | null
+          organization_id: string
+          plating_notes: string | null
+          plating_notes_es: string | null
+          portions_text: string | null
+          prep_minutes: number | null
+          season: string | null
+          section: string
+          shelf_life: string | null
+          station: string | null
+          steps: Json
+          subcategory: string | null
+          thumbnail_url: string | null
+          updated_at: string
+          yield_text: string | null
+        }
+        Insert: {
+          allergens?: string[]
+          category?: string | null
+          cook_minutes?: number | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          description_es?: string | null
+          display_order?: number
+          group_id?: string | null
+          id?: string
+          images?: Json
+          ingredients?: Json
+          is_active?: boolean
+          is_special?: boolean
+          menu_active?: boolean
+          menu_item_id?: string | null
+          name: string
+          name_es?: string | null
+          off_menu_at?: string | null
+          organization_id: string
+          plating_notes?: string | null
+          plating_notes_es?: string | null
+          portions_text?: string | null
+          prep_minutes?: number | null
+          season?: string | null
+          section: string
+          shelf_life?: string | null
+          station?: string | null
+          steps?: Json
+          subcategory?: string | null
+          thumbnail_url?: string | null
+          updated_at?: string
+          yield_text?: string | null
+        }
+        Update: {
+          allergens?: string[]
+          category?: string | null
+          cook_minutes?: number | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          description_es?: string | null
+          display_order?: number
+          group_id?: string | null
+          id?: string
+          images?: Json
+          ingredients?: Json
+          is_active?: boolean
+          is_special?: boolean
+          menu_active?: boolean
+          menu_item_id?: string | null
+          name?: string
+          name_es?: string | null
+          off_menu_at?: string | null
+          organization_id?: string
+          plating_notes?: string | null
+          plating_notes_es?: string | null
+          portions_text?: string | null
+          prep_minutes?: number | null
+          season?: string | null
+          section?: string
+          shelf_life?: string | null
+          station?: string | null
+          steps?: Json
+          subcategory?: string | null
+          thumbnail_url?: string | null
+          updated_at?: string
+          yield_text?: string | null
+        }
+        Relationships: []
+      }
+      user_kitchen_checklist_progress: {
+        Row: {
+          checklist_item_id: string
+          completed: boolean
+          completed_date: string
+          created_at: string
+          id: string
+          organization_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          checklist_item_id: string
+          completed?: boolean
+          completed_date: string
+          created_at?: string
+          id?: string
+          organization_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          checklist_item_id?: string
+          completed?: boolean
+          completed_date?: string
+          created_at?: string
+          id?: string
+          organization_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       libation_recipes: {
         Row: {
@@ -2398,72 +2677,6 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "shade_dismissals_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      signature_recipes: {
-        Row: {
-          created_at: string | null
-          created_by: string | null
-          display_order: number | null
-          glassware: string | null
-          id: string
-          ingredients: Json | null
-          is_active: boolean | null
-          name: string
-          organization_id: string
-          price: string | null
-          procedure: string | null
-          subcategory: string | null
-          thumbnail_url: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          created_by?: string | null
-          display_order?: number | null
-          glassware?: string | null
-          id?: string
-          ingredients?: Json | null
-          is_active?: boolean | null
-          name: string
-          organization_id: string
-          price?: string | null
-          procedure?: string | null
-          subcategory?: string | null
-          thumbnail_url?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          created_by?: string | null
-          display_order?: number | null
-          glassware?: string | null
-          id?: string
-          ingredients?: Json | null
-          is_active?: boolean | null
-          name?: string
-          organization_id?: string
-          price?: string | null
-          procedure?: string | null
-          subcategory?: string | null
-          thumbnail_url?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "signature_recipes_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "signature_recipes_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -4473,21 +4686,6 @@ export type Database = {
         }
         Returns: string
       }
-      create_signature_recipe: {
-        Args: {
-          p_display_order: number
-          p_glassware: string
-          p_ingredients: Json
-          p_name: string
-          p_organization_id?: string
-          p_price: string
-          p_procedure: string
-          p_subcategory: string
-          p_thumbnail_url: string
-          p_user_id: string
-        }
-        Returns: string
-      }
       create_special_feature: {
         Args: {
           p_display_order?: number
@@ -4584,14 +4782,6 @@ export type Database = {
         Returns: boolean
       }
       delete_puree_syrup_recipe: {
-        Args: {
-          p_organization_id?: string
-          p_recipe_id: string
-          p_user_id: string
-        }
-        Returns: undefined
-      }
-      delete_signature_recipe: {
         Args: {
           p_organization_id?: string
           p_recipe_id: string
@@ -4834,8 +5024,9 @@ export type Database = {
         Returns: number
       }
       get_checklist_categories: {
-        Args: { p_actor_id: string; p_bartender: boolean; p_checklist_type?: string }
+        Args: { p_actor_id: string; p_bartender: boolean; p_checklist_type?: string; p_kind?: string }
         Returns: {
+          attachments: Json
           checklist_type: string
           display_order: number
           id: string
@@ -4843,8 +5034,144 @@ export type Database = {
           name_es: string | null
         }[]
       }
+      get_my_assistant_editor_keys: {
+        Args: { p_actor_id: string }
+        Returns: { assistant_key: string }[]
+      }
+      set_checklist_category_attachments: {
+        Args: { p_actor_id: string; p_bartender: boolean; p_category_id: string; p_attachments: Json; p_kind?: string }
+        Returns: Json
+      }
+      update_kitchen_checklist_category_translations_actor: {
+        Args: { p_actor_id: string; p_id: string; p_name_es?: string | null }
+        Returns: undefined
+      }
+      update_kitchen_checklist_item_translations_actor: {
+        Args: { p_actor_id: string; p_id: string; p_text_es?: string | null }
+        Returns: undefined
+      }
+      get_kitchen_hub: {
+        Args: { p_actor_id: string }
+        Returns: { book: string; total: number; needs: number; thumbs: Json }[]
+      }
+      get_kitchen_recipes: {
+        Args: { p_actor_id: string; p_book: string }
+        Returns: {
+          id: string
+          section: string
+          menu_item_id: string | null
+          group_id: string | null
+          group_name: string | null
+          group_name_es: string | null
+          name: string
+          name_es: string | null
+          thumbnail_url: string | null
+          images: Json
+          category: string | null
+          subcategory: string | null
+          season: string | null
+          is_special: boolean
+          station: string | null
+          prep_minutes: number | null
+          cook_minutes: number | null
+          step_count: number
+          is_written: boolean
+          is_saved: boolean
+          off_menu: boolean
+          display_order: number
+        }[]
+      }
+      get_kitchen_recipe: {
+        Args: { p_actor_id: string; p_id: string }
+        Returns: {
+          id: string
+          section: string
+          menu_item_id: string | null
+          group_id: string | null
+          group_name: string | null
+          group_name_es: string | null
+          name: string
+          name_es: string | null
+          description: string | null
+          description_es: string | null
+          thumbnail_url: string | null
+          images: Json
+          category: string | null
+          subcategory: string | null
+          season: string | null
+          is_special: boolean
+          menu_active: boolean
+          off_menu: boolean
+          yield_text: string | null
+          portions_text: string | null
+          prep_minutes: number | null
+          cook_minutes: number | null
+          station: string | null
+          shelf_life: string | null
+          allergens: string[]
+          plating_notes: string | null
+          plating_notes_es: string | null
+          ingredients: Json
+          steps: Json
+          is_saved: boolean
+          save_count: number
+          display_order: number
+          updated_at: string
+        }[]
+      }
+      get_kitchen_recipe_for_item: {
+        Args: { p_actor_id: string; p_menu_item_id: string }
+        Returns: { id: string; is_written: boolean }[]
+      }
+      get_kitchen_recipe_groups: {
+        Args: { p_actor_id: string; p_section?: string }
+        Returns: {
+          id: string
+          section: string
+          name: string
+          name_es: string | null
+          display_order: number
+          recipe_count: number
+        }[]
+      }
+      create_kitchen_recipe: {
+        Args: { p_actor_id: string; p_section: string; p_payload: Json }
+        Returns: string
+      }
+      update_kitchen_recipe: {
+        Args: { p_actor_id: string; p_id: string; p_payload: Json }
+        Returns: undefined
+      }
+      delete_kitchen_recipe: {
+        Args: { p_actor_id: string; p_id: string }
+        Returns: boolean
+      }
+      reorder_kitchen_recipes: {
+        Args: { p_actor_id: string; p_ordered_ids: string[] }
+        Returns: undefined
+      }
+      upsert_kitchen_recipe_group: {
+        Args: { p_actor_id: string; p_section: string; p_name: string; p_group_id?: string }
+        Returns: string
+      }
+      delete_kitchen_recipe_group: {
+        Args: { p_actor_id: string; p_group_id: string }
+        Returns: boolean
+      }
+      reorder_kitchen_recipe_groups: {
+        Args: { p_actor_id: string; p_ordered_ids: string[] }
+        Returns: undefined
+      }
+      update_kitchen_recipe_group_translations_actor: {
+        Args: { p_actor_id: string; p_id: string; p_name_es?: string | null }
+        Returns: undefined
+      }
+      set_kitchen_recipe_saved: {
+        Args: { p_actor_id: string; p_recipe_id: string; p_saved: boolean }
+        Returns: boolean
+      }
       get_checklist_items: {
-        Args: { p_actor_id: string; p_bartender: boolean; p_checklist_type?: string }
+        Args: { p_actor_id: string; p_bartender: boolean; p_checklist_type?: string; p_kind?: string }
         Returns: {
           category_id: string
           display_order: number
@@ -4854,7 +5181,7 @@ export type Database = {
         }[]
       }
       get_my_checklist_progress: {
-        Args: { p_actor_id: string; p_bartender: boolean; p_date: string }
+        Args: { p_actor_id: string; p_bartender: boolean; p_date: string; p_kind?: string }
         Returns: {
           checklist_item_id: string
           completed: boolean
@@ -4867,6 +5194,7 @@ export type Database = {
           p_completed: boolean
           p_date: string
           p_item_id: string
+          p_kind?: string
         }
         Returns: undefined
       }
@@ -4877,11 +5205,12 @@ export type Database = {
           p_category_id?: string
           p_checklist_type: string
           p_name: string
+          p_kind?: string
         }
         Returns: string
       }
       delete_checklist_category: {
-        Args: { p_actor_id: string; p_bartender: boolean; p_category_id: string }
+        Args: { p_actor_id: string; p_bartender: boolean; p_category_id: string; p_kind?: string }
         Returns: boolean
       }
       upsert_checklist_item: {
@@ -4891,11 +5220,12 @@ export type Database = {
           p_category_id: string
           p_item_id?: string
           p_text: string
+          p_kind?: string
         }
         Returns: string
       }
       delete_checklist_item: {
-        Args: { p_actor_id: string; p_bartender: boolean; p_item_id: string }
+        Args: { p_actor_id: string; p_bartender: boolean; p_item_id: string; p_kind?: string }
         Returns: boolean
       }
       get_checkout_defaults: {
@@ -6341,22 +6671,6 @@ export type Database = {
       }
       update_quick_tools: {
         Args: { p_organization_id?: string; tools: Json; user_id: string }
-        Returns: undefined
-      }
-      update_signature_recipe: {
-        Args: {
-          p_display_order: number
-          p_glassware: string
-          p_ingredients: Json
-          p_name: string
-          p_organization_id?: string
-          p_price: string
-          p_procedure: string
-          p_recipe_id: string
-          p_subcategory: string
-          p_thumbnail_url: string
-          p_user_id: string
-        }
         Returns: undefined
       }
       update_special_feature: {

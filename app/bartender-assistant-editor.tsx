@@ -9,7 +9,8 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useThemeColors } from '@/hooks/useThemeColors';
-import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
+import { useRequireEditorRoute } from '@/hooks/useRequireEditorRoute';
+import { isManagerOrOwner } from '@/utils/roles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -60,7 +61,7 @@ const firstThumbs = (rows: { thumbnail_url?: string | null }[] | null | undefine
     .slice(0, 3);
 
 export default function BartenderAssistantEditorScreen() {
-  useRequireManagerRoute();
+  useRequireEditorRoute('bartender');
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
@@ -75,7 +76,11 @@ export default function BartenderAssistantEditorScreen() {
   const [uploadVisible, setUploadVisible] = useState(false);
   const [credits, setCredits] = useState<{ remaining: number; max: number } | null>(null);
   const isOwner = user?.role === 'owner';
-  const canUploadLibations = isOwner || perms.aiLibationUpload;
+  // s91: a granted recipe editor (not a manager) opens this hub too — the
+  // Upload tile stays visible but LOCKED ("Managers only"), the nav sheet
+  // shows only To User, and the upload sheet never mounts.
+  const isManager = isManagerOrOwner(user);
+  const canUploadLibations = isManager && (isOwner || perms.aiLibationUpload);
 
   // A one-menu restaurant has no Menu 2 libations — its recipes editor tile
   // and featured rows stay out (any saved Menu 2 recipes are kept, unlisted)
@@ -233,8 +238,10 @@ export default function BartenderAssistantEditorScreen() {
   // call). Locked states keep the tile visible: a padlock replaces the
   // sparkles and the second line says why — never hidden.
   const uploadTile = (wide: boolean) => {
-    const locked = !hasPremium || !canUploadLibations;
-    const sub = !hasPremium
+    const locked = !isManager || !hasPremium || !canUploadLibations;
+    const sub = !isManager
+      ? t('bartender_assistant_editor.upload_locked_managers')
+      : !hasPremium
       ? t('bartender_assistant_editor.upload_locked_premium')
       : !canUploadLibations
         ? t('bartender_assistant_editor.upload_locked_owner')
@@ -254,7 +261,7 @@ export default function BartenderAssistantEditorScreen() {
     const pill = (
       <View style={[styles.premPill, { backgroundColor: colors.primary + '26' }]}>
         <Text style={[styles.premPillText, { color: colors.primary }]}>
-          {(locked && hasPremium ? t('bartender_assistant_editor.locked_pill') : `✦ ${t('common.premium_badge')}`).toUpperCase()}
+          {(locked && (hasPremium || !isManager) ? t('bartender_assistant_editor.locked_pill') : `✦ ${t('common.premium_badge')}`).toUpperCase()}
         </Text>
       </View>
     );
@@ -264,6 +271,7 @@ export default function BartenderAssistantEditorScreen() {
         <TouchableOpacity
           style={[styles.wideTile, tint, locked && styles.tileLocked]}
           onPress={() => setUploadVisible(true)}
+          disabled={!isManager}
           activeOpacity={0.7}
         >
           {chip}
@@ -280,6 +288,7 @@ export default function BartenderAssistantEditorScreen() {
       <TouchableOpacity
         style={[styles.gridTile, tint, locked && styles.tileLocked]}
         onPress={() => setUploadVisible(true)}
+        disabled={!isManager}
         activeOpacity={0.7}
       >
         <View style={styles.gridTileTop}>
@@ -308,7 +317,8 @@ export default function BartenderAssistantEditorScreen() {
           androidIcon: 'person',
           onPress: () => router.replace('/bartender-assistant'),
         },
-        {
+        // s91: the manager-only rows — a granted recipe editor's sheet shows only To User.
+        ...(isManager ? [{
           key: 'cats',
           label: t('menu_sheet.edit_categories'),
           iosIcon: 'square.grid.2x2',
@@ -330,7 +340,7 @@ export default function BartenderAssistantEditorScreen() {
           iosIcon: 'sparkles',
           androidIcon: 'auto-awesome',
           onPress: () => setUploadVisible(true),
-        },
+        }] : []),
       ]}
     />
   );
@@ -436,8 +446,8 @@ export default function BartenderAssistantEditorScreen() {
           </View>
         </ScrollView>
       )}
-      <LibationUploadSheet visible={uploadVisible} onClose={() => setUploadVisible(false)} />
-      <BottomNavBar activeTab="manage" />
+      {isManager && <LibationUploadSheet visible={uploadVisible} onClose={() => setUploadVisible(false)} />}
+      <BottomNavBar activeTab={isManager ? 'manage' : 'tools'} />
     </View>
   );
 }

@@ -49,6 +49,19 @@
 //
 // v18 (session 90): libation_upload_file — the Libations AI Upload scan file
 //   (menu-uploads bucket, grantKey premium.ai_libation_upload).
+// v19 (session 90): 'cocktail-images' + 'puree-syrup-recipe-images' join
+//   DELETE_BUCKETS (the multi-image field removes photos in those editors).
+//
+// v20 (session 91): the Kitchen Assistant. Two buckets — 'kitchen-recipes'
+//   (recipe + step photos) and 'checklist-attachments' (files on a checklist
+//   category, all three families). Purposes gated 'manager' may also name an
+//   `editorKey`: a non-manager passes when one of their job titles is mapped to
+//   `<editorKey>_editor` in job_title_assistants (the s91 "Who can edit recipes"
+//   grant — _may_edit_assistant() server-side; this mirrors it for uploads).
+//
+// v21 (session 91, device round): kitchen_menu_cover_image — a menu-fed
+//   recipe's cover uploaded from the Kitchen Editor into 'menu-items' (the
+//   kitchen editor gate); update_kitchen_recipe mirrors it onto the menu item.
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -97,6 +110,8 @@ interface Gate {
   // Owner-gated purposes may name a manager_permissions key that also admits a
   // manager whose org holds the grant (s68 manager-permissions feature).
   grantKey?: string;
+  // v20: manager-gated purposes may admit a recipe editor (job-title grant).
+  editorKey?: 'kitchen' | 'bartender' | 'host';
 }
 
 const GATES: Record<string, Gate> = {
@@ -218,6 +233,38 @@ const GATES: Record<string, Gate> = {
     path: (c) => `${c.orgId}/${c.ts}-${c.safeName}`,
     grantKey: 'premium.ai_schedule_upload',
   },
+  kitchen_recipe_image: {
+    // v20 (s91): a kitchen recipe's own photos + step photos (menu covers stay
+    // in menu-items). Owners / managers, or a title holding the kitchen grant.
+    bucket: 'kitchen-recipes', roles: 'manager', maxBytes: 10 * MB, mimes: IMAGES,
+    path: (c) => `${c.orgId}/${c.ts}-${c.rand}.${c.ext}`,
+    editorKey: 'kitchen',
+  },
+  kitchen_menu_cover_image: {
+    // v21 (s91 device round): a MENU-FED recipe's cover, edited from the Kitchen
+    // Editor. It IS the menu item's cover (update_kitchen_recipe writes it back to
+    // menu_items.thumbnail_url / images[0]), so it lives in menu-items like one
+    // the Menu Editor uploaded. Same gate as the recipe photos.
+    bucket: 'menu-items', roles: 'manager', maxBytes: 10 * MB, mimes: IMAGES,
+    path: (c) => `${c.orgId}/${c.ts}-${c.rand}.${c.ext}`,
+    editorKey: 'kitchen',
+  },
+  kitchen_checklist_attachment: {
+    // v20 (s91): a file on a checklist category (PDF / image, 20 MB, ≤3 per category).
+    bucket: 'checklist-attachments', roles: 'manager', maxBytes: 20 * MB, mimes: ATTACHMENT_TYPES,
+    path: (c) => `${c.orgId}/kitchen/${c.ts}_${c.safeName}`,
+    editorKey: 'kitchen',
+  },
+  bartender_checklist_attachment: {
+    bucket: 'checklist-attachments', roles: 'manager', maxBytes: 20 * MB, mimes: ATTACHMENT_TYPES,
+    path: (c) => `${c.orgId}/bartender/${c.ts}_${c.safeName}`,
+    editorKey: 'bartender',
+  },
+  host_checklist_attachment: {
+    bucket: 'checklist-attachments', roles: 'manager', maxBytes: 20 * MB, mimes: ATTACHMENT_TYPES,
+    path: (c) => `${c.orgId}/host/${c.ts}_${c.safeName}`,
+    editorKey: 'host',
+  },
   libation_upload_file: {
     // v18 (s90): the Libations AI Upload — same bucket + layout as a menu scan
     // (parse-libations reads only this bucket under the org prefix); owner, or a
@@ -233,19 +280,24 @@ const GATES: Record<string, Gate> = {
 // (delete_menu_upload returns the file_url; the client broker-deletes it after).
 // v16 (s88): + the two libation recipe image buckets (hard recipe deletes).
 // v17 (s89): + 'notification-images' (a composer that drops a picked photo).
+// v19 (s90): + 'cocktail-images' + 'puree-syrup-recipe-images' — the multi-image
+// field removes photos from those editors too (the rows stay soft-deleted).
+// v20 (s91): + 'kitchen-recipes' + 'checklist-attachments'.
 const DELETE_BUCKETS = new Set([
   'guides-and-training', 'announcements', 'special-features', 'upcoming-events', 'menu-items',
   'menu-uploads', 'schedules', 'libation-recipe-images', 'summer-libation-recipe-images',
-  'notification-images',
+  'notification-images', 'cocktail-images', 'puree-syrup-recipe-images',
+  'kitchen-recipes', 'checklist-attachments',
 ]);
 
-// The 16 real buckets sign-read will mint READ URLs for (excludes the inert,
-// empty b4a-proof bucket). v17: + 'notification-images'.
+// The 18 real buckets sign-read will mint READ URLs for (excludes the inert,
+// empty b4a-proof bucket). v17: + 'notification-images'. v20: + 'kitchen-recipes',
+// 'checklist-attachments'.
 const READ_BUCKETS = new Set([
-  'announcements', 'cocktail-images', 'guides-and-training', 'host-section-images',
-  'libation-recipe-images', 'menu-items', 'menu-uploads', 'message-attachments',
-  'notification-images', 'organization-logos', 'profile-pictures',
-  'puree-syrup-recipe-images', 'schedules', 'special-features',
+  'announcements', 'checklist-attachments', 'cocktail-images', 'guides-and-training',
+  'host-section-images', 'kitchen-recipes', 'libation-recipe-images', 'menu-items',
+  'menu-uploads', 'message-attachments', 'notification-images', 'organization-logos',
+  'profile-pictures', 'puree-syrup-recipe-images', 'schedules', 'special-features',
   'summer-libation-recipe-images', 'upcoming-events',
 ]);
 
@@ -388,7 +440,7 @@ serve(async (req) => {
     // Server-side actor verification (custom auth — never trust the JWT).
     const { data: actor, error: actorErr } = await supabase
       .from('users')
-      .select('id, role, organization_id, is_active')
+      .select('id, role, organization_id, is_active, job_titles')
       .eq('id', actorId)
       .single();
     if (actorErr || !actor || actor.is_active === false || !actor.organization_id) {
@@ -415,7 +467,20 @@ serve(async (req) => {
         }
         if (!granted) return json({ success: false, error: 'Not authorized' }, 403);
       }
-      if (gate.roles === 'manager' && !isManager) return json({ success: false, error: 'Not authorized' }, 403);
+      if (gate.roles === 'manager' && !isManager) {
+        // v20: a recipe editor (job-title grant) passes a manager gate that names an editorKey.
+        let editor = false;
+        const titles: string[] = Array.isArray(actor.job_titles) ? actor.job_titles : [];
+        if (gate.editorKey && titles.length > 0) {
+          const { data: maps } = await supabase
+            .from('job_title_assistants')
+            .select('job_title')
+            .eq('organization_id', actor.organization_id)
+            .eq('assistant_key', `${gate.editorKey}_editor`);
+          editor = (maps ?? []).some((m: { job_title: string }) => titles.includes(m.job_title));
+        }
+        if (!editor) return json({ success: false, error: 'Not authorized' }, 403);
+      }
 
       // profile_picture: default target self; managers may target same-org users.
       let targetUserId = actor.id as string;

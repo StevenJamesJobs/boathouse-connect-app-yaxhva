@@ -22,6 +22,8 @@ import { isManagerOrOwner } from '@/utils/roles';
 import AmbientGlow from '@/components/AmbientGlow';
 import ScreenHeader from '@/components/ScreenHeader';
 import HeaderNavMenu from '@/components/HeaderNavMenu';
+import HeaderNavButton from '@/components/HeaderNavButton';
+import { useAssistantEditor } from '@/hooks/useAssistantEditor';
 import { useManagerPermissions } from '@/hooks/useManagerPermissions';
 import RecipeDetailSheet from '@/components/RecipeDetailSheet';
 import { RECIPE_TILE_SIZE } from '@/components/RecipeGridCard';
@@ -69,6 +71,10 @@ export default function PureeSyrupRecipesScreen() {
   const colors = useThemeColors();
   const { user } = useAuth();
   const isManager = isManagerOrOwner(user);
+  // s91: a granted recipe editor (not a manager) gets a plain To Editor pill
+  // and the Edit chip; the manager sheet rows stay manager-only.
+  const { canEdit } = useAssistantEditor();
+  const canEditBar = canEdit('bartender');
   const { perms } = useManagerPermissions();
   const [recipes, setRecipes] = useState<PureeSyrupRecipe[]>([]);
   const [loading, setLoading] = useState(true);
@@ -172,7 +178,7 @@ export default function PureeSyrupRecipesScreen() {
       <AmbientGlow />
       <ScreenHeader
         title={t('purees_syrups.title')}
-        rightWide={isManager}
+        rightWide={isManager || canEditBar}
         right={isManager ? (
           <HeaderNavMenu
             label={t('common:to_editor')}
@@ -203,6 +209,13 @@ export default function PureeSyrupRecipesScreen() {
                 onPress: () => router.push('/menu-editor' as any),
               },
             ]}
+          />
+        ) : canEditBar ? (
+          <HeaderNavButton
+            label={t('common:to_editor')}
+            iconIos="pencil"
+            iconAndroid="edit"
+            onPress={() => router.replace('/puree-syrup-recipes-editor')}
           />
         ) : undefined}
       />
@@ -309,7 +322,7 @@ export default function PureeSyrupRecipesScreen() {
           images: parseImageList(selectedRecipe.images, selectedRecipe.thumbnail_url),
           subcategoryLabel: getCategoryLabel(selectedRecipe.category || 'Other'),
         } : null}
-        editAction={isManager && selectedRecipe ? {
+        editAction={canEditBar && selectedRecipe ? {
           label: t('common.edit'),
           onPress: () => router.push({ pathname: '/puree-syrup-recipes-editor', params: { edit: selectedRecipe.name } } as any),
         } : null}

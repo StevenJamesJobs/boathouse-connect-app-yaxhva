@@ -19,6 +19,8 @@ import { isManagerOrOwner } from '@/utils/roles';
 import AmbientGlow from '@/components/AmbientGlow';
 import ScreenHeader from '@/components/ScreenHeader';
 import HeaderNavMenu from '@/components/HeaderNavMenu';
+import HeaderNavButton from '@/components/HeaderNavButton';
+import { useAssistantEditor } from '@/hooks/useAssistantEditor';
 import { useManagerPermissions } from '@/hooks/useManagerPermissions';
 import RecipeDetailSheet from '@/components/RecipeDetailSheet';
 import { fonts } from '@/constants/fonts';
@@ -86,6 +88,10 @@ export default function CocktailsAZScreen() {
   const colors = useThemeColors();
   const { user } = useAuth();
   const isManager = isManagerOrOwner(user);
+  // s91: a granted recipe editor (not a manager) gets a plain To Editor pill
+  // and the Edit chip; the manager sheet rows stay manager-only.
+  const { canEdit } = useAssistantEditor();
+  const canEditBar = canEdit('bartender');
   const { perms } = useManagerPermissions();
   const [cocktails, setCocktails] = useState<Cocktail[]>([]);
   const [filteredCocktails, setFilteredCocktails] = useState<Cocktail[]>([]);
@@ -163,7 +169,7 @@ export default function CocktailsAZScreen() {
       <AmbientGlow />
       <ScreenHeader
         title={t('cocktails.title')}
-        rightWide={isManager}
+        rightWide={isManager || canEditBar}
         right={isManager ? (
           <HeaderNavMenu
             label={t('common:to_editor')}
@@ -194,6 +200,13 @@ export default function CocktailsAZScreen() {
                 onPress: () => router.push('/menu-editor' as any),
               },
             ]}
+          />
+        ) : canEditBar ? (
+          <HeaderNavButton
+            label={t('common:to_editor')}
+            iconIos="pencil"
+            iconAndroid="edit"
+            onPress={() => router.replace('/cocktails-az-editor')}
           />
         ) : undefined}
       />
@@ -339,7 +352,7 @@ export default function CocktailsAZScreen() {
           images: parseImageList(selectedCocktail.images, selectedCocktail.thumbnail_url),
           subcategoryLabel: selectedCocktail.alcohol_type,
         } : null}
-        editAction={isManager && selectedCocktail ? {
+        editAction={canEditBar && selectedCocktail ? {
           label: t('common.edit'),
           onPress: () => router.push({ pathname: '/cocktails-az-editor', params: { edit: selectedCocktail.name } } as any),
         } : null}

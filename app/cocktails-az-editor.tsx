@@ -14,7 +14,8 @@ import { brokerDelete } from '@/utils/storageBroker';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
-import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
+import { useRequireEditorRoute } from '@/hooks/useRequireEditorRoute';
+import { isManagerOrOwner } from '@/utils/roles';
 import { supabase } from '@/app/integrations/supabase/client';
 import { IconSymbol } from '@/components/IconSymbol';
 import MultiImageField from '@/components/MultiImageField';
@@ -107,13 +108,15 @@ const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 const TRASH_RED = '#E53935';
 
 export default function CocktailsAZEditorScreen() {
-  useRequireManagerRoute();
+  useRequireEditorRoute('bartender');
   const router = useRouter();
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const { language } = useLanguage();
   const { organizationId } = useOrganization();
   const { perms } = useManagerPermissions();
+  // s91: a granted recipe editor (not a manager) sees only To User on the sheet.
+  const isManager = isManagerOrOwner(user);
   const colors = useThemeColors();
   const [cocktails, setCocktails] = useState<Cocktail[]>([]);
   const [filteredCocktails, setFilteredCocktails] = useState<Cocktail[]>([]);
@@ -512,7 +515,7 @@ export default function CocktailsAZEditorScreen() {
                   androidIcon: 'person',
                   onPress: () => router.replace('/cocktails-az'),
                 },
-                {
+                ...(isManager ? [{
                   key: 'cats',
                   label: t('menu_sheet.edit_categories'),
                   iosIcon: 'square.grid.2x2',
@@ -526,7 +529,7 @@ export default function CocktailsAZEditorScreen() {
                   iosIcon: 'fork.knife',
                   androidIcon: 'restaurant-menu',
                   onPress: () => router.push('/menu-editor' as any),
-                },
+                }] : []),
               ]}
             />
           </View>

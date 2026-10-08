@@ -11,7 +11,9 @@ const config: ExpoConfig = {
   slug: isMcloones ? "BoathouseConnect" : "MyRestoConnect",
   owner: "stevenjamesjobs",
   version: isMcloones ? "2.2.1" : "1.0.0",
-  orientation: "portrait",
+  // s91: the Kitchen Assistant's Book reader turns the phone sideways — the app
+  // allows every orientation and locks portrait at the root (expo-screen-orientation).
+  orientation: "default",
   icon: isMcloones
     ? "./assets/images/MayMothersDayAppClip.png"
     : "./assets/images/MyRestoAppClipCharcoalAppClip.png",
@@ -63,6 +65,7 @@ const config: ExpoConfig = {
   },
   plugins: [
     "expo-router",
+    ["expo-screen-orientation", { initialOrientation: "PORTRAIT_UP" }],
     "@sentry/react-native/expo",
     [
       "expo-image-picker",
