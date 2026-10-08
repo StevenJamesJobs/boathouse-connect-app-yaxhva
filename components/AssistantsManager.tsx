@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  Pressable,
   Alert,
   ActivityIndicator,
   Switch,
@@ -39,6 +40,15 @@ const ASSISTANT_INFO: Record<string, { labelKey: string; descKey: string }> = {
   check_outs: { labelKey: 'employee_tools:check_out_calculator', descKey: 'org_settings.assistant_check_outs_desc' },
 };
 
+// s91: the families with an EDITOR grant. Their rows carry a second chip block,
+// "Who can edit recipes", stored in the same job_title_assistants table under
+// `${assistant_key}_editor` (the server's _require_recipe_editor reads it).
+const EDITOR_FAMILIES: Record<string, { editorNameKey: string }> = {
+  bartender: { editorNameKey: 'org_settings:editor_name_bartender' },
+  kitchen: { editorNameKey: 'org_settings:editor_name_kitchen' },
+};
+const editorKeyFor = (assistantKey: string) => `${assistantKey}_editor`;
+
 interface Props {
   colors: any;
   /** Render bare content (no card, no title) — the host's fold group provides
@@ -47,6 +57,68 @@ interface Props {
   /** Reports the assistant count once loaded (the host's fold badge). */
   onCountChange?: (n: number) => void;
 }
+
+/**
+ * The s86 Onboarding chip grammar (setup-wizard's JobChip): a glass chip with a
+ * FIXED 14pt round slot, an empty ring when off and a tinted filled ✓ when on,
+ * so picking never reflows the row. Selected = tint ring, never a solid fill.
+ */
+function TitleChip({ label, selected, onPress, colors }: { label: string; selected: boolean; onPress: () => void; colors: any }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      style={({ pressed }) => [
+        chipStyles.chip,
+        selected
+          ? { backgroundColor: colors.primary + '14', borderColor: colors.primary }
+          : { backgroundColor: colors.glass, borderColor: colors.glassBorder },
+        pressed && { opacity: 0.8 },
+      ]}
+    >
+      <View
+        style={[
+          chipStyles.slot,
+          selected
+            ? { backgroundColor: colors.primary, borderColor: colors.primary }
+            : { borderColor: colors.glassBorder },
+        ]}
+      >
+        {selected && (
+          <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={9} color={colors.fireText} />
+        )}
+      </View>
+      <Text style={[chipStyles.label, { color: selected ? colors.text : colors.textSecondary }]} numberOfLines={1}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+const chipStyles = StyleSheet.create({
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  slot: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  label: {
+    fontFamily: fonts.body.semibold,
+    fontSize: 12,
+  },
+});
 
 export default function AssistantsManager({ colors, embedded, onCountChange }: Props) {
   const { t } = useTranslation();
@@ -98,28 +170,48 @@ export default function AssistantsManager({ colors, embedded, onCountChange }: P
     }
   };
 
+  // Exact-key matches only: the `_editor` rows live in the same table and must
+  // never count toward (or read as) visibility.
   const titleHasAccess = (assistantKey: string, jobTitle: string) =>
     mappings.some(m => m.assistant_key === assistantKey && m.job_title === jobTitle);
+  const countFor = (assistantKey: string) =>
+    mappings.filter(m => m.assistant_key === assistantKey).length;
 
+  const setMapping = async (assistantKey: string, jobTitle: string, enabled: boolean) => {
+    if (!user?.id) return;
+    const { error } = await supabase.rpc('set_job_title_assistant', {
+      p_actor_id: user.id,
+      p_assistant_key: assistantKey,
+      p_job_title: jobTitle,
+      p_enabled: enabled,
+    });
+    if (error) throw error;
+    setMappings(prev => {
+      const without = prev.filter(m => !(m.assistant_key === assistantKey && m.job_title === jobTitle));
+      return enabled ? [...without, { assistant_key: assistantKey, job_title: jobTitle }] : without;
+    });
+  };
+
+  /** "Who can see it": unticking a title also drops its editor grant (a title
+      that cannot see the assistant cannot edit it), one RPC each. */
   const handleToggleTitle = async (assistantKey: string, jobTitle: string) => {
     const hasAccess = titleHasAccess(assistantKey, jobTitle);
-    if (!user?.id) return;
-
     try {
-      const { error } = await supabase.rpc('set_job_title_assistant', {
-        p_actor_id: user.id,
-        p_assistant_key: assistantKey,
-        p_job_title: jobTitle,
-        p_enabled: !hasAccess,
-      });
-      if (error) throw error;
-      if (hasAccess) {
-        setMappings(prev => prev.filter(m =>
-          !(m.assistant_key === assistantKey && m.job_title === jobTitle)
-        ));
-      } else {
-        setMappings(prev => [...prev, { assistant_key: assistantKey, job_title: jobTitle }]);
+      await setMapping(assistantKey, jobTitle, !hasAccess);
+      if (hasAccess && EDITOR_FAMILIES[assistantKey] && titleHasAccess(editorKeyFor(assistantKey), jobTitle)) {
+        await setMapping(editorKeyFor(assistantKey), jobTitle, false);
       }
+    } catch (err: any) {
+      Alert.alert(t('common:error'), translateServerError(err, t('org_settings.update_access_failed', 'Failed to update access.')));
+    }
+  };
+
+  /** "Who can edit recipes": the `${key}_editor` mapping. */
+  const handleToggleEditor = async (assistantKey: string, jobTitle: string) => {
+    const editorKey = editorKeyFor(assistantKey);
+    const hasGrant = titleHasAccess(editorKey, jobTitle);
+    try {
+      await setMapping(editorKey, jobTitle, !hasGrant);
     } catch (err: any) {
       Alert.alert(t('common:error'), translateServerError(err, t('org_settings.update_access_failed', 'Failed to update access.')));
     }
@@ -152,7 +244,12 @@ export default function AssistantsManager({ colors, embedded, onCountChange }: P
           description: meta ? t(meta.descKey) : '',
         };
         const isExpanded = expandedKey === item.assistant_key;
-        const assignedCount = mappings.filter(m => m.assistant_key === item.assistant_key).length;
+        const editorFamily = EDITOR_FAMILIES[item.assistant_key];
+        const editorKey = editorKeyFor(item.assistant_key);
+        const seeCount = countFor(item.assistant_key);
+        const editCount = editorFamily ? countFor(editorKey) : 0;
+        // Only titles that can SEE the assistant are offered an editor grant.
+        const editableTitles = editorFamily ? activeJobTitles.filter(title => titleHasAccess(item.assistant_key, title)) : [];
 
         return (
           <View key={item.id}>
@@ -178,9 +275,12 @@ export default function AssistantsManager({ colors, embedded, onCountChange }: P
                 >
                   {item.display_name || info.label}
                 </Text>
-                <Text style={styles.assistantDesc}>
-                  {info.description}
-                  {assignedCount > 0 ? ' · ' + t('org_settings.title_count', { count: assignedCount }) : ''}
+                {!!info.description && (
+                  <Text style={styles.assistantDesc}>{info.description}</Text>
+                )}
+                <Text style={styles.assistantMeta} numberOfLines={1}>
+                  {t('org_settings.titles_can_see', { count: seeCount })}
+                  {editorFamily ? ' · ' + t('org_settings.titles_can_edit', { count: editCount }) : ''}
                 </Text>
               </View>
               <Switch
@@ -193,36 +293,48 @@ export default function AssistantsManager({ colors, embedded, onCountChange }: P
 
             {isExpanded && (
               <View style={styles.titlesList}>
-                <Text style={styles.titlesHeader}>{t('org_settings.who_can_access', 'Who can access this tool?')}</Text>
-                {activeJobTitles.map(title => {
-                  const checked = titleHasAccess(item.assistant_key, title);
-                  return (
-                    <TouchableOpacity
-                      key={title}
-                      style={styles.titleCheckRow}
-                      onPress={() => handleToggleTitle(item.assistant_key, title)}
-                      activeOpacity={0.7}
-                    >
-                      <View style={[
-                        styles.checkbox,
-                        checked && { backgroundColor: colors.primary, borderColor: colors.primary },
-                        !checked && { borderColor: colors.glassBorder },
-                      ]}>
-                        {checked && (
-                          <IconSymbol
-                            ios_icon_name="checkmark"
-                            android_material_icon_name="check"
-                            size={14}
-                            color={colors.fireText}
-                          />
-                        )}
-                      </View>
-                      <Text style={styles.titleCheckLabel}>{title}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-                {activeJobTitles.length === 0 && (
+                <Text style={styles.fieldLabel}>{t('org_settings.who_can_see')}</Text>
+                {activeJobTitles.length > 0 ? (
+                  <View style={styles.chips}>
+                    {activeJobTitles.map(title => (
+                      <TitleChip
+                        key={title}
+                        label={title}
+                        colors={colors}
+                        selected={titleHasAccess(item.assistant_key, title)}
+                        onPress={() => handleToggleTitle(item.assistant_key, title)}
+                      />
+                    ))}
+                  </View>
+                ) : (
                   <Text style={styles.emptyText}>{t('org_settings.no_active_titles', 'No active job titles. Add some above first.')}</Text>
+                )}
+
+                {editorFamily && (
+                  <>
+                    <View style={styles.fieldLabelRow}>
+                      <Text style={styles.fieldLabel}>{t('org_settings.who_can_edit_recipes')}</Text>
+                      <Text style={styles.newTag}>{' · ' + t('org_settings.new_tag')}</Text>
+                    </View>
+                    {editableTitles.length > 0 ? (
+                      <View style={styles.chips}>
+                        {editableTitles.map(title => (
+                          <TitleChip
+                            key={title}
+                            label={title}
+                            colors={colors}
+                            selected={titleHasAccess(editorKey, title)}
+                            onPress={() => handleToggleEditor(item.assistant_key, title)}
+                          />
+                        ))}
+                      </View>
+                    ) : (
+                      <Text style={styles.editorHint}>{t('org_settings.edit_needs_see_hint')}</Text>
+                    )}
+                    <Text style={styles.editorHint}>
+                      {t('org_settings.editor_grant_hint', { editor: t(editorFamily.editorNameKey) })}
+                    </Text>
+                  </>
                 )}
               </View>
             )}
@@ -297,6 +409,15 @@ function createStyles(colors: any) {
       color: colors.textSecondary,
       marginTop: 2,
     },
+    // The collapsed meta line: mono, uppercase, "{n} TITLES CAN SEE IT · {m} CAN EDIT".
+    assistantMeta: {
+      fontFamily: fonts.mono.semibold,
+      fontSize: 9.5,
+      letterSpacing: 0.9,
+      textTransform: 'uppercase',
+      color: colors.textSecondary,
+      marginTop: 4,
+    },
     titlesList: {
       paddingLeft: 28,
       paddingVertical: 8,
@@ -304,7 +425,12 @@ function createStyles(colors: any) {
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: colors.hairline,
     },
-    titlesHeader: {
+    fieldLabelRow: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      marginTop: 14,
+    },
+    fieldLabel: {
       fontFamily: fonts.mono.semibold,
       fontSize: 10,
       letterSpacing: 1.1,
@@ -312,25 +438,25 @@ function createStyles(colors: any) {
       color: colors.textSecondary,
       marginBottom: 8,
     },
-    titleCheckRow: {
+    newTag: {
+      fontFamily: fonts.mono.semibold,
+      fontSize: 10,
+      letterSpacing: 1.1,
+      textTransform: 'uppercase',
+      color: colors.primary,
+      marginBottom: 8,
+    },
+    chips: {
       flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: 6,
+      flexWrap: 'wrap',
+      gap: 6,
     },
-    checkbox: {
-      width: 22,
-      height: 22,
-      borderRadius: 6,
-      borderWidth: 1.5,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginRight: 10,
-      backgroundColor: colors.glass,
-    },
-    titleCheckLabel: {
+    editorHint: {
       fontFamily: fonts.body.regular,
-      fontSize: 14,
-      color: colors.text,
+      fontSize: 11.5,
+      lineHeight: 15,
+      color: colors.textSecondary,
+      marginTop: 10,
     },
     emptyText: {
       fontFamily: fonts.body.regular,

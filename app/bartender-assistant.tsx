@@ -23,6 +23,8 @@ import { StorageImage } from '@/components/StorageImage';
 import AmbientGlow from '@/components/AmbientGlow';
 import ScreenHeader from '@/components/ScreenHeader';
 import HeaderNavMenu from '@/components/HeaderNavMenu';
+import HeaderNavButton from '@/components/HeaderNavButton';
+import { useAssistantEditor } from '@/hooks/useAssistantEditor';
 import ProgressRing from '@/components/ProgressRing';
 import RecipeDetailSheet from '@/components/RecipeDetailSheet';
 import LibationUploadSheet from '@/components/LibationUploadSheet';
@@ -78,6 +80,11 @@ export default function BartenderAssistantScreen() {
   const { user } = useAuth();
   const { perms } = useManagerPermissions();
   const isManager = isManagerOrOwner(user);
+  // s91: a granted job title (Org Settings › Who can edit recipes) may open the
+  // Bar Editor without Manager powers — it gets a plain To Editor pill, never
+  // the manager sheet (Menu Categories / Edit Menu / Upload stay manager-only).
+  const { canEdit } = useAssistantEditor();
+  const canEditBar = canEdit('bartender');
   const [hub, setHub] = useState<HubData | null>(null);
   const [featuredDetail, setFeaturedDetail] = useState<FeaturedSip | null>(null);
   const [showFeaturedDetail, setShowFeaturedDetail] = useState(false);
@@ -304,8 +311,15 @@ export default function BartenderAssistantScreen() {
       <AmbientGlow />
       <ScreenHeader
         title={t('bartender_assistant.title')}
-        rightWide={isManager}
-        right={isManager ? navMenu : undefined}
+        rightWide={isManager || canEditBar}
+        right={isManager ? navMenu : canEditBar ? (
+          <HeaderNavButton
+            label={t('common:to_editor')}
+            iconIos="pencil"
+            iconAndroid="edit"
+            onPress={() => router.replace('/bartender-assistant-editor')}
+          />
+        ) : undefined}
       />
 
       {!hub ? (
@@ -417,7 +431,7 @@ export default function BartenderAssistantScreen() {
           // disambiguates; a one-menu hub shows the price pill alone.
           subcategoryLabel: twoMenus ? menuName(featuredDetail.menu) : null,
         } : null}
-        editAction={isManager && featuredDetail ? {
+        editAction={canEditBar && featuredDetail ? {
           label: t('common.edit'),
           onPress: () => router.push({
             pathname: featuredDetail.menu === 2 ? '/summer-libation-recipes-editor' : '/libation-recipes-editor',

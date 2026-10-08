@@ -14,7 +14,8 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
-import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
+import { useRequireEditorRoute } from '@/hooks/useRequireEditorRoute';
+import { isManagerOrOwner } from '@/utils/roles';
 import { supabase } from '@/app/integrations/supabase/client';
 import type { Database } from '@/app/integrations/supabase/types';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -82,7 +83,7 @@ const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1587049352846-4a222
 const TRASH_RED = '#E53935';
 
 export default function PureeSyrupRecipesEditorScreen() {
-  useRequireManagerRoute();
+  useRequireEditorRoute('bartender');
   const router = useRouter();
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
@@ -90,6 +91,8 @@ export default function PureeSyrupRecipesEditorScreen() {
   const { language } = useLanguage();
   const { organizationId } = useOrganization();
   const { perms } = useManagerPermissions();
+  // s91: a granted recipe editor (not a manager) sees only To User on the sheet.
+  const isManager = isManagerOrOwner(user);
   const procedureInputRef = useRef<TextInput>(null);
   const [procedureSelection, setProcedureSelection] = useState({ start: 0, end: 0 });
   const [recipes, setRecipes] = useState<PureeSyrupRecipe[]>([]);
@@ -523,7 +526,7 @@ export default function PureeSyrupRecipesEditorScreen() {
                 androidIcon: 'person',
                 onPress: () => router.replace('/puree-syrup-recipes'),
               },
-              {
+              ...(isManager ? [{
                 key: 'cats',
                 label: t('menu_sheet.edit_categories'),
                 iosIcon: 'square.grid.2x2',
@@ -537,7 +540,7 @@ export default function PureeSyrupRecipesEditorScreen() {
                 iosIcon: 'fork.knife',
                 androidIcon: 'restaurant-menu',
                 onPress: () => router.push('/menu-editor' as any),
-              },
+              }] : []),
             ]}
           />
         }

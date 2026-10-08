@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
+  Pressable,
   FlatList,
   StyleSheet,
   Animated,
@@ -63,6 +64,8 @@ export interface PosterSheetProps {
   children: React.ReactNode;
   /** Replaces the pinned Close row (GlassHeroSheet contract). */
   footer?: React.ReactNode;
+  /** s91: a tap on a hero photo (its index) — hosts open a lightbox. */
+  onImagePress?: (index: number) => void;
 }
 
 // Fixed-dark scrim + ink literals: they sit on a photo (or the hue board),
@@ -159,6 +162,7 @@ export default function PosterSheet({
   subtitle,
   children,
   footer,
+  onImagePress,
 }: PosterSheetProps) {
   const theme = useThemeColors();
   const isDark = useIsDarkTheme();
@@ -200,7 +204,7 @@ export default function PosterSheet({
 
   // ─── Hero: photo pager or hue board, title set into it ────────────────────
   const renderSlide = useCallback(
-    ({ item }: { item: string }) => (
+    ({ item, index }: { item: string; index: number }) => (
       <View style={{ width: windowWidth, height: heroHeight, backgroundColor: containOnWhite ? '#FFFFFF' : undefined }}>
         {containOnWhite ? (
           <StorageExpoImage source={item} style={StyleSheet.absoluteFill} contentFit="contain" />
@@ -212,9 +216,12 @@ export default function PosterSheet({
         ) : (
           <StorageExpoImage source={item} style={StyleSheet.absoluteFill} contentFit="cover" />
         )}
+        {!!onImagePress && (
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => onImagePress(index)} accessibilityRole="imagebutton" />
+        )}
       </View>
     ),
-    [windowWidth, heroHeight, imageShape, containOnWhite],
+    [windowWidth, heroHeight, imageShape, containOnWhite, onImagePress],
   );
 
   const hero = (

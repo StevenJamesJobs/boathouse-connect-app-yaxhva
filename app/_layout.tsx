@@ -31,6 +31,7 @@ import JoltRoot from "@/components/jolt/JoltRoot";
 import { REVENUECAT_ENABLED, REVENUECAT_API_KEY } from "@/config/revenueCat";
 import { fontAssets } from "@/constants/fonts";
 import { flushPendingSubmits } from "@/utils/exam/pendingSubmits";
+import { lockPortrait } from "@/utils/screenOrientation";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -133,6 +134,11 @@ function RootLayoutNav() {
     ...fontAssets,
   });
   const [showSplash, setShowSplash] = React.useState(true);
+
+  // s91: app.config allows every orientation (the Kitchen Assistant's Book reader
+  // turns the phone sideways); the app itself stays portrait — lock it once here.
+  // The reader unlocks for itself and re-locks on the way out.
+  useEffect(() => { lockPortrait(); }, []);
 
   // Hide native splash as soon as fonts are loaded (AnimatedSplash takes over visually)
   useEffect(() => {

@@ -24,6 +24,8 @@ import { isManagerOrOwner } from '@/utils/roles';
 import AmbientGlow from '@/components/AmbientGlow';
 import ScreenHeader from '@/components/ScreenHeader';
 import HeaderNavMenu from '@/components/HeaderNavMenu';
+import HeaderNavButton from '@/components/HeaderNavButton';
+import { useAssistantEditor } from '@/hooks/useAssistantEditor';
 import RecipeDetailSheet from '@/components/RecipeDetailSheet';
 import LibationUploadSheet from '@/components/LibationUploadSheet';
 import { useManagerPermissions } from '@/hooks/useManagerPermissions';
@@ -62,6 +64,10 @@ export default function LibationRecipesScreen() {
   const colors = useThemeColors();
   const { user } = useAuth();
   const isManager = isManagerOrOwner(user);
+  // s91: a granted recipe editor (not a manager) gets a plain To Editor pill
+  // and the Edit chip; the manager sheet rows stay manager-only.
+  const { canEdit } = useAssistantEditor();
+  const canEditBar = canEdit('bartender');
   const { perms } = useManagerPermissions();
   // Menu 1 → slot 1 in per-menu scope (shared scope ignores the slot).
   const { categories: menuCats } = useMenuCategories({ includeHidden: true, menuSlot: 1 });
@@ -223,7 +229,7 @@ export default function LibationRecipesScreen() {
       <AmbientGlow />
       <ScreenHeader
         title={t('libation_recipes.title')}
-        rightWide={isManager}
+        rightWide={isManager || canEditBar}
         right={isManager ? (
           <HeaderNavMenu
             label={t('common:to_editor')}
@@ -261,6 +267,13 @@ export default function LibationRecipesScreen() {
                 onPress: () => setUploadVisible(true),
               },
             ]}
+          />
+        ) : canEditBar ? (
+          <HeaderNavButton
+            label={t('common:to_editor')}
+            iconIos="pencil"
+            iconAndroid="edit"
+            onPress={() => router.replace('/libation-recipes-editor')}
           />
         ) : undefined}
       />
@@ -428,7 +441,7 @@ export default function LibationRecipesScreen() {
           images: selectedRecipe.images,
           subcategoryLabel: recipePillLabel(selectedRecipe),
         } : null}
-        editAction={isManager && selectedRecipe ? {
+        editAction={canEditBar && selectedRecipe ? {
           label: t('common.edit'),
           onPress: () => router.push({ pathname: '/libation-recipes-editor', params: { edit: selectedRecipe.name } } as any),
         } : null}

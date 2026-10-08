@@ -46,6 +46,8 @@ export interface MultiImageFieldProps {
   /** Crop aspect for the pickers (square recipes; menu items pass their shape). */
   aspect?: [number, number];
   label?: string;
+  /** Replaces the default hint line; null hides it. */
+  hint?: string | null;
   disabled?: boolean;
   max?: number;
 }
@@ -137,6 +139,7 @@ export default function MultiImageField({
   bucket,
   aspect = [1, 1],
   label,
+  hint,
   disabled,
   max = MAX_ITEM_PHOTOS,
 }: MultiImageFieldProps) {
@@ -254,12 +257,13 @@ export default function MultiImageField({
           </Pressable>
         )}
         {/* Keep the row's geometry when the strip is full or short: empty flex
-            spacers so a lone tile never stretches to the full width. */}
-        {Array.from({ length: Math.max(0, max - images.length - (images.length < max ? 1 : 0)) }).map((_, k) => (
+            spacers so a lone tile never stretches to the full width. Always the
+            4-cell strip, whatever `max` is (a 1-slot cover field stays a thumbnail). */}
+        {Array.from({ length: Math.max(0, MAX_ITEM_PHOTOS - images.length - (images.length < max ? 1 : 0)) }).map((_, k) => (
           <View key={`sp-${k}`} style={styles.spacer} />
         ))}
       </View>
-      <Text style={[styles.hint, { color: colors.textSecondary }]}>{t('multi_image.hint')}</Text>
+      {hint !== null && <Text style={[styles.hint, { color: colors.textSecondary }]}>{hint ?? t('multi_image.hint')}</Text>}
 
       <PhotoSheet
         state={sheet}

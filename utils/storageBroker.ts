@@ -35,7 +35,12 @@ export type UploadPurpose =
   | 'org_logo'
   | 'menu_upload_file'
   | 'schedule_upload_file'
-  | 'libation_upload_file';
+  | 'libation_upload_file'
+  | 'kitchen_recipe_image'
+  | 'kitchen_menu_cover_image'
+  | 'kitchen_checklist_attachment'
+  | 'bartender_checklist_attachment'
+  | 'host_checklist_attachment';
 
 interface SignUploadResponse {
   success: boolean;
